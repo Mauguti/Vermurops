@@ -18,6 +18,7 @@ import { useServicios, renderIcon } from '../../config/serviciosStore';
 import { storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { calcLinea } from '../../lib/cotizacionCalculator';
+import { puedeTransicionarA, transicionesDisponibles } from '../../lib/stateMachine';
 
 interface FichaCotizacionProps {
   quote: KanbanQuote | null;
@@ -682,6 +683,14 @@ export default function FichaCotizacion({
 
   const handleStageChange = (newEtapa: PipelineStageId, lossReasonText: string | null = null) => {
     if (quote.etapa === newEtapa) return;
+
+    // ── Guard E5.2: validar transición antes de ejecutar ──────────────────
+    const guard = puedeTransicionarA(quote.etapa, newEtapa, rolActivo, quote);
+    if (!guard.ok) {
+      alert(guard.razon ?? 'Transición no permitida.');
+      return;
+    }
+
     const fechaActual = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
     const prevLabel = PIPELINE_STAGES.find(s => s.id === quote.etapa)?.label ?? quote.etapa;
@@ -831,7 +840,10 @@ export default function FichaCotizacion({
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
-  const inputCls = 'w-full text-sm text-gray-700 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200 rounded-lg px-2.5 py-1.5 focus:bg-white focus:border-[#E11D48] outline-none transition-all';
+  /** Etapas a las que el rol activo puede transicionar desde la etapa actual. */
+  const disponibles = transicionesDisponibles(quote.etapa, rolActivo, quote);
+
+  const inputCls ='w-full text-sm text-gray-700 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200 rounded-lg px-2.5 py-1.5 focus:bg-white focus:border-[#E11D48] outline-none transition-all';
 
   const TABS = [
     { id: 'info', label: 'Información' },
@@ -1027,7 +1039,10 @@ export default function FichaCotizacion({
                   }}
                   className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 outline-none focus:border-[#E11D48] shadow-xs"
                 >
-                  {PIPELINE_STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                  {/* Siempre muestra la etapa actual + solo las transiciones permitidas */}
+                  {PIPELINE_STAGES
+                    .filter(s => s.id === quote.etapa || disponibles.includes(s.id))
+                    .map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                 </select>
 
                 {quote.etapa === 'perdida' && quote.motivoPerdida && (
@@ -1544,19 +1559,10 @@ export default function FichaCotizacion({
             </button>
           )}
 
-          {/* Acción: Consolidar (Pricing) */}
-          {rolActivo === 'pricing' && ['pricing_solicitando', 'cotizaciones_recibidas'].includes(quote.etapa) && (
+          {/* Acción: Consolidar (Pricing, solo desde cotizaciones_recibidas) */}
+          {rolActivo === 'pricing' && quote.etapa === 'cotizaciones_recibidas' && (
             <button
-              onClick={() => {
-                const faltanCot = quote.servicios.some(
-                  s => !(s.cotizacionesProveedor ?? []).some(cp => cp.seleccionada)
-                );
-                if (faltanCot) {
-                  alert('Selecciona un proveedor por cada servicio antes de consolidar.');
-                  return;
-                }
-                handleStageChange('consolidada');
-              }}
+              onClick={() => handleStageChange('consolidada')}
               className="w-full px-4 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2 shadow-xs"
             >
               <CheckCircle2 className="w-4 h-4" /> Consolidar cotización
@@ -1572,7 +1578,7 @@ export default function FichaCotizacion({
               <FileText className="w-4 h-4 text-gray-400" /> Generar PDF
             </button>
 
-            {quote.etapa !== 'ganada' && quote.etapa !== 'perdida' && (
+            {disponibles.includes('ganada') && (
               <button
                 onClick={() => {
                   if (confirm(`¿Marcar ${quote.id} como GANADA?`)) {
@@ -1587,7 +1593,7 @@ export default function FichaCotizacion({
             )}
           </div>
 
-          {quote.etapa !== 'ganada' && quote.etapa !== 'perdida' && !showLossReasonForm && (
+          {disponibles.includes('perdida') && !showLossReasonForm && (
             <button
               onClick={() => setShowLossReasonForm(true)}
               className="w-full px-4 py-2 text-red-600 hover:text-red-700 hover:bg-red-50 text-xs font-bold uppercase tracking-wider rounded-xl transition-colors text-center border border-transparent hover:border-red-100"
