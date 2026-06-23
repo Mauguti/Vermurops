@@ -863,6 +863,14 @@ export default function FichaCotizacion({
   const disponibles = transicionesDisponibles(quote.etapa, rolActivo, quote);
 
   const inputCls ='w-full text-sm text-gray-700 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200 rounded-lg px-2.5 py-1.5 focus:bg-white focus:border-[#E11D48] outline-none transition-all';
+  // Estilo atenuado/solo-lectura para campos del prospecto cuando hay cliente vinculado.
+  const inputReadonlyCls = 'w-full text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none cursor-not-allowed';
+
+  // Cliente vinculado (E6.4): fuente de verdad cuando clienteId existe en la colección.
+  // Solo lectura en tiempo de render — NO se escribe en quote.prospecto.
+  const clienteVinculado = quote.clienteId
+    ? clientes.find(c => c.id === quote.clienteId) ?? null
+    : null;
 
   const TABS = [
     { id: 'info', label: 'Información' },
@@ -1100,10 +1108,6 @@ export default function FichaCotizacion({
                     se muestra la tarjeta del cliente vinculado. Si no, un buscador.
                     Los campos del prospecto embebido (abajo) NUNCA se tocan. */}
                 {(() => {
-                  const clienteVinculado = quote.clienteId
-                    ? clientes.find(c => c.id === quote.clienteId)
-                    : null;
-
                   if (clienteVinculado) {
                     const creditoLabel = clienteVinculado.tipoCredito === 'credito'
                       ? `Crédito ${clienteVinculado.dias} días`
@@ -1181,18 +1185,27 @@ export default function FichaCotizacion({
                   );
                 })()}
 
+                {clienteVinculado && (
+                  <p className="text-[9px] text-gray-400 italic -mb-1">
+                    Datos del cliente vinculado — edítalos en la ficha del Cliente.
+                  </p>
+                )}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Razón Social</label>
-                    <input type="text" value={quote.prospecto.empresa}
+                    <input type="text"
+                      value={clienteVinculado ? clienteVinculado.nombre : quote.prospecto.empresa}
                       onChange={e => handleFieldChange('prospecto', 'empresa', e.target.value)}
-                      className={inputCls} />
+                      readOnly={!!clienteVinculado}
+                      className={clienteVinculado ? inputReadonlyCls : inputCls} />
                   </div>
                   <div>
                     <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Contacto</label>
-                    <input type="text" value={quote.prospecto.contacto}
+                    <input type="text"
+                      value={clienteVinculado ? clienteVinculado.representante : quote.prospecto.contacto}
                       onChange={e => handleFieldChange('prospecto', 'contacto', e.target.value)}
-                      className={inputCls} />
+                      readOnly={!!clienteVinculado}
+                      className={clienteVinculado ? inputReadonlyCls : inputCls} />
                   </div>
                   <div>
                     <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Origen del lead</label>
@@ -1204,15 +1217,19 @@ export default function FichaCotizacion({
                   </div>
                   <div>
                     <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Teléfono</label>
-                    <input type="text" value={quote.prospecto.telefono}
+                    <input type="text"
+                      value={clienteVinculado ? clienteVinculado.telefono : quote.prospecto.telefono}
                       onChange={e => handleFieldChange('prospecto', 'telefono', e.target.value)}
-                      className={inputCls} />
+                      readOnly={!!clienteVinculado}
+                      className={clienteVinculado ? inputReadonlyCls : inputCls} />
                   </div>
                   <div>
                     <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Email</label>
-                    <input type="email" value={quote.prospecto.email}
+                    <input type="email"
+                      value={clienteVinculado ? clienteVinculado.correo : quote.prospecto.email}
                       onChange={e => handleFieldChange('prospecto', 'email', e.target.value)}
-                      className={inputCls} />
+                      readOnly={!!clienteVinculado}
+                      className={clienteVinculado ? inputReadonlyCls : inputCls} />
                   </div>
                 </div>
               </div>
