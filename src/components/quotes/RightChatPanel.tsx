@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { KanbanQuote } from './QuotesData';
 import { useNotifications } from '../../notifications/NotificationsContext';
-import { MessageSquare, Clock } from 'lucide-react';
+import { MessageSquare, Clock, X } from 'lucide-react';
 import { AuthUser } from '../../auth/users';
 import { tiempoRelativo } from '../../notifications/notificationsStore';
 
@@ -9,9 +9,11 @@ interface RightChatPanelProps {
   quotes: KanbanQuote[];
   onSelectQuote: (quote: KanbanQuote) => void;
   user: AuthUser | null;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export default function RightChatPanel({ quotes, onSelectQuote, user }: RightChatPanelProps) {
+export default function RightChatPanel({ quotes, onSelectQuote, user, isOpen, onClose }: RightChatPanelProps) {
   const { notificaciones } = useNotifications();
 
   // Filtrar cotizaciones que tienen chat
@@ -37,12 +39,21 @@ export default function RightChatPanel({ quotes, onSelectQuote, user }: RightCha
   }, [quotes, notificaciones]);
 
   return (
-    <div className="fixed right-0 top-[64px] bottom-0 w-[320px] bg-[#FAFAF9] border-l border-gray-200 shadow-sm z-30 hidden xl:flex flex-col">
+    <div className={`fixed right-0 top-[64px] bottom-0 w-[320px] bg-[#FAFAF9] border-l border-gray-200 shadow-sm z-30 flex-col ${isOpen ? 'flex' : 'hidden'}`}>
       <div className="px-5 py-4 border-b border-gray-200 bg-white shrink-0">
-        <h3 className="text-[14px] font-bold text-[#18181B] flex items-center gap-2">
-          <MessageSquare className="w-4 h-4 text-[#E11D48]" />
-          Conversaciones
-        </h3>
+        <div className="flex items-center justify-between">
+          <h3 className="text-[14px] font-bold text-[#18181B] flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-[#E11D48]" />
+            Conversaciones
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            title="Cerrar"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
         <p className="text-[11px] text-gray-500 font-medium mt-1">Actividad reciente en tus cotizaciones</p>
       </div>
 

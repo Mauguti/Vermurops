@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { initialQuotes, initialClients, initialProspectos, Prospecto } from '../data';
-import { Plane, Ship, Truck, Check, X, Clock, MoreVertical, Plus, Trash2, Search, Filter, ShieldCheck, Settings, Download, Upload, List, LayoutGrid } from 'lucide-react';
+import { Plane, Ship, Truck, Check, X, Clock, MoreVertical, Plus, Trash2, Search, Filter, ShieldCheck, Settings, Download, Upload, List, LayoutGrid, MessageSquare } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import KanbanCotizaciones from './quotes/KanbanCotizaciones';
 import BandejaPricing from './quotes/BandejaPricing';
@@ -28,7 +28,9 @@ export default function Quotes() {
   const [showProspectForm, setShowProspectForm] = useState(false);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const { serviciosActivos } = useServicios();
-  const { agregarNotificacion } = useNotifications();
+  const { agregarNotificacion, notificaciones } = useNotifications();
+  const [chatOpen, setChatOpen] = useState(false);
+  const chatUnreadCount = notificaciones.filter(n => n.tipo === 'chat' && !n.leida).length;
 
   // Rol activo derivado del usuario autenticado
   const rolActivo: 'ventas' | 'pricing' | 'admin' = user?.rol === 'admin' ? 'admin' : (user?.rol === 'pricing' ? 'pricing' : 'ventas');
@@ -306,7 +308,7 @@ export default function Quotes() {
   }
 
   return (
-    <div className="space-y-[32px] animate-fade-in pb-12 xl:pr-[320px]" onClick={() => setActiveMenu(null)}>
+    <div className={`space-y-[32px] animate-fade-in pb-12 ${chatOpen ? 'xl:pr-[320px]' : ''}`} onClick={() => setActiveMenu(null)}>
       {/* ── Header principal ──────────────────────────────────────────── */}
       {!showForm && (
         <div className="flex flex-col gap-4">
@@ -384,6 +386,24 @@ export default function Quotes() {
                       <Plus className="w-4 h-4" /> Nueva cotización
                     </button>
                   )}
+
+                  {/* Toggle panel de chat */}
+                  <button
+                    onClick={() => setChatOpen(o => !o)}
+                    title={chatOpen ? 'Cerrar conversaciones' : 'Abrir conversaciones'}
+                    className={`relative p-2 rounded-lg border transition-all shadow-sm ${
+                      chatOpen
+                        ? 'bg-[#E11D48]/10 border-[#E11D48]/30 text-[#E11D48]'
+                        : 'bg-white border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <MessageSquare className="w-4 h-4" />
+                    {chatUnreadCount > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 bg-[#E11D48] text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center leading-none">
+                        {chatUnreadCount}
+                      </span>
+                    )}
+                  </button>
                 </div>
               </div>
 
@@ -912,11 +932,13 @@ export default function Quotes() {
           />
         </>
       ) : null}
-      {/* Panel Lateral de Chat */}
-      <RightChatPanel 
+      {/* Panel Lateral de Chat — colapsable */}
+      <RightChatPanel
         quotes={permittedQuotes}
         onSelectQuote={handleSelectQuoteForChat}
         user={user}
+        isOpen={chatOpen}
+        onClose={() => setChatOpen(false)}
       />
     </div>
   );
