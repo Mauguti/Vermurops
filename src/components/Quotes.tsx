@@ -8,12 +8,13 @@ import KanbanProspeccion from './quotes/KanbanProspeccion';
 import FichaCotizacion from './quotes/FichaCotizacion';
 import RightChatPanel from './quotes/RightChatPanel';
 import {
-  initialKanbanQuotes, KanbanQuote, TipoServicio,
+  KanbanQuote, TipoServicio,
   ORIGENES_PROSPECTO, VENDEDORES, INCOTERMS, calcularTotalConsolidado,
   PipelineStageId,
 } from './quotes/QuotesData';
 import { useServicios, renderIcon } from '../config/serviciosStore';
 import { useNotifications } from '../notifications/NotificationsContext';
+import { useCotizaciones } from '../hooks/useCotizaciones';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Componente principal del módulo de Cotizaciones
@@ -91,8 +92,11 @@ export default function Quotes() {
 
 
 
-  // Estado central de cotizaciones y prospectos
-  const [kanbanQuotes, setKanbanQuotes] = useState<KanbanQuote[]>(initialKanbanQuotes);
+  // Estado central de cotizaciones — leído desde Firestore (E3.3)
+  // Los writes todavía son no-ops; se conectan en E3.4.
+  const { quotes: kanbanQuotes, loading: quotesLoading, error: quotesError } = useCotizaciones();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const setKanbanQuotes = (_: KanbanQuote[]) => {}; // shim temporal → reemplazar en E3.4
   
   const filteredInitialProspectos = initialProspectos.filter(p => {
     if (rolActivo === 'ventas') {
@@ -270,6 +274,22 @@ export default function Quotes() {
       // Or we can add an event/state. Let's just open the quote.
     }, 100);
   };
+
+  // ── Loading / error de Firestore ─────────────────────────────────────────
+  if (quotesLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="w-8 h-8 border-4 border-[#E11D48] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+  if (quotesError) {
+    return (
+      <div className="flex items-center justify-center py-24 text-sm text-red-500">
+        Error al cargar cotizaciones: {quotesError}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-[32px] animate-fade-in pb-12 xl:pr-[320px]" onClick={() => setActiveMenu(null)}>
