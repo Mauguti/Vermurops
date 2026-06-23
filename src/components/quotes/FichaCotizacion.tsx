@@ -11,6 +11,7 @@ import {
   PipelineStageId,
 } from './QuotesData';
 import { initialProviders } from '../../data';
+import { useAuth } from '../../auth/AuthContext';
 import { useNotifications } from '../../notifications/NotificationsContext';
 import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
 import { useServicios, renderIcon } from '../../config/serviciosStore';
