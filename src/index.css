@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Archivo+Narrow:ital,wght@0,400..700;1,400..700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "Inter", "Geist", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Archivo Narrow", sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+
+  --color-vermur-primary: #4B2A8C;
+  --color-vermur-accent: #E1432B;
+  --color-vermur-navy: #1A1A2E;
+
+  
+  --color-brand: #E11D48;
+  --color-brand-hover: #BE123C;
+  
+  --color-surface-dark: #0A0A0C;
+  --color-surface-elevated: #141417;
+  --color-surface-border: #1F1F23;
+  
+  --color-canvas: #FAFAFB;
+  --color-card: #FFFFFF;
+  --color-card-border: #ECECEF;
+  --color-divider: #F1F1F3;
+  
+  --color-text-primary: #18181B;
+  --color-text-secondary: #52525B;
+  --color-text-muted: #A1A1AA;
+  
+  --color-text-inverse: #FAFAFA;
+  --color-text-inverse-muted: #A1A1AA;
+  
+  --color-success-bg: #F0FDF4;
+  --color-success-text: #15803D;
+  
+  --color-warning-bg: #FFFBEB;
+  --color-warning-text: #B45309;
+  
+  --color-info-bg: #EFF6FF;
+  --color-info-text: #1D4ED8;
+  
+  --color-danger-bg: #FEF2F2;
+  --color-danger-text: #B91C1C;
+  
+  --color-neutral-bg: #F4F4F5;
+  --color-neutral-text: #52525B;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+.login-texture {
+  background-image: radial-gradient(circle at 2px 2px, rgba(255, 255, 255, 0.03) 1px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.tabular-data {
+  font-variant-numeric: tabular-nums;
+}
