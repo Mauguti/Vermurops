@@ -26,6 +26,16 @@ service cloud.firestore {
       allow write:  if request.auth != null;
     }
 
+    // ── Clientes ──────────────────────────────────────────────────────────
+    // Cualquier usuario autenticado puede leer y crear/actualizar.
+    // Eliminar está prohibido: un cliente inactivo se marca statusOperativo='INACTIVO'.
+    match /clientes/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // ── Notificaciones ────────────────────────────────────────────────────
     // Lectura: solo el destinatario nombrado en el documento.
     //   Alinea con la query de NotificationsContext:
