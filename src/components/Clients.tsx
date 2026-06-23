@@ -1,20 +1,26 @@
 import React, { useState } from 'react';
 import { initialProviders, Provider } from '../data';
-import { Search, Phone, Mail, ChevronRight, Upload, Calendar, ArrowRight, MessageSquare, CheckCircle2, Clock, Plane, Ship, Truck, FileText, Check } from 'lucide-react';
+import { Search, Phone, Mail, Upload, Plane, Ship, Truck, FileText, Check, ChevronRight } from 'lucide-react';
 import { useClientes } from '../hooks/useClientes';
-import { ClienteVermur } from './clientes/ClientesData';
+import FichaCliente from './clientes/FichaCliente';
+import NuevoClienteModal from './clientes/NuevoClienteModal';
 
 export default function Clients() {
-  const { clientes, loading, error } = useClientes();
+  const { clientes, loading, error, createCliente, updateCliente } = useClientes();
   const [viewType, setViewType] = useState<'Clientes' | 'Proveedores'>('Clientes');
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedClient, setSelectedClient] = useState<ClienteVermur | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('Cuentas');
-  const [detailTab, setDetailTab] = useState('Resumen');
+  const [showModal, setShowModal] = useState(false);
 
   const [providerSearchTerm, setProviderSearchTerm] = useState('');
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
+
+  // Derive selectedClient from live clientes array so FichaCliente always gets fresh data
+  const selectedClient = selectedClientId
+    ? (clientes.find(c => c.id === selectedClientId) ?? null)
+    : null;
 
   if (loading) {
     return (
@@ -48,7 +54,6 @@ export default function Clients() {
   );
 
   const tabs = ['Cuentas', 'Contactos', 'Leads', 'Oportunidades'];
-  const detailTabs = ['Resumen', 'Embarques', 'Cotizaciones', 'Documentos', 'Estado de cuenta'];
   const providerTabs = ['Todos', 'Navieras', 'Aerolíneas', 'Transportistas', 'Aduanales'];
 
   const getTransportIcon = (type: string) => {
@@ -74,7 +79,7 @@ export default function Clients() {
   return (
     <div className="space-y-[24px]">
       {/* Top Toggle Selector */}
-      {!selectedClient && !selectedProvider && (
+      {!selectedClientId && !selectedProvider && (
         <div className="flex justify-between items-center mb-[12px] bg-card p-4 rounded-xl border border-card-border shadow-sm">
           <h2 className="text-[18px] font-semibold text-text-primary tracking-tight">
             Directorio Empresarial
@@ -96,7 +101,7 @@ export default function Clients() {
         </div>
       )}
 
-      {viewType === 'Clientes' && !selectedClient && (
+      {viewType === 'Clientes' && !selectedClientId && (
         <>
           {/* Top Tabs */}
           <div className="border-b border-divider mb-[24px]">
@@ -133,7 +138,10 @@ export default function Clients() {
                 <Upload className="w-[16px] h-[16px] mr-2 text-text-muted" />
                 Importar CSV
               </button>
-              <button className="bg-brand text-white px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-brand-hover shadow-sm transition-colors shrink-0">
+              <button
+                onClick={() => setShowModal(true)}
+                className="bg-brand text-white px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-brand-hover shadow-sm transition-colors shrink-0"
+              >
                 Nuevo cliente
               </button>
             </div>
@@ -195,7 +203,7 @@ export default function Clients() {
                 </div>
 
                 <div
-                  onClick={() => setSelectedClient(cliente)}
+                  onClick={() => setSelectedClientId(cliente.id)}
                   className="border-t border-divider py-[12px] text-center cursor-pointer transition-colors hover:bg-neutral-bg group"
                 >
                   <span className="text-[13px] font-medium text-text-primary group-hover:text-brand transition-colors">Ver ficha</span>
@@ -207,148 +215,11 @@ export default function Clients() {
       )}
 
       {viewType === 'Clientes' && selectedClient && (
-        <div className="space-y-[24px]">
-          {/* Breadcrumb / Header Ficha */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-[8px] text-[13px] text-text-secondary">
-              <button onClick={() => setSelectedClient(null)} className="hover:text-text-primary transition-colors">Cuentas</button>
-              <ChevronRight className="w-4 h-4 text-text-muted" />
-              <span className="text-text-primary font-medium">{selectedClient.nombre}</span>
-            </div>
-            <div className="flex space-x-[12px]">
-               <button className="bg-white border border-card-border text-text-primary px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium hover:bg-neutral-bg transition-colors shadow-sm">
-                 Editar
-               </button>
-               <button className="bg-brand text-white px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium hover:bg-brand-hover shadow-sm transition-colors">
-                 Nueva Operación
-               </button>
-            </div>
-          </div>
-
-          <div className="bg-card rounded-[12px] border border-card-border shadow-sm overflow-hidden flex flex-col md:flex-row">
-            {/* Main Content (Left 2/3) */}
-            <div className="flex-1 border-r border-divider flex flex-col">
-              <div className="p-[32px] border-b border-divider bg-white">
-                <div className="flex items-center space-x-[16px] mb-[16px]">
-                  <div className="w-[64px] h-[64px] bg-canvas border border-card-border rounded-[12px] flex items-center justify-center text-[24px] font-medium text-text-primary">
-                    {selectedClient.nombre.charAt(0)}
-                  </div>
-                  <div>
-                    <h2 className="text-[24px] font-semibold text-text-primary tracking-tight leading-none mb-[8px]">{selectedClient.nombre}</h2>
-                    <div className="flex items-center text-[13px] space-x-[12px]">
-                      <span className="text-text-secondary font-mono">RFC: {selectedClient.rfc}</span>
-                      <span className="text-divider">•</span>
-                      <span className={`px-[8px] py-[2px] rounded-[4px] text-[11px] font-medium ${
-                        selectedClient.statusOperativo === 'ACTIVO'
-                          ? 'bg-success-bg text-success-text'
-                          : 'bg-neutral-bg text-text-secondary'
-                      }`}>
-                        {selectedClient.statusOperativo}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-wrap gap-[24px] mt-[24px] pt-[24px] border-t border-divider">
-                  <div>
-                    <p className="text-[11px] font-medium text-text-muted mb-[4px]">Representante Legal</p>
-                    <p className="text-[14px] font-medium text-text-primary">{selectedClient.representante}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-medium text-text-muted mb-[4px]">Correo</p>
-                    <p className="text-[14px] font-medium text-text-primary">{selectedClient.correo}</p>
-                  </div>
-                  <div>
-                     <p className="text-[11px] font-medium text-text-muted mb-[4px]">Teléfono</p>
-                     <p className="text-[14px] font-medium text-text-primary">{selectedClient.telefono}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Internal Tabs */}
-              <div className="px-[32px] border-b border-divider bg-canvas">
-                <nav className="-mb-px flex space-x-[24px]">
-                  {detailTabs.map((tab) => (
-                    <button
-                      key={tab}
-                      onClick={() => setDetailTab(tab)}
-                      className={`py-[16px] px-[4px] text-[13px] font-medium transition-colors border-b-[2px] ${
-                        detailTab === tab
-                          ? 'border-brand text-text-primary'
-                          : 'border-transparent text-text-muted hover:text-text-secondary hover:border-text-muted'
-                      }`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </nav>
-              </div>
-
-              <div className="p-[32px] flex-1 bg-white">
-                <div className="flex items-center justify-center p-[40px] text-text-muted text-[14px] border border-dashed border-card-border rounded-[8px] bg-canvas">
-                   Contenido de {detailTab}
-                </div>
-              </div>
-            </div>
-
-            {/* Sidebar (Right 1/3) */}
-            <div className="w-full md:w-[320px] bg-canvas shrink-0 p-[24px]">
-              <h3 className="text-[14px] font-semibold text-text-primary mb-[20px]">Actividad Reciente</h3>
-
-              <div className="space-y-[24px]">
-                <div className="flex gap-[16px]">
-                  <div className="flex flex-col items-center">
-                    <div className="w-[32px] h-[32px] bg-white border border-card-border rounded-full flex items-center justify-center text-text-primary shadow-sm z-10">
-                      <MessageSquare className="w-[14px] h-[14px]" />
-                    </div>
-                    <div className="w-px h-full bg-divider mt-[8px]"></div>
-                  </div>
-                  <div className="pb-[8px]">
-                    <p className="text-[13px] text-text-primary font-medium mb-[2px]">Correo enviado</p>
-                    <p className="text-[13px] text-text-secondary mb-[4px]">Cotización #QT-1004 enviada a {selectedClient.representante}.</p>
-                    <p className="text-[12px] text-text-muted flex items-center">
-                      <Clock className="w-[12px] h-[12px] mr-[4px]" />
-                      Hace 2 horas
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-[16px]">
-                  <div className="flex flex-col items-center">
-                    <div className="w-[32px] h-[32px] bg-white border border-card-border rounded-full flex items-center justify-center text-text-primary shadow-sm z-10">
-                      <CheckCircle2 className="w-[14px] h-[14px] text-success-text" />
-                    </div>
-                    <div className="w-px h-full bg-divider mt-[8px]"></div>
-                  </div>
-                  <div className="pb-[8px]">
-                    <p className="text-[13px] text-text-primary font-medium mb-[2px]">Embarque entregado</p>
-                    <p className="text-[13px] text-text-secondary mb-[4px]">El embarque SHP-2023-004 fue entregado en Manzanillo.</p>
-                    <p className="text-[12px] text-text-muted flex items-center">
-                      <Calendar className="w-[12px] h-[12px] mr-[4px]" />
-                      20 Oct, 2023
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex gap-[16px]">
-                  <div className="flex flex-col items-center">
-                    <div className="w-[32px] h-[32px] bg-white border border-card-border rounded-full flex items-center justify-center text-text-primary shadow-sm z-10">
-                      <ArrowRight className="w-[14px] h-[14px]" />
-                    </div>
-                  </div>
-                  <div className="pb-[8px]">
-                    <p className="text-[13px] text-text-primary font-medium mb-[2px]">Oportunidad ganada</p>
-                    <p className="text-[13px] text-text-secondary mb-[4px]">Negocio cerrado vía marítima.</p>
-                    <p className="text-[12px] text-text-muted flex items-center">
-                      <Calendar className="w-[12px] h-[12px] mr-[4px]" />
-                      15 Oct, 2023
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <FichaCliente
+          cliente={selectedClient}
+          onBack={() => setSelectedClientId(null)}
+          onUpdate={updateCliente}
+        />
       )}
 
       {/* ========================================================= */}
@@ -616,6 +487,12 @@ export default function Clients() {
         </div>
       ) : null}
 
+      {showModal && (
+        <NuevoClienteModal
+          onClose={() => setShowModal(false)}
+          onCreate={createCliente}
+        />
+      )}
     </div>
   );
 }
