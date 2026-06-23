@@ -22,17 +22,29 @@ import { db } from '../firebase';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { KanbanQuote, initialKanbanQuotes } from '../components/quotes/QuotesData';
 import { initContadorDesdeFolios } from '../lib/folioService';
+import { useAuth } from '../auth/AuthContext';
 
 export function useCotizaciones() {
+  const { user } = useAuth();
+
   const [quotes, setQuotes]   = useState<KanbanQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
-  // Evita que el seed corra más de una vez por mount,
+  // Evita que el seed corra más de una vez por sesión de usuario,
   // aunque onSnapshot dispare varias veces mientras las escrituras terminan.
   const seedAttempted = useRef(false);
 
   useEffect(() => {
+    // Guarda de autenticación: no abrir el listener hasta tener usuario.
+    // AuthProvider ya resolvió onAuthStateChanged antes de renderizar hijos,
+    // pero el token interno de Firestore puede propagarse con un tick de retraso.
+    // Dependiendo de `user` del contexto garantizamos que el token está listo.
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onSnapshot(
       collection(db, 'cotizaciones'),
       async (snapshot) => {
@@ -41,8 +53,7 @@ export function useCotizaciones() {
           seedAttempted.current = true;
           try {
             // setDoc preserva el folio como document ID (no usa addDoc).
-            // Si dos sesiones intentan el seed a la vez, el segundo setDoc
-            // sobreescribe con datos idénticos → sin duplicados ni pérdida.
+            // Dos sesiones simultáneas producirían writes idénticos → sin daño.
             await Promise.all(
               initialKanbanQuotes.map(q =>
                 setDoc(doc(db, 'cotizaciones', q.id), q)
@@ -52,7 +63,6 @@ export function useCotizaciones() {
             // El siguiente generateFolio() devolverá COT-2026-0009.
             await initContadorDesdeFolios(initialKanbanQuotes.map(q => q.id));
             // onSnapshot disparará de nuevo con los 8 documentos escritos.
-            // No hacemos setLoading(false) aquí: lo hará el siguiente disparo.
           } catch (err) {
             const msg = err instanceof Error ? err.message : 'Error al sembrar cotizaciones iniciales';
             setError(msg);
@@ -68,7 +78,7 @@ export function useCotizaciones() {
         });
 
         // Más reciente primero (alineado con la convención de Quotes.tsx
-        // que hace [newQuote, ...rest] al crear una nueva cotización).
+        // que hace [newQuote, ...rest] al crear).
         data.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
         setQuotes(data);
@@ -81,7 +91,7 @@ export function useCotizaciones() {
     );
 
     return () => unsubscribe();
-  }, []);
+  }, [user]); // Re-corre cuando cambia el usuario (login / logout)
 
   return { quotes, loading, error };
 }
