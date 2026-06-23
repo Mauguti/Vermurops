@@ -289,7 +289,7 @@ export function calcularTotalConsolidado(servicios: ServicioSolicitado[]): numbe
   let total = 0;
   for (const srv of servicios) {
     // ── Ruta 1: vista plana (BandejaPricing) ──────────────────────────────
-    const flatSelected = srv.cotizacionesProveedor.find(cp => cp.seleccionada);
+    const flatSelected = (srv.cotizacionesProveedor ?? []).find(cp => cp.seleccionada);
     if (flatSelected) {
       total += calcLinea(flatSelected.monto, srv.profit).venta;
       continue; // evitar doble conteo con conceptos

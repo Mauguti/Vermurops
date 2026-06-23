@@ -201,7 +201,7 @@ interface ServicioSectionProps {
 export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servicios, renderIcon }: ServicioSectionProps) {
   const [expanded, setExpanded] = useState(true);
   
-  const def = servicios.find((s: any) => s.id === servicio.tipo);
+  const def = (servicios ?? []).find((s: any) => s.id === servicio.tipo);
   const nombreSrv = def?.nombre || servicio.tipo;
   const iconSrv = def?.icono || 'HelpCircle';
 
@@ -685,7 +685,7 @@ export default function FichaCotizacion({
     : calcularTotalConsolidado(quote.servicios);
 
   const serviciosConProveedor = quote.servicios.filter(
-    s => s.cotizacionesProveedor.some(cp => cp.seleccionada)
+    s => (s.cotizacionesProveedor ?? []).some(cp => cp.seleccionada)
   );
 
   // ─── Render ──────────────────────────────────────────────────────────────
@@ -713,9 +713,9 @@ export default function FichaCotizacion({
         
         <div className="p-4 space-y-4">
           <div className="space-y-2">
-            {quote.servicios.filter(s => s.cotizacionesProveedor.some(cp => cp.seleccionada)).map(srv => {
-              const def = servicios.find(s => s.id === srv.tipo);
-              const prov = srv.cotizacionesProveedor.find(cp => cp.seleccionada)!;
+            {quote.servicios.filter(s => (s.cotizacionesProveedor ?? []).some(cp => cp.seleccionada)).map(srv => {
+              const def = (servicios ?? []).find(s => s.id === srv.tipo);
+              const prov = (srv.cotizacionesProveedor ?? []).find(cp => cp.seleccionada)!;
               const linea = calcLinea(prov.monto, srv.profit);
               return (
                 <div key={srv.id} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0 text-xs">
@@ -996,7 +996,7 @@ export default function FichaCotizacion({
                 {/* Chips de resumen */}
                 <div className="flex flex-wrap gap-1">
                   {Array.from(new Set(quote.servicios.map(s => s.tipo))).map(tipo => {
-                    const def = servicios.find(s => s.id === tipo);
+                    const def = (servicios ?? []).find(s => s.id === tipo);
                     return (
                       <span key={tipo} className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold border bg-gray-50 border-gray-200 text-gray-700 uppercase`}>
                         {renderIcon(def?.icono || 'HelpCircle', "w-2.5 h-2.5")}
@@ -1014,6 +1014,8 @@ export default function FichaCotizacion({
                   servicio={srv}
                   rolActivo={rolActivo}
                   onUpdateServicio={updated => handleUpdateServicio(srv.id, updated)}
+                  servicios={servicios}
+                  renderIcon={renderIcon}
                 />
               ))}
 
@@ -1406,7 +1408,7 @@ export default function FichaCotizacion({
             <button
               onClick={() => {
                 const faltanCot = quote.servicios.some(
-                  s => !s.cotizacionesProveedor.some(cp => cp.seleccionada)
+                  s => !(s.cotizacionesProveedor ?? []).some(cp => cp.seleccionada)
                 );
                 if (faltanCot) {
                   alert('Selecciona un proveedor por cada servicio antes de consolidar.');

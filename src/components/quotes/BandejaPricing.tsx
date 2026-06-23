@@ -256,8 +256,8 @@ function ServicioRow({ servicio, quoteId, onUpdateServicio }: ServicioRowProps) 
 
   const meta = TIPOS_SERVICIO[servicio.tipo] || { label: servicio.tipo, color: 'bg-gray-100 text-gray-700', icon: 'help-circle' };
 
-  const seleccionada = servicio.cotizacionesProveedor.find(cp => cp.seleccionada);
-  const serviciosCount = servicio.cotizacionesProveedor.length;
+  const seleccionada = (servicio.cotizacionesProveedor ?? []).find(cp => cp.seleccionada);
+  const serviciosCount = (servicio.cotizacionesProveedor ?? []).length;
 
   // Actualizar profit absoluto
   const handleProfitBlur = () => {
@@ -269,7 +269,7 @@ function ServicioRow({ servicio, quoteId, onUpdateServicio }: ServicioRowProps) 
 
   // Seleccionar/deseleccionar proveedor (resetea profit si se deselecciona todo)
   const handleSeleccionar = (cpId: string) => {
-    const updated = servicio.cotizacionesProveedor.map(cp => ({
+    const updated = (servicio.cotizacionesProveedor ?? []).map(cp => ({
       ...cp,
       seleccionada: cp.id === cpId ? !cp.seleccionada : false,
     }));
@@ -282,12 +282,12 @@ function ServicioRow({ servicio, quoteId, onUpdateServicio }: ServicioRowProps) 
   };
 
   const handleEliminarProveedor = (cpId: string) => {
-    const updated = servicio.cotizacionesProveedor.filter(cp => cp.id !== cpId);
+    const updated = (servicio.cotizacionesProveedor ?? []).filter(cp => cp.id !== cpId);
     onUpdateServicio({ ...servicio, cotizacionesProveedor: updated });
   };
 
   const handleGuardarProveedor = (cp: CotizacionProveedor) => {
-    const updated = [...servicio.cotizacionesProveedor, cp];
+    const updated = [...(servicio.cotizacionesProveedor ?? []), cp];
     const nuevoEstado = servicio.estado === 'pendiente' ? 'solicitado_proveedores' : servicio.estado;
     onUpdateServicio({
       ...servicio,
@@ -361,7 +361,7 @@ function ServicioRow({ servicio, quoteId, onUpdateServicio }: ServicioRowProps) 
             </p>
           ) : (
             <div className="space-y-2">
-              {servicio.cotizacionesProveedor.map(cp => (
+              {(servicio.cotizacionesProveedor ?? []).map(cp => (
                 <FilaProveedor
                   key={cp.id}
                   cp={cp}
@@ -492,7 +492,7 @@ export default function BandejaPricing({
     if (!quote) return;
 
     const faltanCotizaciones = quote.servicios.some(
-      s => !s.cotizacionesProveedor.some(cp => cp.seleccionada)
+      s => !(s.cotizacionesProveedor ?? []).some(cp => cp.seleccionada)
     );
     if (faltanCotizaciones) {
       alert('Selecciona al menos una cotización de proveedor por servicio antes de consolidar.');
