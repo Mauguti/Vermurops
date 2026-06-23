@@ -10,6 +10,7 @@ import FichaCotizacion from './FichaCotizacion';
 import { useNotifications } from '../../notifications/NotificationsContext';
 import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
 import { generateFolio } from '../../lib/folioService';
+import { puedeTransicionarA } from '../../lib/stateMachine';
 
 interface KanbanCotizacionesProps {
   quotes: KanbanQuote[];
@@ -109,6 +110,14 @@ export default function KanbanCotizaciones({
     if (!quoteId) return;
     const quoteToMove = quotes.find(q => q.id === quoteId);
     if (!quoteToMove || quoteToMove.etapa === targetStage) return;
+
+    // ── Guard E5.3: validar transición antes de mover la tarjeta ──────────
+    const guard = puedeTransicionarA(quoteToMove.etapa, targetStage, rolActivo, quoteToMove);
+    if (!guard.ok) {
+      alert(guard.razon ?? 'Transición no permitida.');
+      return;
+    }
+
     updateQuoteStage(quoteId, targetStage);
   };
 
