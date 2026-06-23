@@ -6,8 +6,9 @@ import {
 } from 'lucide-react';
 import {
   KanbanQuote, QuoteActivity, StageHistory, ORIGENES_PROSPECTO, PIPELINE_STAGES,
-  ServicioSolicitado, CotizacionProveedor, TipoServicio, INCOTERMS,
-  EQUIPO_PRICING, VENDEDORES, calcularTotalConsolidado, PipelineStageId,
+  ServicioSolicitado, ConceptoCotizacion, CotizacionProveedor, TipoServicio,
+  INCOTERMS, Subconcepto, EQUIPO_PRICING, VENDEDORES, calcularTotalConsolidado,
+  PipelineStageId,
 } from './QuotesData';
 import { initialProviders } from '../../data';
 import { useNotifications } from '../../notifications/NotificationsContext';
@@ -186,16 +187,6 @@ interface ServicioSectionProps {
   rolActivo: 'ventas' | 'pricing' | 'admin';
   onUpdateServicio: (updated: ServicioSolicitado) => void;
 }
-
-import React, { useState } from 'react';
-import { 
-  Plus, X, CheckCircle2, FileText, Clock, AlertTriangle, 
-  ChevronDown, ChevronRight, User, BarChart2 
-} from 'lucide-react';
-import { 
-  ServicioSolicitado, ConceptoCotizacion, CotizacionProveedor,
-  INCOTERMS, TipoServicio, Subconcepto
-} from './QuotesData';
 
 interface ServicioSectionProps {
   key?: React.Key;
