@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Denegar todo lo que no esté explícitamente permitido ──────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ── Cotizaciones ──────────────────────────────────────────────────────
+    // Cualquier usuario autenticado puede leer y crear/actualizar.
+    // Eliminar está prohibido: una cotización perdida se marca como 'perdida',
+    // nunca se borra del historial.
+    match /cotizaciones/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    // ── Contadores (usado por folioService.generateFolio) ─────────────────
+    // generateFolio() hace runTransaction: necesita leer Y escribir.
+    // Solo usuarios autenticados pueden tocar el contador.
+    match /contadores/{id} {
+      allow read:   if request.auth != null;
+      allow write:  if request.auth != null;
+    }
+
+    // ── Notificaciones ────────────────────────────────────────────────────
+    // Lectura: solo el destinatario nombrado en el documento.
+    //   Alinea con la query de NotificationsContext:
+    //   where('destinatarioId', '==', user.uid)
+    // Creación: cualquier usuario autenticado puede crear (p.ej. mensaje de chat
+    //   que genera notificación para otro usuario).
+    // Actualización: solo el propio destinatario puede marcarla leída.
+    match /notificaciones/{id} {
+      allow read:   if request.auth != null
+                    && resource.data.destinatarioId == request.auth.uid;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null
+                    && resource.data.destinatarioId == request.auth.uid;
+      allow delete: if false;
+    }
+
+  }
+}
