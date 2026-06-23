@@ -9,6 +9,7 @@ import {
 import FichaCotizacion from './FichaCotizacion';
 import { useNotifications } from '../../notifications/NotificationsContext';
 import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
+import { generateFolio } from '../../lib/folioService';
 
 interface KanbanCotizacionesProps {
   quotes: KanbanQuote[];
@@ -172,12 +173,11 @@ export default function KanbanCotizaciones({
     );
   };
 
-  const handleQuickAdd = (e: React.FormEvent) => {
+  const handleQuickAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!qaEmpresa.trim() || qaServicios.length === 0) return;
 
-    const nextNumber = quotes.length + 1;
-    const folio = `COT-2026-${String(nextNumber).padStart(4, '0')}`;
+    const folio = await generateFolio();
     const fechaActual = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
     const newQuote: KanbanQuote = {
@@ -192,17 +192,19 @@ export default function KanbanCotizaciones({
       },
       vendedorId: qaVendedor,
       pricingId: null,
-      servicios: qaServicios.map((tipo, i) => ({
-        id: `srv-${nextNumber}-${tipo}`,
+      servicios: qaServicios.map((tipo) => ({
+        id: `srv-${folio}-${tipo}`,
         tipo,
         ruta: { origen: 'Por definir', destino: 'Por definir' },
         incoterm: 'FOB',
         mercancia: 'Por definir',
         peso: 0,
         volumen: 0,
-        estado: 'pendiente',
-        margen: 0,
+        estado: 'pendiente' as const,
+        profit: 0,
+        recargosPct: 0,
         cotizacionesProveedor: [],
+        conceptos: [],
       })),
       valorTotalConsolidado: 0,
       moneda: 'USD',
@@ -212,6 +214,7 @@ export default function KanbanCotizaciones({
       updatedAt: fechaActual,
       historialEtapas: [{ etapa: 'solicitud_cliente', fecha: fechaActual }],
       actividades: [],
+      chat: [],
     };
 
     onUpdateQuotes([newQuote, ...quotes]);

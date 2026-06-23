@@ -15,6 +15,7 @@ import {
 import { useServicios, renderIcon } from '../config/serviciosStore';
 import { useNotifications } from '../notifications/NotificationsContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
+import { generateFolio } from '../lib/folioService';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Componente principal del módulo de Cotizaciones
@@ -92,11 +93,23 @@ export default function Quotes() {
 
 
 
-  // Estado central de cotizaciones — leído desde Firestore (E3.3)
-  // Los writes todavía son no-ops; se conectan en E3.4.
-  const { quotes: kanbanQuotes, loading: quotesLoading, error: quotesError } = useCotizaciones();
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const setKanbanQuotes = (_: KanbanQuote[]) => {}; // shim temporal → reemplazar en E3.4
+  // Estado central de cotizaciones — Firestore (E3.3 lectura, E3.4 writes)
+  const { quotes: kanbanQuotes, loading: quotesLoading, error: quotesError, createCotizacion, updateCotizacion } = useCotizaciones();
+
+  // Recibe el array completo que devuelven los componentes hijos y persiste
+  // solo el documento que cambió (o el nuevo que se añadió).
+  const handleUpdateQuotes = async (newQuotes: KanbanQuote[]) => {
+    const existingIds = new Set(kanbanQuotes.map(q => q.id));
+    // Detectar cotización nueva: su id no existe en Firestore todavía
+    const added = newQuotes.find(q => !existingIds.has(q.id));
+    if (added) { await createCotizacion(added); return; }
+    // Detectar cotización actualizada: referencia distinta al original
+    const changed = newQuotes.find(newQ => {
+      const existing = kanbanQuotes.find(q => q.id === newQ.id);
+      return existing !== undefined && existing !== newQ;
+    });
+    if (changed) await updateCotizacion(changed.id, changed);
+  };
   
   const filteredInitialProspectos = initialProspectos.filter(p => {
     if (rolActivo === 'ventas') {
@@ -171,14 +184,13 @@ export default function Quotes() {
     );
   };
 
-  const handleCreateQuote = (stage: 'solicitud_cliente' | 'solicitado_pricing') => {
+  const handleCreateQuote = async (stage: 'solicitud_cliente' | 'solicitado_pricing') => {
     if (!formEmpresa.trim() || formServicios.length === 0) {
       alert('Por favor introduce la empresa y selecciona al menos un servicio requerido.');
       return;
     }
 
-    const nextNumber = kanbanQuotes.length + 1;
-    const folio = `COT-2026-${String(nextNumber).padStart(4, '0')}`;
+    const folio = await generateFolio();
     const fechaActual = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
     const newQuote: KanbanQuote = {
@@ -194,7 +206,7 @@ export default function Quotes() {
       vendedorId: formVendedor,
       pricingId: null,
       servicios: formServicios.map(id => ({
-        id: `srv-${nextNumber}-${id}`,
+        id: `srv-${folio}-${id}`,
         tipo: id as TipoServicio,
         ruta: { origen: formOrigenRuta || 'Por definir', destino: formDestinoRuta || 'Por definir' },
         incoterm: formIncoterm,
@@ -203,8 +215,9 @@ export default function Quotes() {
         volumen: Number(formVolumen) || 0,
         estado: 'pendiente',
         recargosPct: 0,
-        margen: 0,
+        profit: 0,
         cotizacionesProveedor: [],
+        conceptos: [],
       })),
       valorTotalConsolidado: 0,
       moneda: 'USD',
@@ -214,9 +227,10 @@ export default function Quotes() {
       updatedAt: fechaActual,
       historialEtapas: [{ etapa: stage, fecha: fechaActual }],
       actividades: [],
+      chat: [],
     };
 
-    setKanbanQuotes([newQuote, ...kanbanQuotes]);
+    await createCotizacion(newQuote);
     setShowForm(false);
 
     // Reset
@@ -704,7 +718,7 @@ export default function Quotes() {
         /* ─── Vista Bandeja Pricing ─── */
         <BandejaPricing
           quotes={permittedQuotes}
-          onUpdateQuotes={setKanbanQuotes}
+          onUpdateQuotes={handleUpdateQuotes}
           onConvertToShipment={q => {
             alert(`"${q.prospecto.empresa}" convertida a embarque.`);
           }}
@@ -717,20 +731,19 @@ export default function Quotes() {
             /* ── Sub-vista Kanban ── */
             viewMode === 'prospeccion' ? (
               <KanbanProspeccion
-                onConvert={(p) => {
-                  const nextNumber = kanbanQuotes.length + 1;
-                  const folio = `COT-2026-${String(nextNumber).padStart(4, '0')}`;
+                onConvert={async (p) => {
+                  const folio = await generateFolio();
                   const fechaActual = new Date().toISOString().slice(0, 16).replace('T', ' ');
                   const newQuote: KanbanQuote = {
                     id: folio, etapa: 'solicitud_cliente',
                     prospecto: { empresa: p.empresa, contacto: p.contactoNombre || 'Por definir', telefono: p.contactoTel || '—', email: p.contactoEmail || '—', origen: p.origenLead as any },
                     vendedorId: p.responsable || user?.nombre || '', pricingId: null,
-                    servicios: p.servicioPotencial.map((tipo, i) => ({ id: `srv-${nextNumber}-${tipo}`, tipo, ruta: { origen: 'Por definir', destino: 'Por definir' }, incoterm: 'FOB', mercancia: 'Por definir', peso: 0, volumen: 0, estado: 'pendiente' as const, cotizacionesProveedor: [], profit: 0, recargosPct: 0, conceptos: [] })),
+                    servicios: p.servicioPotencial.map((tipo) => ({ id: `srv-${folio}-${tipo}`, tipo, ruta: { origen: 'Por definir', destino: 'Por definir' }, incoterm: 'FOB', mercancia: 'Por definir', peso: 0, volumen: 0, estado: 'pendiente' as const, cotizacionesProveedor: [], profit: 0, recargosPct: 0, conceptos: [] })),
                     valorTotalConsolidado: 0, moneda: 'USD', estadoFinal: null, motivoPerdida: null,
                     createdAt: fechaActual, updatedAt: fechaActual,
-                    historialEtapas: [{ etapa: 'solicitud_cliente', fecha: fechaActual }], actividades: [],
+                    historialEtapas: [{ etapa: 'solicitud_cliente', fecha: fechaActual }], actividades: [], chat: [],
                   };
-                  setKanbanQuotes([newQuote, ...kanbanQuotes]);
+                  await createCotizacion(newQuote);
                   agregarNotificacion({ id: `notif-${Date.now()}`, tipo: 'cambio_etapa', titulo: 'Prospecto convertido', mensaje: `${p.empresa} fue convertido a cotización ${folio}`, cotizacionId: folio, etapaAnterior: 'nuevo_lead', etapaNueva: 'solicitud_cliente', destinatarios: ['ventas', 'admin'], leida: false, fecha: new Date().toISOString() });
                   setTimeout(() => { if (window.confirm(`Cotización ${folio} creada desde prospecto ${p.folio}\n\n¿Ir a Cotizaciones?`)) { setViewMode('kanban'); } }, 100);
                 }}
@@ -741,7 +754,7 @@ export default function Quotes() {
             ) : (
               <KanbanCotizaciones
                 quotes={permittedQuotes}
-                onUpdateQuotes={setKanbanQuotes}
+                onUpdateQuotes={handleUpdateQuotes}
                 rolActivo={rolActivo}
                 onConvertToShipment={q => { alert(`¡Felicidades! "${q.prospecto.empresa}" marcada como GANADA.`); }}
               />
@@ -891,7 +904,7 @@ export default function Quotes() {
             isOpen={selectedQuote !== null}
             onClose={() => setSelectedQuote(null)}
             onUpdateQuote={(updated) => {
-              setKanbanQuotes(kanbanQuotes.map(q => q.id === updated.id ? updated : q));
+              updateCotizacion(updated.id, updated);
               setSelectedQuote(updated);
             }}
             onConvertToShipment={q => { alert(`¡Felicidades! "${q.prospecto.empresa}" marcada como GANADA.`); }}

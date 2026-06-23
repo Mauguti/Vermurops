@@ -19,7 +19,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { KanbanQuote, initialKanbanQuotes } from '../components/quotes/QuotesData';
 import { initContadorDesdeFolios } from '../lib/folioService';
 import { useAuth } from '../auth/AuthContext';
@@ -93,5 +93,15 @@ export function useCotizaciones() {
     return () => unsubscribe();
   }, [user]); // Re-corre cuando cambia el usuario (login / logout)
 
-  return { quotes, loading, error };
+  // ── Writes ───────────────────────────────────────────────────────────────
+
+  const createCotizacion = async (quote: KanbanQuote): Promise<void> => {
+    await setDoc(doc(db, 'cotizaciones', quote.id), quote);
+  };
+
+  const updateCotizacion = async (id: string, data: Partial<KanbanQuote>): Promise<void> => {
+    await updateDoc(doc(db, 'cotizaciones', id), data as Record<string, unknown>);
+  };
+
+  return { quotes, loading, error, createCotizacion, updateCotizacion };
 }
