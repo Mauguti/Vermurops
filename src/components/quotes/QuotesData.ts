@@ -148,6 +148,12 @@ export interface KanbanQuote {
     email: string;
     origen: 'formulario' | 'web' | 'referido' | 'llamada' | 'feria' | 'otro' | 'interno_ventas' | 'interno_pricing';
   };
+  /**
+   * Referencia a la entidad Cliente en la colección clientes/ (E6).
+   * null = cotización legacy con solo prospecto embebido.
+   * string = ID del documento en clientes/.
+   */
+  clienteId?: string | null;
 
   // Responsables
   vendedorId: string;       // Ventas: quien recibió la solicitud y da seguimiento
