@@ -1,34 +1,48 @@
 import React, { useState } from 'react';
-import { initialClients, Client, initialProviders, Provider } from '../data';
+import { initialProviders, Provider } from '../data';
 import { Search, Phone, Mail, ChevronRight, Upload, Calendar, ArrowRight, MessageSquare, CheckCircle2, Clock, Plane, Ship, Truck, FileText, Check } from 'lucide-react';
-import { useAuth } from '../auth/AuthContext';
+import { useClientes } from '../hooks/useClientes';
+import { ClienteVermur } from './clientes/ClientesData';
 
 export default function Clients() {
-  const { user } = useAuth();
+  const { clientes, loading, error } = useClientes();
   const [viewType, setViewType] = useState<'Clientes' | 'Proveedores'>('Clientes');
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [selectedClient, setSelectedClient] = useState<ClienteVermur | null>(null);
   const [activeTab, setActiveTab] = useState('Cuentas');
   const [detailTab, setDetailTab] = useState('Resumen');
 
   const [providerSearchTerm, setProviderSearchTerm] = useState('');
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
 
-  const filteredClients = initialClients.filter(c => {
-    // Si es ADMIN, o no tiene responsable, o es su responsable (email / uid mock), lo ve
-    const isOwner = user?.rol === 'admin' 
-      ? true 
-      : (c.responsableId === user?.email || c.responsableId === user?.id || !c.responsableId);
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <div className="w-8 h-8 border-4 border-brand/30 border-t-brand rounded-full animate-spin" />
+      </div>
+    );
+  }
 
-    const matchSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                        c.rfc.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                        c.contact.toLowerCase().includes(searchTerm.toLowerCase());
-    return isOwner && matchSearch;
-  });
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <div className="text-center">
+          <p className="text-[14px] font-medium text-danger-text mb-1">Error al cargar clientes</p>
+          <p className="text-[12px] text-text-muted">{error}</p>
+        </div>
+      </div>
+    );
+  }
 
-  const filteredProviders = initialProviders.filter(p => 
-    p.name.toLowerCase().includes(providerSearchTerm.toLowerCase()) || 
+  const filteredClients = clientes.filter(c =>
+    c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.rfc.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.representante.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredProviders = initialProviders.filter(p =>
+    p.name.toLowerCase().includes(providerSearchTerm.toLowerCase()) ||
     p.rfc.toLowerCase().includes(providerSearchTerm.toLowerCase()) ||
     p.contact.name.toLowerCase().includes(providerSearchTerm.toLowerCase())
   );
@@ -106,9 +120,9 @@ export default function Clients() {
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-[16px] mb-[24px]">
             <div className="relative flex-1 max-w-[480px]">
               <Search className="w-[18px] h-[18px] absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-              <input 
-                type="text" 
-                placeholder="Buscar por razón social, RFC, contacto..." 
+              <input
+                type="text"
+                placeholder="Buscar por razón social, RFC, representante..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-[36px] pr-[12px] py-[10px] outline-none text-[14px] bg-card border border-card-border rounded-[8px] focus:border-brand focus:ring-1 focus:ring-brand shadow-sm text-text-primary"
@@ -126,57 +140,62 @@ export default function Clients() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[24px]">
-            {filteredClients.map(client => (
-              <div 
-                key={client.id}
+            {filteredClients.map(cliente => (
+              <div
+                key={cliente.id}
                 className="bg-card rounded-[12px] border border-card-border transition-all overflow-hidden flex flex-col shadow-sm"
               >
                 <div className="p-[20px] pb-[16px]">
                   <div className="flex justify-between items-start mb-[4px]">
-                    <h3 className="font-semibold text-text-primary text-[15px] leading-snug pr-[12px]">{client.name}</h3>
-                    <span className={`shrink-0 text-[11px] font-medium tracking-[0.02em] px-[8px] py-[2px] rounded-[4px] ${client.type === 'Cliente' ? 'bg-info-bg text-info-text' : 'bg-neutral-bg text-text-secondary'}`}>
-                      {client.type}
+                    <div className="pr-[12px]">
+                      <h3 className="font-semibold text-text-primary text-[15px] leading-snug">{cliente.nombre}</h3>
+                      {cliente.comercial && (
+                        <p className="text-[12px] text-text-muted mt-0.5">{cliente.comercial}</p>
+                      )}
+                    </div>
+                    <span className={`shrink-0 text-[11px] font-medium tracking-[0.02em] px-[8px] py-[2px] rounded-[4px] ${
+                      cliente.statusOperativo === 'ACTIVO'
+                        ? 'bg-success-bg text-success-text'
+                        : 'bg-neutral-bg text-text-secondary'
+                    }`}>
+                      {cliente.statusOperativo}
                     </span>
                   </div>
-                  <p className="text-[13px] text-text-muted font-mono">{client.rfc}</p>
+                  <p className="text-[13px] text-text-muted font-mono">{cliente.rfc}</p>
                 </div>
-                
+
                 <div className="px-[20px] pb-[20px] space-y-[10px] flex-1">
                   <div className="flex items-center text-[13px] text-text-secondary">
                     <Mail className="w-[16px] h-[16px] mr-[10px] text-text-muted" />
-                    <span className="truncate">{client.email}</span>
+                    <span className="truncate">{cliente.correo}</span>
                   </div>
                   <div className="flex items-center text-[13px] text-text-secondary">
                     <Phone className="w-[16px] h-[16px] mr-[10px] text-text-muted" />
-                    {client.phone}
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-3 divide-x divide-divider border-t border-divider bg-canvas">
-                  <div className="p-[12px] text-center">
-                    <div className="text-[11px] text-text-muted font-medium mb-[2px]">Embarques</div>
-                    <div className="font-medium text-text-primary text-[14px] tabular-nums">{client.shipmentsCount}</div>
-                  </div>
-                  <div className="p-[12px] text-center">
-                    <div className="text-[11px] text-text-muted font-medium mb-[2px]">Cotizaciones</div>
-                    <div className="font-medium text-text-primary text-[14px] tabular-nums">{client.quotesCount}</div>
-                  </div>
-                  <div className="p-[12px] text-center flex flex-col items-center justify-center">
-                    <div className="text-[11px] text-text-muted font-medium mb-[2px]">Saldo</div>
-                    {client.balanceStatus === 'vencido' ? (
-                      <span className="text-[12px] font-medium text-danger-text bg-danger-bg px-[6px] py-[2px] rounded-[4px] tabular-nums">
-                        ${client.balance.toLocaleString()}
-                      </span>
-                    ) : (
-                      <span className="font-medium text-text-primary text-[14px] tabular-nums">
-                        ${client.balance.toLocaleString()}
-                      </span>
-                    )}
+                    {cliente.telefono}
                   </div>
                 </div>
 
-                <div 
-                  onClick={() => setSelectedClient(client)}
+                <div className="grid grid-cols-3 divide-x divide-divider border-t border-divider bg-canvas">
+                  <div className="p-[12px] text-center">
+                    <div className="text-[11px] text-text-muted font-medium mb-[2px]">Crédito</div>
+                    <div className="font-medium text-text-primary text-[13px]">
+                      {cliente.tipoCredito === 'credito' ? `${cliente.dias}d` : 'Contado'}
+                    </div>
+                  </div>
+                  <div className="p-[12px] text-center">
+                    <div className="text-[11px] text-text-muted font-medium mb-[2px]">Divisa</div>
+                    <div className="font-medium text-text-primary text-[13px] tabular-nums">{cliente.divisa}</div>
+                  </div>
+                  <div className="p-[12px] text-center">
+                    <div className="text-[11px] text-text-muted font-medium mb-[2px]">Línea</div>
+                    <div className="font-medium text-text-primary text-[13px] tabular-nums">
+                      {cliente.monto > 0 ? `${(cliente.monto / 1000).toFixed(0)}k` : '—'}
+                    </div>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setSelectedClient(cliente)}
                   className="border-t border-divider py-[12px] text-center cursor-pointer transition-colors hover:bg-neutral-bg group"
                 >
                   <span className="text-[13px] font-medium text-text-primary group-hover:text-brand transition-colors">Ver ficha</span>
@@ -194,7 +213,7 @@ export default function Clients() {
             <div className="flex items-center space-x-[8px] text-[13px] text-text-secondary">
               <button onClick={() => setSelectedClient(null)} className="hover:text-text-primary transition-colors">Cuentas</button>
               <ChevronRight className="w-4 h-4 text-text-muted" />
-              <span className="text-text-primary font-medium">{selectedClient.name}</span>
+              <span className="text-text-primary font-medium">{selectedClient.nombre}</span>
             </div>
             <div className="flex space-x-[12px]">
                <button className="bg-white border border-card-border text-text-primary px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium hover:bg-neutral-bg transition-colors shadow-sm">
@@ -212,15 +231,19 @@ export default function Clients() {
               <div className="p-[32px] border-b border-divider bg-white">
                 <div className="flex items-center space-x-[16px] mb-[16px]">
                   <div className="w-[64px] h-[64px] bg-canvas border border-card-border rounded-[12px] flex items-center justify-center text-[24px] font-medium text-text-primary">
-                    {selectedClient.name.charAt(0)}
+                    {selectedClient.nombre.charAt(0)}
                   </div>
                   <div>
-                    <h2 className="text-[24px] font-semibold text-text-primary tracking-tight leading-none mb-[8px]">{selectedClient.name}</h2>
+                    <h2 className="text-[24px] font-semibold text-text-primary tracking-tight leading-none mb-[8px]">{selectedClient.nombre}</h2>
                     <div className="flex items-center text-[13px] space-x-[12px]">
                       <span className="text-text-secondary font-mono">RFC: {selectedClient.rfc}</span>
                       <span className="text-divider">•</span>
-                      <span className={`px-[8px] py-[2px] rounded-[4px] text-[11px] font-medium ${selectedClient.type === 'Cliente' ? 'bg-info-bg text-info-text' : 'bg-neutral-bg text-text-secondary'}`}>
-                        {selectedClient.type}
+                      <span className={`px-[8px] py-[2px] rounded-[4px] text-[11px] font-medium ${
+                        selectedClient.statusOperativo === 'ACTIVO'
+                          ? 'bg-success-bg text-success-text'
+                          : 'bg-neutral-bg text-text-secondary'
+                      }`}>
+                        {selectedClient.statusOperativo}
                       </span>
                     </div>
                   </div>
@@ -228,16 +251,16 @@ export default function Clients() {
 
                 <div className="flex flex-wrap gap-[24px] mt-[24px] pt-[24px] border-t border-divider">
                   <div>
-                    <p className="text-[11px] font-medium text-text-muted mb-[4px]">Contacto Principal</p>
-                    <p className="text-[14px] font-medium text-text-primary">{selectedClient.contact}</p>
+                    <p className="text-[11px] font-medium text-text-muted mb-[4px]">Representante Legal</p>
+                    <p className="text-[14px] font-medium text-text-primary">{selectedClient.representante}</p>
                   </div>
                   <div>
                     <p className="text-[11px] font-medium text-text-muted mb-[4px]">Correo</p>
-                    <p className="text-[14px] font-medium text-text-primary">{selectedClient.email}</p>
+                    <p className="text-[14px] font-medium text-text-primary">{selectedClient.correo}</p>
                   </div>
                   <div>
                      <p className="text-[11px] font-medium text-text-muted mb-[4px]">Teléfono</p>
-                     <p className="text-[14px] font-medium text-text-primary">{selectedClient.phone}</p>
+                     <p className="text-[14px] font-medium text-text-primary">{selectedClient.telefono}</p>
                   </div>
                 </div>
               </div>
@@ -271,9 +294,8 @@ export default function Clients() {
             {/* Sidebar (Right 1/3) */}
             <div className="w-full md:w-[320px] bg-canvas shrink-0 p-[24px]">
               <h3 className="text-[14px] font-semibold text-text-primary mb-[20px]">Actividad Reciente</h3>
-              
+
               <div className="space-y-[24px]">
-                {/* Timeline Item */}
                 <div className="flex gap-[16px]">
                   <div className="flex flex-col items-center">
                     <div className="w-[32px] h-[32px] bg-white border border-card-border rounded-full flex items-center justify-center text-text-primary shadow-sm z-10">
@@ -283,7 +305,7 @@ export default function Clients() {
                   </div>
                   <div className="pb-[8px]">
                     <p className="text-[13px] text-text-primary font-medium mb-[2px]">Correo enviado</p>
-                    <p className="text-[13px] text-text-secondary mb-[4px]">Cotización #QT-1004 enviada a {selectedClient.contact}.</p>
+                    <p className="text-[13px] text-text-secondary mb-[4px]">Cotización #QT-1004 enviada a {selectedClient.representante}.</p>
                     <p className="text-[12px] text-text-muted flex items-center">
                       <Clock className="w-[12px] h-[12px] mr-[4px]" />
                       Hace 2 horas
@@ -291,7 +313,6 @@ export default function Clients() {
                   </div>
                 </div>
 
-                {/* Timeline Item */}
                 <div className="flex gap-[16px]">
                   <div className="flex flex-col items-center">
                     <div className="w-[32px] h-[32px] bg-white border border-card-border rounded-full flex items-center justify-center text-text-primary shadow-sm z-10">
@@ -309,7 +330,6 @@ export default function Clients() {
                   </div>
                 </div>
 
-                {/* Timeline Item */}
                 <div className="flex gap-[16px]">
                   <div className="flex flex-col items-center">
                     <div className="w-[32px] h-[32px] bg-white border border-card-border rounded-full flex items-center justify-center text-text-primary shadow-sm z-10">
@@ -325,7 +345,6 @@ export default function Clients() {
                     </p>
                   </div>
                 </div>
-
               </div>
             </div>
           </div>
@@ -358,9 +377,9 @@ export default function Clients() {
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-[16px] mb-[24px]">
             <div className="relative flex-1 max-w-[480px]">
               <Search className="w-[18px] h-[18px] absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-              <input 
-                type="text" 
-                placeholder="Buscar por nombre, RFC o contacto..." 
+              <input
+                type="text"
+                placeholder="Buscar por nombre, RFC o contacto..."
                 value={providerSearchTerm}
                 onChange={(e) => setProviderSearchTerm(e.target.value)}
                 className="w-full pl-[36px] pr-[12px] py-[10px] outline-none text-[14px] bg-card border border-card-border rounded-[8px] focus:border-brand focus:ring-1 focus:ring-brand shadow-sm text-text-primary"
@@ -376,7 +395,7 @@ export default function Clients() {
           {/* Grid de proveedores */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[24px]">
             {filteredProviders.map(provider => (
-              <div 
+              <div
                 key={provider.id}
                 onClick={() => setSelectedProvider(provider)}
                 className="bg-card rounded-[12px] border border-card-border transition-all overflow-hidden flex flex-col shadow-sm hover:border-brand/30 cursor-pointer group"
@@ -388,7 +407,7 @@ export default function Clients() {
                       {provider.active ? 'Activo' : 'Inactivo'}
                     </span>
                   </div>
-                  
+
                   {/* Modalidades Badges */}
                   <div className="flex flex-wrap gap-2 mt-3">
                     {provider.modalities.map(mod => (
@@ -399,7 +418,7 @@ export default function Clients() {
                     ))}
                   </div>
                 </div>
-                
+
                 <div className="px-[20px] py-[16px] space-y-[10px] flex-1 bg-canvas">
                   <div className="flex items-start text-[13px]">
                     <div className="w-[32px] h-[32px] bg-white border border-card-border rounded-full flex items-center justify-center font-bold text-brand mr-3 shrink-0">
@@ -421,7 +440,7 @@ export default function Clients() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="border-t border-divider py-[10px] bg-white text-center transition-colors group-hover:bg-brand/5">
                   <span className="text-[12px] font-medium text-text-primary group-hover:text-brand transition-colors">Ver ficha completa</span>
                 </div>
@@ -471,7 +490,7 @@ export default function Clients() {
                       </div>
                     </div>
                   </div>
-                  
+
                   <span className={`px-[10px] py-[4px] rounded-md text-[12px] font-semibold tracking-wide ${selectedProvider.active ? 'bg-success-bg text-success-text' : 'bg-neutral-bg text-text-secondary'}`}>
                     {selectedProvider.active ? 'PROVEEDOR ACTIVO' : 'INACTIVO'}
                   </span>
@@ -532,7 +551,7 @@ export default function Clients() {
 
               <div className="p-[32px] flex-1 bg-white">
                 <h3 className="text-[15px] font-semibold text-text-primary mb-4">Cotizaciones Enviadas por {selectedProvider.name}</h3>
-                
+
                 {selectedProvider.quotesHistory.length > 0 ? (
                   <div className="border border-card-border rounded-lg overflow-hidden">
                     <table className="w-full text-left border-collapse">
