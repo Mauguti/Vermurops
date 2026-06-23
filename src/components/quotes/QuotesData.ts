@@ -2,6 +2,7 @@
 // QuotesData.ts — Modelo de datos del módulo de Cotizaciones
 // Proceso comercial real: Ventas → Pricing → Proveedores → Consolidación
 // ============================================================
+import { calcLinea } from '../../lib/cotizacionCalculator';
 
 // ------------------------------------------------------------
 // Tipos base
@@ -68,10 +69,16 @@ export interface Subconcepto {
 export interface ConceptoCotizacion {
   id: string;
   nombre: string;
+  // ── Campos del modelo lineas_cotizacion (Luis) ──────────────────────────
+  costo: number;   // Costo base del concepto (de proveedor oficial + subconceptos)
+  profit: number;  // Profit absoluto — INPUT manual de Pricing (no %)
+  venta: number;   // costo + profit  (calculado con calcLinea)
+  margen: number;  // profit / venta  (0–1; calculado con calcLinea)
+  // ── Detalle de tarifas / subconceptos ───────────────────────────────────
   subconceptos: Subconcepto[];
   tarifas: CotizacionProveedor[];
   proveedorOficialId?: string | null;
-  profit: number;
+  orden?: number;
 }
 
 export interface ServicioSolicitado {
@@ -88,6 +95,11 @@ export interface ServicioSolicitado {
   peso: number;           // kg
   volumen: number;        // m³ / CBM
   estado: 'pendiente' | 'solicitado_proveedores' | 'cotizado';
+  // ── Vista plana — BandejaPricing ────────────────────────────────────────
+  cotizacionesProveedor: CotizacionProveedor[]; // Opciones de proveedor para este servicio
+  profit: number;      // Profit absoluto $ — INPUT de Pricing (reemplaza margen %)
+  recargosPct: number; // Recargos adicionales % (display only por ahora)
+  // ── Vista detallada — FichaCotizacion (modelo Luis lineas_cotizacion) ───
   conceptos: ConceptoCotizacion[];
 }
 
@@ -265,38 +277,31 @@ export const EQUIPO_PRICING = [
 // ============================================================
 
 /**
- * Suma los montos de los proveedores seleccionados por servicio,
- * aplicando el margen (%) de cada servicio.
- * Retorna el total en la moneda dominante (USD prioritario).
+ * Suma las ventas de todos los servicios usando calcLinea (E1).
+ *
+ * Prioridad por servicio:
+ *  1. Vista plana (BandejaPricing): si hay un proveedor seleccionado en
+ *     cotizacionesProveedor, usa calcLinea(provMonto, srv.profit).
+ *  2. Vista detallada (FichaCotizacion): suma calcLinea(costo, profit) por
+ *     cada ConceptoCotizacion, donde costo = tarifa oficial + subconceptos.
  */
 export function calcularTotalConsolidado(servicios: ServicioSolicitado[]): number {
   let total = 0;
   for (const srv of servicios) {
-    if (srv.conceptos) {
-      for (const concepto of srv.conceptos) {
-        // Encontrar la tarifa seleccionada
-        const seleccionada = concepto.tarifas?.find(cp => cp.id === concepto.proveedorOficialId);
-        
-        let costoConcepto = 0;
-        
-        // Sumar la tarifa ganadora
-        if (seleccionada) {
-          costoConcepto += seleccionada.monto;
-        }
+    // ── Ruta 1: vista plana (BandejaPricing) ──────────────────────────────
+    const flatSelected = srv.cotizacionesProveedor.find(cp => cp.seleccionada);
+    if (flatSelected) {
+      total += calcLinea(flatSelected.monto, srv.profit).venta;
+      continue; // evitar doble conteo con conceptos
+    }
 
-        // Sumar todos los subconceptos
-        if (concepto.subconceptos && concepto.subconceptos.length > 0) {
-          for (const sub of concepto.subconceptos) {
-            // Nota: aquí podríamos necesitar conversión de moneda si fuera real.
-            costoConcepto += sub.costo;
-          }
-        }
-
-        // El precio de venta del concepto es el Costo Total + Profit numérico
-        const precioVentaConcepto = costoConcepto + (concepto.profit || 0);
-        
-        total += precioVentaConcepto;
-      }
+    // ── Ruta 2: vista detallada (FichaCotizacion / lineas_cotizacion) ─────
+    for (const concepto of srv.conceptos) {
+      const tarifaOficial = concepto.tarifas?.find(t => t.id === concepto.proveedorOficialId);
+      const costoOficial  = tarifaOficial?.monto ?? 0;
+      const costoSubs     = concepto.subconceptos?.reduce((acc, s) => acc + s.costo, 0) ?? 0;
+      const costoTotal    = costoOficial + costoSubs;
+      total += calcLinea(costoTotal, concepto.profit).venta;
     }
   }
   return Math.round(total * 100) / 100;
@@ -332,6 +337,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
         peso: 4500,
         volumen: 12,
         estado: 'pendiente',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
         conceptos: [],
       },
       {
@@ -343,6 +349,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
         peso: 4500,
         volumen: 12,
         estado: 'pendiente',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
         conceptos: [],
       },
     ],
@@ -392,6 +399,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
         peso: 1500,
         volumen: 6,
         estado: 'pendiente',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
         conceptos: [],
       },
       {
@@ -403,6 +411,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
         peso: 1500,
         volumen: 6,
         estado: 'pendiente',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
         conceptos: [],
       },
     ],
@@ -455,6 +464,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
         peso: 120,
         volumen: 1.5,
         estado: 'solicitado_proveedores',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
         conceptos: [],
       },
     ],
@@ -508,6 +518,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
         peso: 15000,
         volumen: 30,
         estado: 'cotizado',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
         conceptos: [],
       },
       {
@@ -519,6 +530,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
         peso: 15000,
         volumen: 30,
         estado: 'cotizado',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
         conceptos: [],
       },
     ],
@@ -573,6 +585,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
         peso: 450,
         volumen: 2.8,
         estado: 'cotizado',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
         conceptos: [],
       },
       {
@@ -584,6 +597,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
         peso: 450,
         volumen: 2.8,
         estado: 'cotizado',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
         conceptos: [],
       },
       {
@@ -595,6 +609,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
         peso: 450,
         volumen: 2.8,
         estado: 'cotizado',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
         conceptos: [],
       },
     ],
@@ -650,6 +665,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
         peso: 2200,
         volumen: 8,
         estado: 'cotizado',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
         conceptos: [],
       },
     ],
@@ -706,6 +722,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
         peso: 280,
         volumen: 3.2,
         estado: 'cotizado',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
         conceptos: [],
       },
     ],
@@ -763,6 +780,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
         peso: 42000,
         volumen: 45,
         estado: 'cotizado',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
         conceptos: [],
       },
     ],

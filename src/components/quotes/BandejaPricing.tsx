@@ -7,6 +7,7 @@ import {
   KanbanQuote, ServicioSolicitado, CotizacionProveedor, TipoServicio,
   TIPOS_SERVICIO, PIPELINE_STAGES, calcularTotalConsolidado,
 } from './QuotesData';
+import { calcLinea } from '../../lib/cotizacionCalculator';
 import FichaCotizacion from './FichaCotizacion';
 
 interface BandejaPricingProps {
@@ -251,22 +252,22 @@ interface ServicioRowProps {
 function ServicioRow({ servicio, quoteId, onUpdateServicio }: ServicioRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [margenLocal, setMargenLocal] = useState(String(servicio.margen));
+  const [profitLocal, setProfitLocal] = useState(String(servicio.profit ?? 0));
 
   const meta = TIPOS_SERVICIO[servicio.tipo] || { label: servicio.tipo, color: 'bg-gray-100 text-gray-700', icon: 'help-circle' };
 
   const seleccionada = servicio.cotizacionesProveedor.find(cp => cp.seleccionada);
   const serviciosCount = servicio.cotizacionesProveedor.length;
 
-  // Actualizar margen
-  const handleMargenBlur = () => {
-    const val = Number(margenLocal);
+  // Actualizar profit absoluto
+  const handleProfitBlur = () => {
+    const val = Number(profitLocal);
     if (!isNaN(val)) {
-      onUpdateServicio({ ...servicio, margen: val });
+      onUpdateServicio({ ...servicio, profit: val });
     }
   };
 
-  // Seleccionar/deseleccionar proveedor
+  // Seleccionar/deseleccionar proveedor (resetea profit si se deselecciona todo)
   const handleSeleccionar = (cpId: string) => {
     const updated = servicio.cotizacionesProveedor.map(cp => ({
       ...cp,
@@ -371,31 +372,38 @@ function ServicioRow({ servicio, quoteId, onUpdateServicio }: ServicioRowProps) 
             </div>
           )}
 
-          {/* Margen + total calculado */}
-          {seleccionada && (
-            <div className="flex items-center justify-between bg-green-50 border border-green-100 rounded-lg px-3 py-2.5">
-              <div className="text-xs text-green-700">
-                <span className="font-bold">Proveedor seleccionado:</span>{' '}
-                {seleccionada.proveedor} — ${seleccionada.monto.toLocaleString()} {seleccionada.moneda}
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <span className="text-gray-500 font-semibold">Margen:</span>
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    value={margenLocal}
-                    onChange={e => setMargenLocal(e.target.value)}
-                    onBlur={handleMargenBlur}
-                    className="w-12 text-center border border-gray-200 rounded-md px-1 py-0.5 text-xs outline-none focus:border-indigo-400"
-                  />
-                  <span className="text-gray-400">%</span>
+          {/* Profit absoluto → Venta / Margen calculados */}
+          {seleccionada && (() => {
+            const linea = calcLinea(seleccionada.monto, Number(profitLocal) || 0);
+            return (
+              <div className="bg-green-50 border border-green-100 rounded-lg px-3 py-2.5 space-y-2">
+                <div className="text-xs text-green-700 font-bold">
+                  Costo proveedor: ${seleccionada.monto.toLocaleString()} {seleccionada.moneda}
+                  <span className="ml-2 font-normal text-gray-500">({seleccionada.proveedor})</span>
                 </div>
-                <span className="font-bold text-green-800">
-                  = ${(seleccionada.monto * (1 + (Number(margenLocal) || 0) / 100)).toLocaleString()} {seleccionada.moneda}
-                </span>
+                <div className="flex items-center gap-3 text-xs flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <span className="text-gray-500 font-semibold">Profit $</span>
+                    <input
+                      type="number"
+                      value={profitLocal}
+                      onChange={e => setProfitLocal(e.target.value)}
+                      onBlur={handleProfitBlur}
+                      className="w-20 text-center border border-gray-200 rounded-md px-1 py-0.5 text-xs outline-none focus:border-indigo-400"
+                      placeholder="0"
+                    />
+                  </div>
+                  <span className="text-gray-300">→</span>
+                  <span className="font-bold text-indigo-900">
+                    Venta: ${linea.venta.toLocaleString()} {seleccionada.moneda}
+                  </span>
+                  <span className="text-green-700 font-semibold">
+                    Margen: {(linea.margen * 100).toFixed(1)}%
+                  </span>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Botón añadir cotización de proveedor */}
           {!showForm ? (

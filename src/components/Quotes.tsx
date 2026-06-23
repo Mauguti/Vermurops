@@ -705,7 +705,7 @@ export default function Quotes() {
                     id: folio, etapa: 'solicitud_cliente',
                     prospecto: { empresa: p.empresa, contacto: p.contactoNombre || 'Por definir', telefono: p.contactoTel || '—', email: p.contactoEmail || '—', origen: p.origenLead as any },
                     vendedorId: p.responsable || user?.nombre || '', pricingId: null,
-                    servicios: p.servicioPotencial.map((tipo, i) => ({ id: `srv-${nextNumber}-${tipo}`, tipo, ruta: { origen: 'Por definir', destino: 'Por definir' }, incoterm: 'FOB', mercancia: 'Por definir', peso: 0, volumen: 0, estado: 'pendiente' as const, recargosPct: 0, margen: 0, cotizacionesProveedor: [] })),
+                    servicios: p.servicioPotencial.map((tipo, i) => ({ id: `srv-${nextNumber}-${tipo}`, tipo, ruta: { origen: 'Por definir', destino: 'Por definir' }, incoterm: 'FOB', mercancia: 'Por definir', peso: 0, volumen: 0, estado: 'pendiente' as const, cotizacionesProveedor: [], profit: 0, recargosPct: 0, conceptos: [] })),
                     valorTotalConsolidado: 0, moneda: 'USD', estadoFinal: null, motivoPerdida: null,
                     createdAt: fechaActual, updatedAt: fechaActual,
                     historialEtapas: [{ etapa: 'solicitud_cliente', fecha: fechaActual }], actividades: [],

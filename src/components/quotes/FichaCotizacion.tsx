@@ -15,6 +15,7 @@ import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
 import { useServicios, renderIcon } from '../../config/serviciosStore';
 import { storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { calcLinea } from '../../lib/cotizacionCalculator';
 
 interface FichaCotizacionProps {
   quote: KanbanQuote | null;
@@ -232,9 +233,10 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
     const newConcepto: ConceptoCotizacion = {
       id: `conc-${Date.now()}`,
       nombre: 'Nuevo Concepto',
+      costo: 0, profit: 0, venta: 0, margen: 0,
       subconceptos: [],
       tarifas: [],
-      profit: 0
+      proveedorOficialId: null,
     };
     onUpdateServicio({ ...servicio, conceptos: [...(servicio.conceptos || []), newConcepto] });
   };
@@ -359,23 +361,32 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
 export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete }: { concepto: ConceptoCotizacion, rolActivo: string, onUpdate: (c: ConceptoCotizacion) => void, onDelete: () => void }) {
   const [newSubNombre, setNewSubNombre] = useState('');
   const [newSubCosto, setNewSubCosto] = useState('');
-  
+
   const tarifaOficial = concepto.tarifas?.find(t => t.id === concepto.proveedorOficialId);
   const costoOficial = tarifaOficial ? tarifaOficial.monto : 0;
   const costoSubconceptos = (concepto.subconceptos || []).reduce((acc, sub) => acc + sub.costo, 0);
   const costoTotalConcepto = costoOficial + costoSubconceptos;
-  const precioVenta = costoTotalConcepto + (concepto.profit || 0);
-  const margenRealPct = precioVenta > 0 ? ((concepto.profit || 0) / precioVenta) * 100 : 0;
+  // Usa calcLinea para mantener consistencia con la calculadora de E1
+  const lineaCalc = calcLinea(costoTotalConcepto, concepto.profit || 0);
+  const precioVenta = lineaCalc.venta;
+  const margenRealPct = lineaCalc.margen * 100;
+
+  // Persistir costo/venta/margen calculados cada vez que cambian subconceptos
+  const updateConSubs = (newSubs: typeof concepto.subconceptos) => {
+    const newCosto = costoOficial + newSubs.reduce((acc, s) => acc + s.costo, 0);
+    const { venta, margen } = calcLinea(newCosto, concepto.profit || 0);
+    onUpdate({ ...concepto, subconceptos: newSubs, costo: newCosto, venta, margen });
+  };
 
   const handleAddSub = () => {
     if (!newSubNombre || !newSubCosto) return;
     const sub = { id: `sub-${Date.now()}`, nombre: newSubNombre, costo: Number(newSubCosto), moneda: 'USD' as const };
-    onUpdate({ ...concepto, subconceptos: [...(concepto.subconceptos || []), sub] });
+    updateConSubs([...(concepto.subconceptos || []), sub]);
     setNewSubNombre(''); setNewSubCosto('');
   };
 
   const handleRemoveSub = (subId: string) => {
-    onUpdate({ ...concepto, subconceptos: (concepto.subconceptos || []).filter(s => s.id !== subId) });
+    updateConSubs((concepto.subconceptos || []).filter(s => s.id !== subId));
   };
 
   return (
@@ -444,11 +455,15 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete }: { c
         {rolActivo !== 'ventas' ? (
           <div className="flex items-center gap-2 border-l border-indigo-200 pl-3">
             <span className="text-[10px] text-indigo-600 font-bold uppercase">Profit: $</span>
-            <input 
-              type="number" 
-              value={concepto.profit === 0 && !concepto.profit ? '' : concepto.profit} 
-              onChange={e => onUpdate({ ...concepto, profit: Number(e.target.value) })}
-              className="w-20 text-xs font-bold text-indigo-700 border border-indigo-200 focus:border-indigo-400 rounded px-1.5 py-1 outline-none text-right shadow-sm" 
+            <input
+              type="number"
+              value={concepto.profit === 0 && !concepto.profit ? '' : concepto.profit}
+              onChange={e => {
+                const newProfit = Number(e.target.value) || 0;
+                const { venta, margen } = calcLinea(costoTotalConcepto, newProfit);
+                onUpdate({ ...concepto, profit: newProfit, costo: costoTotalConcepto, venta, margen });
+              }}
+              className="w-20 text-xs font-bold text-indigo-700 border border-indigo-200 focus:border-indigo-400 rounded px-1.5 py-1 outline-none text-right shadow-sm"
               placeholder="0"
             />
           </div>
@@ -520,7 +535,8 @@ export default function FichaCotizacion({
       peso: 0,
       volumen: 0,
       estado: 'pendiente',
-      conceptos: []
+      cotizacionesProveedor: [], profit: 0, recargosPct: 0,
+      conceptos: [],
     };
     onUpdateQuote({
       ...quote,
@@ -708,7 +724,7 @@ export default function FichaCotizacion({
             {quote.servicios.filter(s => s.cotizacionesProveedor.some(cp => cp.seleccionada)).map(srv => {
               const def = servicios.find(s => s.id === srv.tipo);
               const prov = srv.cotizacionesProveedor.find(cp => cp.seleccionada)!;
-              const costoVenta = prov.monto * (1 + (srv.recargosPct / 100) + (srv.margen / 100));
+              const linea = calcLinea(prov.monto, srv.profit);
               return (
                 <div key={srv.id} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0 text-xs">
                   <div className="flex-1">
@@ -723,18 +739,18 @@ export default function FichaCotizacion({
                     {rolActivo !== 'ventas' && (
                       <>
                         <div className="w-16">
-                          <p className="text-[9px] text-gray-400 uppercase">Recargos</p>
-                          <p className="font-semibold text-gray-700 tabular-nums">{srv.recargosPct}%</p>
+                          <p className="text-[9px] text-gray-400 uppercase">Profit $</p>
+                          <p className="font-semibold text-gray-700 tabular-nums">${(srv.profit || 0).toLocaleString()}</p>
                         </div>
                         <div className="w-16">
                           <p className="text-[9px] text-gray-400 uppercase">Margen</p>
-                          <p className="font-semibold text-gray-700 tabular-nums">{srv.margen}%</p>
+                          <p className="font-semibold text-gray-700 tabular-nums">{(linea.margen * 100).toFixed(1)}%</p>
                         </div>
                       </>
                     )}
                     <div className="w-24">
                       <p className="text-[9px] text-indigo-400 font-bold uppercase">Venta</p>
-                      <p className="font-black text-indigo-900 tabular-nums">${costoVenta.toLocaleString()} {prov.moneda}</p>
+                      <p className="font-black text-indigo-900 tabular-nums">${linea.venta.toLocaleString()} {prov.moneda}</p>
                     </div>
                   </div>
                 </div>
