@@ -96,11 +96,38 @@ export interface ServicioSolicitado {
   volumen: number;        // m³ / CBM
   estado: 'pendiente' | 'solicitado_proveedores' | 'cotizado';
   // ── Vista plana — BandejaPricing ────────────────────────────────────────
-  cotizacionesProveedor: CotizacionProveedor[]; // Opciones de proveedor para este servicio
-  profit: number;      // Profit absoluto $ — INPUT de Pricing (reemplaza margen %)
-  recargosPct: number; // Recargos adicionales % (display only por ahora)
+  cotizacionesProveedor: CotizacionProveedor[];
+  profit: number;
+  recargosPct: number;
   // ── Vista detallada — FichaCotizacion (modelo Luis lineas_cotizacion) ───
   conceptos: ConceptoCotizacion[];
+
+  // ── Campos condicionales de embarque (E4 — modelo Luis solicitudes) ─────
+  // Marítimo: tipo de embarque
+  tipo_embarque?: 'FCL' | 'LCL' | 'ninguno';
+  // FCL (Full Container Load)
+  fcl_contenedor?: string;          // ej. "20'GP", "40'HC", "40'RH", "20'Reef"
+  fcl_peso?: number;
+  fcl_peso_unidad?: 'kg' | 'tons';
+  fcl_reqs?: string;                // Requerimientos especiales texto libre
+  food_grade?: boolean;
+  reforzado?: boolean;
+  sobredimension?: boolean;
+  enlonado?: boolean;
+  atmos_controlada?: boolean;
+  // LCL (Less than Container Load)
+  lcl_num_pallets?: number;
+  lcl_estibable?: boolean;
+  lcl_cubicaje_total?: number;      // CBM total
+  // Terrestre
+  ter_tipo?: 'FTL' | 'LTL';        // Full Truck Load | Less Than Truck
+  ter_unidad?: string;              // ej. "Torton", "Rabón", "Caja seca 53'"
+  ter_num_pallets?: number;
+  ter_peso?: number;
+  ter_peso_unidad?: 'kg' | 'tons';
+  ter_medidas?: string;             // dimensiones texto libre
+  ter_volumen?: number;
+  ter_estibable?: boolean;
 }
 
 // ------------------------------------------------------------

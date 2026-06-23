@@ -187,15 +187,17 @@ interface ServicioSectionProps {
   servicio: ServicioSolicitado;
   rolActivo: 'ventas' | 'pricing' | 'admin';
   onUpdateServicio: (updated: ServicioSolicitado) => void;
-}
-
-interface ServicioSectionProps {
-  key?: React.Key;
-  servicio: ServicioSolicitado;
-  rolActivo: 'ventas' | 'pricing' | 'admin';
-  onUpdateServicio: (updated: ServicioSolicitado) => void;
   servicios: any[];
   renderIcon: any;
+}
+
+/** Detecta la modalidad de transporte por tipo (clave legacy o nombre) e icono. */
+function getModality(tipo: string, icono: string): 'maritimo' | 'terrestre' | 'otro' {
+  const t = tipo.toLowerCase();
+  const i = icono.toLowerCase();
+  if (t.includes('maritim') || t === 'flete internacional' || i === 'ship' || i === 'anchor') return 'maritimo';
+  if (t.includes('terrestre') || t.includes('recolec') || i === 'truck' || i === 'map-pin') return 'terrestre';
+  return 'otro';
 }
 
 export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servicios, renderIcon }: ServicioSectionProps) {
@@ -204,8 +206,9 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
   const def = (servicios ?? []).find((s: any) => s.id === servicio.tipo);
   const nombreSrv = def?.nombre || servicio.tipo;
   const iconSrv = def?.icono || 'HelpCircle';
+  const modality = getModality(servicio.tipo, iconSrv);
 
-  const inputCls = 'w-full text-xs text-gray-700 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200 rounded-lg px-2 py-1.5 focus:bg-white focus:border-[#E11D48] outline-none transition-all';
+  const inputCls ='w-full text-xs text-gray-700 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200 rounded-lg px-2 py-1.5 focus:bg-white focus:border-[#E11D48] outline-none transition-all';
 
   const handleFieldChange = (field: keyof ServicioSolicitado | 'ruta_origen' | 'ruta_destino' | 'ruta_aduana_salida' | 'ruta_aduana_recepcion', value: any) => {
     if (field === 'ruta_origen') {
@@ -314,6 +317,144 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
               <input type="number" value={servicio.volumen || ''} onChange={e => handleFieldChange('volumen', Number(e.target.value))} className={inputCls} />
             </div>
           </div>
+
+          {/* ── E4: Campos condicionales de embarque ──────────────────────── */}
+          {modality === 'maritimo' && (
+            <div className="border-t border-blue-100 pt-3 space-y-3">
+              <h5 className="text-[9px] font-bold text-blue-500 uppercase tracking-widest">Embarque Marítimo</h5>
+              {/* Selector FCL / LCL / Ninguno */}
+              <div className="flex items-center gap-2">
+                {(['FCL', 'LCL', 'ninguno'] as const).map(opt => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => handleFieldChange('tipo_embarque', opt)}
+                    className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-all
+                      ${servicio.tipo_embarque === opt
+                        ? 'bg-blue-600 text-white border-blue-600'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}
+                  >
+                    {opt === 'ninguno' ? 'Ninguno' : opt}
+                  </button>
+                ))}
+              </div>
+
+              {/* FCL fields */}
+              {servicio.tipo_embarque === 'FCL' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Contenedor</label>
+                    <select value={servicio.fcl_contenedor || ''} onChange={e => handleFieldChange('fcl_contenedor', e.target.value)} className={inputCls}>
+                      <option value="">— Tipo —</option>
+                      {["20' GP", "40' GP", "40' HC", "20' Reef", "40' Reef", "45' HC"].map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Peso FCL</label>
+                    <div className="flex gap-1">
+                      <input type="number" value={servicio.fcl_peso || ''} onChange={e => handleFieldChange('fcl_peso', Number(e.target.value))} className={inputCls} placeholder="0" />
+                      <select value={servicio.fcl_peso_unidad || 'kg'} onChange={e => handleFieldChange('fcl_peso_unidad', e.target.value)} className="text-xs border border-transparent hover:border-gray-200 bg-transparent rounded-lg px-1 focus:bg-white focus:border-[#E11D48] outline-none">
+                        <option value="kg">kg</option><option value="tons">tons</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Requerimientos especiales</label>
+                    <input type="text" value={servicio.fcl_reqs || ''} onChange={e => handleFieldChange('fcl_reqs', e.target.value)} className={inputCls} placeholder="Ej: temperatura controlada, humedad < 60%" />
+                  </div>
+                  <div className="col-span-2 flex flex-wrap gap-x-4 gap-y-2">
+                    {([
+                      ['food_grade', 'Food Grade'],
+                      ['reforzado', 'Reforzado'],
+                      ['sobredimension', 'Sobredimensión'],
+                      ['enlonado', 'Enlonado'],
+                      ['atmos_controlada', 'Atmósfera Controlada'],
+                    ] as const).map(([field, label]) => (
+                      <label key={field} className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer select-none">
+                        <input type="checkbox" checked={!!(servicio as any)[field]} onChange={e => handleFieldChange(field as keyof ServicioSolicitado, e.target.checked)} className="accent-blue-600" />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* LCL fields */}
+              {servicio.tipo_embarque === 'LCL' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Núm. Pallets</label>
+                    <input type="number" value={servicio.lcl_num_pallets || ''} onChange={e => handleFieldChange('lcl_num_pallets', Number(e.target.value))} className={inputCls} placeholder="0" />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Cubicaje Total (CBM)</label>
+                    <input type="number" value={servicio.lcl_cubicaje_total || ''} onChange={e => handleFieldChange('lcl_cubicaje_total', Number(e.target.value))} className={inputCls} placeholder="0.00" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer select-none">
+                      <input type="checkbox" checked={!!servicio.lcl_estibable} onChange={e => handleFieldChange('lcl_estibable', e.target.checked)} className="accent-blue-600" />
+                      Estibable
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {modality === 'terrestre' && (
+            <div className="border-t border-emerald-100 pt-3 space-y-3">
+              <h5 className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Carga Terrestre</h5>
+              {/* FTL / LTL selector */}
+              <div className="flex items-center gap-2">
+                {(['FTL', 'LTL'] as const).map(opt => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => handleFieldChange('ter_tipo', opt)}
+                    className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-all
+                      ${servicio.ter_tipo === opt
+                        ? 'bg-emerald-600 text-white border-emerald-600'
+                        : 'bg-white text-gray-600 border-gray-200 hover:border-emerald-300'}`}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Unidad</label>
+                  <input type="text" value={servicio.ter_unidad || ''} onChange={e => handleFieldChange('ter_unidad', e.target.value)} className={inputCls} placeholder="Ej: Torton, Rabón, Caja 53'" />
+                </div>
+                <div>
+                  <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Núm. Pallets</label>
+                  <input type="number" value={servicio.ter_num_pallets || ''} onChange={e => handleFieldChange('ter_num_pallets', Number(e.target.value))} className={inputCls} placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Peso</label>
+                  <div className="flex gap-1">
+                    <input type="number" value={servicio.ter_peso || ''} onChange={e => handleFieldChange('ter_peso', Number(e.target.value))} className={inputCls} placeholder="0" />
+                    <select value={servicio.ter_peso_unidad || 'kg'} onChange={e => handleFieldChange('ter_peso_unidad', e.target.value)} className="text-xs border border-transparent hover:border-gray-200 bg-transparent rounded-lg px-1 focus:bg-white focus:border-[#E11D48] outline-none">
+                      <option value="kg">kg</option><option value="tons">tons</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Medidas</label>
+                  <input type="text" value={servicio.ter_medidas || ''} onChange={e => handleFieldChange('ter_medidas', e.target.value)} className={inputCls} placeholder="Ej: 120×100×80 cm" />
+                </div>
+                <div>
+                  <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Volumen terrestre (m³)</label>
+                  <input type="number" value={servicio.ter_volumen || ''} onChange={e => handleFieldChange('ter_volumen', Number(e.target.value))} className={inputCls} placeholder="0.00" />
+                </div>
+                <div className="flex items-end pb-1">
+                  <label className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer select-none">
+                    <input type="checkbox" checked={!!servicio.ter_estibable} onChange={e => handleFieldChange('ter_estibable', e.target.checked)} className="accent-emerald-600" />
+                    Estibable
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Conceptos */}
           <div className="border-t border-gray-150 pt-4 mt-4 space-y-3">
