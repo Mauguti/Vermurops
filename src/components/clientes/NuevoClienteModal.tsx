@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ClienteVermur } from './ClientesData';
+import { validarRFC } from '../../lib/validadores';
 import { X, Loader2 } from 'lucide-react';
 
 interface Props {
@@ -23,13 +24,25 @@ export default function NuevoClienteModal({ onClose, onCreate }: Props) {
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  // Feedback inline de formato del RFC (se muestra al salir del campo).
+  const [rfcError, setRfcError] = useState('');
 
   const s = <K extends keyof typeof form>(k: K, v: typeof form[K]) =>
     setForm(prev => ({ ...prev, [k]: v }));
 
+  // Valida el formato del RFC al salir del campo (onBlur), solo si hay algo escrito.
+  const handleRfcBlur = () => {
+    const rfc = form.rfc.trim();
+    setRfcError(rfc === '' ? '' : validarRFC(rfc).error);
+  };
+
   const handleSubmit = async () => {
     if (!form.nombre.trim()) { setError('La razón social es obligatoria.'); return; }
     if (!form.rfc.trim())    { setError('El RFC es obligatorio.'); return; }
+    // Bloqueo por formato de RFC inválido (alta nueva siempre valida).
+    const rfcCheck = validarRFC(form.rfc);
+    if (!rfcCheck.valido) { setRfcError(rfcCheck.error); setError(rfcCheck.error); return; }
+    setRfcError('');
     setError('');
     setSaving(true);
     try {
@@ -98,11 +111,13 @@ export default function NuevoClienteModal({ onClose, onCreate }: Props) {
             <div>
               <label className={LABEL}>RFC *</label>
               <input
-                className={INPUT}
+                className={`${INPUT} ${rfcError ? 'border-danger-text focus:border-danger-text focus:ring-danger-text' : ''}`}
                 value={form.rfc}
-                onChange={e => s('rfc', e.target.value.toUpperCase())}
+                onChange={e => { s('rfc', e.target.value.toUpperCase()); if (rfcError) setRfcError(''); }}
+                onBlur={handleRfcBlur}
                 placeholder="XAXX010101000"
               />
+              {rfcError && <p className="mt-1 text-[11px] text-danger-text">{rfcError}</p>}
             </div>
             <div>
               <label className={LABEL}>Nombre comercial</label>

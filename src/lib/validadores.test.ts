@@ -29,6 +29,13 @@ describe('validarRFC', () => {
     expect(validarRFC('  gode561231gr8  ').valido).toBe(true);
   });
 
+  it('acepta los RFC genéricos del SAT vía whitelist (nacional y extranjero)', () => {
+    expect(validarRFC('XAXX010101000')).toEqual({ valido: true, error: '' });
+    expect(validarRFC('XEXX010101000')).toEqual({ valido: true, error: '' });
+    // También con minúsculas/espacios (se normaliza antes de la whitelist).
+    expect(validarRFC('  xexx010101000  ').valido).toBe(true);
+  });
+
   it('acepta RFC moral con & en el nombre (formato permitido)', () => {
     // Estructura moral con & — solo verificamos que el formato no lo rechace
     // por el carácter; el dígito se calcula igual.

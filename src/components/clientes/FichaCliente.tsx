@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ClienteVermur } from './ClientesData';
+import { validarRFC } from '../../lib/validadores';
 import { ChevronRight, Loader2, Check } from 'lucide-react';
 
 interface Props {
@@ -68,11 +69,35 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
   const [tab, setTab] = useState<TabId>('informacion');
   const [draft, setDraft] = useState<ClienteVermur>(cliente);
   const [saving, setSaving] = useState(false);
+  // Feedback inline de formato del RFC (solo en pestaña Información).
+  const [rfcError, setRfcError] = useState('');
 
   // Reset draft when Firestore confirms write (onSnapshot pushes fresh cliente)
   useEffect(() => {
     setDraft(cliente);
+    setRfcError('');
   }, [cliente]);
+
+  // ¿El usuario modificó el RFC respecto al valor guardado? Solo entonces se valida
+  // (backward compat: RFCs heredados intactos nunca bloquean el guardado).
+  const rfcModificado = () => draft.rfc.trim().toUpperCase() !== cliente.rfc.trim().toUpperCase();
+
+  // Valida el RFC al salir del campo, solo si fue modificado y tiene contenido.
+  const handleRfcBlur = () => {
+    const rfc = draft.rfc.trim();
+    setRfcError(rfc !== '' && rfcModificado() ? validarRFC(rfc).error : '');
+  };
+
+  // Guarda la pestaña Información con guard de RFC: si el RFC fue modificado y es
+  // inválido, bloquea; si no se tocó, no valida (heredados pasan siempre).
+  const saveInformacion = (fields: Partial<ClienteVermur>) => {
+    if (rfcModificado()) {
+      const check = validarRFC(draft.rfc);
+      if (!check.valido) { setRfcError(check.error); return; }
+    }
+    setRfcError('');
+    save(fields);
+  };
 
   const set = <K extends keyof ClienteVermur>(key: K, val: ClienteVermur[K]) =>
     setDraft(prev => ({ ...prev, [key]: val }));
@@ -192,8 +217,12 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                     onChange={e => set('representante', e.target.value)} />
                 </Field>
                 <Field label="RFC">
-                  <input className={INPUT} value={draft.rfc}
-                    onChange={e => set('rfc', e.target.value.toUpperCase())} />
+                  <input
+                    className={`${INPUT} ${rfcError ? 'border-danger-text focus:border-danger-text focus:ring-danger-text' : ''}`}
+                    value={draft.rfc}
+                    onChange={e => { set('rfc', e.target.value.toUpperCase()); if (rfcError) setRfcError(''); }}
+                    onBlur={handleRfcBlur} />
+                  {rfcError && <p className="mt-1 text-[11px] text-danger-text">{rfcError}</p>}
                 </Field>
                 <Field label="Teléfono">
                   <input className={INPUT} value={draft.telefono}
@@ -231,7 +260,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                   </Field>
                 </div>
               </div>
-              <SaveBar saving={saving} onSave={() => save({
+              <SaveBar saving={saving} onSave={() => saveInformacion({
                 nombre: draft.nombre, comercial: draft.comercial,
                 representante: draft.representante, rfc: draft.rfc,
                 domicilio: draft.domicilio, telefono: draft.telefono,

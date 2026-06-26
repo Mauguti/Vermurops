@@ -47,6 +47,16 @@ const RFC_FISICA = /^[A-ZÑ&]{4}[0-9]{6}[A-Z0-9]{2}[0-9A]$/;
 const RFC_DICCIONARIO = '0123456789ABCDEFGHIJKLMN&OPQRSTUVWXYZ Ñ';
 
 /**
+ * RFCs genéricos oficiales del SAT. Son válidos ante el SAT aunque NO cumplen
+ * el dígito verificador estándar, por lo que se aceptan vía whitelist.
+ *   - XAXX010101000: genérico NACIONAL (operaciones con público en general /
+ *                    clientes sin RFC mexicano).
+ *   - XEXX010101000: genérico EXTRANJERO (residentes en el extranjero sin RFC).
+ * Relevantes para Vermur por su operación de comercio internacional.
+ */
+const RFC_GENERICOS = new Set(['XAXX010101000', 'XEXX010101000']);
+
+/**
  * Calcula el dígito verificador esperado para los primeros 11 (física) o
  * 10 (moral) caracteres del RFC, siguiendo el algoritmo oficial del SAT.
  *
@@ -84,6 +94,9 @@ export function validarRFC(rfcInput: string): ResultadoValidacion {
   const rfc = (rfcInput ?? '').trim().toUpperCase();
 
   if (rfc === '') return fail('El RFC es obligatorio.');
+
+  // RFCs genéricos del SAT: válidos por whitelist (no pasan dígito verificador).
+  if (RFC_GENERICOS.has(rfc)) return OK;
 
   if (rfc.length !== 12 && rfc.length !== 13) {
     return fail('El RFC debe tener 12 dígitos (moral) o 13 (física).');
