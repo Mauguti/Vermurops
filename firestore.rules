@@ -36,6 +36,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Proveedores ─────────────────────────────────────────────────────
+    // Cualquier usuario autenticado puede leer y crear/actualizar.
+    // Eliminar está prohibido: un proveedor inactivo se marca activo=false.
+    match /proveedores/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // ── Notificaciones ────────────────────────────────────────────────────
     // Lectura: solo el destinatario nombrado en el documento.
     //   Alinea con la query de NotificationsContext:
