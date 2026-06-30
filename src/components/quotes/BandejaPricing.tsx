@@ -9,6 +9,8 @@ import {
 } from './QuotesData';
 import { calcLinea } from '../../lib/cotizacionCalculator';
 import FichaCotizacion from './FichaCotizacion';
+import { useProveedores } from '../../hooks/useProveedores';
+import { ProveedorVermur, Modalidad, contactoPrincipal } from '../proveedores/ProveedoresData';
 
 interface BandejaPricingProps {
   quotes: KanbanQuote[];
@@ -36,9 +38,11 @@ function ServicioIcon({ tipo }: { tipo: TipoServicio }) {
 interface FormProveedorProps {
   onGuardar: (cp: CotizacionProveedor) => void;
   onCancelar: () => void;
+  servicioTipo: TipoServicio;
+  proveedores: ProveedorVermur[];
 }
 
-function FormProveedor({ onGuardar, onCancelar }: FormProveedorProps) {
+function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: FormProveedorProps) {
   const [proveedor, setProveedor] = useState('');
   const [contacto, setContacto] = useState('');
   const [monto, setMonto] = useState('');
@@ -46,6 +50,20 @@ function FormProveedor({ onGuardar, onCancelar }: FormProveedorProps) {
   const [tiempo, setTiempo] = useState('');
   const [vigencia, setVigencia] = useState('');
   const [condiciones, setCondiciones] = useState('');
+
+  // Filtrar proveedores por modalidad del servicio.
+  // Tipos directos (maritimo, aereo, terrestre, aduanal) y sus labels legibles
+  // mapean a la modalidad correspondiente. El resto muestra todos los activos.
+  const TIPO_A_MODALIDAD: Record<string, Modalidad> = {
+    'maritimo': 'maritimo', 'Flete Internacional': 'maritimo',
+    'aereo': 'aereo', 'Transporte Aéreo': 'aereo',
+    'terrestre': 'terrestre', 'Transporte Terrestre': 'terrestre', 'Recolección': 'terrestre',
+    'aduanal': 'aduanal', 'Asesoría Aduanal': 'aduanal',
+  };
+  const modalidadFiltro = TIPO_A_MODALIDAD[servicioTipo];
+  const availableProviders = proveedores.filter(p =>
+    p.activo && (modalidadFiltro ? p.modalidades.includes(modalidadFiltro) : true)
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,14 +95,27 @@ function FormProveedor({ onGuardar, onCancelar }: FormProveedorProps) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Proveedor *</label>
-          <input
+          <select
             required
-            type="text"
-            placeholder="Ej. Evergreen Line"
             value={proveedor}
-            onChange={e => setProveedor(e.target.value)}
+            onChange={e => {
+              const provName = e.target.value;
+              setProveedor(provName);
+              const provObj = availableProviders.find(p => p.nombre === provName);
+              if (provObj) {
+                const cp = contactoPrincipal(provObj);
+                setContacto(cp?.nombre ?? '');
+              } else {
+                setContacto('');
+              }
+            }}
             className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-indigo-400 bg-white"
-          />
+          >
+            <option value="">Seleccionar proveedor...</option>
+            {availableProviders.map(p => (
+              <option key={p.id} value={p.nombre}>{p.nombre}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Contacto</label>
@@ -94,6 +125,7 @@ function FormProveedor({ onGuardar, onCancelar }: FormProveedorProps) {
             value={contacto}
             onChange={e => setContacto(e.target.value)}
             className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-indigo-400 bg-white"
+            readOnly
           />
         </div>
       </div>
@@ -250,6 +282,7 @@ interface ServicioRowProps {
 }
 
 function ServicioRow({ servicio, quoteId, onUpdateServicio }: ServicioRowProps) {
+  const { proveedores } = useProveedores();
   const [expanded, setExpanded] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [profitLocal, setProfitLocal] = useState(String(servicio.profit ?? 0));
@@ -417,6 +450,8 @@ function ServicioRow({ servicio, quoteId, onUpdateServicio }: ServicioRowProps) 
             <FormProveedor
               onGuardar={handleGuardarProveedor}
               onCancelar={() => setShowForm(false)}
+              servicioTipo={servicio.tipo}
+              proveedores={proveedores}
             />
           )}
         </div>
