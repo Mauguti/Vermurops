@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { RFQ, ProviderQuote, Modality, RFQService } from './PricingData';
-import { initialProviders } from '../../data';
+import { useProveedores } from '../../hooks/useProveedores';
 import { ChevronRight, ChevronDown, Check, X, Plane, Ship, Truck, FileText, Plus, DollarSign, Send, ArrowLeft, Paperclip, File as FileIcon, HelpCircle } from 'lucide-react';
 import { useServicios, renderIcon } from '../../config/serviciosStore';
 
@@ -11,6 +11,7 @@ interface FichaRFQProps {
 }
 
 export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
+  const { proveedores } = useProveedores();
   const [expandedServices, setExpandedServices] = useState<string[]>(rfq.services.map(s => s.id));
   const [surcharges, setSurcharges] = useState(rfq.surchargesPercent);
   const [margin, setMargin] = useState(rfq.marginPercent);
@@ -162,12 +163,12 @@ export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
             const iconSrv = def?.icono || 'HelpCircle';
             
             // Filtro de proveedores según la categoría
-            const availableProviders = initialProviders.filter(p => {
-              if (!p.active) return false;
+            const availableProviders = proveedores.filter(p => {
+              if (!p.activo) return false;
               if (def?.categoria === 'transporte') {
-                return p.modalities.includes('maritimo') || p.modalities.includes('aereo') || p.modalities.includes('terrestre');
+                return p.modalidades.includes('maritimo') || p.modalidades.includes('aereo') || p.modalidades.includes('terrestre');
               } else if (def?.categoria === 'aduana') {
-                return p.modalities.includes('aduanal');
+                return p.modalidades.includes('aduanal');
               } else {
                 // carga y otros -> todos los activos
                 return true;
@@ -259,7 +260,7 @@ export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
                               value={newProvName} onChange={e => setNewProvName(e.target.value)}
                             >
                               <option value="">Seleccionar...</option>
-                              {availableProviders.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                              {availableProviders.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
                             </select>
                           </div>
                           <div className="col-span-2 md:col-span-1">

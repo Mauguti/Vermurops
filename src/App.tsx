@@ -249,8 +249,7 @@ function AppShell() {
   const [currentView, setCurrentView] = useState('dashboard');
   const [showPortal, setShowPortal] = useState(false);
 
-  // E9.0: montar hook para que el seed de proveedores se escriba a Firestore.
-  // En E9.1 los componentes que hoy leen initialProviders pasarán a usar este hook.
+  // E9: seed de proveedores a Firestore en cualquier vista (no solo Clientes).
   useProveedores();
 
   const safeNavigate = (view: string) => {

@@ -71,6 +71,13 @@ export interface ProveedorVermur {
   updatedAt: string;    // ISO timestamp
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Devuelve el contacto marcado como principal, o el primero del array. */
+export function contactoPrincipal(p: ProveedorVermur): ContactoProveedor | undefined {
+  return p.contactos.find(c => c.principal) ?? p.contactos[0];
+}
+
 // ─── Seed de desarrollo ────────────────────────────────────────────────────────
 // Migración de los 5 proveedores de data.ts (initialProviders) al modelo
 // enriquecido. El contacto único se convierte en array de 1 con principal=true.

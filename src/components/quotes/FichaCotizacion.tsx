@@ -10,7 +10,8 @@ import {
   INCOTERMS, Subconcepto, EQUIPO_PRICING, VENDEDORES, calcularTotalConsolidado,
   PipelineStageId,
 } from './QuotesData';
-import { initialProviders } from '../../data';
+import { ProveedorVermur, contactoPrincipal } from '../proveedores/ProveedoresData';
+import { useProveedores } from '../../hooks/useProveedores';
 import { useAuth } from '../../auth/AuthContext';
 import { useNotifications } from '../../notifications/NotificationsContext';
 import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
@@ -37,9 +38,10 @@ interface FormProveedorProps {
   onGuardar: (cp: CotizacionProveedor) => void;
   onCancelar: () => void;
   servicioTipo: TipoServicio;
+  proveedores: ProveedorVermur[];
 }
 
-function FormProveedor({ onGuardar, onCancelar, servicioTipo }: FormProveedorProps) {
+function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: FormProveedorProps) {
   const [proveedor, setProveedor] = useState('');
   const [contacto, setContacto] = useState('');
   const [monto, setMonto] = useState('');
@@ -83,14 +85,15 @@ function FormProveedor({ onGuardar, onCancelar, servicioTipo }: FormProveedorPro
   const labelCls = 'block text-[9px] font-bold text-gray-400 uppercase mb-1';
   const inputCls = 'w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-indigo-400 bg-white';
 
-  const availableProviders = initialProviders.filter(p => p.active && p.modalities.includes(servicioTipo as any));
+  const availableProviders = proveedores.filter(p => p.activo && p.modalidades.includes(servicioTipo as any));
 
   const handleProveedorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const provName = e.target.value;
     setProveedor(provName);
-    const provObj = availableProviders.find(p => p.name === provName);
+    const provObj = availableProviders.find(p => p.nombre === provName);
     if (provObj) {
-      setContacto(provObj.contact.name);
+      const cp = contactoPrincipal(provObj);
+      setContacto(cp?.nombre ?? '');
     } else {
       setContacto('');
     }
@@ -108,7 +111,7 @@ function FormProveedor({ onGuardar, onCancelar, servicioTipo }: FormProveedorPro
           <select required value={proveedor} onChange={handleProveedorChange} className={inputCls}>
             <option value="">Seleccionar proveedor...</option>
             {availableProviders.map(p => (
-              <option key={p.id} value={p.name}>{p.name}</option>
+              <option key={p.id} value={p.nombre}>{p.nombre}</option>
             ))}
           </select>
         </div>

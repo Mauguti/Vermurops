@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { initialProviders, Provider } from '../data';
 import { Search, Phone, Mail, Upload, Plane, Ship, Truck, FileText, Check, ChevronRight } from 'lucide-react';
 import { useClientes } from '../hooks/useClientes';
+import { useProveedores } from '../hooks/useProveedores';
+import { ProveedorVermur, contactoPrincipal } from './proveedores/ProveedoresData';
 import FichaCliente from './clientes/FichaCliente';
 import NuevoClienteModal from './clientes/NuevoClienteModal';
 
 export default function Clients() {
   const { clientes, loading, error, createCliente, updateCliente } = useClientes();
+  const { proveedores, loading: loadingProv, error: errorProv } = useProveedores();
   const [viewType, setViewType] = useState<'Clientes' | 'Proveedores'>('Clientes');
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,14 +17,14 @@ export default function Clients() {
   const [showModal, setShowModal] = useState(false);
 
   const [providerSearchTerm, setProviderSearchTerm] = useState('');
-  const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<ProveedorVermur | null>(null);
 
   // Derive selectedClient from live clientes array so FichaCliente always gets fresh data
   const selectedClient = selectedClientId
     ? (clientes.find(c => c.id === selectedClientId) ?? null)
     : null;
 
-  if (loading) {
+  if (loading || loadingProv) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
         <div className="w-8 h-8 border-4 border-brand/30 border-t-brand rounded-full animate-spin" />
@@ -30,12 +32,12 @@ export default function Clients() {
     );
   }
 
-  if (error) {
+  if (error || errorProv) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
         <div className="text-center">
-          <p className="text-[14px] font-medium text-danger-text mb-1">Error al cargar clientes</p>
-          <p className="text-[12px] text-text-muted">{error}</p>
+          <p className="text-[14px] font-medium text-danger-text mb-1">Error al cargar datos</p>
+          <p className="text-[12px] text-text-muted">{error || errorProv}</p>
         </div>
       </div>
     );
@@ -47,11 +49,12 @@ export default function Clients() {
     c.representante.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredProviders = initialProviders.filter(p =>
-    p.name.toLowerCase().includes(providerSearchTerm.toLowerCase()) ||
-    p.rfc.toLowerCase().includes(providerSearchTerm.toLowerCase()) ||
-    p.contact.name.toLowerCase().includes(providerSearchTerm.toLowerCase())
-  );
+  const filteredProviders = proveedores.filter(p => {
+    const cp = contactoPrincipal(p);
+    return p.nombre.toLowerCase().includes(providerSearchTerm.toLowerCase()) ||
+      p.rfc.toLowerCase().includes(providerSearchTerm.toLowerCase()) ||
+      (cp?.nombre ?? '').toLowerCase().includes(providerSearchTerm.toLowerCase());
+  });
 
   const tabs = ['Cuentas', 'Contactos', 'Leads', 'Oportunidades'];
   const providerTabs = ['Todos', 'Navieras', 'Aerolíneas', 'Transportistas', 'Aduanales'];
@@ -265,7 +268,9 @@ export default function Clients() {
 
           {/* Grid de proveedores */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[24px]">
-            {filteredProviders.map(provider => (
+            {filteredProviders.map(provider => {
+              const cp = contactoPrincipal(provider);
+              return (
               <div
                 key={provider.id}
                 onClick={() => setSelectedProvider(provider)}
@@ -273,15 +278,15 @@ export default function Clients() {
               >
                 <div className="p-[20px] pb-[16px] border-b border-divider">
                   <div className="flex justify-between items-start mb-[8px]">
-                    <h3 className="font-semibold text-text-primary text-[15px] leading-snug pr-[12px]">{provider.name}</h3>
-                    <span className={`shrink-0 text-[11px] font-medium tracking-[0.02em] px-[8px] py-[2px] rounded-[4px] ${provider.active ? 'bg-success-bg text-success-text' : 'bg-neutral-bg text-text-secondary'}`}>
-                      {provider.active ? 'Activo' : 'Inactivo'}
+                    <h3 className="font-semibold text-text-primary text-[15px] leading-snug pr-[12px]">{provider.nombre}</h3>
+                    <span className={`shrink-0 text-[11px] font-medium tracking-[0.02em] px-[8px] py-[2px] rounded-[4px] ${provider.activo ? 'bg-success-bg text-success-text' : 'bg-neutral-bg text-text-secondary'}`}>
+                      {provider.activo ? 'Activo' : 'Inactivo'}
                     </span>
                   </div>
 
                   {/* Modalidades Badges */}
                   <div className="flex flex-wrap gap-2 mt-3">
-                    {provider.modalities.map(mod => (
+                    {provider.modalidades.map(mod => (
                       <span key={mod} className="flex items-center bg-canvas border border-card-border text-text-secondary px-2 py-1 rounded-md text-[10px] font-medium uppercase tracking-wider">
                         {getTransportIcon(mod)}
                         {getTransportLabel(mod)}
@@ -291,45 +296,52 @@ export default function Clients() {
                 </div>
 
                 <div className="px-[20px] py-[16px] space-y-[10px] flex-1 bg-canvas">
+                  {cp && (
                   <div className="flex items-start text-[13px]">
                     <div className="w-[32px] h-[32px] bg-white border border-card-border rounded-full flex items-center justify-center font-bold text-brand mr-3 shrink-0">
-                      {provider.contact.name.charAt(0)}
+                      {cp.nombre.charAt(0)}
                     </div>
                     <div>
-                      <p className="font-medium text-text-primary leading-tight">{provider.contact.name}</p>
-                      <p className="text-[11px] text-text-muted mt-0.5">{provider.contact.role}</p>
+                      <p className="font-medium text-text-primary leading-tight">{cp.nombre}</p>
+                      <p className="text-[11px] text-text-muted mt-0.5">{cp.puesto}</p>
                     </div>
                   </div>
+                  )}
+                  {cp && (
                   <div className="mt-3 space-y-2">
                     <div className="flex items-center text-[12px] text-text-secondary">
                       <Mail className="w-[14px] h-[14px] mr-[10px] text-text-muted" />
-                      <span className="truncate">{provider.contact.email}</span>
+                      <span className="truncate">{cp.email}</span>
                     </div>
                     <div className="flex items-center text-[12px] text-text-secondary">
                       <Phone className="w-[14px] h-[14px] mr-[10px] text-text-muted" />
-                      {provider.contact.phone}
+                      {cp.telefono}
                     </div>
                   </div>
+                  )}
                 </div>
 
                 <div className="border-t border-divider py-[10px] bg-white text-center transition-colors group-hover:bg-brand/5">
                   <span className="text-[12px] font-medium text-text-primary group-hover:text-brand transition-colors">Ver ficha completa</span>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </>
       ) : null}
 
       {/* Ficha de Proveedor */}
-      {viewType === 'Proveedores' && selectedProvider ? (
+      {viewType === 'Proveedores' && selectedProvider ? (() => {
+        const cp = contactoPrincipal(selectedProvider);
+        return (
         <div className="space-y-[24px]">
           {/* Header Ficha Proveedor */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-[8px] text-[13px] text-text-secondary">
               <button onClick={() => setSelectedProvider(null)} className="hover:text-text-primary transition-colors">Proveedores</button>
               <ChevronRight className="w-4 h-4 text-text-muted" />
-              <span className="text-text-primary font-medium">{selectedProvider.name}</span>
+              <span className="text-text-primary font-medium">{selectedProvider.nombre}</span>
             </div>
             <div className="flex space-x-[12px]">
                <button className="bg-white border border-card-border text-text-primary px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium hover:bg-neutral-bg transition-colors shadow-sm">
@@ -348,10 +360,10 @@ export default function Clients() {
                 <div className="flex justify-between items-start">
                   <div className="flex items-center space-x-[16px] mb-[16px]">
                     <div className="w-[64px] h-[64px] bg-brand/10 border border-brand/20 rounded-[12px] flex items-center justify-center text-[24px] font-bold text-brand">
-                      {selectedProvider.name.charAt(0)}
+                      {selectedProvider.nombre.charAt(0)}
                     </div>
                     <div>
-                      <h2 className="text-[24px] font-semibold text-text-primary tracking-tight leading-none mb-[8px]">{selectedProvider.name}</h2>
+                      <h2 className="text-[24px] font-semibold text-text-primary tracking-tight leading-none mb-[8px]">{selectedProvider.nombre}</h2>
                       <div className="flex items-center text-[13px] space-x-[12px]">
                         <span className="text-text-secondary font-mono">RFC: {selectedProvider.rfc}</span>
                         <span className="text-divider">•</span>
@@ -362,8 +374,8 @@ export default function Clients() {
                     </div>
                   </div>
 
-                  <span className={`px-[10px] py-[4px] rounded-md text-[12px] font-semibold tracking-wide ${selectedProvider.active ? 'bg-success-bg text-success-text' : 'bg-neutral-bg text-text-secondary'}`}>
-                    {selectedProvider.active ? 'PROVEEDOR ACTIVO' : 'INACTIVO'}
+                  <span className={`px-[10px] py-[4px] rounded-md text-[12px] font-semibold tracking-wide ${selectedProvider.activo ? 'bg-success-bg text-success-text' : 'bg-neutral-bg text-text-secondary'}`}>
+                    {selectedProvider.activo ? 'PROVEEDOR ACTIVO' : 'INACTIVO'}
                   </span>
                 </div>
 
@@ -371,7 +383,7 @@ export default function Clients() {
                   <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-[12px]">Modalidades Soportadas</h4>
                   <div className="flex flex-wrap gap-4">
                     {['maritimo', 'aereo', 'terrestre', 'aduanal'].map(mod => {
-                      const isSupported = selectedProvider.modalities.includes(mod as any);
+                      const isSupported = selectedProvider.modalidades.includes(mod as any);
                       return (
                         <div key={mod} className={`flex items-center border rounded-lg px-3 py-2 ${isSupported ? 'border-brand/30 bg-brand/5' : 'border-card-border bg-canvas opacity-50'}`}>
                           <div className={`w-4 h-4 rounded border flex items-center justify-center mr-2 ${isSupported ? 'bg-brand border-brand' : 'border-text-muted'}`}>
@@ -386,20 +398,22 @@ export default function Clients() {
                   </div>
                 </div>
 
+                {cp && (
                 <div className="flex flex-wrap gap-[24px] mt-[24px] pt-[24px] border-t border-divider">
                   <div className="flex-1 min-w-[200px]">
                     <p className="text-[11px] font-medium text-text-muted mb-[4px]">Contacto Principal</p>
-                    <p className="text-[15px] font-semibold text-text-primary">{selectedProvider.contact.name}</p>
-                    <p className="text-[13px] text-text-secondary">{selectedProvider.contact.role}</p>
+                    <p className="text-[15px] font-semibold text-text-primary">{cp.nombre}</p>
+                    <p className="text-[13px] text-text-secondary">{cp.puesto}</p>
                   </div>
                   <div className="flex-1 min-w-[200px]">
                     <p className="text-[11px] font-medium text-text-muted mb-[4px]">Contacto Rápido</p>
                     <div className="space-y-1">
-                      <p className="text-[14px] font-medium text-text-primary flex items-center"><Mail className="w-4 h-4 mr-2 text-text-muted"/> {selectedProvider.contact.email}</p>
-                      <p className="text-[14px] font-medium text-text-primary flex items-center"><Phone className="w-4 h-4 mr-2 text-text-muted"/> {selectedProvider.contact.phone}</p>
+                      <p className="text-[14px] font-medium text-text-primary flex items-center"><Mail className="w-4 h-4 mr-2 text-text-muted"/> {cp.email}</p>
+                      <p className="text-[14px] font-medium text-text-primary flex items-center"><Phone className="w-4 h-4 mr-2 text-text-muted"/> {cp.telefono}</p>
                     </div>
                   </div>
                 </div>
+                )}
               </div>
 
               {/* Internal Tabs Provider */}
@@ -421,71 +435,42 @@ export default function Clients() {
               </div>
 
               <div className="p-[32px] flex-1 bg-white">
-                <h3 className="text-[15px] font-semibold text-text-primary mb-4">Cotizaciones Enviadas por {selectedProvider.name}</h3>
+                <h3 className="text-[15px] font-semibold text-text-primary mb-4">Cotizaciones Enviadas por {selectedProvider.nombre}</h3>
 
-                {selectedProvider.quotesHistory.length > 0 ? (
-                  <div className="border border-card-border rounded-lg overflow-hidden">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="bg-canvas border-b border-card-border">
-                          <th className="py-3 px-4 text-[11px] font-semibold text-text-muted uppercase tracking-wider">ID Pricing</th>
-                          <th className="py-3 px-4 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Fecha</th>
-                          <th className="py-3 px-4 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Modalidad</th>
-                          <th className="py-3 px-4 text-[11px] font-semibold text-text-muted uppercase tracking-wider text-right">Monto</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedProvider.quotesHistory.map(qh => (
-                          <tr key={qh.id} className="border-b border-card-border last:border-0 hover:bg-neutral-bg transition-colors">
-                            <td className="py-3 px-4 text-[13px] font-medium text-brand">{qh.id}</td>
-                            <td className="py-3 px-4 text-[13px] text-text-secondary">{qh.date}</td>
-                            <td className="py-3 px-4 text-[13px] text-text-secondary">
-                               <span className="flex items-center text-[11px] font-medium uppercase tracking-wider">
-                                 {getTransportIcon(qh.modality)} {getTransportLabel(qh.modality)}
-                               </span>
-                            </td>
-                            <td className="py-3 px-4 text-[14px] font-semibold text-text-primary text-right tabular-nums">
-                              ${qh.amount.toLocaleString()}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-10 border border-dashed border-card-border rounded-lg bg-canvas text-text-muted">
-                    <FileText className="w-8 h-8 mb-2 opacity-50" />
-                    <p className="text-[13px]">No hay historial de cotizaciones registrado para este proveedor.</p>
-                  </div>
-                )}
+                {/* Historial se conectará en E15 (trazabilidad) — por ahora placeholder */}
+                <div className="flex flex-col items-center justify-center py-10 border border-dashed border-card-border rounded-lg bg-canvas text-text-muted">
+                  <FileText className="w-8 h-8 mb-2 opacity-50" />
+                  <p className="text-[13px]">Sin historial — se conectará al historial real de cotizaciones.</p>
+                </div>
 
                 {/* Notas Internas */}
                 <div className="mt-8">
                   <h3 className="text-[15px] font-semibold text-text-primary mb-3">Notas Internas (Pricing / Operaciones)</h3>
                   <div className="bg-warning-bg border border-warning-border rounded-lg p-4">
-                    <p className="text-[13px] text-warning-text leading-relaxed">{selectedProvider.notes || 'Sin notas.'}</p>
+                    <p className="text-[13px] text-warning-text leading-relaxed">{selectedProvider.notas || 'Sin notas.'}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Sidebar Empty State for Provider */}
+            {/* Sidebar Resumen */}
             <div className="w-full md:w-[280px] bg-canvas shrink-0 p-[24px]">
               <h3 className="text-[14px] font-semibold text-text-primary mb-[20px]">Resumen Operativo</h3>
               <div className="space-y-4">
                 <div className="bg-white border border-card-border p-4 rounded-lg shadow-sm">
                   <p className="text-[11px] text-text-muted uppercase tracking-wider font-semibold mb-1">Total Cotizado</p>
-                  <p className="text-[20px] font-bold text-text-primary">${selectedProvider.quotesHistory.reduce((acc, val) => acc + val.amount, 0).toLocaleString()}</p>
+                  <p className="text-[20px] font-bold text-text-primary">—</p>
                 </div>
                 <div className="bg-white border border-card-border p-4 rounded-lg shadow-sm">
                   <p className="text-[11px] text-text-muted uppercase tracking-wider font-semibold mb-1">Cotizaciones Atendidas</p>
-                  <p className="text-[20px] font-bold text-text-primary">{selectedProvider.quotesHistory.length}</p>
+                  <p className="text-[20px] font-bold text-text-primary">—</p>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      ) : null}
+        );
+      })() : null}
 
       {showModal && (
         <NuevoClienteModal
