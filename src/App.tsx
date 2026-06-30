@@ -27,6 +27,7 @@ import ExchangeRates from './components/ExchangeRates';
 import Notificaciones from './pages/Notificaciones';
 import LandingPage from './components/LandingPage';
 import { ChevronDown, User, LogOut, Bell, ArrowRight, CheckCheck } from 'lucide-react';
+import { useProveedores } from './hooks/useProveedores';
 
 // ─── Role badge labels ────────────────────────────────────────────────────────
 const ROLE_LABEL: Record<string, string> = {
@@ -247,6 +248,10 @@ function AppShell() {
   const { user, isAllowed } = useAuth();
   const [currentView, setCurrentView] = useState('dashboard');
   const [showPortal, setShowPortal] = useState(false);
+
+  // E9.0: montar hook para que el seed de proveedores se escriba a Firestore.
+  // En E9.1 los componentes que hoy leen initialProviders pasarán a usar este hook.
+  useProveedores();
 
   const safeNavigate = (view: string) => {
     // notifications is accessible to all roles
