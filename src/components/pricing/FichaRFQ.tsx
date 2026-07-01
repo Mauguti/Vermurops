@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { RFQ, ProviderQuote, Modality, RFQService } from './PricingData';
 import { useProveedores } from '../../hooks/useProveedores';
+import { Modalidad } from '../proveedores/ProveedoresData';
+import AltaRapidaProveedorModal from '../proveedores/AltaRapidaProveedorModal';
 import { ChevronRight, ChevronDown, Check, X, Plane, Ship, Truck, FileText, Plus, DollarSign, Send, ArrowLeft, Paperclip, File as FileIcon, HelpCircle } from 'lucide-react';
 import { useServicios, renderIcon } from '../../config/serviciosStore';
 
@@ -11,14 +13,16 @@ interface FichaRFQProps {
 }
 
 export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
-  const { proveedores } = useProveedores();
+  const { proveedores, createProveedor } = useProveedores();
   const [expandedServices, setExpandedServices] = useState<string[]>(rfq.services.map(s => s.id));
   const [surcharges, setSurcharges] = useState(rfq.surchargesPercent);
   const [margin, setMargin] = useState(rfq.marginPercent);
-  
+
   // Estado para un nuevo proveedor en línea
   const [addingToService, setAddingToService] = useState<string | null>(null);
   const [newProvName, setNewProvName] = useState('');
+  const [showAltaRapida, setShowAltaRapida] = useState(false);
+  const [altaRapidaModalidad, setAltaRapidaModalidad] = useState<Modalidad | undefined>(undefined);
   const [newProvCost, setNewProvCost] = useState('');
   const [newProvCurrency, setNewProvCurrency] = useState<'USD'|'MXN'>('USD');
   const [newProvDesc, setNewProvDesc] = useState('');
@@ -255,12 +259,21 @@ export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                           <div className="col-span-2 md:col-span-1">
                             <label className="block text-[10px] font-semibold text-text-muted uppercase mb-1">Proveedor *</label>
-                            <select 
+                            <select
                               className="w-full text-[13px] border border-card-border rounded-md px-2 py-1.5 focus:border-brand outline-none"
-                              value={newProvName} onChange={e => setNewProvName(e.target.value)}
+                              value={newProvName} onChange={e => {
+                                if (e.target.value === '__nuevo__') {
+                                  const modalidadCtx: Modalidad | undefined = def?.categoria === 'aduana' ? 'aduanal' : undefined;
+                                  setAltaRapidaModalidad(modalidadCtx);
+                                  setShowAltaRapida(true);
+                                } else {
+                                  setNewProvName(e.target.value);
+                                }
+                              }}
                             >
                               <option value="">Seleccionar...</option>
                               {availableProviders.map(p => <option key={p.id} value={p.nombre}>{p.nombre}</option>)}
+                              <option value="__nuevo__">+ Nuevo proveedor...</option>
                             </select>
                           </div>
                           <div className="col-span-2 md:col-span-1">
@@ -392,6 +405,18 @@ export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
         </div>
 
       </div>
+
+      {showAltaRapida && (
+        <AltaRapidaProveedorModal
+          onClose={() => setShowAltaRapida(false)}
+          onCreate={createProveedor}
+          modalidadContexto={altaRapidaModalidad}
+          onCreated={(_id, nombre) => {
+            setNewProvName(nombre);
+            setShowAltaRapida(false);
+          }}
+        />
+      )}
     </div>
   );
 }

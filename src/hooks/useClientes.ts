@@ -19,9 +19,9 @@ import { useAuth } from '../auth/AuthContext';
 export function useClientes() {
   const { user } = useAuth();
 
-  const [clientes, setClientes]   = useState<ClienteVermur[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [error, setError]         = useState<string | null>(null);
+  const [clientes, setClientes] = useState<ClienteVermur[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Evita que el seed corra más de una vez por sesión de usuario.
   const seedAttempted = useRef(false);

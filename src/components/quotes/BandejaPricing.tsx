@@ -11,6 +11,7 @@ import { calcLinea } from '../../lib/cotizacionCalculator';
 import FichaCotizacion from './FichaCotizacion';
 import { useProveedores } from '../../hooks/useProveedores';
 import { ProveedorVermur, Modalidad, contactoPrincipal } from '../proveedores/ProveedoresData';
+import AltaRapidaProveedorModal from '../proveedores/AltaRapidaProveedorModal';
 
 interface BandejaPricingProps {
   quotes: KanbanQuote[];
@@ -43,6 +44,7 @@ interface FormProveedorProps {
 }
 
 function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: FormProveedorProps) {
+  const { createProveedor } = useProveedores();
   const [proveedor, setProveedor] = useState('');
   const [contacto, setContacto] = useState('');
   const [monto, setMonto] = useState('');
@@ -50,10 +52,9 @@ function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: For
   const [tiempo, setTiempo] = useState('');
   const [vigencia, setVigencia] = useState('');
   const [condiciones, setCondiciones] = useState('');
+  const [showAltaRapida, setShowAltaRapida] = useState(false);
 
   // Filtrar proveedores por modalidad del servicio.
-  // Tipos directos (maritimo, aereo, terrestre, aduanal) y sus labels legibles
-  // mapean a la modalidad correspondiente. El resto muestra todos los activos.
   const TIPO_A_MODALIDAD: Record<string, Modalidad> = {
     'maritimo': 'maritimo', 'Flete Internacional': 'maritimo',
     'aereo': 'aereo', 'Transporte Aéreo': 'aereo',
@@ -64,6 +65,22 @@ function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: For
   const availableProviders = proveedores.filter(p =>
     p.activo && (modalidadFiltro ? p.modalidades.includes(modalidadFiltro) : true)
   );
+
+  const handleProveedorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val === '__nuevo__') {
+      setShowAltaRapida(true);
+      return;
+    }
+    setProveedor(val);
+    const provObj = availableProviders.find(p => p.nombre === val);
+    if (provObj) {
+      const cp = contactoPrincipal(provObj);
+      setContacto(cp?.nombre ?? '');
+    } else {
+      setContacto('');
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,6 +100,7 @@ function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: For
   };
 
   return (
+    <>
     <form
       onSubmit={handleSubmit}
       className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-4 space-y-3 mt-3"
@@ -98,23 +116,14 @@ function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: For
           <select
             required
             value={proveedor}
-            onChange={e => {
-              const provName = e.target.value;
-              setProveedor(provName);
-              const provObj = availableProviders.find(p => p.nombre === provName);
-              if (provObj) {
-                const cp = contactoPrincipal(provObj);
-                setContacto(cp?.nombre ?? '');
-              } else {
-                setContacto('');
-              }
-            }}
+            onChange={handleProveedorChange}
             className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-indigo-400 bg-white"
           >
             <option value="">Seleccionar proveedor...</option>
             {availableProviders.map(p => (
               <option key={p.id} value={p.nombre}>{p.nombre}</option>
             ))}
+            <option value="__nuevo__">+ Nuevo proveedor...</option>
           </select>
         </div>
         <div>
@@ -204,6 +213,18 @@ function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: For
         </button>
       </div>
     </form>
+    {showAltaRapida && (
+      <AltaRapidaProveedorModal
+        onClose={() => setShowAltaRapida(false)}
+        onCreate={createProveedor}
+        modalidadContexto={modalidadFiltro}
+        onCreated={(_id, nombre) => {
+          setProveedor(nombre);
+          setShowAltaRapida(false);
+        }}
+      />
+    )}
+    </>
   );
 }
 

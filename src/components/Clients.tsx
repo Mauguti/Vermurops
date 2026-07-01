@@ -5,10 +5,11 @@ import { useProveedores } from '../hooks/useProveedores';
 import { ProveedorVermur, contactoPrincipal } from './proveedores/ProveedoresData';
 import FichaCliente from './clientes/FichaCliente';
 import NuevoClienteModal from './clientes/NuevoClienteModal';
+import ProveedorFormModal from './proveedores/ProveedorFormModal';
 
 export default function Clients() {
   const { clientes, loading, error, createCliente, updateCliente } = useClientes();
-  const { proveedores, loading: loadingProv, error: errorProv } = useProveedores();
+  const { proveedores, loading: loadingProv, error: errorProv, createProveedor, updateProveedor } = useProveedores();
   const [viewType, setViewType] = useState<'Clientes' | 'Proveedores'>('Clientes');
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,7 +18,12 @@ export default function Clients() {
   const [showModal, setShowModal] = useState(false);
 
   const [providerSearchTerm, setProviderSearchTerm] = useState('');
-  const [selectedProvider, setSelectedProvider] = useState<ProveedorVermur | null>(null);
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const selectedProvider = selectedProviderId
+    ? (proveedores.find(p => p.id === selectedProviderId) ?? null)
+    : null;
+
+  const [showProvModal, setShowProvModal] = useState<false | 'crear' | 'editar'>(false);
 
   // Derive selectedClient from live clientes array so FichaCliente always gets fresh data
   const selectedClient = selectedClientId
@@ -260,7 +266,10 @@ export default function Clients() {
               />
             </div>
             <div className="flex items-center space-x-[12px]">
-              <button className="bg-brand text-white px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-brand-hover shadow-sm transition-colors shrink-0">
+              <button
+                onClick={() => setShowProvModal('crear')}
+                className="bg-brand text-white px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-brand-hover shadow-sm transition-colors shrink-0"
+              >
                 Nuevo proveedor
               </button>
             </div>
@@ -273,7 +282,7 @@ export default function Clients() {
               return (
               <div
                 key={provider.id}
-                onClick={() => setSelectedProvider(provider)}
+                onClick={() => setSelectedProviderId(provider.id)}
                 className="bg-card rounded-[12px] border border-card-border transition-all overflow-hidden flex flex-col shadow-sm hover:border-brand/30 cursor-pointer group"
               >
                 <div className="p-[20px] pb-[16px] border-b border-divider">
@@ -339,12 +348,15 @@ export default function Clients() {
           {/* Header Ficha Proveedor */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-[8px] text-[13px] text-text-secondary">
-              <button onClick={() => setSelectedProvider(null)} className="hover:text-text-primary transition-colors">Proveedores</button>
+              <button onClick={() => setSelectedProviderId(null)} className="hover:text-text-primary transition-colors">Proveedores</button>
               <ChevronRight className="w-4 h-4 text-text-muted" />
               <span className="text-text-primary font-medium">{selectedProvider.nombre}</span>
             </div>
             <div className="flex space-x-[12px]">
-               <button className="bg-white border border-card-border text-text-primary px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium hover:bg-neutral-bg transition-colors shadow-sm">
+               <button
+                 onClick={() => setShowProvModal('editar')}
+                 className="bg-white border border-card-border text-text-primary px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium hover:bg-neutral-bg transition-colors shadow-sm"
+               >
                  Editar Datos
                </button>
                <button className="bg-brand text-white px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium hover:bg-brand-hover shadow-sm transition-colors">
@@ -476,6 +488,16 @@ export default function Clients() {
         <NuevoClienteModal
           onClose={() => setShowModal(false)}
           onCreate={createCliente}
+        />
+      )}
+
+      {showProvModal && (
+        <ProveedorFormModal
+          mode={showProvModal}
+          proveedor={showProvModal === 'editar' && selectedProvider ? selectedProvider : undefined}
+          onClose={() => setShowProvModal(false)}
+          onCreate={createProveedor}
+          onUpdate={updateProveedor}
         />
       )}
     </div>

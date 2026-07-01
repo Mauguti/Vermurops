@@ -10,8 +10,9 @@ import {
   INCOTERMS, Subconcepto, EQUIPO_PRICING, VENDEDORES, calcularTotalConsolidado,
   PipelineStageId,
 } from './QuotesData';
-import { ProveedorVermur, contactoPrincipal } from '../proveedores/ProveedoresData';
+import { ProveedorVermur, Modalidad, contactoPrincipal } from '../proveedores/ProveedoresData';
 import { useProveedores } from '../../hooks/useProveedores';
+import AltaRapidaProveedorModal from '../proveedores/AltaRapidaProveedorModal';
 import { useAuth } from '../../auth/AuthContext';
 import { useNotifications } from '../../notifications/NotificationsContext';
 import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
@@ -42,6 +43,7 @@ interface FormProveedorProps {
 }
 
 function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: FormProveedorProps) {
+  const { createProveedor } = useProveedores();
   const [proveedor, setProveedor] = useState('');
   const [contacto, setContacto] = useState('');
   const [monto, setMonto] = useState('');
@@ -51,11 +53,12 @@ function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: For
   const [condiciones, setCondiciones] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [showAltaRapida, setShowAltaRapida] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!proveedor.trim() || !monto) return;
-    
+
     setUploading(true);
     let adjuntoUrl: string | null = null;
     let archivoNombre: string | null = null;
@@ -87,10 +90,19 @@ function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: For
 
   const availableProviders = proveedores.filter(p => p.activo && p.modalidades.includes(servicioTipo as any));
 
+  const TIPO_A_MODALIDAD: Record<string, Modalidad> = {
+    'maritimo': 'maritimo', 'aereo': 'aereo', 'terrestre': 'terrestre', 'aduanal': 'aduanal',
+  };
+  const modalidadFiltro = TIPO_A_MODALIDAD[servicioTipo];
+
   const handleProveedorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const provName = e.target.value;
-    setProveedor(provName);
-    const provObj = availableProviders.find(p => p.nombre === provName);
+    const val = e.target.value;
+    if (val === '__nuevo__') {
+      setShowAltaRapida(true);
+      return;
+    }
+    setProveedor(val);
+    const provObj = availableProviders.find(p => p.nombre === val);
     if (provObj) {
       const cp = contactoPrincipal(provObj);
       setContacto(cp?.nombre ?? '');
@@ -100,6 +112,7 @@ function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: For
   };
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3.5 space-y-3 mt-2">
       <h6 className="text-[9px] font-bold text-indigo-700 uppercase tracking-widest">
         Nueva cotización de proveedor
@@ -113,6 +126,7 @@ function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: For
             {availableProviders.map(p => (
               <option key={p.id} value={p.nombre}>{p.nombre}</option>
             ))}
+            <option value="__nuevo__">+ Nuevo proveedor...</option>
           </select>
         </div>
         <div>
@@ -182,6 +196,18 @@ function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: For
         </button>
       </div>
     </form>
+    {showAltaRapida && (
+      <AltaRapidaProveedorModal
+        onClose={() => setShowAltaRapida(false)}
+        onCreate={createProveedor}
+        modalidadContexto={modalidadFiltro}
+        onCreated={(_id, nombre) => {
+          setProveedor(nombre);
+          setShowAltaRapida(false);
+        }}
+      />
+    )}
+    </>
   );
 }
 
