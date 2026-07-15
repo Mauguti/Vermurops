@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
-import { PuertoVermur } from './PuertosData';
+import { X, Loader2, Plus, Trash2 } from 'lucide-react';
+import { PuertoVermur, Terminal } from './PuertosData';
 
 interface Props {
   mode: 'crear' | 'editar';
@@ -13,6 +13,10 @@ interface Props {
 const INPUT = 'w-full px-3 py-2 text-[13px] bg-white border border-card-border rounded-[6px] focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand text-text-primary';
 const LABEL = 'block text-[11px] font-semibold text-text-muted uppercase tracking-wider mb-1.5';
 
+function emptyTerminal(): Terminal {
+  return { id: `trm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, nombre: '' };
+}
+
 export default function PuertoFormModal({ mode, puerto, onClose, onCreate, onUpdate }: Props) {
   const isEdit = mode === 'editar' && puerto;
 
@@ -20,6 +24,7 @@ export default function PuertoFormModal({ mode, puerto, onClose, onCreate, onUpd
   const [nombre, setNombre] = useState(puerto?.nombre ?? '');
   const [pais, setPais] = useState(puerto?.pais ?? '');
   const [codigoPais, setCodigoPais] = useState(puerto?.codigoPais ?? '');
+  const [terminales, setTerminales] = useState<Terminal[]>(puerto?.terminales ?? []);
   const [activo, setActivo] = useState(puerto?.activo ?? true);
 
   const [saving, setSaving] = useState(false);
@@ -37,12 +42,17 @@ export default function PuertoFormModal({ mode, puerto, onClose, onCreate, onUpd
     try {
       const now = new Date().toISOString();
 
+      const finalTerminales = terminales
+        .filter(t => t.nombre.trim() !== '')
+        .map(t => ({ ...t, nombre: t.nombre.trim() }));
+
       if (isEdit && onUpdate) {
         await onUpdate(puerto.id, {
           codigo: codigo.trim().toUpperCase(),
           nombre: nombre.trim(),
           pais: pais.trim(),
           codigoPais: codigoPais.trim().toUpperCase(),
+          terminales: finalTerminales,
           activo,
           updatedAt: now,
         });
@@ -53,6 +63,7 @@ export default function PuertoFormModal({ mode, puerto, onClose, onCreate, onUpd
           nombre: nombre.trim(),
           pais: pais.trim(),
           codigoPais: codigoPais.trim().toUpperCase(),
+          terminales: finalTerminales,
           activo: true,
           fechaAlta: now.split('T')[0],
           updatedAt: now,
@@ -112,6 +123,51 @@ export default function PuertoFormModal({ mode, puerto, onClose, onCreate, onUpd
                 maxLength={3}
               />
             </div>
+          </div>
+
+          {/* ── Terminales ────────────────────────────────────────── */}
+          <div>
+            <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-3">
+              Terminales
+              {terminales.length > 0 && (
+                <span className="ml-2 text-text-secondary font-normal normal-case">({terminales.length})</span>
+              )}
+            </h4>
+            {terminales.length === 0 ? (
+              <p className="text-[12px] text-text-muted italic mb-2">
+                Este puerto no tiene terminales registradas.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {terminales.map((t, idx) => (
+                  <div key={t.id} className="flex items-center gap-2">
+                    <input
+                      className={INPUT}
+                      value={t.nombre}
+                      onChange={e => {
+                        setTerminales(prev => prev.map((x, i) => i === idx ? { ...x, nombre: e.target.value } : x));
+                      }}
+                      placeholder={`Terminal ${idx + 1}`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setTerminales(prev => prev.filter((_, i) => i !== idx))}
+                      className="p-1.5 rounded text-text-muted hover:text-danger-text transition-colors shrink-0"
+                      title="Eliminar terminal"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setTerminales(prev => [...prev, emptyTerminal()])}
+              className="mt-2 flex items-center gap-1.5 text-[12px] font-semibold text-brand hover:text-brand-hover transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" /> Agregar terminal
+            </button>
           </div>
 
           {/* Estado (solo en editar) */}

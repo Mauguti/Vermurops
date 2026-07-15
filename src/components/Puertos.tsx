@@ -108,6 +108,7 @@ export default function Puertos() {
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Puerto</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">País</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">ISO</th>
+                <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Terminales</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Estado</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider w-[60px]"></th>
               </tr>
@@ -115,7 +116,7 @@ export default function Puertos() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-12 text-center">
+                  <td colSpan={7} className="px-4 py-12 text-center">
                     <Anchor className="w-8 h-8 text-text-muted mx-auto mb-3" />
                     <p className="text-[13px] text-text-muted">
                       {search || filterPais ? 'Sin resultados para los filtros aplicados.' : 'No hay puertos en el catálogo.'}
@@ -133,6 +134,13 @@ export default function Puertos() {
                     <td className="px-4 py-3 text-[13px] font-medium text-text-primary">{p.nombre}</td>
                     <td className="px-4 py-3 text-[13px] text-text-secondary">{p.pais}</td>
                     <td className="px-4 py-3 text-[12px] text-text-muted font-mono">{p.codigoPais}</td>
+                    <td className="px-4 py-3 text-[12px] text-text-muted">
+                      {p.terminales?.length ? (
+                        <span className="text-text-secondary">{p.terminales.length}</span>
+                      ) : (
+                        <span className="italic">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                         p.activo
