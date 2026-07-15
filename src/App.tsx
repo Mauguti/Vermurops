@@ -24,10 +24,12 @@ import Reports from './components/Reports';
 import RatesManagement from './components/RatesManagement';
 import Settings from './components/Settings';
 import ExchangeRates from './components/ExchangeRates';
+import Puertos from './components/Puertos';
 import Notificaciones from './pages/Notificaciones';
 import LandingPage from './components/LandingPage';
 import { ChevronDown, User, LogOut, Bell, ArrowRight, CheckCheck } from 'lucide-react';
 import { useProveedores } from './hooks/useProveedores';
+import { usePuertos } from './hooks/usePuertos';
 
 // ─── Role badge labels ────────────────────────────────────────────────────────
 const ROLE_LABEL: Record<string, string> = {
@@ -48,6 +50,7 @@ const VIEW_LABELS: Record<string, string> = {
   finance: 'Finanzas',
   exchange: 'Tipo de cambio',
   clients: 'Clientes',
+  puertos: 'Puertos',
   rates: 'Tarifas',
   reports: 'Reportes',
   settings: 'Configuración',
@@ -251,6 +254,8 @@ function AppShell() {
 
   // E9: seed de proveedores a Firestore en cualquier vista (no solo Clientes).
   useProveedores();
+  // E10.0: seed de puertos a Firestore.
+  usePuertos();
 
   const safeNavigate = (view: string) => {
     // notifications is accessible to all roles
@@ -281,6 +286,7 @@ function AppShell() {
       case 'finance':    return <Finance />;
       case 'exchange':   return <ExchangeRates />;
       case 'clients':    return <Clients />;
+      case 'puertos':    return <Puertos />;
       case 'rates':      return <RatesManagement />;
       case 'reports':    return <Reports />;
       case 'settings':   return <Settings />;

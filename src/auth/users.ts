@@ -16,11 +16,11 @@ export interface AuthUser {
 // Rutas/vistas permitidas por rol
 export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
   ventas: ['dashboard', 'quotes', 'clients', 'settings'],
-  pricing: ['dashboard', 'quotes', 'pricing', 'documents', 'settings'],
+  pricing: ['dashboard', 'quotes', 'pricing', 'documents', 'puertos', 'settings'],
   admin: [
     'dashboard', 'quotes', 'pricing', 'bookings', 'pickups',
     'shipments', 'documents', 'finance', 'exchange', 'clients',
-    'rates', 'reports', 'settings',
+    'puertos', 'rates', 'reports', 'settings',
   ],
 };
 
