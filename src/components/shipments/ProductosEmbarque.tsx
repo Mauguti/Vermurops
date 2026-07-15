@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Package, Plus, Trash2, Weight, Box, ChevronDown, ChevronRight, Edit2, ShieldCheck, X } from 'lucide-react';
-import { EmbarqueProducto, Pallet, DatosContenedor, TIPOS_CONTENEDOR } from './EmbarquesData';
+import { EmbarqueProducto, Pallet, DatosContenedor, TIPOS_CONTENEDOR, palletPiezas, palletPeso, palletVolumen, palletDescripcion } from './EmbarquesData';
 
 const TIPOS_EMBALAJE = ['Pallet', 'Caja', 'Tambor', 'Bulto', 'Bobina', 'Contenedor', 'Otro'] as const;
 
@@ -56,10 +56,10 @@ export default function ProductosEmbarque({
   const totalPeso   = productos.reduce((s, p) => s + p.peso, 0);
   const totalVol    = productos.reduce((s, p) => s + (p.volumen ?? 0), 0);
 
-  // Helper para cálculos LCL
-  const totalLclPiezas = pallets.reduce((s, p) => s + p.piezas, 0);
-  const totalLclPeso = pallets.reduce((s, p) => s + p.pesoKg, 0);
-  const totalLclVol = pallets.reduce((s, p) => s + (p.volumenM3 ?? 0), 0);
+  // Helper para cálculos de pallets (FCL y LCL)
+  const totalLclPiezas = pallets.reduce((s, p) => s + palletPiezas(p), 0);
+  const totalLclPeso = pallets.reduce((s, p) => s + palletPeso(p), 0);
+  const totalLclVol = pallets.reduce((s, p) => s + palletVolumen(p), 0);
   const clientesUnicos = new Set(pallets.map(p => p.clienteNombre)).size;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -73,7 +73,7 @@ export default function ProductosEmbarque({
     if (embalaje === 'Contenedor') {
       datosContenedor = { numeroContenedor, tipoContenedor, numeroSello, folioSello };
       consolType = tipoConsolidacion;
-      palletList = tipoConsolidacion === 'LCL' ? [...pallets] : [];
+      palletList = [...pallets];
     }
 
     onAddProducto({
@@ -163,7 +163,7 @@ export default function ProductosEmbarque({
                 productos.map(p => {
                   const isContainer = p.tipoEmbalaje === 'Contenedor';
                   const isExpanded = expandedRows.includes(p.id);
-                  const isLCL = isContainer && p.tipoConsolidacion === 'LCL';
+                  const hasPallets = isContainer && p.pallets && p.pallets.length > 0;
 
                   return (
                     <React.Fragment key={p.id}>
@@ -190,9 +190,9 @@ export default function ProductosEmbarque({
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-brand/10 text-brand border border-brand/20 uppercase">
                               {p.tipoEmbalaje}
                             </span>
-                            {isLCL && (
+                            {isContainer && p.tipoConsolidacion && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-indigo-100 text-indigo-700 border border-indigo-200">
-                                LCL • {p.pallets?.length || 0} PLT
+                                {p.tipoConsolidacion}{hasPallets ? ` • ${p.pallets!.length} PLT` : ''}
                               </span>
                             )}
                           </div>
@@ -236,8 +236,8 @@ export default function ProductosEmbarque({
                                 </div>
                               )}
 
-                              {/* Tabla LCL Pallets */}
-                              {isLCL && p.pallets && p.pallets.length > 0 && (
+                              {/* Tabla Pallets (FCL y LCL) */}
+                              {hasPallets && (
                                 <div className="bg-white rounded-lg border border-divider overflow-hidden">
                                   <table className="w-full text-left">
                                     <thead>
@@ -250,7 +250,7 @@ export default function ProductosEmbarque({
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-divider text-[11px]">
-                                      {p.pallets.map(plt => (
+                                      {p.pallets!.map(plt => (
                                         <tr key={plt.id} className="hover:bg-brand/5">
                                           <td className="px-4 py-2 font-mono font-bold text-text-primary">{plt.numeroPallet}</td>
                                           <td className="px-4 py-2">
@@ -263,11 +263,11 @@ export default function ProductosEmbarque({
                                               )}
                                             </div>
                                           </td>
-                                          <td className="px-4 py-2 text-text-secondary truncate max-w-[200px]" title={plt.descripcionMercancia}>
-                                            {plt.descripcionMercancia}
+                                          <td className="px-4 py-2 text-text-secondary truncate max-w-[200px]" title={palletDescripcion(plt)}>
+                                            {palletDescripcion(plt)}
                                           </td>
-                                          <td className="px-4 py-2 text-right font-mono text-text-primary">{plt.piezas}</td>
-                                          <td className="px-4 py-2 text-right font-mono text-text-primary">{plt.pesoKg} kg</td>
+                                          <td className="px-4 py-2 text-right font-mono text-text-primary">{palletPiezas(plt)}</td>
+                                          <td className="px-4 py-2 text-right font-mono text-text-primary">{palletPeso(plt)} kg</td>
                                         </tr>
                                       ))}
                                     </tbody>
@@ -437,8 +437,7 @@ export default function ProductosEmbarque({
                   </div>
                 </div>
 
-                {tipoConsolidacion === 'LCL' && (
-                  <div className="bg-white rounded-lg border border-card-border overflow-hidden">
+                <div className="bg-white rounded-lg border border-card-border overflow-hidden">
                     <div className="flex justify-between items-center px-4 py-3 border-b border-divider">
                       <span className="text-[10px] font-black text-text-primary uppercase tracking-widest">Pallets del contenedor</span>
                       <button type="button" onClick={() => { setEditPalletId(null); setPalletForm({}); setShowPalletModal(true); }} className="flex items-center gap-1 text-[10px] font-bold text-brand hover:text-brand-hover transition-colors uppercase tracking-wide">
@@ -472,10 +471,10 @@ export default function ProductosEmbarque({
                                 </span>
                               </td>
                               <td className="px-4 py-2.5 text-text-muted font-mono">{p.cotizacionRef || '—'}</td>
-                              <td className="px-4 py-2.5 text-text-secondary truncate max-w-[150px]" title={p.descripcionMercancia}>{p.descripcionMercancia}</td>
-                              <td className="px-4 py-2.5 text-right font-mono">{p.piezas}</td>
-                              <td className="px-4 py-2.5 text-right font-mono">{p.pesoKg}</td>
-                              <td className="px-4 py-2.5 text-right font-mono text-text-muted">{p.volumenM3 || '—'}</td>
+                              <td className="px-4 py-2.5 text-text-secondary truncate max-w-[150px]" title={palletDescripcion(p)}>{palletDescripcion(p)}</td>
+                              <td className="px-4 py-2.5 text-right font-mono">{palletPiezas(p)}</td>
+                              <td className="px-4 py-2.5 text-right font-mono">{palletPeso(p)}</td>
+                              <td className="px-4 py-2.5 text-right font-mono text-text-muted">{palletVolumen(p) || '—'}</td>
                               <td className="px-4 py-2.5 text-center">
                                 <div className="flex items-center justify-center gap-1">
                                   <button type="button" onClick={() => { setEditPalletId(p.id); setPalletForm(p); setShowPalletModal(true); }} className="p-1 text-text-muted hover:text-brand hover:bg-brand/10 rounded transition-colors"><Edit2 className="w-3.5 h-3.5" /></button>
@@ -490,7 +489,7 @@ export default function ProductosEmbarque({
                         <tfoot>
                           <tr className="bg-canvas border-t-2 border-divider text-[10px] font-bold uppercase tracking-wide">
                             <td colSpan={4} className="px-4 py-2 text-text-primary">
-                              Totales LCL <span className="lowercase font-medium text-text-muted ml-2">({clientesUnicos} clientes)</span>
+                              Totales pallets <span className="lowercase font-medium text-text-muted ml-2">({clientesUnicos} {clientesUnicos === 1 ? 'cliente' : 'clientes'})</span>
                             </td>
                             <td className="px-4 py-2 text-right font-mono text-brand">{totalLclPiezas}</td>
                             <td className="px-4 py-2 text-right font-mono text-brand">{totalLclPeso} kg</td>
@@ -501,7 +500,6 @@ export default function ProductosEmbarque({
                       )}
                     </table>
                   </div>
-                )}
               </div>
             </div>
           </div>

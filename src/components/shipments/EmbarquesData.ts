@@ -100,14 +100,27 @@ export interface DatosContenedor {
   folioSello: string;
 }
 
+/** Línea de mercancía dentro de un pallet (Sub-paso 3 la usa, Sub-paso 1 la define). */
+export interface MercanciaLine {
+  id: string;
+  descripcion: string;
+  cantidad: number;       // cajas, bultos, piezas
+  pesoKg: number;
+  volumenM3?: number;
+}
+
 export interface Pallet {
   id: string;
   numeroPallet: string;
+  clienteId?: string;             // Referencia a clientes/ (Sub-paso 2 lo cablea)
   clienteNombre: string;
   cotizacionRef?: string;
-  descripcionMercancia: string;
-  piezas: number;
-  pesoKg: number;
+  /** Múltiples líneas de mercancía (Sub-paso 3). */
+  mercancia?: MercanciaLine[];
+  // ── Legacy (plano) — datos pre-Sub-paso 3, se leen si mercancia[] no existe ──
+  descripcionMercancia?: string;
+  piezas?: number;
+  pesoKg?: number;
   volumenM3?: number;
   observaciones?: string;
 }
@@ -122,6 +135,44 @@ export interface EmbarqueProducto {
   datosContenedor?: DatosContenedor;
   tipoConsolidacion?: 'FCL' | 'LCL';
   pallets?: Pallet[];
+  /** Override manual: el usuario pisó el peso auto-calculado de pallets. */
+  pesoOverride?: boolean;
+  /** Override manual: el usuario pisó las piezas auto-calculadas de pallets. */
+  piezasOverride?: boolean;
+}
+
+// ── Helpers para leer pallets en formato legacy o nuevo ─────────────────────
+
+/** Devuelve piezas de un pallet, leyendo mercancia[] si existe o el campo plano legacy. */
+export function palletPiezas(p: Pallet): number {
+  if (p.mercancia && p.mercancia.length > 0) {
+    return p.mercancia.reduce((s, m) => s + m.cantidad, 0);
+  }
+  return p.piezas ?? 0;
+}
+
+/** Devuelve peso de un pallet, leyendo mercancia[] si existe o el campo plano legacy. */
+export function palletPeso(p: Pallet): number {
+  if (p.mercancia && p.mercancia.length > 0) {
+    return p.mercancia.reduce((s, m) => s + m.pesoKg, 0);
+  }
+  return p.pesoKg ?? 0;
+}
+
+/** Devuelve volumen de un pallet, leyendo mercancia[] si existe o el campo plano legacy. */
+export function palletVolumen(p: Pallet): number {
+  if (p.mercancia && p.mercancia.length > 0) {
+    return p.mercancia.reduce((s, m) => s + (m.volumenM3 ?? 0), 0);
+  }
+  return p.volumenM3 ?? 0;
+}
+
+/** Devuelve descripción de mercancía de un pallet (resumen para tabla). */
+export function palletDescripcion(p: Pallet): string {
+  if (p.mercancia && p.mercancia.length > 0) {
+    return p.mercancia.map(m => m.descripcion).join(', ');
+  }
+  return p.descripcionMercancia ?? '';
 }
 
 export const TIPOS_CONTENEDOR = [
