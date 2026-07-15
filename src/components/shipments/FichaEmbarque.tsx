@@ -5,6 +5,7 @@ import EntidadesEmbarque from './EntidadesEmbarque';
 import RutaEmbarque from './RutaEmbarque';
 import DocumentosEmbarque from './DocumentosEmbarque';
 import ProductosEmbarque from './ProductosEmbarque';
+import { useClientes } from '../../hooks/useClientes';
 
 interface FichaEmbarqueProps {
   embarque: EmbarqueCompleto;
@@ -21,6 +22,7 @@ export default function FichaEmbarque({
   onUpdateEmbarque,
   onSelectEmbarqueById
 }: FichaEmbarqueProps) {
+  const { clientes } = useClientes();
   const [activeTab, setActiveTab] = useState<'general' | 'entidades' | 'ruta' | 'cargos' | 'documentos' | 'eventos' | 'productos' | 'master_hijo'>('general');
 
   // Estado temporal de edición general
@@ -842,6 +844,7 @@ export default function FichaEmbarque({
         {activeTab === 'productos' && (
           <ProductosEmbarque
             productos={embarque.productos || []}
+            clientes={clientes}
             onAddProducto={handleAddProducto}
             onDeleteProducto={handleDeleteProducto}
           />

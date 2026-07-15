@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Package, Plus, Trash2, Weight, Box, ChevronDown, ChevronRight, Edit2, ShieldCheck, X } from 'lucide-react';
 import { EmbarqueProducto, Pallet, DatosContenedor, TIPOS_CONTENEDOR, palletPiezas, palletPeso, palletVolumen, palletDescripcion } from './EmbarquesData';
+import { ClienteVermur } from '../clientes/ClientesData';
 
 const TIPOS_EMBALAJE = ['Pallet', 'Caja', 'Tambor', 'Bulto', 'Bobina', 'Contenedor', 'Otro'] as const;
 
@@ -15,12 +16,14 @@ const PALLET_COLORS = [
 
 interface ProductosEmbarqueProps {
   productos: EmbarqueProducto[];
+  clientes: ClienteVermur[];
   onAddProducto: (prod: Omit<EmbarqueProducto, 'id'>) => void;
   onDeleteProducto: (id: string) => void;
 }
 
 export default function ProductosEmbarque({
   productos,
+  clientes,
   onAddProducto,
   onDeleteProducto,
 }: ProductosEmbarqueProps) {
@@ -101,7 +104,8 @@ export default function ProductosEmbarque({
   };
 
   const handleSavePallet = () => {
-    if (!palletForm.numeroPallet || !palletForm.clienteNombre || !palletForm.descripcionMercancia || !palletForm.piezas || !palletForm.pesoKg) return;
+    const hasClient = clientes.length > 0 ? !!palletForm.clienteId : !!palletForm.clienteNombre;
+    if (!palletForm.numeroPallet || !hasClient || !palletForm.descripcionMercancia || !palletForm.piezas || !palletForm.pesoKg) return;
 
     if (editPalletId) {
       setPallets(prev => prev.map(p => p.id === editPalletId ? { ...p, ...palletForm } as Pallet : p));
@@ -523,7 +527,7 @@ export default function ProductosEmbarque({
           <div className="bg-white rounded-xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-divider bg-canvas">
               <h3 className="text-sm font-black text-text-primary uppercase tracking-wide flex items-center gap-2">
-                <Box className="w-4 h-4 text-brand" /> {editPalletId ? 'Editar Pallet LCL' : 'Nuevo Pallet LCL'}
+                <Box className="w-4 h-4 text-brand" /> {editPalletId ? 'Editar Pallet' : 'Nuevo Pallet'}
               </h3>
               <button onClick={() => setShowPalletModal(false)} className="text-text-muted hover:text-text-primary transition-colors p-1"><X className="w-5 h-5" /></button>
             </div>
@@ -536,7 +540,33 @@ export default function ProductosEmbarque({
                 </div>
                 <div>
                   <label className="block text-[9px] font-bold text-text-muted uppercase mb-1">Cliente Dueño *</label>
-                  <input type="text" value={palletForm.clienteNombre || ''} onChange={e => setPalletForm({...palletForm, clienteNombre: e.target.value})} placeholder="Ej. Alfa Corporativo S.A." className="w-full px-3 py-2 border border-card-border rounded-lg text-xs font-semibold outline-none focus:border-brand" />
+                  {clientes.length > 0 ? (
+                    <select
+                      value={palletForm.clienteId || ''}
+                      onChange={e => {
+                        const sel = clientes.find(c => c.id === e.target.value);
+                        setPalletForm({
+                          ...palletForm,
+                          clienteId: sel?.id || '',
+                          clienteNombre: sel?.nombre || '',
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-card-border rounded-lg text-xs font-semibold outline-none focus:border-brand bg-white"
+                    >
+                      <option value="">— Seleccionar cliente —</option>
+                      {clientes.filter(c => c.statusOperativo === 'ACTIVO').map(c => (
+                        <option key={c.id} value={c.id}>{c.nombre}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={palletForm.clienteNombre || ''}
+                      onChange={e => setPalletForm({...palletForm, clienteNombre: e.target.value})}
+                      placeholder="Sin clientes en catálogo — escribir nombre"
+                      className="w-full px-3 py-2 border border-card-border rounded-lg text-xs font-semibold outline-none focus:border-brand"
+                    />
+                  )}
                 </div>
               </div>
 
