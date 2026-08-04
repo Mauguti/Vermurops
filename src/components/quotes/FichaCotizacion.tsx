@@ -22,6 +22,8 @@ import { storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { calcLinea } from '../../lib/cotizacionCalculator';
 import { puedeTransicionarA, transicionesDisponibles } from '../../lib/stateMachine';
+import ComparativaPricing from './ComparativaPricing';
+import type { ProveedorComparativa } from './ComparativaPricing';
 
 interface FichaCotizacionProps {
   quote: KanbanQuote | null;
@@ -220,6 +222,10 @@ interface ServicioSectionProps {
   onUpdateServicio: (updated: ServicioSolicitado) => void;
   servicios: any[];
   renderIcon: any;
+  moneda?: 'USD' | 'MXN';
+  clientePreferidos?: string[];
+  clienteVetados?: string[];
+  diasCredito?: number;
 }
 
 /** Detecta la modalidad de transporte por tipo (clave legacy o nombre) e icono. */
@@ -231,7 +237,7 @@ function getModality(tipo: string, icono: string): 'maritimo' | 'terrestre' | 'o
   return 'otro';
 }
 
-export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servicios, renderIcon }: ServicioSectionProps) {
+export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servicios, renderIcon, moneda, clientePreferidos, clienteVetados, diasCredito }: ServicioSectionProps) {
   const [expanded, setExpanded] = useState(true);
   
   const def = (servicios ?? []).find((s: any) => s.id === servicio.tipo);
@@ -506,12 +512,17 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
             ) : (
               <div className="space-y-3">
                 {servicio.conceptos.map(concepto => (
-                  <ConceptoSection 
-                    key={concepto.id} 
-                    concepto={concepto} 
-                    rolActivo={rolActivo} 
-                    onUpdate={handleUpdateConcepto} 
+                  <ConceptoSection
+                    key={concepto.id}
+                    concepto={concepto}
+                    rolActivo={rolActivo}
+                    onUpdate={handleUpdateConcepto}
                     onDelete={() => handleDeleteConcepto(concepto.id)}
+                    moneda={moneda}
+                    ruta={`${servicio.ruta?.origen?.split(',')[0] || ''} → ${servicio.ruta?.destino?.split(',')[0] || ''}`}
+                    clientePreferidos={clientePreferidos}
+                    clienteVetados={clienteVetados}
+                    diasCredito={diasCredito}
                   />
                 ))}
               </div>
@@ -523,9 +534,23 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
   );
 }
 
-export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete }: { concepto: ConceptoCotizacion, rolActivo: string, onUpdate: (c: ConceptoCotizacion) => void, onDelete: () => void }) {
+interface ConceptoSectionProps {
+  key?: React.Key;
+  concepto: ConceptoCotizacion;
+  rolActivo: string;
+  onUpdate: (c: ConceptoCotizacion) => void;
+  onDelete: () => void;
+  moneda?: 'USD' | 'MXN';
+  ruta?: string;
+  clientePreferidos?: string[];
+  clienteVetados?: string[];
+  diasCredito?: number;
+}
+
+export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moneda = 'USD', ruta = '', clientePreferidos, clienteVetados, diasCredito = 30 }: ConceptoSectionProps) {
   const [newSubNombre, setNewSubNombre] = useState('');
   const [newSubCosto, setNewSubCosto] = useState('');
+  const [comparativaOpen, setComparativaOpen] = useState(false);
 
   const costoOficial = getCostoOficial(concepto);
   const costoSubconceptos = (concepto.subconceptos || []).reduce((acc, sub) => acc + sub.costo, 0);
@@ -553,20 +578,99 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete }: { c
     updateConSubs((concepto.subconceptos || []).filter(s => s.id !== subId));
   };
 
+  // ── CP-4: Comparativa de pricing ────────────────────────────────────────────
+
+  const tieneComparativa = (concepto.tarifas || []).length >= 2;
+
+  // Enriquecer tarifas con preferencias del cliente
+  const enrichedTarifas: ProveedorComparativa[] = (concepto.tarifas || []).map(t => ({
+    ...t,
+    esPreferido: !!(t.proveedorId && clientePreferidos?.includes(t.proveedorId)),
+    esVetado: !!(t.proveedorId && clienteVetados?.includes(t.proveedorId)),
+  }));
+
+  // Persistir cambios de tarifas (candidata/seleccionada) a Firestore
+  const handleTarifasChange = (updatedItems: ProveedorComparativa[]) => {
+    const seleccionadaIds = updatedItems.filter(i => i.seleccionada).map(i => i.id);
+    // Strip enrichment fields before persisting
+    const nuevasTarifas: CotizacionProveedor[] = updatedItems.map(
+      ({ esPreferido, esVetado, tiempoTransitoDias, ...tarifa }) => tarifa
+    );
+    const costoOficialNuevo = updatedItems.filter(i => i.seleccionada).reduce((acc, i) => acc + i.monto, 0);
+    const costoTotal = costoOficialNuevo + costoSubconceptos;
+    const { venta, margen } = calcLinea(costoTotal, concepto.profit || 0);
+    onUpdate({
+      ...concepto,
+      tarifas: nuevasTarifas,
+      proveedoresOficialIds: seleccionadaIds,
+      costo: costoTotal,
+      venta,
+      margen,
+    });
+  };
+
+  // Persistir cambios de profit desde la comparativa
+  const handleComparativaProfitChange = (newProfit: number) => {
+    const { venta, margen } = calcLinea(costoTotalConcepto, newProfit);
+    onUpdate({ ...concepto, profit: newProfit, costo: costoTotalConcepto, venta, margen });
+  };
+
+  // ── Vista comparativa ──────────────────────────────────────────────────────
+  if (comparativaOpen) {
+    return (
+      <div className="border border-gray-200 rounded-lg bg-gray-50/50 p-3 space-y-3">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setComparativaOpen(false)}
+            className="flex items-center gap-1.5 text-[11px] font-semibold text-text-secondary hover:text-text-primary transition-colors"
+          >
+            <ChevronRight className="w-3.5 h-3.5 rotate-180" />
+            Volver al concepto
+          </button>
+          <span className="text-[11px] font-bold text-[#18181B]">{concepto.nombre}</span>
+        </div>
+        <ComparativaPricing
+          concepto={concepto.nombre}
+          ruta={ruta}
+          moneda={moneda}
+          cotizaciones={enrichedTarifas}
+          sinRespuesta={[]}
+          totalSolicitados={enrichedTarifas.length}
+          profitInicial={concepto.profit || 0}
+          diasCredito={diasCredito}
+          onTarifasChange={handleTarifasChange}
+          onProfitChange={handleComparativaProfitChange}
+        />
+      </div>
+    );
+  }
+
+  // ── Vista normal del concepto ──────────────────────────────────────────────
   return (
     <div className="border border-gray-200 rounded-lg bg-gray-50/50 p-3 space-y-3">
       <div className="flex items-center justify-between">
-        <input 
-          type="text" 
-          value={concepto.nombre} 
-          onChange={e => onUpdate({ ...concepto, nombre: e.target.value })} 
+        <input
+          type="text"
+          value={concepto.nombre}
+          onChange={e => onUpdate({ ...concepto, nombre: e.target.value })}
           className="text-xs font-bold text-[#18181B] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#E11D48] outline-none px-1 py-0.5"
           placeholder="Nombre del concepto"
           readOnly={rolActivo === 'ventas'}
         />
-        {rolActivo !== 'ventas' && (
-          <button onClick={onDelete} className="text-gray-300 hover:text-red-500"><X className="w-4 h-4" /></button>
-        )}
+        <div className="flex items-center gap-2">
+          {tieneComparativa && rolActivo !== 'ventas' && (
+            <button
+              onClick={() => setComparativaOpen(true)}
+              className="flex items-center gap-1 text-[9px] font-bold text-[#E11D48] hover:text-[#BE123C] uppercase tracking-wide hover:bg-[#E11D48]/5 px-2 py-1 rounded-lg transition-colors"
+            >
+              <BarChart2 className="w-3 h-3" />
+              Comparar ({concepto.tarifas.length})
+            </button>
+          )}
+          {rolActivo !== 'ventas' && (
+            <button onClick={onDelete} className="text-gray-300 hover:text-red-500"><X className="w-4 h-4" /></button>
+          )}
+        </div>
       </div>
 
       {/* Proveedor(es) Oficial(es) */}
@@ -620,7 +724,7 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete }: { c
           <span>Costo Total Concepto:</span>
           <span className="text-xs font-bold text-gray-700">${costoTotalConcepto.toLocaleString()}</span>
         </div>
-        
+
         {rolActivo !== 'ventas' ? (
           <div className="flex items-center gap-2 border-l border-indigo-200 pl-3">
             <span className="text-[10px] text-indigo-600 font-bold uppercase">Profit: $</span>
@@ -1329,6 +1433,10 @@ export default function FichaCotizacion({
                   onUpdateServicio={updated => handleUpdateServicio(srv.id, updated)}
                   servicios={servicios}
                   renderIcon={renderIcon}
+                  moneda={quote.moneda}
+                  clientePreferidos={clienteVinculado?.proveedoresPreferidos}
+                  clienteVetados={clienteVinculado?.proveedoresVetados}
+                  diasCredito={clienteVinculado?.dias ?? 30}
                 />
               ))}
 

@@ -20,7 +20,7 @@ import type { CotizacionProveedor, EstadoRespuesta } from './QuotesData';
 
 type SortKey = 'precio' | 'transito' | 'freetime';
 
-interface ProveedorComparativa extends CotizacionProveedor {
+export interface ProveedorComparativa extends CotizacionProveedor {
   tiempoTransitoDias?: number;
   esPreferido?: boolean;
   esVetado?: boolean;
@@ -37,8 +37,10 @@ export interface ComparativaPricingProps {
   totalSolicitados: number;
   profitInicial: number;
   diasCredito: number;
-  /** Callback cuando cambia la selección (para integración CP-4). */
-  onSeleccionChange?: (seleccionadas: ProveedorComparativa[]) => void;
+  /** Callback en cada toggle (candidata o seleccionada) — items completos. */
+  onTarifasChange?: (items: ProveedorComparativa[]) => void;
+  /** Callback cuando el usuario edita el profit. */
+  onProfitChange?: (profit: number) => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────────
@@ -267,7 +269,8 @@ export default function ComparativaPricing({
   totalSolicitados,
   profitInicial,
   diasCredito,
-  onSeleccionChange,
+  onTarifasChange,
+  onProfitChange,
 }: ComparativaPricingProps) {
   // ── Estado local ────────────────────────────────────────────────────────────
   const [items, setItems] = useState<ProveedorComparativa[]>(cotizacionesIniciales);
@@ -290,20 +293,22 @@ export default function ComparativaPricing({
             }
           : item
       );
-      onSeleccionChange?.(next.filter(i => i.seleccionada));
+      onTarifasChange?.(next);
       return next;
     });
-  }, [onSeleccionChange]);
+  }, [onTarifasChange]);
 
   const toggleCandidata = useCallback((id: string) => {
-    setItems(prev =>
-      prev.map(item =>
+    setItems(prev => {
+      const next = prev.map(item =>
         item.id === id && !item.seleccionada
           ? { ...item, candidata: !item.candidata }
           : item
-      )
-    );
-  }, []);
+      );
+      onTarifasChange?.(next);
+      return next;
+    });
+  }, [onTarifasChange]);
 
   // ── Ordenamiento ──────────────────────────────────────────────────────────
   const sorted = useMemo(() => {
@@ -356,7 +361,9 @@ export default function ComparativaPricing({
   // ── Profit input ────────────────────────────────────────────────────────────
   const handleProfitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/[^0-9.-]/g, '');
-    setProfit(raw === '' || raw === '-' ? 0 : parseFloat(raw) || 0);
+    const newProfit = raw === '' || raw === '-' ? 0 : parseFloat(raw) || 0;
+    setProfit(newProfit);
+    onProfitChange?.(newProfit);
   };
 
   return (
