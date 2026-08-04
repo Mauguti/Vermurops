@@ -1,15 +1,18 @@
 // ============================================================
 // ComparativaPricing.tsx — Comparativa de proveedores por concepto
 //
-// CP-2: Visual con datos mock. Sin lógica de selección (CP-3).
-// Diseño: tarjetas minimalistas, la más barata arriba como sugerida,
-// badges contextuales, métricas en tiempo real.
+// CP-3: Selección interactiva + recálculo de métricas en vivo.
+//   - Candidata (toggle): apoyo visual del analista, NO afecta cálculos.
+//   - Seleccionada (toggle): elegida en firme, SÍ suma al costo.
+//   - Profit editable con % mostrado junto.
+//   - Desglose visible cuando hay 2+ seleccionadas.
 // ============================================================
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
-  ArrowUpDown, Clock, Ship, TrendingDown, TrendingUp, Star,
-  Ban, AlertTriangle, Mail, DollarSign, BarChart2, Percent, Wallet,
+  ArrowUpDown, Clock, Ship, TrendingDown, Star,
+  Ban, AlertTriangle, Mail, DollarSign, BarChart2, Wallet,
+  Bookmark, Check,
 } from 'lucide-react';
 import type { CotizacionProveedor, EstadoRespuesta } from './QuotesData';
 
@@ -23,7 +26,7 @@ interface ProveedorComparativa extends CotizacionProveedor {
   esVetado?: boolean;
 }
 
-interface ComparativaPricingProps {
+export interface ComparativaPricingProps {
   concepto: string;
   ruta: string;
   tipoContenedor?: string;
@@ -32,10 +35,10 @@ interface ComparativaPricingProps {
   cotizaciones: ProveedorComparativa[];
   sinRespuesta: { proveedor: string; estadoRespuesta: EstadoRespuesta }[];
   totalSolicitados: number;
-  // Métricas (se recalcularán en CP-3 con selección real)
-  costoElegido: number;
-  profitAbsoluto: number;
+  profitInicial: number;
   diasCredito: number;
+  /** Callback cuando cambia la selección (para integración CP-4). */
+  onSeleccionChange?: (seleccionadas: ProveedorComparativa[]) => void;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────────
@@ -96,9 +99,14 @@ interface ProveedorCardProps {
   esMasRapida: boolean;
   diffPrecio: number;
   moneda: string;
+  onToggleSeleccionada: (id: string) => void;
+  onToggleCandidata: (id: string) => void;
 }
 
-function ProveedorCard({ cp, esSugerida, esMasRapida, diffPrecio, moneda }: ProveedorCardProps) {
+function ProveedorCard({
+  cp, esSugerida, esMasRapida, diffPrecio, moneda,
+  onToggleSeleccionada, onToggleCandidata,
+}: ProveedorCardProps) {
   const vencida = !esVigente(cp.vigencia);
   const atenuada = vencida || cp.esVetado;
 
@@ -202,19 +210,43 @@ function ProveedorCard({ cp, esSugerida, esMasRapida, diffPrecio, moneda }: Prov
         </div>
       </div>
 
-      {/* Botón de acción */}
-      <div className="flex justify-end mt-3">
+      {/* Botones de acción */}
+      <div className="flex items-center justify-end gap-2 mt-3">
+        {/* Candidata toggle — solo visible si no está seleccionada ni vencida */}
+        {!cp.seleccionada && !vencida && (
+          <button
+            onClick={() => onToggleCandidata(cp.id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-[11px] font-medium transition-colors ${
+              cp.candidata
+                ? 'bg-gray-200 text-text-primary'
+                : 'bg-neutral-bg text-text-muted hover:bg-gray-200'
+            }`}
+            title={cp.candidata ? 'Quitar de candidatas' : 'Marcar como candidata'}
+          >
+            <Bookmark className={`w-3 h-3 ${cp.candidata ? 'fill-current' : ''}`} />
+            Candidata
+          </button>
+        )}
+
+        {/* Elegir / Elegida toggle */}
         {vencida ? (
           <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-[11px] font-medium bg-warning-bg text-warning-text hover:bg-amber-100 transition-colors">
             <Mail className="w-3 h-3" /> Repedir
           </button>
         ) : (
-          <button className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-[11px] font-medium transition-colors ${
-            cp.seleccionada
-              ? 'bg-brand text-white hover:bg-brand-hover'
-              : 'bg-neutral-bg text-text-secondary hover:bg-gray-200'
-          }`}>
-            {cp.seleccionada ? 'Elegida' : 'Elegir'}
+          <button
+            onClick={() => onToggleSeleccionada(cp.id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-[6px] text-[11px] font-medium transition-colors ${
+              cp.seleccionada
+                ? 'bg-brand text-white hover:bg-brand-hover'
+                : 'bg-neutral-bg text-text-secondary hover:bg-gray-200'
+            }`}
+          >
+            {cp.seleccionada ? (
+              <><Check className="w-3 h-3" /> Elegida</>
+            ) : (
+              'Elegir'
+            )}
           </button>
         )}
       </div>
@@ -230,20 +262,52 @@ export default function ComparativaPricing({
   tipoContenedor,
   folio,
   moneda,
-  cotizaciones,
+  cotizaciones: cotizacionesIniciales,
   sinRespuesta,
   totalSolicitados,
-  costoElegido,
-  profitAbsoluto,
+  profitInicial,
   diasCredito,
+  onSeleccionChange,
 }: ComparativaPricingProps) {
+  // ── Estado local ────────────────────────────────────────────────────────────
+  const [items, setItems] = useState<ProveedorComparativa[]>(cotizacionesIniciales);
+  const [profit, setProfit] = useState(profitInicial);
   const [sortKey, setSortKey] = useState<SortKey>('precio');
 
-  const totalRespondieron = cotizaciones.length;
+  const totalRespondieron = items.length;
+
+  // ── Toggles ─────────────────────────────────────────────────────────────────
+
+  const toggleSeleccionada = useCallback((id: string) => {
+    setItems(prev => {
+      const next = prev.map(item =>
+        item.id === id
+          ? {
+              ...item,
+              seleccionada: !item.seleccionada,
+              // Al seleccionar, quitar candidata (seleccionada > candidata)
+              candidata: item.seleccionada ? item.candidata : false,
+            }
+          : item
+      );
+      onSeleccionChange?.(next.filter(i => i.seleccionada));
+      return next;
+    });
+  }, [onSeleccionChange]);
+
+  const toggleCandidata = useCallback((id: string) => {
+    setItems(prev =>
+      prev.map(item =>
+        item.id === id && !item.seleccionada
+          ? { ...item, candidata: !item.candidata }
+          : item
+      )
+    );
+  }, []);
 
   // ── Ordenamiento ──────────────────────────────────────────────────────────
   const sorted = useMemo(() => {
-    const arr = [...cotizaciones];
+    const arr = [...items];
     arr.sort((a, b) => {
       switch (sortKey) {
         case 'precio':
@@ -258,32 +322,42 @@ export default function ComparativaPricing({
       }
     });
     return arr;
-  }, [cotizaciones, sortKey]);
+  }, [items, sortKey]);
 
-  // La más barata siempre es la primera del ordenamiento por precio
   const masBarata = useMemo(() => {
-    return [...cotizaciones].sort((a, b) => a.monto - b.monto)[0];
-  }, [cotizaciones]);
+    return [...items].sort((a, b) => a.monto - b.monto)[0];
+  }, [items]);
 
-  // La más rápida
   const masRapida = useMemo(() => {
-    const conTT = cotizaciones.filter(c => parseTTDias(c.tiempoTransito, c.tiempoTransitoDias) != null);
+    const conTT = items.filter(c => parseTTDias(c.tiempoTransito, c.tiempoTransitoDias) != null);
     if (conTT.length === 0) return null;
     return conTT.reduce((min, c) => {
       const dias = parseTTDias(c.tiempoTransito, c.tiempoTransitoDias)!;
       const minDias = parseTTDias(min.tiempoTransito, min.tiempoTransitoDias)!;
       return dias < minDias ? c : min;
     });
-  }, [cotizaciones]);
+  }, [items]);
 
-  // ── Cálculos de métricas ──────────────────────────────────────────────────
-  const venta = costoElegido + profitAbsoluto;
-  const margenPct = venta === 0 ? 0 : (profitAbsoluto / venta) * 100;
+  // ── Métricas derivadas ──────────────────────────────────────────────────────
+  const seleccionadas = useMemo(() => items.filter(i => i.seleccionada), [items]);
+  const costoElegido = useMemo(
+    () => seleccionadas.reduce((sum, i) => sum + i.monto, 0),
+    [seleccionadas],
+  );
+
+  const venta = costoElegido + profit;
+  const margenPct = venta === 0 ? 0 : (profit / venta) * 100;
 
   const financiamientoPct = diasCredito / 2000;
   const financiamientoMonto = venta * financiamientoPct;
-  const comisionMonto = profitAbsoluto * 0.10;
-  const profitReal = profitAbsoluto - comisionMonto - financiamientoMonto;
+  const comisionMonto = profit * 0.10;
+  const profitReal = profit - comisionMonto - financiamientoMonto;
+
+  // ── Profit input ────────────────────────────────────────────────────────────
+  const handleProfitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/[^0-9.-]/g, '');
+    setProfit(raw === '' || raw === '-' ? 0 : parseFloat(raw) || 0);
+  };
 
   return (
     <div className="space-y-5">
@@ -295,12 +369,8 @@ export default function ComparativaPricing({
           <span className="text-[13px] text-text-secondary">{ruta}</span>
         </div>
         <div className="flex items-center gap-3 mt-1 text-[12px] text-text-muted">
-          {tipoContenedor && (
-            <span>{tipoContenedor}</span>
-          )}
-          {folio && (
-            <span className="font-mono">{folio}</span>
-          )}
+          {tipoContenedor && <span>{tipoContenedor}</span>}
+          {folio && <span className="font-mono">{folio}</span>}
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-info-bg text-info-text font-medium">
             {totalRespondieron} de {totalSolicitados} proveedores respondieron
           </span>
@@ -309,31 +379,97 @@ export default function ComparativaPricing({
 
       {/* ── Métricas ───────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-4 gap-3">
+        {/* 1. Costo elegido — derivado de seleccionadas */}
         <MetricCard
           label="Costo elegido"
-          valor={formatMoneda(costoElegido, moneda)}
+          valor={costoElegido === 0 ? '—' : formatMoneda(costoElegido, moneda)}
+          sub={
+            seleccionadas.length === 0
+              ? 'Sin selección'
+              : `${seleccionadas.length} proveedor${seleccionadas.length > 1 ? 'es' : ''}`
+          }
           icon={DollarSign}
         />
+
+        {/* 2. Profit — editable con % al lado */}
+        <div className="rounded-[10px] border border-card-border bg-white p-4 flex flex-col gap-1">
+          <div className="flex items-center gap-1.5">
+            <BarChart2 className="w-3.5 h-3.5 text-text-muted" />
+            <span className="text-[11px] font-medium uppercase tracking-wide text-text-muted">
+              Profit
+            </span>
+          </div>
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-text-muted text-[14px]">$</span>
+            <input
+              type="text"
+              value={profit}
+              onChange={handleProfitChange}
+              className="text-[20px] font-bold tabular-nums text-text-primary bg-transparent border-b border-dashed border-gray-300 focus:border-brand focus:outline-none w-[90px] transition-colors"
+            />
+            <span className="text-[12px] text-text-muted">{moneda}</span>
+            {costoElegido > 0 && (
+              <span className="text-[12px] font-semibold text-text-secondary ml-1">
+                {margenPct.toFixed(1)}%
+              </span>
+            )}
+          </div>
+          <span className="text-[11px] text-text-muted">
+            Venta: {costoElegido === 0 ? '—' : formatMoneda(venta, moneda)}
+          </span>
+        </div>
+
+        {/* 3. Venta total */}
         <MetricCard
           label="Venta"
-          valor={formatMoneda(venta, moneda)}
-          sub={`Profit: ${formatMoneda(profitAbsoluto, moneda)}`}
-          icon={BarChart2}
+          valor={costoElegido === 0 ? '—' : formatMoneda(venta, moneda)}
+          sub={costoElegido > 0 ? `Margen ${margenPct.toFixed(1)}% sobre venta` : 'Sin selección'}
+          icon={DollarSign}
         />
-        <MetricCard
-          label="Margen"
-          valor={`${margenPct.toFixed(1)}%`}
-          sub="sobre venta"
-          icon={Percent}
-        />
+
+        {/* 4. Profit real — amber */}
         <MetricCard
           label="Profit real"
-          valor={formatMoneda(Math.round(profitReal), moneda)}
-          sub={`-${formatMoneda(Math.round(comisionMonto), moneda)} comisión · -${formatMoneda(Math.round(financiamientoMonto), moneda)} financ.`}
+          valor={costoElegido === 0 ? '—' : formatMoneda(Math.round(profitReal), moneda)}
+          sub={
+            costoElegido > 0
+              ? `-${formatMoneda(Math.round(comisionMonto), moneda)} com. · -${formatMoneda(Math.round(financiamientoMonto), moneda)} fin.`
+              : 'Sin selección'
+          }
           icon={Wallet}
           highlight
         />
       </div>
+
+      {/* ── Desglose (solo con 2+ seleccionadas) ──────────────────────────── */}
+      {seleccionadas.length >= 2 && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-[8px] bg-brand/5 border border-brand/15 text-[12px]">
+          <span className="font-semibold text-text-secondary shrink-0">Desglose:</span>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {seleccionadas.map((s, i) => (
+              <React.Fragment key={s.id}>
+                {i > 0 && <span className="text-text-muted font-bold">+</span>}
+                <span className="text-text-primary">
+                  {s.proveedor}{' '}
+                  <span className="font-bold tabular-nums">{formatMoneda(s.monto, moneda)}</span>
+                </span>
+              </React.Fragment>
+            ))}
+            <span className="text-text-muted font-bold">=</span>
+            <span className="font-black text-brand tabular-nums">
+              {formatMoneda(costoElegido, moneda)}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Aviso sin selección ────────────────────────────────────────────── */}
+      {seleccionadas.length === 0 && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-[8px] bg-warning-bg border border-amber-200 text-[12px] text-warning-text">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+          Sin proveedores seleccionados — elige al menos uno para calcular métricas.
+        </div>
+      )}
 
       {/* ── Ordenamiento ───────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2">
@@ -364,6 +500,8 @@ export default function ComparativaPricing({
             esMasRapida={masRapida?.id === cp.id && masRapida?.id !== masBarata?.id}
             diffPrecio={cp.monto - (masBarata?.monto ?? 0)}
             moneda={moneda}
+            onToggleSeleccionada={toggleSeleccionada}
+            onToggleCandidata={toggleCandidata}
           />
         ))}
       </div>
@@ -402,7 +540,7 @@ export default function ComparativaPricing({
   );
 }
 
-// ─── Datos mock para desarrollo (CP-2) ────────────────────────────────────────
+// ─── Datos mock para desarrollo (CP-3) ──────────────────────────────────────────
 
 export const MOCK_COMPARATIVA_PROPS: ComparativaPricingProps = {
   concepto: 'Ocean Freight',
@@ -410,8 +548,7 @@ export const MOCK_COMPARATIVA_PROPS: ComparativaPricingProps = {
   tipoContenedor: '2 × 40\' HC',
   folio: 'COT-2026-0004',
   moneda: 'USD',
-  costoElegido: 2400,
-  profitAbsoluto: 800,
+  profitInicial: 800,
   diasCredito: 30,
   totalSolicitados: 8,
   cotizaciones: [
@@ -444,7 +581,6 @@ export const MOCK_COMPARATIVA_PROPS: ComparativaPricingProps = {
       seleccionada: false,
       candidata: true,
       estadoRespuesta: 'recibida',
-      esPreferido: false,
     },
     {
       id: 'cmp-3',
@@ -472,7 +608,7 @@ export const MOCK_COMPARATIVA_PROPS: ComparativaPricingProps = {
       freeTimeDias: 14,
       vigencia: '2026-09-20',
       seleccionada: false,
-      candidata: true,
+      candidata: false,
       estadoRespuesta: 'recibida',
     },
     {
