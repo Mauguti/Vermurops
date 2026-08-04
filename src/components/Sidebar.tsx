@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Home, FileText, Users, BarChart2, BookmarkMinus, Ship,
   DollarSign, Files, Settings as Settings2, Calculator, Tag, Bell, Anchor,
+  FlaskConical,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useNotifications } from '../notifications/NotificationsContext';
@@ -26,6 +27,8 @@ const ROLE_ITEMS = [
   { id: 'settings',   label: 'Configuración',    icon: <Settings2   className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   // Notificaciones: siempre visible (se filtra aparte)
   { id: 'notifications', label: 'Notificaciones', icon: <Bell className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
+  // DEV: Comparativa de pricing (temporal — CP-2)
+  { id: 'comparativa', label: 'Comparativa (dev)', icon: <FlaskConical className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
 ];
 
 export default function Sidebar({ currentView, onChangeView }: SidebarProps) {

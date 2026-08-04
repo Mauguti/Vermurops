@@ -25,6 +25,7 @@ import RatesManagement from './components/RatesManagement';
 import Settings from './components/Settings';
 import ExchangeRates from './components/ExchangeRates';
 import Puertos from './components/Puertos';
+import ComparativaPricing, { MOCK_COMPARATIVA_PROPS } from './components/quotes/ComparativaPricing';
 import Notificaciones from './pages/Notificaciones';
 import LandingPage from './components/LandingPage';
 import { ChevronDown, User, LogOut, Bell, ArrowRight, CheckCheck } from 'lucide-react';
@@ -55,6 +56,7 @@ const VIEW_LABELS: Record<string, string> = {
   reports: 'Reportes',
   settings: 'Configuración',
   notifications: 'Notificaciones',
+  comparativa: 'Comparativa (dev)',
 };
 
 // ─── Notification Badge ───────────────────────────────────────────────────────
@@ -288,6 +290,7 @@ function AppShell() {
       case 'clients':    return <Clients />;
       case 'puertos':    return <Puertos />;
       case 'rates':      return <RatesManagement />;
+      case 'comparativa': return <ComparativaPricing {...MOCK_COMPARATIVA_PROPS} />;
       case 'reports':    return <Reports />;
       case 'settings':   return <Settings />;
       default:           return <Dashboard />;
