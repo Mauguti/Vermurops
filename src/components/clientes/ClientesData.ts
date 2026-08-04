@@ -82,6 +82,12 @@ export interface ClienteVermur {
   /** Fecha de alta del cliente. Formato 'YYYY-MM-DD'. */
   fechaAlta: string;
 
+  // ── Preferencias de proveedores (CP-1: comparativa de pricing) ────────────
+  /** IDs de ProveedorVermur que el cliente prefiere. */
+  proveedoresPreferidos?: string[];
+  /** IDs de ProveedorVermur vetados por el cliente. */
+  proveedoresVetados?: string[];
+
   // ── Sub-objetos KYC ───────────────────────────────────────────────────────
   docsAlta: DocsAlta;
   contrato: ContratoCliente;

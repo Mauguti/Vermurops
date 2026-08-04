@@ -39,6 +39,8 @@ export interface StageHistory {
 // Cotización de proveedor (cargada por Pricing)
 // ------------------------------------------------------------
 
+export type EstadoRespuesta = 'pendiente' | 'recibida' | 'sin_respuesta' | 'declinada';
+
 export interface CotizacionProveedor {
   id: string;
   proveedor: string;       // Nombre de la naviera/aerolínea/transportista/agente aduanal
@@ -51,6 +53,18 @@ export interface CotizacionProveedor {
   adjuntoUrl?: string | null;
   archivoNombre?: string | null;
   seleccionada: boolean;   // Pricing marca la que se usará para consolidar
+
+  // ── CP-1: campos para comparativa de pricing ─────────────────────────────
+  /** Preseleccionada como candidata (apoyo visual, NO afecta cálculos). */
+  candidata?: boolean;
+  /** Estado de la solicitud al proveedor. */
+  estadoRespuesta?: EstadoRespuesta;
+  /** Días libres — solo FCL marítimo. */
+  freeTimeDias?: number | null;
+  /** FK al catálogo de proveedores (ProveedorVermur.id). */
+  proveedorId?: string | null;
+  /** FK al catálogo de conceptos (ConceptoVermur.id). */
+  conceptoId?: string | null;
 }
 
 // ------------------------------------------------------------
@@ -77,7 +91,10 @@ export interface ConceptoCotizacion {
   // ── Detalle de tarifas / subconceptos ───────────────────────────────────
   subconceptos: Subconcepto[];
   tarifas: CotizacionProveedor[];
+  /** @deprecated Usar proveedoresOficialIds. Se mantiene para backward compat. */
   proveedorOficialId?: string | null;
+  /** IDs de tarifas seleccionadas en firme (suman al costo). */
+  proveedoresOficialIds?: string[];
   orden?: number;
 }
 
@@ -309,6 +326,45 @@ export const EQUIPO_PRICING = [
 // Helper: calcular total consolidado de una cotización
 // ============================================================
 
+// ============================================================
+// Helper: resolver IDs oficiales con backward compat
+// ============================================================
+
+/**
+ * Devuelve los IDs de tarifas oficiales de un concepto.
+ * Prefiere proveedoresOficialIds (nuevo); fallback a proveedorOficialId (legacy).
+ */
+export function getOficialIds(concepto: ConceptoCotizacion): string[] {
+  if (concepto.proveedoresOficialIds?.length) return concepto.proveedoresOficialIds;
+  if (concepto.proveedorOficialId) return [concepto.proveedorOficialId];
+  return [];
+}
+
+/**
+ * Devuelve las tarifas oficiales (seleccionadas en firme) de un concepto.
+ */
+export function getTarifasOficiales(concepto: ConceptoCotizacion): CotizacionProveedor[] {
+  const ids = getOficialIds(concepto);
+  if (ids.length === 0) return [];
+  return (concepto.tarifas ?? []).filter(t => ids.includes(t.id));
+}
+
+/**
+ * Suma el monto de las tarifas oficiales de un concepto.
+ * Con multi-selección, los costos se suman (carga dividida entre proveedores).
+ */
+export function getCostoOficial(concepto: ConceptoCotizacion): number {
+  const ids = getOficialIds(concepto);
+  if (ids.length === 0) return 0;
+  return (concepto.tarifas ?? [])
+    .filter(t => ids.includes(t.id))
+    .reduce((acc, t) => acc + t.monto, 0);
+}
+
+// ============================================================
+// Helper: calcular total consolidado de una cotización
+// ============================================================
+
 /**
  * Suma las ventas de todos los servicios usando calcLinea (E1).
  *
@@ -330,10 +386,9 @@ export function calcularTotalConsolidado(servicios: ServicioSolicitado[]): numbe
 
     // ── Ruta 2: vista detallada (FichaCotizacion / lineas_cotizacion) ─────
     for (const concepto of srv.conceptos) {
-      const tarifaOficial = concepto.tarifas?.find(t => t.id === concepto.proveedorOficialId);
-      const costoOficial  = tarifaOficial?.monto ?? 0;
-      const costoSubs     = concepto.subconceptos?.reduce((acc, s) => acc + s.costo, 0) ?? 0;
-      const costoTotal    = costoOficial + costoSubs;
+      const costoOficial = getCostoOficial(concepto);
+      const costoSubs    = concepto.subconceptos?.reduce((acc, s) => acc + s.costo, 0) ?? 0;
+      const costoTotal   = costoOficial + costoSubs;
       total += calcLinea(costoTotal, concepto.profit).venta;
     }
   }

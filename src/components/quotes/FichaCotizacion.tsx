@@ -8,7 +8,7 @@ import {
   KanbanQuote, QuoteActivity, StageHistory, ORIGENES_PROSPECTO, PIPELINE_STAGES,
   ServicioSolicitado, ConceptoCotizacion, CotizacionProveedor, TipoServicio,
   INCOTERMS, Subconcepto, EQUIPO_PRICING, VENDEDORES, calcularTotalConsolidado,
-  PipelineStageId,
+  PipelineStageId, getCostoOficial, getTarifasOficiales,
 } from './QuotesData';
 import { ProveedorVermur, Modalidad, contactoPrincipal } from '../proveedores/ProveedoresData';
 import { useProveedores } from '../../hooks/useProveedores';
@@ -263,6 +263,7 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
       subconceptos: [],
       tarifas: [],
       proveedorOficialId: null,
+      proveedoresOficialIds: [],
     };
     onUpdateServicio({ ...servicio, conceptos: [...(servicio.conceptos || []), newConcepto] });
   };
@@ -526,8 +527,7 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete }: { c
   const [newSubNombre, setNewSubNombre] = useState('');
   const [newSubCosto, setNewSubCosto] = useState('');
 
-  const tarifaOficial = concepto.tarifas?.find(t => t.id === concepto.proveedorOficialId);
-  const costoOficial = tarifaOficial ? tarifaOficial.monto : 0;
+  const costoOficial = getCostoOficial(concepto);
   const costoSubconceptos = (concepto.subconceptos || []).reduce((acc, sub) => acc + sub.costo, 0);
   const costoTotalConcepto = costoOficial + costoSubconceptos;
   // Usa calcLinea para mantener consistencia con la calculadora de E1
@@ -569,18 +569,23 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete }: { c
         )}
       </div>
 
-      {/* Proveedor Oficial */}
+      {/* Proveedor(es) Oficial(es) */}
       <div className="bg-white border border-gray-150 rounded p-2 text-xs flex justify-between items-center shadow-sm">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-500">Proveedor Oficial:</span>{' '}
-          {tarifaOficial ? (
-            <span className="font-bold text-indigo-700">{tarifaOficial.proveedor}</span>
-          ) : (
-            <span className="text-gray-400 italic">Por definir en Bandeja Pricing</span>
-          )}
+          {(() => {
+            const oficiales = getTarifasOficiales(concepto);
+            if (oficiales.length === 0) return <span className="text-gray-400 italic">Por definir en Bandeja Pricing</span>;
+            return oficiales.map((t, i) => (
+              <span key={t.id}>
+                {i > 0 && <span className="text-gray-300 mx-1">+</span>}
+                <span className="font-bold text-indigo-700">{t.proveedor}</span>
+              </span>
+            ));
+          })()}
         </div>
         <div className="font-black text-indigo-900 tabular-nums bg-indigo-50 px-2 py-0.5 rounded">
-          ${costoOficial.toLocaleString()} {tarifaOficial?.moneda || 'USD'}
+          ${costoOficial.toLocaleString()} {getTarifasOficiales(concepto)[0]?.moneda || 'USD'}
         </div>
       </div>
 
