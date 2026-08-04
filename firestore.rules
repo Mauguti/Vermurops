@@ -46,6 +46,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Conceptos ────────────────────────────────────────────────────────
+    // Catálogo de conceptos/servicios (105 registros de Magaya).
+    // Baja lógica: un concepto inactivo se marca activo=false.
+    match /conceptos/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // ── Puertos (E10.0) ─────────────────────────────────────────────────
     // Catálogo de puertos marítimos. Mismo patrón que proveedores.
     // Baja lógica: un puerto inactivo se marca activo=false.
