@@ -1,7 +1,7 @@
 # VermurOps — Estado de Tarifas/Pricing (Pausa documentada)
 
-> Última actualización: 1 julio 2026
-> Estado: **EN PAUSA** — E9 cerrada, E10 pendiente de sesión de diseño con Mau.
+> Última actualización: 18 agosto 2026
+> Estado: **EN PAUSA** — Sprint FC cerrado, E10 pendiente de sesión de diseño con Mau.
 
 ---
 
@@ -16,6 +16,26 @@
 | E7 | Validadores RFC/CLABE (68 tests) + cableado en UI | `0948784`, `74200c8` | Sí |
 | E8 | Migración 70 clientes reales | — | **BLOQUEADA** (falta `seed_clientes.json` de Luis) |
 | E9 | Proveedores en Firestore (modelo, hook, CRUD, alta rápida) | `56134d3`–`99c86a9` | Sí |
+
+---
+
+## Sprint FC — Ficha de Cotización + Drag & Drop (cerrado 18 ago 2026)
+
+| Paso | Descripción | Archivos clave |
+|------|-------------|----------------|
+| **FC-1** | FichaCotizacion a pantalla completa + extracción de componentes | `ConceptoSection.tsx`, `ServicioSection.tsx`, `FormProveedorFicha.tsx` (muerto) |
+| **FC-2** | Panel lateral de tarifas por concepto activo (dos columnas en tab Servicios) | `TarifaPanel.tsx`, `tarifaMatching.ts` |
+| **FC-3** | Drag and drop con @dnd-kit (drag desde panel, drop en concepto) | `DraggableTarifaCard` en TarifaPanel, `useDroppable` en ConceptoSection |
+
+**Decisiones implementadas:**
+- D1: Pantalla completa con early-return en BandejaPricing, KanbanCotizaciones, Quotes
+- D2: Comparativa expande a ancho completo (panel se oculta), controlado por `comparativaCount`
+- D3: Mobile (<768px) oculta panel lateral, mantiene TarifaSuggestions inline
+- D4: `applyTarifaToConcepto()` compartida entre botón "Usar" y drag & drop
+
+**Lógica de matching extraída:** `tarifaMatching.ts` contiene funciones puras reutilizables:
+`normalize`, `resolverMonto`, `fmtPrecio`, `etiquetaContenedor`, `matchConceptByName`,
+`buildTarifaRuta`, `groupManobrasByTerminal`. TarifaSuggestions re-exporta para backward compat.
 
 ---
 
@@ -61,9 +81,68 @@ E10 requiere decisiones de diseño que NO se pueden tomar sin una sesión con Ma
 - **Endurecer por rol** cuando se haga la épica de seguridad (fuera de E9–E18).
 - Aplica también a `clientes/`, `cotizaciones/`, `contadores/`.
 
+### FormProveedorFicha.tsx — código muerto (candidato a eliminar)
+- `src/components/quotes/FormProveedorFicha.tsx` fue extraído mecánicamente en FC-1.
+- Estaba definido pero nunca invocado en el original FichaCotizacion.
+- **No borrar ahora** — eliminar en una limpieza dedicada, no mezclarlo con sprints activos.
+
 ### Alta rápida inline — CUMPLIDO
 - El compromiso de E9.2 (alta rápida de proveedor desde BandejaPricing y FichaCotizacion)
   **ya está implementado y validado**. Si aparece en notas viejas como pendiente, ignorar.
+
+### Dualidad de CotizacionProveedor (requiere épica propia)
+
+**Problema:** BandejaPricing guarda cotizaciones de proveedor en
+`servicio.cotizacionesProveedor` (sin `proveedorId`); FichaCotizacion guarda en
+`concepto.tarifas` (con `proveedorId`). Son dos estructuras paralelas que no se hablan.
+
+**Impacto actual:**
+- La comparativa es **aditiva** (ambos niveles se muestran si tienen datos): si
+  `servicio.cotizacionesProveedor` tiene 2+, se muestra "Comparativa del servicio"; si algún
+  concepto tiene 2+ tarifas, se muestra "Comparativa · [nombre]". Esto resuelve el bug donde
+  cotizaciones a nivel servicio quedaban invisibles cuando existían conceptos (fix 13 ago 2026).
+- **Deuda pendiente (Opción C):** migrar los datos de `cotizacionesProveedor` a `concepto.tarifas`
+  para eliminar la dualidad de raíz. Requiere script de migración de Firestore + refactor de
+  BandejaPricing. NO hacer sin sesión de planeación dedicada.
+- El historial de proveedor necesita fallback por nombre normalizado para encontrar registros legacy.
+- `calcularTotalConsolidado()` tiene lógica dual (flat vs conceptos).
+
+**Solución propuesta: concepto default oculto en BandejaPricing.**
+BandejaPricing crearía automáticamente un concepto ("Servicio general") al agregar la primera
+cotización de proveedor. El usuario no ve conceptos — la interfaz se mantiene simple. Pero por
+debajo, los datos viven en `concepto.tarifas`, unificando la estructura.
+
+**Alcance estimado: 2–3 días (12–15 horas).**
+
+**Puntos de riesgo alto:**
+1. **Refactor de BandejaPricing** (~150 líneas) — cambiar todas las lecturas/escrituras de
+   `servicio.cotizacionesProveedor` a `servicio.conceptos[0].tarifas`.
+2. **`calcularTotalConsolidado()`** — reescribir la lógica dual a una sola ruta por conceptos.
+   Es la función más crítica: se llama en cada actualización de cotización.
+3. **Guard de la state machine** (`stateMachine.ts`) — la transición
+   `cotizaciones_recibidas → consolidada` valida `servicio.cotizacionesProveedor.some(cp => cp.seleccionada)`.
+   Debe cambiar a `servicio.conceptos.some(c => c.tarifas.some(t => t.seleccionada))`.
+4. **Migración de datos en Firestore** — cotizaciones existentes con `cotizacionesProveedor`
+   no vacío necesitan un script que mueva esos datos a un concepto default.
+
+**Requisitos:** Plan propio, validación paso a paso, estrategia de rollback.
+**NO ejecutar sin sesión de planeación dedicada.**
+
+### Migración de `proveedorId` en CotizacionProveedor legacy
+
+**Problema:** CotizacionProveedor creadas por BandejaPricing solo tienen `proveedor` (nombre
+libre) pero no `proveedorId` (FK al catálogo). El historial de proveedor usa un fallback por
+nombre normalizado, pero los datos quedan sucios.
+
+**Solución:** Script de migración que recorra todas las cotizaciones en Firestore, busque cada
+`CotizacionProveedor` sin `proveedorId`, haga match por nombre contra el catálogo de proveedores,
+y escriba el `proveedorId` correspondiente.
+
+**Riesgo:** Las CotizacionProveedor son arrays anidados dentro de KanbanQuote (no documentos
+propios). Tocar arrays anidados en producción requiere cuidado.
+
+**Estado:** Pendiente. El fallback por nombre funciona como workaround — la migración es
+opcional pero recomendable para limpieza de datos.
 
 ---
 

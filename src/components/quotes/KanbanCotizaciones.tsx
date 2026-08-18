@@ -256,6 +256,19 @@ export default function KanbanCotizaciones({
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
+  // ── Vista de ficha completa (reemplaza el kanban) ─────────────────────────
+  if (selectedQuote) {
+    return (
+      <FichaCotizacion
+        quote={selectedQuote}
+        onBack={() => setSelectedQuote(null)}
+        onUpdateQuote={handleUpdateQuote}
+        onConvertToShipment={onConvertToShipment}
+        rolActivo={rolActivo}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
 
@@ -514,15 +527,7 @@ export default function KanbanCotizaciones({
         </div>
       </div>
 
-      {/* ── Drawer Ficha ──────────────────────────────────────────────────── */}
-      <FichaCotizacion
-        quote={selectedQuote}
-        isOpen={selectedQuote !== null}
-        onClose={() => setSelectedQuote(null)}
-        onUpdateQuote={handleUpdateQuote}
-        onConvertToShipment={onConvertToShipment}
-        rolActivo={rolActivo}
-      />
+      {/* Ficha se muestra a pantalla completa arriba (early return) */}
 
       {/* ── Modal Quick Add ───────────────────────────────────────────────── */}
       {showQuickAdd && (

@@ -746,6 +746,18 @@ export default function Quotes() {
 
       ) : (viewMode === 'prospeccion' || viewMode === 'kanban') ? (
         /* ─── Vista Prospectos / Negociación (con sub-vista tabla/kanban) ─── */
+        selectedQuote ? (
+          <FichaCotizacion
+            quote={selectedQuote}
+            onBack={() => setSelectedQuote(null)}
+            onUpdateQuote={(updated) => {
+              updateCotizacion(updated.id, updated);
+              setSelectedQuote(updated);
+            }}
+            onConvertToShipment={q => { alert(`¡Felicidades! "${q.prospecto.empresa}" marcada como GANADA.`); }}
+            rolActivo={rolActivo}
+          />
+        ) : (
         <>
           {subView === 'kanban' ? (
             /* ── Sub-vista Kanban ── */
@@ -918,19 +930,9 @@ export default function Quotes() {
             </>
           )}
 
-          {/* Drawer de Ficha de Cotización (abre al hacer clic en una fila) */}
-          <FichaCotizacion
-            quote={selectedQuote}
-            isOpen={selectedQuote !== null}
-            onClose={() => setSelectedQuote(null)}
-            onUpdateQuote={(updated) => {
-              updateCotizacion(updated.id, updated);
-              setSelectedQuote(updated);
-            }}
-            onConvertToShipment={q => { alert(`¡Felicidades! "${q.prospecto.empresa}" marcada como GANADA.`); }}
-            rolActivo={rolActivo}
-          />
+          {/* Ficha se muestra a pantalla completa (ver bloque selectedQuote arriba) */}
         </>
+        )
       ) : null}
       {/* Panel Lateral de Chat — colapsable */}
       <RightChatPanel

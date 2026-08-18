@@ -63,7 +63,7 @@ function FormProveedor({ onGuardar, onCancelar, servicioTipo, proveedores }: For
   };
   const modalidadFiltro = TIPO_A_MODALIDAD[servicioTipo];
   const availableProviders = proveedores.filter(p =>
-    p.activo && (modalidadFiltro ? p.modalidades.includes(modalidadFiltro) : true)
+    p.activo && (modalidadFiltro ? (!p.modalidades?.length || p.modalidades.includes(modalidadFiltro)) : true)
   );
 
   const handleProveedorChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -589,6 +589,19 @@ export default function BandejaPricing({
 
   // ─── Render ─────────────────────────────────────────────────────────────
 
+  // ── Vista de ficha completa (reemplaza la bandeja) ──────────────────────
+  if (selectedQuote) {
+    return (
+      <FichaCotizacion
+        quote={selectedQuote}
+        onBack={() => setSelectedQuote(null)}
+        onUpdateQuote={handleUpdateQuote}
+        onConvertToShipment={onConvertToShipment}
+        rolActivo="pricing"
+      />
+    );
+  }
+
   if (bandeja.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
@@ -725,15 +738,7 @@ export default function BandejaPricing({
         );
       })}
 
-      {/* Ficha drawer */}
-      <FichaCotizacion
-        quote={selectedQuote}
-        isOpen={selectedQuote !== null}
-        onClose={() => setSelectedQuote(null)}
-        onUpdateQuote={handleUpdateQuote}
-        onConvertToShipment={onConvertToShipment}
-        rolActivo="pricing"
-      />
+      {/* Ficha se muestra a pantalla completa arriba (early return) */}
     </div>
   );
 }
