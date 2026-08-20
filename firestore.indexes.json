@@ -1,0 +1,37 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "tarifas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "activo", "order": "ASCENDING" },
+        { "fieldPath": "fechaFin", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "ordenesCompra",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "activo", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "vistasUsuario",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "usuarioId", "order": "ASCENDING" },
+        { "fieldPath": "modulo", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "vistasUsuario",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "compartida", "order": "ASCENDING" },
+        { "fieldPath": "modulo", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

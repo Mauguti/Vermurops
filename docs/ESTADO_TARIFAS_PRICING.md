@@ -1,7 +1,7 @@
 # VermurOps — Estado de Tarifas/Pricing (Pausa documentada)
 
 > Última actualización: 20 agosto 2026
-> Estado: **EN PAUSA** — Sprints FC, CC, SP cerrados. E10 pendiente de sesión de diseño con Mau.
+> Estado: **EN PAUSA** — Sprints FC, CC, SP, BP, TV cerrados. E10 pendiente de sesión de diseño con Mau.
 
 ---
 
@@ -82,6 +82,39 @@ Múltiples → candidata. Label cambiado a "Sin proveedor asignado".
 - Delta positivo en rojo, negativo en verde. Separado por moneda (USD/MXN en líneas independientes).
 - Single apply a concepto vacío → auto-oficial. Multi apply → ninguna oficial, usuario decide en comparativa.
 - `window.confirm` para confirmar multi-apply — **provisional**, candidato a reemplazar por modal propio.
+
+---
+
+## Sprint BP — Bandeja de Pricing rediseñada (cerrado 20 ago 2026)
+
+| Paso | Descripción | Archivos clave |
+|------|-------------|----------------|
+| **BP-1** | `clasificarBandeja()`: clasifica cotizaciones en 3 bloques (Te toca / Esperando / Listas) + `calcularProgreso` + `diasEsperando` | `clasificarBandeja.ts` (+32 tests) |
+| **BP-2** | `buildTarifaCountMap` + `contarTarifasDisponibles`: badge de tarifas vigentes por cotización (O(1) por concepto) | `clasificarBandeja.ts` |
+| **BP-3–6** | Rewrite completo de BandejaPricing: 3 secciones, 4 cards resumen, barra de progreso, badge de días, badge de tarifas, filtro por asignado | `BandejaPricing.tsx` (752→320 líneas) |
+
+---
+
+## Sprint TV — Vista de Lista tipo Spreadsheet (cerrado 20 ago 2026)
+
+| Paso | Descripción | Archivos clave |
+|------|-------------|----------------|
+| **TV-0** | `SpreadsheetTable<T>` genérico: sorting, pinning, visibility, ordering, sizing, fallback silencioso para IDs desconocidos | `src/components/table/SpreadsheetTable.tsx` |
+| **TV-1** | 15 columnas de cotización (`COTIZACION_COLUMNS`), vista default de 6 columnas, wired en Quotes.tsx | `src/components/quotes/cotizacionColumns.tsx` |
+| **TV-2** | Column resize con drag handle (barra azul en borde derecho del header) | `SpreadsheetTable.tsx` |
+| **TV-3** | Panel de configuración de columnas: checkbox visibility + drag-to-reorder con @dnd-kit/sortable | `ColumnConfigPanel.tsx`, `SpreadsheetTable.tsx` |
+| **TV-4** | Modelo `VistaUsuario` en Firestore (`vistasUsuario/`), hook `useVistasUsuario`, reglas (solo creador edita/borra), 2 índices compuestos | `VistasData.ts`, `useVistasUsuario.ts`, `firestore.rules`, `firestore.indexes.json` |
+| **TV-5** | `VistaSelector` UI: guardar, sobreescribir, marcar default (estrella), compartir, eliminar, auto-carga al recargar | `VistaSelector.tsx`, `Quotes.tsx` |
+
+**Decisiones implementadas:**
+- TanStack Table v8 (v9 tenía API incompatible, se bajó a v8.21.3)
+- Vista default del módulo: 6 columnas esenciales (folio, cliente, etapa, total, moneda, updatedAt)
+- Folio siempre pinned a la izquierda, no se oculta ni reordena
+- Ancho de columna (`ColumnaVista.ancho`) se persiste en la vista — se conserva al recargar
+- Columnas obsoletas en vistas guardadas se ignoran silenciosamente (filtro por `validColumnIds`)
+- Vistas compartidas: `creadoPorNombre` en UI, solo creador puede editar/borrar (regla Firestore `resource.data.usuarioId == request.auth.uid`)
+- Resize debounced (500ms) para no saturar Firestore
+- **Pendiente:** aplicar SpreadsheetTable a Clientes, Proveedores y Embarques (requiere solo definir columnas + wiring)
 
 ---
 
@@ -223,6 +256,13 @@ opcional pero recomendable para limpieza de datos.
 | Directorio (Clients) | `src/components/Clients.tsx` |
 | Dropdowns proveedor | `BandejaPricing.tsx`, `FichaCotizacion.tsx`, `FichaRFQ.tsx` |
 | Selector conceptos | `src/components/conceptos/ConceptoSelector.tsx` |
+| SpreadsheetTable | `src/components/table/SpreadsheetTable.tsx` (genérico reutilizable) |
+| Columnas cotización | `src/components/quotes/cotizacionColumns.tsx` (15 cols, 6 default) |
+| Config columnas | `src/components/table/ColumnConfigPanel.tsx` |
+| Modelo vistas | `src/components/table/VistasData.ts` |
+| Hook vistas | `src/hooks/useVistasUsuario.ts` |
+| Selector vistas | `src/components/table/VistaSelector.tsx` |
+| Clasificar bandeja | `src/lib/clasificarBandeja.ts` (+32 tests) |
 | Matching tarifas | `src/components/tarifas/tarifaMatching.ts` (+tests en `src/lib/tarifaMatching.test.ts`) |
 | Validadores | `src/lib/validadores.ts` |
 | Calculadora | `src/lib/cotizacionCalculator.ts` |

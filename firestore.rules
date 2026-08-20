@@ -56,6 +56,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Términos de pago ────────────────────────────────────────────────
+    // Catálogo de términos/condiciones de pago (25 registros).
+    // Baja lógica: un término inactivo se marca activo=false.
+    match /terminosPago/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // ── Puertos (E10.0) ─────────────────────────────────────────────────
     // Catálogo de puertos marítimos. Mismo patrón que proveedores.
     // Baja lógica: un puerto inactivo se marca activo=false.
@@ -64,6 +74,41 @@ service cloud.firestore {
       allow create: if request.auth != null;
       allow update: if request.auth != null;
       allow delete: if false;
+    }
+
+    // ── Tarifas (TA-1) ──────────────────────────────────────────────────
+    // Catálogo de tarifas (precios por concepto + proveedor + ruta).
+    // Baja lógica: una tarifa inactiva se marca activo=false.
+    // Queries del listener acotado usan: activo + fechaFin.
+    match /tarifas/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    // ── Órdenes de Compra (OC-1) ─────────────────────────────────────────
+    // Cualquier usuario autenticado puede leer y crear/actualizar.
+    // Eliminar está prohibido: una OC cancelada se marca activo=false.
+    match /ordenesCompra/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    // ── Vistas de usuario (TV-4) ─────────────────────────────────────────
+    // Lectura: autenticado (para ver vistas compartidas de otros).
+    // Creación: autenticado, siempre que usuarioId == su UID.
+    // Actualización/Borrado: solo el creador (usuarioId == UID).
+    match /vistasUsuario/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.usuarioId == request.auth.uid;
+      allow update: if request.auth != null
+                    && resource.data.usuarioId == request.auth.uid;
+      allow delete: if request.auth != null
+                    && resource.data.usuarioId == request.auth.uid;
     }
 
     // ── Notificaciones ────────────────────────────────────────────────────

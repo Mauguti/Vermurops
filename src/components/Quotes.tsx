@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { initialQuotes, initialClients, initialProspectos, Prospecto } from '../data';
-import { Plane, Ship, Truck, Check, X, Clock, MoreVertical, Plus, Trash2, Search, Filter, ShieldCheck, Settings, Download, Upload, List, LayoutGrid, MessageSquare } from 'lucide-react';
+import { X, Plus, Search, Filter, Download, Upload, List, LayoutGrid, MessageSquare } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import KanbanCotizaciones from './quotes/KanbanCotizaciones';
 import BandejaPricing from './quotes/BandejaPricing';
@@ -9,13 +9,16 @@ import FichaCotizacion from './quotes/FichaCotizacion';
 import RightChatPanel from './quotes/RightChatPanel';
 import {
   KanbanQuote, TipoServicio,
-  ORIGENES_PROSPECTO, VENDEDORES, INCOTERMS, calcularTotalConsolidado,
-  PipelineStageId,
+  ORIGENES_PROSPECTO, VENDEDORES, INCOTERMS,
 } from './quotes/QuotesData';
 import { useServicios, renderIcon } from '../config/serviciosStore';
 import { useNotifications } from '../notifications/NotificationsContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
 import { generateFolio } from '../lib/folioService';
+import SpreadsheetTable, { type VistaConfig } from './table/SpreadsheetTable';
+import { COTIZACION_COLUMNS, VISTA_DEFAULT_COTIZACIONES } from './quotes/cotizacionColumns';
+import { useVistasUsuario } from '../hooks/useVistasUsuario';
+import VistaSelector from './table/VistaSelector';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Componente principal del módulo de Cotizaciones
@@ -26,7 +29,6 @@ export default function Quotes() {
   const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [showProspectForm, setShowProspectForm] = useState(false);
-  const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const { serviciosActivos } = useServicios();
   const { agregarNotificacion, notificaciones } = useNotifications();
   const [chatOpen, setChatOpen] = useState(false);
@@ -42,18 +44,6 @@ export default function Quotes() {
   else if (isAdmin) defaultView = 'prospeccion';
 
   const [viewMode, setViewMode] = useState<'kanban' | 'pricing' | 'lista' | 'prospeccion'>(defaultView);
-  const ALL_QUOTES_COLUMNS = [
-    { id: 'id', label: 'Cotización' },
-    { id: 'client', label: 'Cliente' },
-    { id: 'details', label: 'Detalles' },
-    { id: 'date', label: 'Fecha' },
-    { id: 'validity', label: 'Validez' },
-    { id: 'value', label: 'Valor' },
-    { id: 'status', label: 'Estatus' },
-    { id: 'actions', label: '' }
-  ];
-  const [visibleQuoteCols, setVisibleQuoteCols] = useState<string[]>(ALL_QUOTES_COLUMNS.map(c => c.id));
-  const [showQuoteColConfig, setShowQuoteColConfig] = useState(false);
   const [showQuoteImportModal, setShowQuoteImportModal] = useState(false);
 
   // Sub-vista dentro de Prospectos/Negociación: 'tabla' o 'kanban'
@@ -65,9 +55,97 @@ export default function Quotes() {
   // Ficha abierta en un componente hijo (BandejaPricing o KanbanCotizaciones)
   const [fichaAbierta, setFichaAbierta] = useState(false);
 
-  const toggleQuoteColumn = (id: string) => {
-    setVisibleQuoteCols(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
-  };
+  // ── Vistas guardadas (TV-4/5: Firestore) ─────────────────────────────
+  const {
+    vistas: vistasGuardadas,
+    crearVista,
+    actualizarVista,
+    eliminarVista,
+    vistaDefault,
+  } = useVistasUsuario('cotizaciones');
+
+  // ID de la vista seleccionada (null = vista default del módulo)
+  const [vistaActivaId, setVistaActivaId] = useState<string | null>(null);
+
+  // Resolver la vista activa: guardada por ID, o default del usuario, o default del módulo
+  const vistaGuardadaActiva = vistasGuardadas.find(v => v.id === vistaActivaId);
+
+  // Estado local de la tabla (se inicializa desde la vista guardada o default)
+  const [vistaTabla, setVistaTabla] = useState<VistaConfig>(VISTA_DEFAULT_COTIZACIONES);
+
+  // Auto-cargar la vista default del usuario cuando se cargan las vistas de Firestore
+  const defaultLoadedRef = useRef(false);
+  useEffect(() => {
+    if (defaultLoadedRef.current) return;
+    if (vistaDefault && vistaActivaId === null) {
+      defaultLoadedRef.current = true;
+      setVistaActivaId(vistaDefault.id);
+      setVistaTabla({
+        columnas: vistaDefault.columnas,
+        ordenamiento: vistaDefault.ordenamiento ?? null,
+      });
+    }
+  }, [vistaDefault, vistaActivaId]);
+
+  // Cuando cambia la vista seleccionada, sincronizar
+  const handleSeleccionarVista = useCallback((id: string | null) => {
+    setVistaActivaId(id);
+    if (id) {
+      const v = vistasGuardadas.find(vg => vg.id === id);
+      if (v) {
+        setVistaTabla({
+          columnas: v.columnas,
+          ordenamiento: v.ordenamiento ?? null,
+        });
+      }
+    } else {
+      // Si hay vista default del usuario en Firestore, usarla; sino, default del módulo
+      if (vistaDefault) {
+        setVistaTabla({
+          columnas: vistaDefault.columnas,
+          ordenamiento: vistaDefault.ordenamiento ?? null,
+        });
+      } else {
+        setVistaTabla(VISTA_DEFAULT_COTIZACIONES);
+      }
+    }
+  }, [vistasGuardadas, vistaDefault]);
+
+  const handleGuardarVista = useCallback(async (nombre: string) => {
+    const id = await crearVista(nombre, vistaTabla.columnas, {});
+    setVistaActivaId(id);
+  }, [crearVista, vistaTabla]);
+
+  const handleActualizarVista = useCallback(async (
+    id: string,
+    cambios: Parameters<typeof actualizarVista>[1],
+  ) => {
+    await actualizarVista(id, cambios);
+  }, [actualizarVista]);
+
+  const handleEliminarVista = useCallback(async (id: string) => {
+    await eliminarVista(id);
+    if (vistaActivaId === id) {
+      setVistaActivaId(null);
+      setVistaTabla(vistaDefault
+        ? { columnas: vistaDefault.columnas, ordenamiento: vistaDefault.ordenamiento ?? null }
+        : VISTA_DEFAULT_COTIZACIONES
+      );
+    }
+  }, [eliminarVista, vistaActivaId, vistaDefault]);
+
+  // Cotizaciones filtradas para la vista de tabla (SpreadsheetTable)
+  const filteredTableQuotes = useMemo(() => {
+    return permittedQuotes.filter(q => {
+      if (viewMode === 'prospeccion') {
+        return ['solicitud_cliente', 'solicitado_pricing'].includes(q.etapa);
+      }
+      if (viewMode === 'kanban') {
+        return ['enviada_cliente', 'negociacion', 'ganada', 'perdida', 'pricing_solicitando', 'cotizaciones_recibidas', 'consolidada'].includes(q.etapa);
+      }
+      return true;
+    });
+  }, [permittedQuotes, viewMode]);
 
   const handleExportCSVQuotes = () => {
     const headers = ['Cotización', 'Cliente', 'Detalles', 'Fecha', 'Valor', 'Estatus'];
@@ -251,30 +329,6 @@ export default function Quotes() {
     setFormMercancia('');
     setFormPeso(0);
     setFormVolumen(0);
-  };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'Enviada':   return <span className="flex items-center px-[10px] py-[4px] bg-info-bg text-info-text rounded-[6px] text-[11px] font-medium tracking-[0.02em] whitespace-nowrap"><Clock className="w-3 h-3 mr-1" /> Enviada</span>;
-      case 'Aceptada':  return <span className="flex items-center px-[10px] py-[4px] bg-success-bg text-success-text rounded-[6px] text-[11px] font-medium tracking-[0.02em] whitespace-nowrap"><Check className="w-3 h-3 mr-1" /> Aceptada</span>;
-      case 'Rechazada': return <span className="flex items-center px-[10px] py-[4px] bg-neutral-bg text-neutral-text rounded-[6px] text-[11px] font-medium tracking-[0.02em] whitespace-nowrap"><X className="w-3 h-3 mr-1" /> Rechazada</span>;
-      case 'Vencida':   return <span className="flex items-center px-[10px] py-[4px] bg-danger-bg text-danger-text rounded-[6px] text-[11px] font-medium tracking-[0.02em] whitespace-nowrap"><Clock className="w-3 h-3 mr-1" /> Vencida</span>;
-      default:          return null;
-    }
-  };
-
-  const getTransportIcon = (type: string) => {
-    switch (type) {
-      case 'Aéreo':      return <Plane className="w-4 h-4 mr-2 text-text-muted" />;
-      case 'Marítimo':   return <Ship className="w-4 h-4 mr-2 text-text-muted" />;
-      case 'Terrestre':  return <Truck className="w-4 h-4 mr-2 text-text-muted" />;
-      default:           return null;
-    }
-  };
-
-  const toggleMenu = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setActiveMenu(activeMenu === id ? null : id);
   };
 
   // Conteo de cotizaciones en etapas de Pricing para el badge
@@ -797,29 +851,24 @@ export default function Quotes() {
               />
             )
           ) : (
-            /* ── Sub-vista Tabla ── */
+            /* ── Sub-vista Tabla (SpreadsheetTable) ── */
             <>
-              <div className="flex justify-end mb-[24px]">
+              <div className="flex items-center justify-between mb-3">
+                {/* Selector de vistas */}
+                <VistaSelector
+                  vistas={vistasGuardadas}
+                  vistaActivaId={vistaActivaId}
+                  currentUserId={user?.uid || user?.id || ''}
+                  vistaActual={vistaTabla}
+                  labelDefault="Vista por defecto"
+                  onSeleccionar={handleSeleccionarVista}
+                  onGuardar={handleGuardarVista}
+                  onActualizar={handleActualizarVista}
+                  onEliminar={handleEliminarVista}
+                />
+
                 {isAdmin && (
                   <div className="flex items-center gap-2">
-                    <div className="relative">
-                      <button onClick={() => setShowQuoteColConfig(!showQuoteColConfig)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200">
-                        <Settings className="w-4 h-4" />
-                      </button>
-                      {showQuoteColConfig && (
-                        <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 shadow-lg rounded-xl p-3 z-10">
-                          <h4 className="text-[11px] font-bold text-gray-400 uppercase mb-2">Columnas Visibles</h4>
-                          <div className="space-y-2">
-                            {ALL_QUOTES_COLUMNS.map(col => (
-                              <label key={col.id} className="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
-                                <input type="checkbox" checked={visibleQuoteCols.includes(col.id)} onChange={() => toggleQuoteColumn(col.id)} className="rounded text-[#E11D48] focus:ring-[#E11D48]" />
-                                {col.label || 'Acciones'}
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
                     <button onClick={() => setShowQuoteImportModal(true)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200">
                       <Upload className="w-4 h-4" />
                     </button>
@@ -830,83 +879,15 @@ export default function Quotes() {
                 )}
               </div>
 
-              <div className="bg-card rounded-[12px] border border-card-border shadow-sm overflow-visible">
-                <div className="overflow-visible min-h-[300px]">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr>
-                        {ALL_QUOTES_COLUMNS.map(col => visibleQuoteCols.includes(col.id) && (
-                          <th key={col.id} className="bg-canvas text-left px-[24px] py-[14px] text-[11px] font-medium text-text-muted border-b border-divider">{col.label}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-divider">
-                      {permittedQuotes.filter(q => {
-                        if (viewMode === 'prospeccion') {
-                          return ['solicitud_cliente', 'solicitado_pricing'].includes(q.etapa);
-                        }
-                        if (viewMode === 'kanban') {
-                          return ['enviada_cliente', 'negociacion', 'ganada', 'perdida', 'pricing_solicitando', 'cotizaciones_recibidas', 'consolidada'].includes(q.etapa);
-                        }
-                        return true;
-                      }).map(quote => {
-                        const clientName = quote.prospecto.empresa || 'Desconocido';
-                        const srv = quote.servicios[0];
-                        const origin = srv?.ruta?.origen || 'N/A';
-                        const destination = srv?.ruta?.destino || 'N/A';
-                        const transportType = srv?.tipo?.charAt(0).toUpperCase() + srv?.tipo?.slice(1) || 'Aéreo';
-                        const validez = '—';
-
-                        return (
-                          <tr
-                            key={quote.id}
-                            onClick={() => setSelectedQuote(quote)}
-                            className="hover:bg-neutral-bg transition-colors relative group cursor-pointer"
-                          >
-                            {visibleQuoteCols.includes('id') && <td className="px-[24px] py-[16px] text-[13px] text-text-primary font-medium">{quote.id}</td>}
-                            {visibleQuoteCols.includes('client') && <td className="px-[24px] py-[16px] text-[13px] text-text-primary">{clientName}</td>}
-                            {visibleQuoteCols.includes('details') && (
-                              <td className="px-[24px] py-[16px] text-[13px] text-text-secondary whitespace-nowrap">
-                                <div className="flex items-center">
-                                  {getTransportIcon(transportType)}
-                                  <span>{origin} <span className="mx-1 text-text-muted">→</span> {destination}</span>
-                                </div>
-                              </td>
-                            )}
-                            {visibleQuoteCols.includes('date') && <td className="px-[24px] py-[16px] text-[13px] text-text-secondary tabular-nums whitespace-nowrap">{quote.createdAt?.split(' ')[0]}</td>}
-                            {visibleQuoteCols.includes('validity') && <td className="px-[24px] py-[16px] text-[13px] text-text-secondary">{validez}</td>}
-                            {visibleQuoteCols.includes('value') && <td className="px-[24px] py-[16px] text-[13px] text-text-primary tabular-nums font-medium whitespace-nowrap">${(quote.valorTotalConsolidado || 0).toLocaleString()} {quote.moneda}</td>}
-                            {visibleQuoteCols.includes('status') && <td className="px-[24px] py-[16px]">
-                              <span className="flex items-center px-[10px] py-[4px] bg-neutral-bg text-neutral-text rounded-[6px] text-[11px] font-medium tracking-[0.02em] whitespace-nowrap w-fit capitalize">
-                                {quote.etapa.replace(/_/g, ' ')}
-                              </span>
-                            </td>}
-                            {visibleQuoteCols.includes('actions') && (
-                              <td className="px-[24px] py-[16px] text-center relative">
-                              <button onClick={e => { e.stopPropagation(); toggleMenu(quote.id, e); }} className="text-text-muted hover:text-text-primary p-[4px] rounded-[4px] hover:bg-canvas transition-colors">
-                                <MoreVertical className="w-4 h-4" />
-                              </button>
-                              {activeMenu === quote.id && (
-                                <div className="absolute right-[24px] top-[40px] w-[180px] bg-white border border-card-border rounded-[8px] shadow-lg py-[8px] z-20 text-left">
-                                  <button onClick={(e) => { e.stopPropagation(); setActiveMenu(null); setSelectedQuote(quote); }} className="w-full text-left px-[16px] py-[8px] text-[13px] text-text-primary hover:bg-neutral-bg">Ver detalle</button>
-                                  <button className="w-full text-left px-[16px] py-[8px] text-[13px] text-text-primary hover:bg-neutral-bg">Editar</button>
-                                  <button className="w-full text-left px-[16px] py-[8px] text-[13px] text-text-primary hover:bg-neutral-bg">Duplicar</button>
-                                  {['ganada', 'negociacion'].includes(quote.etapa) && (
-                                    <button className="w-full text-left px-[16px] py-[8px] text-[13px] text-brand hover:bg-neutral-bg font-medium">Convertir en reserva</button>
-                                  )}
-                                  <div className="my-[4px] border-t border-divider" />
-                                  <button className="w-full text-left px-[16px] py-[8px] text-[13px] text-text-secondary hover:bg-neutral-bg">Descargar PDF</button>
-                                </div>
-                              )}
-                              </td>
-                            )}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <SpreadsheetTable<KanbanQuote>
+                data={filteredTableQuotes}
+                columns={COTIZACION_COLUMNS}
+                pinnedColumnIds={['folio']}
+                vista={vistaTabla}
+                onVistaChange={setVistaTabla}
+                onRowClick={(quote) => setSelectedQuote(quote)}
+                maxHeight="calc(100vh - 220px)"
+              />
 
               {showQuoteImportModal && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
