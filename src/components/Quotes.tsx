@@ -55,6 +55,38 @@ export default function Quotes() {
   // Ficha abierta en un componente hijo (BandejaPricing o KanbanCotizaciones)
   const [fichaAbierta, setFichaAbierta] = useState(false);
 
+  // Estado central de cotizaciones — Firestore (E3.3 lectura, E3.4 writes)
+  const { quotes: kanbanQuotes, loading: quotesLoading, error: quotesError, createCotizacion, updateCotizacion } = useCotizaciones();
+
+  // Recibe el array completo que devuelven los componentes hijos y persiste
+  // solo el documento que cambió (o el nuevo que se añadió).
+  const handleUpdateQuotes = async (newQuotes: KanbanQuote[]) => {
+    const existingIds = new Set(kanbanQuotes.map(q => q.id));
+    const added = newQuotes.find(q => !existingIds.has(q.id));
+    if (added) { await createCotizacion(added); return; }
+    const changed = newQuotes.find(newQ => {
+      const existing = kanbanQuotes.find(q => q.id === newQ.id);
+      return existing !== undefined && existing !== newQ;
+    });
+    if (changed) await updateCotizacion(changed.id, changed);
+  };
+
+  const filteredInitialProspectos = initialProspectos.filter(p => {
+    if (rolActivo === 'ventas') {
+      return p.responsable === user?.nombre || p.responsable === user?.uid;
+    }
+    return true;
+  });
+  const [prospectos, setProspectos] = useState<Prospecto[]>(filteredInitialProspectos);
+
+  // Filtro de visibilidad por rol (Ventas solo ve lo suyo)
+  const permittedQuotes = kanbanQuotes.filter(q => {
+    if (rolActivo === 'ventas') {
+      return q.vendedorId === user?.uid || q.vendedorId === user?.nombre;
+    }
+    return true;
+  });
+
   // ── Vistas guardadas (TV-4/5: Firestore) ─────────────────────────────
   const {
     vistas: vistasGuardadas,
@@ -64,13 +96,7 @@ export default function Quotes() {
     vistaDefault,
   } = useVistasUsuario('cotizaciones');
 
-  // ID de la vista seleccionada (null = vista default del módulo)
   const [vistaActivaId, setVistaActivaId] = useState<string | null>(null);
-
-  // Resolver la vista activa: guardada por ID, o default del usuario, o default del módulo
-  const vistaGuardadaActiva = vistasGuardadas.find(v => v.id === vistaActivaId);
-
-  // Estado local de la tabla (se inicializa desde la vista guardada o default)
   const [vistaTabla, setVistaTabla] = useState<VistaConfig>(VISTA_DEFAULT_COTIZACIONES);
 
   // Auto-cargar la vista default del usuario cuando se cargan las vistas de Firestore
@@ -87,7 +113,6 @@ export default function Quotes() {
     }
   }, [vistaDefault, vistaActivaId]);
 
-  // Cuando cambia la vista seleccionada, sincronizar
   const handleSeleccionarVista = useCallback((id: string | null) => {
     setVistaActivaId(id);
     if (id) {
@@ -99,7 +124,6 @@ export default function Quotes() {
         });
       }
     } else {
-      // Si hay vista default del usuario en Firestore, usarla; sino, default del módulo
       if (vistaDefault) {
         setVistaTabla({
           columnas: vistaDefault.columnas,
@@ -173,42 +197,6 @@ export default function Quotes() {
     link.click();
     document.body.removeChild(link);
   };
-
-
-
-  // Estado central de cotizaciones — Firestore (E3.3 lectura, E3.4 writes)
-  const { quotes: kanbanQuotes, loading: quotesLoading, error: quotesError, createCotizacion, updateCotizacion } = useCotizaciones();
-
-  // Recibe el array completo que devuelven los componentes hijos y persiste
-  // solo el documento que cambió (o el nuevo que se añadió).
-  const handleUpdateQuotes = async (newQuotes: KanbanQuote[]) => {
-    const existingIds = new Set(kanbanQuotes.map(q => q.id));
-    // Detectar cotización nueva: su id no existe en Firestore todavía
-    const added = newQuotes.find(q => !existingIds.has(q.id));
-    if (added) { await createCotizacion(added); return; }
-    // Detectar cotización actualizada: referencia distinta al original
-    const changed = newQuotes.find(newQ => {
-      const existing = kanbanQuotes.find(q => q.id === newQ.id);
-      return existing !== undefined && existing !== newQ;
-    });
-    if (changed) await updateCotizacion(changed.id, changed);
-  };
-  
-  const filteredInitialProspectos = initialProspectos.filter(p => {
-    if (rolActivo === 'ventas') {
-      return p.responsable === user?.nombre || p.responsable === user?.uid;
-    }
-    return true; // admin y pricing ven todo
-  });
-  const [prospectos, setProspectos] = useState<Prospecto[]>(filteredInitialProspectos);
-
-  // Filtro de visibilidad por rol (Ventas solo ve lo suyo)
-  const permittedQuotes = kanbanQuotes.filter(q => {
-    if (rolActivo === 'ventas') {
-      return q.vendedorId === user?.uid || q.vendedorId === user?.nombre;
-    }
-    return true; // Admin y Pricing ven todo (Bandeja Pricing tiene su propio filtro de etapas)
-  });
 
   // ─── Formulario de creación de cotizaciones ────────────────────────
   const [formEmpresa, setFormEmpresa] = useState('');
