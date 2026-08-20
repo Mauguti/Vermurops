@@ -7,6 +7,7 @@ import {
 import ComparativaPricing from './ComparativaPricing';
 import type { ProveedorComparativa } from './ComparativaPricing';
 import type { TarifaVermur } from '../tarifas/TarifasData';
+import type { ConceptoVermur } from '../conceptos/ConceptosData';
 import { ConceptoSection } from './ConceptoSection';
 
 export interface ServicioSectionProps {
@@ -30,6 +31,10 @@ export interface ServicioSectionProps {
   panelVisible?: boolean;
   /** FC-2: callback cuando se abre/cierra una comparativa (D2). */
   onComparativaToggle?: (open: boolean) => void;
+  /** CC-2: conceptos activos del catálogo para el selector. */
+  conceptosActivos?: ConceptoVermur[];
+  /** CC-3: callback para alta rápida de concepto. */
+  onCrearConcepto?: () => void;
 }
 
 /** Detecta la modalidad de transporte por tipo (clave legacy o nombre) e icono. */
@@ -41,7 +46,7 @@ function getModality(tipo: string, icono: string): 'maritimo' | 'terrestre' | 'o
   return 'otro';
 }
 
-export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servicios, renderIcon, moneda, clientePreferidos, clienteVetados, diasCredito, catalogoTarifas, onCrearTarifaSpot, activeConceptoId, onConceptoActivate, panelVisible, onComparativaToggle }: ServicioSectionProps) {
+export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servicios, renderIcon, moneda, clientePreferidos, clienteVetados, diasCredito, catalogoTarifas, onCrearTarifaSpot, activeConceptoId, onConceptoActivate, panelVisible, onComparativaToggle, conceptosActivos, onCrearConcepto }: ServicioSectionProps) {
   const [expanded, setExpanded] = useState(true);
   const [srvComparativaOpen, setSrvComparativaOpen] = useState(false);
 
@@ -422,6 +427,8 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
                     panelVisible={panelVisible}
                     onComparativaToggle={onComparativaToggle}
                     servicioId={servicio.id}
+                    conceptosActivos={conceptosActivos}
+                    onCrearConcepto={onCrearConcepto}
                   />
                 ))}
               </div>

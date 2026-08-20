@@ -10,6 +10,8 @@ import type { ProveedorComparativa } from './ComparativaPricing';
 import type { TarifaVermur } from '../tarifas/TarifasData';
 import TarifaSuggestions, { resolverMonto } from '../tarifas/TarifaSuggestions';
 import CapturaManualConcepto from '../tarifas/CapturaManualConcepto';
+import ConceptoSelector from '../conceptos/ConceptoSelector';
+import type { ConceptoVermur } from '../conceptos/ConceptosData';
 import { useDroppable } from '@dnd-kit/core';
 
 export interface ConceptoSectionProps {
@@ -36,9 +38,13 @@ export interface ConceptoSectionProps {
   onComparativaToggle?: (open: boolean) => void;
   /** FC-3: ID del servicio padre (para droppable). */
   servicioId?: string;
+  /** CC-2: conceptos activos del catálogo para el selector. */
+  conceptosActivos?: ConceptoVermur[];
+  /** CC-3: callback para alta rápida de concepto. */
+  onCrearConcepto?: () => void;
 }
 
-export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moneda = 'USD', ruta = '', clientePreferidos, clienteVetados, diasCredito = 30, catalogoTarifas, contenedorTipo, onCrearTarifaSpot, isActive, onActivate, panelVisible, onComparativaToggle, servicioId }: ConceptoSectionProps) {
+export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moneda = 'USD', ruta = '', clientePreferidos, clienteVetados, diasCredito = 30, catalogoTarifas, contenedorTipo, onCrearTarifaSpot, isActive, onActivate, panelVisible, onComparativaToggle, servicioId, conceptosActivos, onCrearConcepto }: ConceptoSectionProps) {
   const [newSubNombre, setNewSubNombre] = useState('');
   const [newSubCosto, setNewSubCosto] = useState('');
   const [comparativaOpen, setComparativaOpen] = useState(false);
@@ -176,14 +182,19 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moned
       onClick={onActivate}
     >
       <div className="flex items-center justify-between">
-        <input
-          type="text"
-          value={concepto.nombre}
-          onChange={e => onUpdate({ ...concepto, nombre: e.target.value })}
-          className="text-xs font-bold text-[#18181B] bg-transparent border-b border-transparent hover:border-gray-300 focus:border-[#E11D48] outline-none px-1 py-0.5"
-          placeholder="Nombre del concepto"
-          readOnly={rolActivo === 'ventas'}
-        />
+        {conceptosActivos ? (
+          <ConceptoSelector
+            selectedNombre={concepto.nombre || null}
+            conceptos={conceptosActivos}
+            onSelect={(conceptoId, nombre) => onUpdate({ ...concepto, conceptoId, nombre })}
+            onCrearNuevo={onCrearConcepto}
+            readOnly={rolActivo === 'ventas'}
+          />
+        ) : (
+          <span className="text-xs font-bold text-[#18181B] px-1 py-0.5">
+            {concepto.nombre || 'Sin concepto'}
+          </span>
+        )}
         <div className="flex items-center gap-2">
           {tieneComparativa && rolActivo !== 'ventas' && (
             <button
@@ -206,6 +217,7 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moned
         <div className={panelVisible ? 'md:hidden' : ''} onClick={e => e.stopPropagation()}>
           <TarifaSuggestions
             conceptoNombre={concepto.nombre}
+            conceptoId={concepto.conceptoId}
             rutaTexto={ruta}
             catalogoTarifas={catalogoTarifas}
             contenedorTipo={contenedorTipo}
@@ -213,8 +225,10 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moned
             onUsarTarifa={(tarifa, provNombre, contactoNombre) => {
               // Duplicate check
               if ((concepto.tarifas || []).some(t => t.tarifaOrigenId === tarifa.id)) return;
+              const esPrimera = !(concepto.tarifas?.length);
+              const cpId = `cp-${Date.now()}`;
               const cp: CotizacionProveedor = {
-                id: `cp-${Date.now()}`,
+                id: cpId,
                 proveedor: provNombre,
                 contacto: contactoNombre,
                 monto: resolverMonto(tarifa, contenedorTipo),
@@ -224,14 +238,18 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moned
                 condiciones: tarifa.condiciones || undefined,
                 adjuntoUrl: null,
                 archivoNombre: null,
-                seleccionada: false,
+                seleccionada: esPrimera,
                 estadoRespuesta: 'recibida',
                 freeTimeDias: tarifa.freeTimeDias,
                 proveedorId: tarifa.proveedorId,
                 conceptoId: tarifa.conceptoId,
                 tarifaOrigenId: tarifa.id,
               };
-              onUpdate({ ...concepto, tarifas: [...(concepto.tarifas || []), cp] });
+              onUpdate({
+                ...concepto,
+                tarifas: [...(concepto.tarifas || []), cp],
+                ...(esPrimera ? { proveedoresOficialIds: [cpId] } : {}),
+              });
             }}
           />
           <CapturaManualConcepto
@@ -250,7 +268,7 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moned
           <span className="font-semibold text-gray-500">Proveedor Oficial:</span>{' '}
           {(() => {
             const oficiales = getTarifasOficiales(concepto);
-            if (oficiales.length === 0) return <span className="text-gray-400 italic">Por definir en Bandeja Pricing</span>;
+            if (oficiales.length === 0) return <span className="text-gray-400 italic">Sin proveedor asignado</span>;
             return oficiales.map((t, i) => (
               <span key={t.id}>
                 {i > 0 && <span className="text-gray-300 mx-1">+</span>}

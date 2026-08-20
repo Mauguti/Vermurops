@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Plane, Ship, Truck, ShieldCheck, Plus, X, Check, Clock, AlertTriangle,
   ChevronDown, ChevronRight, DollarSign, User, Building,
@@ -17,6 +17,7 @@ interface BandejaPricingProps {
   quotes: KanbanQuote[];
   onUpdateQuotes: (quotes: KanbanQuote[]) => void;
   onConvertToShipment: (quote: KanbanQuote) => void;
+  onFichaVisible?: (visible: boolean) => void;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -489,9 +490,15 @@ export default function BandejaPricing({
   quotes,
   onUpdateQuotes,
   onConvertToShipment,
+  onFichaVisible,
 }: BandejaPricingProps) {
 
   const [selectedQuote, setSelectedQuote] = useState<KanbanQuote | null>(null);
+
+  useEffect(() => {
+    onFichaVisible?.(!!selectedQuote);
+    return () => onFichaVisible?.(false);
+  }, [!!selectedQuote, onFichaVisible]);
 
   // Etapas relevantes para Pricing
   const pricingStages: string[] = [

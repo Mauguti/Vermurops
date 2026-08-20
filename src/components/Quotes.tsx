@@ -62,6 +62,9 @@ export default function Quotes() {
   // Cotización seleccionada para abrir la ficha de detalle
   const [selectedQuote, setSelectedQuote] = useState<KanbanQuote | null>(null);
 
+  // Ficha abierta en un componente hijo (BandejaPricing o KanbanCotizaciones)
+  const [fichaAbierta, setFichaAbierta] = useState(false);
+
   const toggleQuoteColumn = (id: string) => {
     setVisibleQuoteCols(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]);
   };
@@ -309,8 +312,8 @@ export default function Quotes() {
 
   return (
     <div className={`space-y-[32px] animate-fade-in pb-12 ${chatOpen ? 'xl:pr-[320px]' : ''}`} onClick={() => setActiveMenu(null)}>
-      {/* ── Header principal ──────────────────────────────────────────── */}
-      {!showForm && (
+      {/* ── Header principal (oculto cuando hay una ficha abierta) ──── */}
+      {!showForm && !selectedQuote && !fichaAbierta && (
         <div className="flex flex-col gap-4">
           <div className="flex justify-between items-end border-b border-[#E4E4E7] pb-0">
             <div className="flex flex-col gap-4 w-full">
@@ -742,6 +745,7 @@ export default function Quotes() {
           onConvertToShipment={q => {
             alert(`"${q.prospecto.empresa}" convertida a embarque.`);
           }}
+          onFichaVisible={setFichaAbierta}
         />
 
       ) : (viewMode === 'prospeccion' || viewMode === 'kanban') ? (
@@ -789,6 +793,7 @@ export default function Quotes() {
                 onUpdateQuotes={handleUpdateQuotes}
                 rolActivo={rolActivo}
                 onConvertToShipment={q => { alert(`¡Felicidades! "${q.prospecto.empresa}" marcada como GANADA.`); }}
+                onFichaVisible={setFichaAbierta}
               />
             )
           ) : (

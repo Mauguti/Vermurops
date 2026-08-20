@@ -1,7 +1,7 @@
 # VermurOps — Estado de Tarifas/Pricing (Pausa documentada)
 
-> Última actualización: 18 agosto 2026
-> Estado: **EN PAUSA** — Sprint FC cerrado, E10 pendiente de sesión de diseño con Mau.
+> Última actualización: 20 agosto 2026
+> Estado: **EN PAUSA** — Sprints FC, CC, SP cerrados. E10 pendiente de sesión de diseño con Mau.
 
 ---
 
@@ -36,6 +36,52 @@
 **Lógica de matching extraída:** `tarifaMatching.ts` contiene funciones puras reutilizables:
 `normalize`, `resolverMonto`, `fmtPrecio`, `etiquetaContenedor`, `matchConceptByName`,
 `buildTarifaRuta`, `groupManobrasByTerminal`. TarifaSuggestions re-exporta para backward compat.
+
+---
+
+## Sprint CC — Dropdown de conceptos del catálogo (cerrado 20 ago 2026)
+
+| Paso | Descripción | Archivos clave |
+|------|-------------|----------------|
+| **CC-1** | `conceptoId` en ConceptoCotizacion + `matchConcept()` ID-first O(1) con fallback a nombre | `QuotesData.ts`, `tarifaMatching.ts`, `TarifaPanel.tsx`, `TarifaSuggestions.tsx` |
+| **CC-2** | ConceptoSelector: dropdown con buscador, agrupado por categoría, badges Impo/Expo, readOnly para ventas | `ConceptoSelector.tsx`, `ConceptoSection.tsx`, `ServicioSection.tsx` |
+| **CC-3** | _(pendiente)_ Alta rápida de concepto modal | — |
+| **CC-4** | _(pendiente)_ "Agregar concepto" abre selector en vez de crear vacío | — |
+
+**Decisiones implementadas:**
+- `conceptoId` es opcional (backward compat con conceptos legacy de texto libre)
+- Matching: ID primero (O(1) Map), fallback a nombre (includes bidireccional)
+- 23 tests en `tarifaMatching.test.ts` (normalize, matchConceptByName, buildConceptoMap, matchConcept)
+- Mensajes contextuales en TarifaPanel: "no está en el catálogo" (amber) vs "sin tarifas vigentes" (gris)
+
+---
+
+## Fix: Proveedor oficial al usar/arrastrar tarifa (20 ago 2026)
+
+**Bug:** "Proveedor Oficial: Por definir en Bandeja Pricing" persistía tras asignar tarifa.
+**Causa:** `applyTarifaToConcepto` y `onUsarTarifa` inline creaban CotizacionProveedor con
+`seleccionada: false` y nunca escribían `proveedoresOficialIds`.
+**Fix:** Primera/única tarifa → auto-oficial (`seleccionada: true` + `proveedoresOficialIds: [cpId]`).
+Múltiples → candidata. Label cambiado a "Sin proveedor asignado".
+
+---
+
+## Sprint SP — Simulador de costo en panel de tarifas (cerrado 20 ago 2026)
+
+| Paso | Descripción | Archivos clave |
+|------|-------------|----------------|
+| **SP-1** | Estado `simulatedIds` + toggle click en tarjeta + visual dashed indigo | `TarifaPanel.tsx` (DraggableTarifaCard) |
+| **SP-2** | Footer de simulación: costo actual / simulado / delta por moneda. Siempre visible. | `TarifaPanel.tsx` (SimuladorFooter), `FichaCotizacion.tsx` (costoBaseByMoneda) |
+| **SP-3** | "Aplicar selección" bulk + "Limpiar". Confirm si >1. Multi-apply: ninguna auto-oficial. | `TarifaPanel.tsx`, `FichaCotizacion.tsx` (handlePanelAplicarSimulacion) |
+| **SP-4** | Reset simulación al cambiar de concepto (ya hecho en SP-1) | — |
+
+**Decisiones implementadas:**
+- Click en cuerpo = toggle simulación. `stopPropagation` en grip (drag) y botón "Usar" → sin conflicto.
+- Tarjetas aplicadas (`yaUsada`) ignoran click — no se pueden simular.
+- `costoBaseByMoneda` excluye concepto activo + incluye subconceptos del activo (no cambian en simulación).
+- Delta positivo en rojo, negativo en verde. Separado por moneda (USD/MXN en líneas independientes).
+- Single apply a concepto vacío → auto-oficial. Multi apply → ninguna oficial, usuario decide en comparativa.
+- `window.confirm` para confirmar multi-apply — **provisional**, candidato a reemplazar por modal propio.
 
 ---
 
@@ -85,6 +131,26 @@ E10 requiere decisiones de diseño que NO se pueden tomar sin una sesión con Ma
 - `src/components/quotes/FormProveedorFicha.tsx` fue extraído mecánicamente en FC-1.
 - Estaba definido pero nunca invocado en el original FichaCotizacion.
 - **No borrar ahora** — eliminar en una limpieza dedicada, no mezclarlo con sprints activos.
+
+### Campo `trafico` + `ubicacion` en ServicioSolicitado — PENDIENTE PRIORITARIO
+
+**Problema:** `ServicioSolicitado` no tiene campo `trafico` (importacion/exportacion) ni
+`ubicacion` (origen/destino). Sin ellos no se puede aplicar `calcularIVA` en la cotización,
+aunque la función ya existe y está probada (21 tests en Conceptos-1.1).
+
+**Impacto:**
+- La regla espejo del IVA (`espejo`) depende del tráfico y la ubicación:
+  Impo + Destino = 16% · Impo + Origen = 0% · Expo + Origen = 16% · Expo + Destino = 0%
+- Sin estos campos, el cálculo fiscal es imposible en el flujo de cotización.
+- El dropdown de conceptos del catálogo no puede filtrar por `aplicaImpo`/`aplicaExpo`.
+- Tenemos la lógica fiscal lista pero desconectada del flujo real.
+
+**Solución:** Agregar `trafico?: 'importacion' | 'exportacion'` a `ServicioSolicitado` y capturarlo
+en el formulario de creación de servicio. `ubicacion` se puede derivar de la posición del concepto
+en la cadena (antes o después de la aduana). Requiere épica propia — toca el formulario de servicio
+y la calculadora de totales.
+
+**Estado:** Pendiente. Bloquea el cálculo fiscal correcto.
 
 ### Alta rápida inline — CUMPLIDO
 - El compromiso de E9.2 (alta rápida de proveedor desde BandejaPricing y FichaCotizacion)
@@ -156,6 +222,8 @@ opcional pero recomendable para limpieza de datos.
 | Alta rápida | `src/components/proveedores/AltaRapidaProveedorModal.tsx` |
 | Directorio (Clients) | `src/components/Clients.tsx` |
 | Dropdowns proveedor | `BandejaPricing.tsx`, `FichaCotizacion.tsx`, `FichaRFQ.tsx` |
+| Selector conceptos | `src/components/conceptos/ConceptoSelector.tsx` |
+| Matching tarifas | `src/components/tarifas/tarifaMatching.ts` (+tests en `src/lib/tarifaMatching.test.ts`) |
 | Validadores | `src/lib/validadores.ts` |
 | Calculadora | `src/lib/cotizacionCalculator.ts` |
 | Máquina de estados | `src/lib/stateMachine.ts` |

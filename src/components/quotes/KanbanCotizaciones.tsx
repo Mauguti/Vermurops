@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Search, Plus, X, Plane, Ship, Truck, ShieldCheck, Calendar, ArrowRight, HelpCircle,
 } from 'lucide-react';
@@ -18,6 +18,7 @@ interface KanbanCotizacionesProps {
   onConvertToShipment: (quote: KanbanQuote) => void;
   /** Rol activo del usuario simulado */
   rolActivo: 'ventas' | 'pricing' | 'admin';
+  onFichaVisible?: (visible: boolean) => void;
 }
 
 // ─── Icono por tipo de servicio ───────────────────────────────────────────────
@@ -52,9 +53,15 @@ export default function KanbanCotizaciones({
   onUpdateQuotes,
   onConvertToShipment,
   rolActivo,
+  onFichaVisible,
 }: KanbanCotizacionesProps) {
   const { agregarNotificacion } = useNotifications();
   const [selectedQuote, setSelectedQuote] = useState<KanbanQuote | null>(null);
+
+  useEffect(() => {
+    onFichaVisible?.(!!selectedQuote);
+    return () => onFichaVisible?.(false);
+  }, [!!selectedQuote, onFichaVisible]);
 
   // Búsqueda y filtros
   const [searchTerm, setSearchTerm] = useState('');

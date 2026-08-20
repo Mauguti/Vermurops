@@ -7,7 +7,7 @@ import {
 import {
   KanbanQuote, QuoteActivity, StageHistory, ORIGENES_PROSPECTO, PIPELINE_STAGES,
   ServicioSolicitado, TipoServicio, CotizacionProveedor,
-  EQUIPO_PRICING, VENDEDORES, calcularTotalConsolidado,
+  EQUIPO_PRICING, VENDEDORES, calcularTotalConsolidado, getOficialIds,
   PipelineStageId,
 } from './QuotesData';
 import { useAuth } from '../../auth/AuthContext';
@@ -18,9 +18,12 @@ import { useClientes } from '../../hooks/useClientes';
 import { calcLinea } from '../../lib/cotizacionCalculator';
 import { puedeTransicionarA, transicionesDisponibles } from '../../lib/stateMachine';
 import { useTarifas } from '../../hooks/useTarifas';
+import { useConceptos } from '../../hooks/useConceptos';
 import { ServicioSection } from './ServicioSection';
 import TarifaPanel from '../tarifas/TarifaPanel';
 import { resolverMonto, fmtPrecio } from '../tarifas/tarifaMatching';
+import { useProveedores } from '../../hooks/useProveedores';
+import { contactoPrincipal } from '../proveedores/ProveedoresData';
 import type { TarifaVermur } from '../tarifas/TarifasData';
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
@@ -75,6 +78,9 @@ export default function FichaCotizacion({
   const { servicios } = useServicios();
   const { clientes } = useClientes();
   const { tarifas: catalogoTarifas, createTarifa } = useTarifas();
+  const { proveedores } = useProveedores();
+  const { conceptos: conceptosCatalogo } = useConceptos();
+  const conceptosActivos = useMemo(() => conceptosCatalogo.filter(c => c.activo), [conceptosCatalogo]);
 
   const [activeTab, setActiveTab] = useState<'info' | 'servicios' | 'actividades' | 'historial' | 'chat'>('info');
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
@@ -227,6 +233,41 @@ export default function FichaCotizacion({
     return { concepto: conc, servicio: srv };
   }, [activeConcepto, quote.servicios]);
 
+  // ── SP-2: Costo de la cotización por moneda para el simulador ──────────
+  /** Costo total por moneda de todos los conceptos EXCEPTO el activo (incluye subconceptos del activo). */
+  const costoBaseByMoneda = useMemo(() => {
+    const r = { USD: 0, MXN: 0 };
+    for (const srv of quote.servicios) {
+      for (const conc of srv.conceptos || []) {
+        const isActive = activeConcepto && conc.id === activeConcepto.id && srv.id === activeConcepto.servicioId;
+        if (isActive) {
+          // Solo subconceptos del activo (no cambian en simulación)
+          for (const s of conc.subconceptos || []) r[s.moneda] += s.costo;
+        } else {
+          // Todo: tarifas oficiales + subconceptos
+          const ids = getOficialIds(conc);
+          for (const t of conc.tarifas || []) {
+            if (ids.includes(t.id)) r[t.moneda] += t.monto;
+          }
+          for (const s of conc.subconceptos || []) r[s.moneda] += s.costo;
+        }
+      }
+    }
+    return r;
+  }, [quote.servicios, activeConcepto]);
+
+  /** Costo actual del concepto activo por moneda (solo tarifas oficiales — lo que la simulación reemplaza). */
+  const costoConceptoActualByMoneda = useMemo(() => {
+    const r = { USD: 0, MXN: 0 };
+    if (!activeConceptoData) return r;
+    const { concepto } = activeConceptoData;
+    const ids = getOficialIds(concepto);
+    for (const t of concepto.tarifas || []) {
+      if (ids.includes(t.id)) r[t.moneda] += t.monto;
+    }
+    return r;
+  }, [activeConceptoData]);
+
   /** Aplica una tarifa del catálogo a un concepto específico (usado por panel "Usar" y drag & drop). */
   const applyTarifaToConcepto = (
     tarifa: TarifaVermur, provNombre: string, contactoNombre: string,
@@ -238,8 +279,10 @@ export default function FichaCotizacion({
     if (!conc) return;
     // Duplicate check
     if ((conc.tarifas || []).some(t => t.tarifaOrigenId === tarifa.id)) return;
+    const esPrimera = !(conc.tarifas?.length);
+    const cpId = `cp-${Date.now()}`;
     const cp: CotizacionProveedor = {
-      id: `cp-${Date.now()}`,
+      id: cpId,
       proveedor: provNombre,
       contacto: contactoNombre,
       monto: resolverMonto(tarifa, srv.fcl_contenedor),
@@ -249,14 +292,18 @@ export default function FichaCotizacion({
       condiciones: tarifa.condiciones || undefined,
       adjuntoUrl: null,
       archivoNombre: null,
-      seleccionada: false,
+      seleccionada: esPrimera,
       estadoRespuesta: 'recibida',
       freeTimeDias: tarifa.freeTimeDias,
       proveedorId: tarifa.proveedorId,
       conceptoId: tarifa.conceptoId,
       tarifaOrigenId: tarifa.id,
     };
-    const updatedConcepto = { ...conc, tarifas: [...(conc.tarifas || []), cp] };
+    const updatedConcepto = {
+      ...conc,
+      tarifas: [...(conc.tarifas || []), cp],
+      ...(esPrimera ? { proveedoresOficialIds: [cpId] } : {}),
+    };
     const updatedServicio = {
       ...srv,
       conceptos: (srv.conceptos || []).map(c => c.id === conc.id ? updatedConcepto : c),
@@ -269,6 +316,58 @@ export default function FichaCotizacion({
     if (!activeConcepto) return;
     applyTarifaToConcepto(tarifa, provNombre, contactoNombre, activeConcepto.id, activeConcepto.servicioId);
   }, [activeConcepto, quote.servicios]);
+
+  /** SP-3: Aplicar múltiples tarifas simuladas al concepto activo. */
+  const handlePanelAplicarSimulacion = useCallback((tarifas: TarifaVermur[]) => {
+    if (!activeConcepto) return;
+    const srv = quote.servicios.find(s => s.id === activeConcepto.servicioId);
+    if (!srv) return;
+    const conc = (srv.conceptos || []).find(c => c.id === activeConcepto.id);
+    if (!conc) return;
+
+    const existingTarifas = conc.tarifas || [];
+    const esPrimeraYUnica = existingTarifas.length === 0 && tarifas.length === 1;
+
+    const newCps: CotizacionProveedor[] = [];
+    for (const tarifa of tarifas) {
+      // Duplicate check
+      if (existingTarifas.some(t => t.tarifaOrigenId === tarifa.id)) continue;
+      if (newCps.some(t => t.tarifaOrigenId === tarifa.id)) continue;
+      const prov = proveedores.find(p => p.id === tarifa.proveedorId);
+      const contacto = prov ? contactoPrincipal(prov) : undefined;
+      const cpId = `cp-${Date.now()}-${newCps.length}`;
+      newCps.push({
+        id: cpId,
+        proveedor: prov?.nombre ?? tarifa.proveedorId,
+        contacto: contacto?.nombre ?? '',
+        monto: resolverMonto(tarifa, srv.fcl_contenedor),
+        moneda: tarifa.moneda,
+        tiempoTransito: tarifa.tiempoTransitoDias ? `${tarifa.tiempoTransitoDias} días` : undefined,
+        vigencia: tarifa.fechaFin ?? undefined,
+        condiciones: tarifa.condiciones || undefined,
+        adjuntoUrl: null,
+        archivoNombre: null,
+        seleccionada: esPrimeraYUnica,
+        estadoRespuesta: 'recibida',
+        freeTimeDias: tarifa.freeTimeDias,
+        proveedorId: tarifa.proveedorId,
+        conceptoId: tarifa.conceptoId,
+        tarifaOrigenId: tarifa.id,
+      });
+    }
+    if (newCps.length === 0) return;
+
+    const updatedConcepto = {
+      ...conc,
+      tarifas: [...existingTarifas, ...newCps],
+      ...(esPrimeraYUnica ? { proveedoresOficialIds: [newCps[0].id] } : {}),
+    };
+    const updatedServicio = {
+      ...srv,
+      conceptos: (srv.conceptos || []).map(c => c.id === conc.id ? updatedConcepto : c),
+    };
+    handleUpdateServicio(srv.id, updatedServicio);
+  }, [activeConcepto, quote.servicios, proveedores]);
 
   /** Captura manual desde el panel lateral. */
   const handlePanelCaptura = useCallback((cp: CotizacionProveedor) => {
@@ -643,6 +742,7 @@ export default function FichaCotizacion({
                 onConceptoActivate={(conceptoId) => handleConceptoActivate(conceptoId, srv.id)}
                 panelVisible={rolActivo !== 'ventas'}
                 onComparativaToggle={handleComparativaToggle}
+                conceptosActivos={conceptosActivos}
               />
             ))}
 
@@ -697,6 +797,7 @@ export default function FichaCotizacion({
             <div className="w-[380px] shrink-0 hidden md:flex flex-col border-l border-gray-100 overflow-hidden">
               <TarifaPanel
                 conceptoNombre={activeConceptoData?.concepto.nombre ?? null}
+                conceptoId={activeConceptoData?.concepto.conceptoId}
                 contenedorTipo={activeConceptoData?.servicio.fcl_contenedor}
                 catalogoTarifas={catalogoTarifas}
                 tarifasYaUsadas={
@@ -707,6 +808,9 @@ export default function FichaCotizacion({
                 onUsarTarifa={handlePanelUsarTarifa}
                 onCaptura={handlePanelCaptura}
                 onCrearTarifaSpot={createTarifa}
+                costoBaseByMoneda={costoBaseByMoneda}
+                costoConceptoActualByMoneda={costoConceptoActualByMoneda}
+                onAplicarSimulacion={handlePanelAplicarSimulacion}
               />
             </div>
           )}

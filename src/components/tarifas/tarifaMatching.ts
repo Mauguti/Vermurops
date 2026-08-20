@@ -68,7 +68,7 @@ export function etiquetaContenedor(contenedorTipo?: string): string {
   return "20'";
 }
 
-// ─── Matching de concepto por nombre ─────────────────────────────────────────
+// ─── Matching de concepto ────────────────────────────────────────────────────
 
 export interface ConceptoMatch {
   id: string;
@@ -91,6 +91,47 @@ export function matchConceptByName(
   return conceptos.find(c =>
     normalize(c.nombre).includes(q) || q.includes(normalize(c.nombre))
   ) ?? null;
+}
+
+/**
+ * Resuelve el concepto del catálogo usando conceptoId (O(1)) con fallback a nombre.
+ *
+ * - Si `conceptoId` existe → búsqueda directa por ID en el Map.
+ * - Si no → fallback al matching por nombre (backward compat con conceptos legacy).
+ *
+ * Devuelve `{ match, method }` para que el caller sepa cómo se resolvió.
+ */
+export type MatchMethod = 'id' | 'nombre' | null;
+
+export function matchConcept(
+  conceptoId: string | undefined,
+  conceptoNombre: string,
+  conceptos: ConceptoMatch[],
+  conceptoMap?: Map<string, ConceptoMatch>,
+): { match: ConceptoMatch | null; method: MatchMethod } {
+  // 1. Intento directo por ID
+  if (conceptoId) {
+    if (conceptoMap) {
+      const byId = conceptoMap.get(conceptoId);
+      if (byId) return { match: byId, method: 'id' };
+    } else {
+      const byId = conceptos.find(c => c.id === conceptoId);
+      if (byId) return { match: byId, method: 'id' };
+    }
+  }
+
+  // 2. Fallback por nombre (conceptos legacy sin conceptoId)
+  const byName = matchConceptByName(conceptoNombre, conceptos);
+  if (byName) return { match: byName, method: 'nombre' };
+
+  return { match: null, method: null };
+}
+
+/** Construye un Map<id, ConceptoMatch> para búsqueda O(1). */
+export function buildConceptoMap(conceptos: ConceptoMatch[]): Map<string, ConceptoMatch> {
+  const m = new Map<string, ConceptoMatch>();
+  conceptos.forEach(c => m.set(c.id, c));
+  return m;
 }
 
 // ─── Ruta de tarifa ──────────────────────────────────────────────────────────

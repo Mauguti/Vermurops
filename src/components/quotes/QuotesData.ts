@@ -65,6 +65,8 @@ export interface CotizacionProveedor {
   proveedorId?: string | null;
   /** FK al catálogo de conceptos (ConceptoVermur.id). */
   conceptoId?: string | null;
+  /** FK a TarifaVermur.id — trazabilidad: de qué tarifa del catálogo provino. */
+  tarifaOrigenId?: string | null;
 }
 
 // ------------------------------------------------------------
@@ -83,6 +85,8 @@ export interface Subconcepto {
 export interface ConceptoCotizacion {
   id: string;
   nombre: string;
+  /** FK al catálogo conceptos/. null/undefined = concepto legacy (texto libre). */
+  conceptoId?: string;
   // ── Campos del modelo lineas_cotizacion (Luis) ──────────────────────────
   costo: number;   // Costo base del concepto (de proveedor oficial + subconceptos)
   profit: number;  // Profit absoluto — INPUT manual de Pricing (no %)

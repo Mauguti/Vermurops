@@ -18,7 +18,7 @@ import { usePuertos } from '../../hooks/usePuertos';
 import { contactoPrincipal } from '../proveedores/ProveedoresData';
 import {
   normalize, resolverMonto, fmtPrecio, etiquetaContenedor,
-  matchConceptByName, buildTarifaRuta, groupManobrasByTerminal,
+  matchConcept, buildConceptoMap, buildTarifaRuta, groupManobrasByTerminal,
 } from './tarifaMatching';
 
 // ─── Re-exports for backward compat ─────────────────────────────────────────
@@ -28,6 +28,8 @@ export { normalize, resolverMonto } from './tarifaMatching';
 
 interface Props {
   conceptoNombre: string;
+  /** FK al catálogo conceptos/. undefined = concepto legacy. */
+  conceptoId?: string;
   rutaTexto: string;
   catalogoTarifas: TarifaVermur[];
   /** Callback para aplicar una tarifa como CotizacionProveedor. */
@@ -41,7 +43,7 @@ interface Props {
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export default function TarifaSuggestions({
-  conceptoNombre, rutaTexto, catalogoTarifas,
+  conceptoNombre, conceptoId, rutaTexto, catalogoTarifas,
   onUsarTarifa, tarifasYaUsadas = [], contenedorTipo,
 }: Props) {
   const { conceptos } = useConceptos();
@@ -51,10 +53,13 @@ export default function TarifaSuggestions({
   const [expanded, setExpanded] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
-  // 1. Match concept name → ConceptoVermur
+  // 0. Map para búsqueda O(1) por conceptoId
+  const conceptoMap = useMemo(() => buildConceptoMap(conceptos), [conceptos]);
+
+  // 1. Match concept: ID primero, fallback a nombre
   const matchedConcept = useMemo(
-    () => matchConceptByName(conceptoNombre, conceptos),
-    [conceptoNombre, conceptos],
+    () => matchConcept(conceptoId, conceptoNombre, conceptos, conceptoMap).match,
+    [conceptoId, conceptoNombre, conceptos, conceptoMap],
   );
 
   // 2. Find vigente tariffs
