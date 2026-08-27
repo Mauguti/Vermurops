@@ -5,3 +5,7 @@ dist/
 .env.local
 *.log
 .DS_Store
+
+# Caché local del CLI de Firebase (se regenera en cada deploy).
+# Ojo: NO ignorar .firebaserc, que sí es configuración del proyecto.
+.firebase/

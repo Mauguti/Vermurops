@@ -101,6 +101,10 @@ export function useClientes() {
    * - Retorna cantidad importada.
    */
   const importarClientesDesdeJSON = useCallback(async (): Promise<number> => {
+    // Es el alta más masiva de la app (~817 documentos) y no pasa por
+    // createCliente, así que necesita su propia guarda.
+    exigir(user?.rol as UserRole | undefined, 'cliente.alta');
+
     const { default: rawClientes } = await import('../data/seeds/clientes.json');
 
     const BATCH_SIZE = 50;
@@ -144,7 +148,7 @@ export function useClientes() {
     }
 
     return count;
-  }, []);
+  }, [user?.rol]);
 
   return { clientes, loading, error, createCliente, updateCliente, importarClientesDesdeJSON };
 }

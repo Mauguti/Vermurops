@@ -18,23 +18,24 @@ import {
 import { UserRole, isViewAllowed } from './users';
 
 describe('matriz de responsabilidades §4.1', () => {
-  // Fila = capacidad, columnas = [ventas, pricing, admin, operaciones]
+  // Fila = capacidad, valor = roles que la tienen.
+  // 'admin' aparece en todas por ser superusuario técnico, no por ser un área.
   const MATRIZ: Array<[Capacidad, UserRole[]]> = [
     ['lead.crear',           ['ventas', 'admin']],
     ['cotizacion.solicitar', ['ventas', 'pricing', 'admin']],
     ['cotizacion.crear',     ['pricing', 'admin']],
     ['tarifa.gestionar',     ['pricing', 'admin']],
     ['tarifario.cargar',     ['pricing', 'admin']],
-    ['cliente.alta',         ['admin']],
-    ['proveedor.alta',       ['admin']],
-    ['puerto.alta',          ['admin']],
+    ['cliente.alta',         ['administracion', 'admin']],
+    ['proveedor.alta',       ['administracion', 'admin']],
+    ['puerto.alta',          ['administracion', 'admin']],
     ['embarque.generar',     ['operaciones', 'admin']],
-    ['factura.generar',      ['operaciones', 'admin']],
-    ['notaCredito.generar',  ['operaciones', 'admin']],
+    ['factura.generar',      ['operaciones', 'administracion', 'admin']],
+    ['notaCredito.generar',  ['operaciones', 'administracion', 'admin']],
     ['kanban.ver',           ['ventas', 'admin']],
   ];
 
-  const ROLES: UserRole[] = ['ventas', 'pricing', 'operaciones', 'admin'];
+  const ROLES: UserRole[] = ['ventas', 'pricing', 'operaciones', 'administracion', 'admin'];
 
   MATRIZ.forEach(([cap, rolesConPermiso]) => {
     ROLES.forEach(rol => {
@@ -68,12 +69,33 @@ describe('reglas duras que el cliente subrayó', () => {
     expect(puedeCrearCotizacion('operaciones', 'cotizada')).toBe(false);
   });
 
-  it('Administración es la única con las tres altas definitivas', () => {
+  it('Administración es la única ÁREA con las tres altas definitivas', () => {
+    // Se excluye 'admin' del conteo a propósito: es superusuario técnico, no un
+    // área. Lo que el cliente pidió es que ningún otro ÁREA dé altas.
+    const AREAS: UserRole[] = ['ventas', 'pricing', 'operaciones', 'administracion'];
     (['cliente.alta', 'proveedor.alta', 'puerto.alta'] as Capacidad[]).forEach(cap => {
-      const conPermiso = (['ventas', 'pricing', 'operaciones', 'admin'] as UserRole[])
-        .filter(rol => puede(rol, cap));
-      expect(conPermiso).toEqual(['admin']);
+      expect(AREAS.filter(rol => puede(rol, cap))).toEqual(['administracion']);
     });
+  });
+
+  it('Operaciones no da altas de catálogo: solo embarque y facturación', () => {
+    expect(puede('operaciones', 'cliente.alta')).toBe(false);
+    expect(puede('operaciones', 'proveedor.alta')).toBe(false);
+    expect(puede('operaciones', 'puerto.alta')).toBe(false);
+    expect(puede('operaciones', 'embarque.generar')).toBe(true);
+  });
+
+  it('Administración no cotiza ni gestiona tarifas', () => {
+    expect(puedeCrearCotizacion('administracion', 'solicitud_cliente')).toBe(false);
+    expect(puedeCrearCotizacion('administracion', 'cotizada')).toBe(false);
+    expect(puede('administracion', 'tarifa.gestionar')).toBe(false);
+  });
+
+  it('«admin» es superusuario técnico, no el área Administración', () => {
+    // Si algún día se separan de verdad, este test obliga a revisar el modelo.
+    expect(puede('admin', 'cliente.alta')).toBe(true);
+    expect(puede('admin', 'cotizacion.crear')).toBe(true);
+    expect(puede('admin', 'embarque.generar')).toBe(true);
   });
 
   it('el alta rápida de proveedor (probable proveedor) sí es de Pricing', () => {
@@ -106,6 +128,7 @@ describe('guardas', () => {
       expect(puede(undefined, cap)).toBe(false);
       expect(puede(null, cap)).toBe(false);
     });
+    expect(puedeCrearCotizacion(undefined, 'solicitud_cliente')).toBe(false);
   });
 
   it('exigir() lanza PermisoDenegadoError con el rol y la capacidad', () => {
@@ -126,6 +149,16 @@ describe('guardas', () => {
 });
 
 describe('integridad de la matriz', () => {
+  it('todos los roles del sistema están en la matriz de capacidades', () => {
+    // Un rol sin entrada aquí se queda sin ninguna capacidad y el síntoma
+    // («no me aparece nada») es difícil de rastrear.
+    const ROLES_DEL_SISTEMA: UserRole[] = ['ventas', 'pricing', 'operaciones', 'administracion', 'admin'];
+    ROLES_DEL_SISTEMA.forEach(rol => {
+      expect(CAPACIDADES_POR_ROL[rol]).toBeDefined();
+      expect(CAPACIDADES_POR_ROL[rol].length).toBeGreaterThan(0);
+    });
+  });
+
   it('admin tiene todas las capacidades declaradas', () => {
     expect([...CAPACIDADES_POR_ROL.admin].sort()).toEqual([...TODAS_LAS_CAPACIDADES].sort());
   });

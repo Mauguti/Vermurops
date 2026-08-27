@@ -13,15 +13,19 @@
  */
 
 import { KanbanQuote, PipelineStageId } from '../components/quotes/QuotesData';
+import type { UserRole } from '../auth/users';
 
 // ─── Tipos internos ────────────────────────────────────────────────────────────
 
 /**
  * Roles que pueden mover el pipeline.
- * 'operaciones' se incluye por completitud del tipo: no aparece en ninguna
- * transición, así que no puede mover cotizaciones — que es lo correcto.
+ *
+ * Se alía a UserRole en vez de duplicar la lista: así, añadir un rol al sistema
+ * no deja esta máquina con un tipo desincronizado. Los roles que no aparecen en
+ * ninguna transición ('operaciones', 'administracion') simplemente no pueden
+ * mover cotizaciones — que es lo correcto.
  */
-export type Rol = 'ventas' | 'pricing' | 'operaciones' | 'admin';
+export type Rol = UserRole;
 
 interface TransitionDef {
   hacia: PipelineStageId;

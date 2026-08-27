@@ -56,7 +56,11 @@ export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
 // ─── Matriz rol → capacidades ────────────────────────────────────────────────
 
 /**
- * Traducción literal de la matriz de §4.1.
+ * Traducción de la matriz de §4.1 a capacidades.
+ *
+ * Ojo con la última fila: 'administracion' es el ÁREA de la matriz (la que da
+ * las altas definitivas y factura); 'admin' es el superusuario TÉCNICO, que
+ * tiene todo para soporte y depuración y no representa un área de la operación.
  *
  * Notas donde el código se aparta de la lectura ingenua de la tabla:
  *
@@ -67,7 +71,10 @@ export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
  *  - `proveedor.altaRapida` para Pricing NO es «alta de proveedor». Es el
  *    «probable proveedor» sin RFC que documenta la deuda técnica de §6: queda
  *    marcado en revisión y Administración lo valida al concretar la cotización.
- *    El alta definitiva (`proveedor.alta`) sigue siendo exclusiva de Admin.
+ *    El alta definitiva (`proveedor.alta`) es de Administración.
+ *
+ *  - `factura.generar` la comparten Administración y Operaciones: es la única
+ *    celda de la matriz con dos áreas marcadas.
  */
 export const CAPACIDADES_POR_ROL: Record<UserRole, Capacidad[]> = {
   ventas: [
@@ -87,7 +94,15 @@ export const CAPACIDADES_POR_ROL: Record<UserRole, Capacidad[]> = {
     'factura.generar',
     'notaCredito.generar',
   ],
-  // Administración concentra las altas definitivas y puede todo lo demás.
+  // El área: concentra las tres altas definitivas y la facturación.
+  administracion: [
+    'cliente.alta',
+    'proveedor.alta',
+    'puerto.alta',
+    'factura.generar',
+    'notaCredito.generar',
+  ],
+  // Superusuario técnico: todo, para poder dar soporte.
   admin: TODAS_LAS_CAPACIDADES,
 };
 
