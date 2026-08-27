@@ -2,12 +2,17 @@ import React, { useState } from 'react';
 import { initialClients } from '../data';
 import { DollarSign, FileText, CheckCircle, Clock, AlertCircle, Plus, Search, Filter, Download, ArrowRight, X, File, ShieldCheck, Calculator } from 'lucide-react';
 import FichaFactura from './finance/FichaFactura';
+import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
+import BandejaOC from './ordenesCompra/BandejaOC';
 
 export default function Finance() {
   const [activeTab, setActiveTab] = useState('Facturas (CFDI)');
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+
+  // ── OC: datos reales de Firestore ─────────────────────────────────────────
+  const { ordenes, loading: loadingOC, totalPorPagar, conteosPorEstado } = useOrdenesCompra();
 
   const tabs = ['Facturas (CFDI)', 'Cuentas por cobrar', 'Cuentas por pagar', 'Estados de cuenta'];
 
@@ -102,7 +107,13 @@ export default function Finance() {
             </div>
             <div className="bg-white p-[20px] rounded-[12px] border border-card-border shadow-sm">
                <p className="text-[11px] font-medium text-text-muted uppercase tracking-[0.05em] mb-[4px]">Por pagar (Prov.)</p>
-               <p className="text-[24px] font-semibold text-text-primary tabular-nums">$42,100 <span className="text-[14px] text-text-muted font-normal">USD</span></p>
+               <p className="text-[24px] font-semibold text-text-primary tabular-nums">
+                 {loadingOC ? (
+                   <span className="text-text-muted">...</span>
+                 ) : (
+                   <>${totalPorPagar.toLocaleString()} <span className="text-[14px] text-text-muted font-normal">USD</span></>
+                 )}
+               </p>
             </div>
           </div>
 
@@ -244,7 +255,15 @@ export default function Finance() {
                    </div>
                 )}
                 
-                {(activeTab === 'Cuentas por pagar' || activeTab === 'Estados de cuenta') && (
+                {activeTab === 'Cuentas por pagar' && (
+                   <BandejaOC
+                     ordenes={ordenes}
+                     loading={loadingOC}
+                     conteosPorEstado={conteosPorEstado}
+                   />
+                )}
+
+                {activeTab === 'Estados de cuenta' && (
                    <div className="flex flex-col items-center justify-center p-[60px] border border-dashed border-card-border rounded-[8px] bg-white">
                       <Calculator className="w-[32px] h-[32px] text-text-muted mb-[16px]" />
                       <p className="text-[14px] font-medium text-text-primary mb-[4px]">Módulo en desarrollo</p>

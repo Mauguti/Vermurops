@@ -10,7 +10,6 @@ import { useServicios, renderIcon, CategoriaServicio } from '../config/servicios
 export default function Settings() {
   const { user, logout } = useAuth();
   const [activeSection, setActiveSection] = useState('users');
-  const [activeUserTab, setActiveUserTab] = useState('users_list');
   const [activeCatalogTab, setActiveCatalogTab] = useState('carriers');
   const [editNombre, setEditNombre] = useState(user?.nombre ?? '');
 
@@ -26,9 +25,10 @@ export default function Settings() {
   const isAdmin = user?.rol === 'admin';
 
   const ROLE_BADGE: Record<string, { label: string; bg: string; color: string }> = {
-    ventas:  { label: 'Ventas',  bg: '#FFF7ED', color: '#C2410C' },
-    pricing: { label: 'Pricing', bg: '#EFF6FF', color: '#1D4ED8' },
-    admin:   { label: 'Admin',   bg: '#FEE2E2', color: '#B91C1C' },
+    ventas:         { label: 'Ventas',         bg: '#FFF7ED', color: '#C2410C' },
+    pricing:        { label: 'Pricing',        bg: '#EFF6FF', color: '#1D4ED8' },
+    administracion: { label: 'Administración', bg: '#F0FDF4', color: '#15803D' },
+    admin:          { label: 'Admin',           bg: '#FEE2E2', color: '#B91C1C' },
   };
 
   // ── Vista de perfil para roles restringidos ───────────────────────────────
@@ -125,16 +125,6 @@ export default function Settings() {
     { id: 'preferences', label: 'Preferencias', icon: <Settings2 className="w-[18px] h-[18px]" /> },
   ];
 
-  const users = [
-    { id: 1, name: 'Mauricio Muñoz', email: 'mauricio@vermur.com', role: 'Administrador', status: 'Activo' },
-    { id: 2, name: 'Ana Silva', email: 'ana.silva@vermur.com', role: 'Operaciones', status: 'Activo' },
-    { id: 3, name: 'Carlos Rendón', email: 'carlos.r@vermur.com', role: 'Ventas', status: 'Inactivo' },
-    { id: 4, name: 'Laura Gómez', email: 'laura.g@vermur.com', role: 'Finanzas', status: 'Activo' },
-    { id: 5, name: 'Invitado Cliente', email: 'auditor@cliente.com', role: 'Solo lectura', status: 'Activo' },
-  ];
-
-  const roles = ['Administrador', 'Operaciones', 'Ventas', 'Finanzas', 'Solo lectura'];
-  const modules = ['Embarques', 'Aduanas', 'Almacén', 'Finanzas', 'Reportes', 'Catálogos', 'Configuración'];
 
   const integrations = [
     { id: 'gmail', name: 'Gmail Workspace', desc: 'Sincroniza correos con expedientes de embarques.', icon: <Mail className="w-[24px] h-[24px] text-[#EA4335]" />, status: 'Conectado' },
@@ -228,109 +218,12 @@ export default function Settings() {
 
            {activeSection === 'users' && (
               <div>
-                 <div className="flex justify-between items-center mb-[24px]">
-                    <h3 className="text-[18px] font-semibold text-text-primary">Usuarios y Roles</h3>
-                    {activeUserTab === 'users_list' && (
-                       <button className="flex items-center bg-brand text-white px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium shadow-sm hover:bg-brand-hover transition-colors">
-                          <Plus className="w-[16px] h-[16px] mr-[8px]" /> Nuevo Usuario
-                       </button>
-                    )}
+                 <h3 className="text-[18px] font-semibold text-text-primary mb-[24px]">Usuarios y Roles</h3>
+                 <div className="flex flex-col items-center justify-center p-[60px] border border-dashed border-card-border rounded-[8px] bg-white">
+                    <Users className="w-[32px] h-[32px] text-text-muted mb-[16px]" />
+                    <p className="text-[14px] font-medium text-text-primary mb-[4px]">Módulo en desarrollo</p>
+                    <p className="text-[13px] text-text-secondary text-center max-w-[300px]">La gestión de usuarios y roles estará disponible próximamente. Por ahora, los usuarios se administran directamente en Firebase.</p>
                  </div>
-
-                 <div className="flex space-x-[24px] border-b border-divider mb-[24px]">
-                    <button 
-                      onClick={() => setActiveUserTab('users_list')}
-                      className={`pb-[12px] text-[13px] font-medium border-b-[2px] transition-colors ${activeUserTab === 'users_list' ? 'border-brand text-brand' : 'border-transparent text-text-secondary hover:text-text-primary'}`}
-                    >
-                      Lista de Usuarios
-                    </button>
-                    <button 
-                      onClick={() => setActiveUserTab('roles')}
-                      className={`pb-[12px] text-[13px] font-medium border-b-[2px] transition-colors ${activeUserTab === 'roles' ? 'border-brand text-brand' : 'border-transparent text-text-secondary hover:text-text-primary'}`}
-                    >
-                      Matriz de Permisos (Roles)
-                    </button>
-                 </div>
-
-                 {activeUserTab === 'users_list' && (
-                    <div className="border border-card-border rounded-[12px] overflow-hidden">
-                       <table className="w-full text-left border-collapse bg-white">
-                          <thead>
-                             <tr>
-                                <th className="bg-canvas border-b border-card-border py-[12px] px-[16px] text-[11px] font-medium text-text-muted uppercase tracking-[0.05em]">Nombre</th>
-                                <th className="bg-canvas border-b border-card-border py-[12px] px-[16px] text-[11px] font-medium text-text-muted uppercase tracking-[0.05em]">Correo Electrónico</th>
-                                <th className="bg-canvas border-b border-card-border py-[12px] px-[16px] text-[11px] font-medium text-text-muted uppercase tracking-[0.05em]">Rol</th>
-                                <th className="bg-canvas border-b border-card-border py-[12px] px-[16px] text-[11px] font-medium text-text-muted uppercase tracking-[0.05em]">Estatus</th>
-                                <th className="bg-canvas border-b border-card-border py-[12px] px-[16px]"></th>
-                             </tr>
-                          </thead>
-                          <tbody className="divide-y divide-divider font-medium">
-                             {users.map(u => (
-                                <tr key={u.id} className="hover:bg-neutral-bg transition-colors">
-                                   <td className="py-[12px] px-[16px] text-[13px] text-text-primary flex items-center">
-                                      <div className="w-[28px] h-[28px] rounded-full bg-brand/10 text-brand flex items-center justify-center text-[10px] mr-[12px] uppercase">
-                                         {u.name.substring(0,2)}
-                                      </div>
-                                      {u.name}
-                                   </td>
-                                   <td className="py-[12px] px-[16px] text-[13px] text-text-secondary">{u.email}</td>
-                                   <td className="py-[12px] px-[16px]">
-                                      <span className="bg-canvas border border-card-border px-[8px] py-[2px] rounded-[4px] text-[11px] text-text-secondary">{u.role}</span>
-                                   </td>
-                                   <td className="py-[12px] px-[16px]">
-                                      <span className={`px-[8px] py-[2px] rounded-[4px] text-[11px] uppercase tracking-[0.02em] font-bold ${u.status === 'Activo' ? 'bg-success-bg/30 text-success-text' : 'bg-neutral-bg text-text-muted'}`}>{u.status}</span>
-                                   </td>
-                                   <td className="py-[12px] px-[16px] text-right">
-                                      <button className="text-[12px] font-medium text-brand hover:underline">Editar</button>
-                                   </td>
-                                </tr>
-                             ))}
-                          </tbody>
-                       </table>
-                    </div>
-                 )}
-
-                 {activeUserTab === 'roles' && (
-                    <div className="space-y-[24px]">
-                       <div className="bg-info-bg/30 border border-info-bg rounded-[8px] p-[16px] flex items-start">
-                          <Shield className="w-[18px] h-[18px] text-info-text mr-[12px] shrink-0 mt-[2px]" />
-                          <p className="text-[12px] text-info-text leading-relaxed">Configura el nivel de acceso para cada rol. Los usuarios asignados a un rol heredarán estos accesos. El rol "Administrador" tiene acceso total por defecto.</p>
-                       </div>
-                       
-                       <div className="overflow-x-auto border border-card-border rounded-[12px]">
-                          <table className="w-full text-left border-collapse bg-white">
-                             <thead>
-                                <tr>
-                                   <th className="bg-canvas border-b border-r border-card-border py-[12px] px-[16px] text-[11px] font-medium text-text-muted uppercase tracking-[0.05em] min-w-[150px]">Módulo</th>
-                                   {roles.map(role => (
-                                      <th key={role} className="bg-canvas border-b border-card-border py-[12px] px-[16px] text-[11px] font-medium text-text-muted tracking-[0.05em] text-center max-w-[100px]">{role}</th>
-                                   ))}
-                                </tr>
-                             </thead>
-                             <tbody className="divide-y divide-divider font-medium">
-                                {modules.map(mod => (
-                                   <tr key={mod} className="hover:bg-neutral-bg transition-colors">
-                                      <td className="py-[12px] px-[16px] text-[13px] text-text-primary border-r border-card-border bg-canvas/30">{mod}</td>
-                                      {roles.map(role => {
-                                         const isAdmin = role === 'Administrador';
-                                         const isReadOnly = role === 'Solo lectura';
-                                         const isActive = isAdmin || (mod === 'Embarques' && role !== 'Finanzas') || (mod === 'Finanzas' && role === 'Finanzas');
-                                         return (
-                                            <td key={role} className="py-[12px] px-[16px] text-center">
-                                               <label className="relative inline-flex items-center cursor-pointer">
-                                                  <input type="checkbox" className="sr-only peer" defaultChecked={isActive} disabled={isAdmin} />
-                                                  <div className="w-[32px] h-[18px] bg-card-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-[14px] after:w-[14px] after:transition-all peer-checked:bg-brand opacity-80 peer-checked:opacity-100 disabled:opacity-50"></div>
-                                               </label>
-                                            </td>
-                                         )
-                                      })}
-                                   </tr>
-                                ))}
-                             </tbody>
-                          </table>
-                       </div>
-                    </div>
-                 )}
               </div>
            )}
 

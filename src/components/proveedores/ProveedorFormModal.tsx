@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
-import { ProveedorVermur, ContactoProveedor, Modalidad } from './ProveedoresData';
+import { ProveedorVermur, ContactoProveedor, Modalidad, TipoProveedor } from './ProveedoresData';
 import { validarRFC } from '../../lib/validadores';
 
 interface Props {
@@ -33,7 +33,8 @@ export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate,
   const [domicilio, setDomicilio] = useState(proveedor?.domicilio ?? '');
   const [website, setWebsite] = useState(proveedor?.website ?? '');
   const [modalidades, setModalidades] = useState<Modalidad[]>(proveedor?.modalidades ?? []);
-  const [diasCredito, setDiasCredito] = useState(proveedor?.diasCredito ?? { maritimo: 45, terrestre: 15, aereo: 20 });
+  const [tipos, setTipos] = useState<TipoProveedor[]>(proveedor?.tipos ?? ['proveedor']);
+  const [diasCredito, setDiasCredito] = useState(proveedor?.diasCredito ?? { maritimo: 45, terrestre: 15, aereo: 20, general: 0 });
   const [contactos, setContactos] = useState<ContactoProveedor[]>(
     proveedor?.contactos?.length ? proveedor.contactos : [{ ...emptyContacto(), principal: true }],
   );
@@ -121,6 +122,7 @@ export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate,
           domicilio: domicilio.trim(),
           website: website.trim(),
           modalidades,
+          tipos,
           diasCredito,
           contactos: finalContactos,
           notas: notas.trim(),
@@ -130,17 +132,33 @@ export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate,
       } else if (onCreate) {
         const nuevo: ProveedorVermur = {
           id: `PRV-${Date.now()}`,
+          idSemantico: `PRV-${nombre.trim().toUpperCase().replace(/\s+/g, '_').slice(0, 30)}`,
           nombre: nombre.trim(),
-          rfc: rfcVal.toUpperCase(),
-          domicilio: domicilio.trim(),
-          website: website.trim(),
-          contactos: finalContactos,
-          modalidades,
+          tipos,
+          esAgenteDeCarga: tipos.includes('agente_carga'),
+          esTambienCliente: false,
           diasCredito,
+          terminoPagoMagaya: null,
+          contactos: finalContactos,
+          cuentasBancarias: [],
+          telefono: null,
+          website: website.trim() || null,
+          direccion: { calle: domicilio.trim() || null, ciudad: null, estado: null, pais: 'Mexico', codigoPostal: null },
+          codigoIATA: null,
+          referenciaMagaya: null,
+          numeroEntidadMagaya: rfcVal.toUpperCase() || null,
+          validadoFiscalmente: !!rfcVal,
+          tuvoTransacciones: false,
+          multiRegistroEnMagaya: false,
           activo: true,
-          notas: notas.trim(),
+          origenDatos: 'manual',
           fechaAlta: now.split('T')[0],
           updatedAt: now,
+          // Legacy fields
+          rfc: rfcVal.toUpperCase(),
+          domicilio: domicilio.trim(),
+          modalidades,
+          notas: notas.trim(),
         };
         await onCreate(nuevo);
       }

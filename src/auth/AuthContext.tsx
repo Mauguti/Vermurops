@@ -16,12 +16,28 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const getRolByEmail = (email: string): UserRole => {
-  if (email === "admin@vermur.com")   return "admin";
-  if (email === "pricing@vermur.com") return "pricing";
-  if (email === "ventas@vermur.com")  return "ventas";
-  return "ventas"; // fallback por default
+/** Mapeo temporal de correo → rol. Se elimina cuando custom claims esté activo (GU). */
+const _ROL_POR_EMAIL_RAW: Record<string, UserRole> = {
+  // ── Cuentas de prueba ──
+  "admin@vermur.com":            "admin",
+  "pricing@vermur.com":          "pricing",
+  "ventas@vermur.com":           "ventas",
+  // ── Equipo Vermur ──
+  "itzel.laurean@vermur.com":    "ventas",
+  "nohema.sosa@vermur.com":      "pricing",
+  "julio.gutierrez@vermur.com":  "administracion",
+  "angel.luna@vermur.com":       "operaciones",
+  "gabriela.huerta@vermur.com":  "admin",
+  "luis.renteria@vermur.com":    "admin",
 };
+
+// Normaliza las llaves a minúsculas+trim para que el lookup sea case-insensitive
+const ROL_POR_EMAIL: Record<string, UserRole> = Object.fromEntries(
+  Object.entries(_ROL_POR_EMAIL_RAW).map(([k, v]) => [k.toLowerCase().trim(), v]),
+);
+
+const getRolByEmail = (email: string): UserRole =>
+  ROL_POR_EMAIL[email.toLowerCase().trim()] ?? "ventas";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);

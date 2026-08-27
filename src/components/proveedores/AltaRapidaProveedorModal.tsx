@@ -59,19 +59,33 @@ export default function AltaRapidaProveedorModal({ onClose, onCreate, modalidadC
       const id = `PRV-${Date.now()}`;
       const nuevo: ProveedorVermur = {
         id,
+        idSemantico: `PRV-${nombre.trim().toUpperCase().replace(/\s+/g, '_').slice(0, 30)}`,
         nombre: nombre.trim(),
-        rfc: rfcVal.toUpperCase(),
-        domicilio: '',
-        website: '',
+        tipos: ['proveedor'],
+        esAgenteDeCarga: false,
+        esTambienCliente: false,
+        diasCredito: { maritimo: 45, terrestre: 15, aereo: 20, general: 0 },
+        terminoPagoMagaya: null,
         contactos: contactoNombre.trim() || contactoEmail.trim()
-          ? [{ id: `cnt-${Date.now()}`, nombre: contactoNombre.trim(), puesto: '', email: contactoEmail.trim(), telefono: '', principal: true }]
-          : [{ id: `cnt-${Date.now()}`, nombre: '', puesto: '', email: '', telefono: '', principal: true }],
-        modalidades,
-        diasCredito: { maritimo: 45, terrestre: 15, aereo: 20 },
+          ? [{ id: `cnt-${Date.now()}`, nombre: contactoNombre.trim(), email: contactoEmail.trim(), tipo: 'general', principal: true }]
+          : [],
+        cuentasBancarias: [],
+        telefono: null,
+        website: null,
+        direccion: { calle: null, ciudad: null, estado: null, pais: 'Mexico', codigoPostal: null },
+        codigoIATA: null,
+        referenciaMagaya: null,
+        numeroEntidadMagaya: rfcVal.toUpperCase() || null,
+        validadoFiscalmente: !!rfcVal,
+        tuvoTransacciones: false,
+        multiRegistroEnMagaya: false,
         activo: true,
-        notas: '',
+        origenDatos: 'manual',
         fechaAlta: now.split('T')[0],
         updatedAt: now,
+        // Legacy fields
+        rfc: rfcVal.toUpperCase(),
+        modalidades,
       };
       await onCreate(nuevo);
       onCreated(id, nombre.trim());

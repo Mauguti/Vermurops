@@ -169,6 +169,7 @@ export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
             // Filtro de proveedores según la categoría
             const availableProviders = proveedores.filter(p => {
               if (!p.activo) return false;
+              if (!p.modalidades?.length) return true; // Sin clasificar → mostrar en todos
               if (def?.categoria === 'transporte') {
                 return p.modalidades.includes('maritimo') || p.modalidades.includes('aereo') || p.modalidades.includes('terrestre');
               } else if (def?.categoria === 'aduana') {

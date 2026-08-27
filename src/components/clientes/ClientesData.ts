@@ -5,9 +5,12 @@
 //   seed_clientes.json + contratos_store.py
 //
 // Incluye los 3 sub-objetos: docsAlta / contrato / pagare.
+// Soporta clientes legacy (internos) y clientes importados de Magaya.
 //
 // Validadores RFC/CLABE = E7 (no aquí).
 // ============================================================
+
+import type { DiasCredito } from '../proveedores/ProveedoresData';
 
 // ─── Sub-objetos ──────────────────────────────────────────────────────────────
 
@@ -39,6 +42,15 @@ export interface PagareCliente {
   vencimiento: string;     // 'YYYY-MM-DD' o vacío
 }
 
+/** Contacto dentro de la organización del cliente (Magaya). */
+export interface ContactoCliente {
+  nombre: string;
+  tipo?: string | null;
+  email?: string | null;
+  telefono?: string | null;
+  principal?: boolean;
+}
+
 // ─── Entidad principal ────────────────────────────────────────────────────────
 
 export interface ClienteVermur {
@@ -47,23 +59,42 @@ export interface ClienteVermur {
 
   // ── Identificación ─────────────────────────────────────────────────────────
   nombre: string;          // Razón social
-  comercial: string;       // Nombre comercial / marca
-  representante: string;   // Representante legal
+  comercial?: string;      // Nombre comercial / marca
+  representante?: string;  // Representante legal
   /** RFC (texto libre en E6; validación algoritmo SAT = E7). */
-  rfc: string;
-  domicilio: string;       // Domicilio fiscal
-  telefono: string;
-  correo: string;
+  rfc?: string;
+  domicilio?: string;      // Domicilio fiscal
+  telefono?: string;
+  correo?: string;
+
+  // ── Identificación Magaya ─────────────────────────────────────────────────
+  /** ID semántico legible (ej. CLI-MULLER_TECHNOPLASTICS). */
+  idSemantico?: string;
+  /** Referencia numérica en Magaya. */
+  referenciaMagaya?: string | null;
+  /** Número de entidad en Magaya. */
+  numeroEntidadMagaya?: string | null;
 
   // ── Condiciones de crédito ─────────────────────────────────────────────────
-  tipoCredito: 'credito' | 'contado';
-  /** Monto de la línea de crédito aprobada. */
-  monto: number;
-  divisa: 'MXN' | 'USD';
-  /** Plazo de crédito en días: 0 = contado. */
-  dias: 0 | 15 | 20 | 30 | 45 | 60 | 90;
+  tipoCredito?: 'credito' | 'contado';
+  /** Monto de la línea de crédito aprobada (campo interno). */
+  monto?: number;
+  /** Límite de crédito en MXN (campo Magaya). */
+  limiteCreditoMXN?: number;
+  divisa?: 'MXN' | 'USD';
+  /**
+   * Plazo de crédito en días: 0 = contado.
+   * Alimenta el cálculo de financiamiento del profit real.
+   * En E14 se desglosará a diasCreditoPorTipo.
+   */
+  dias: number;
+  /**
+   * Días de crédito desglosados por modalidad (importado de Magaya).
+   * Se almacena desde ahora; E14 cambiará la lectura para usarlo.
+   */
+  diasCreditoPorTipo?: DiasCredito;
   /** Tasa de interés moratorio (%). Default 3. */
-  interesMoratorio: number;
+  interesMoratorio?: number;
 
   // ── Estado operativo ───────────────────────────────────────────────────────
   statusOperativo: 'ACTIVO' | 'INACTIVO';
@@ -71,16 +102,30 @@ export interface ClienteVermur {
    * Estado del seguro de crédito Atradius.
    * '✔' = aprobado | 'X' = rechazado | 'NA' | 'SOLICITADO' | 'RECHAZADO' | 'RETIRADO' | ''
    */
-  atradius: '✔' | 'X' | 'NA' | 'SOLICITADO' | 'RECHAZADO' | 'RETIRADO' | '';
+  atradius?: '✔' | 'X' | 'NA' | 'SOLICITADO' | 'RECHAZADO' | 'RETIRADO' | '';
   /** Monto aprobado por Atradius (string porque puede incluir moneda/formato). */
-  montoAprobado: string;
+  montoAprobado?: string;
 
   // ── Administrativo ────────────────────────────────────────────────────────
   /** ¿Tiene carpeta de expediente en Google Drive? */
-  expedienteDrive: boolean;
-  comentarios: string;
+  expedienteDrive?: boolean;
+  comentarios?: string;
   /** Fecha de alta del cliente. Formato 'YYYY-MM-DD'. */
   fechaAlta: string;
+
+  // ── Contactos (Magaya) ───────────────────────────────────────────────────
+  contactos?: ContactoCliente[];
+
+  // ── Calidad de datos / trazabilidad ──────────────────────────────────────
+  /** Estado fiscal del cliente (Magaya). */
+  estado?: string | null;
+  codigoPostal?: string | null;
+  validadoFiscalmente?: boolean;
+  tuvoTransacciones?: boolean;
+  duplicadoEnMagaya?: boolean;
+  origenDatos?: 'manual' | 'magaya';
+  fechaAltaMagaya?: string;
+  updatedAt?: string;
 
   // ── Preferencias de proveedores (CP-1: comparativa de pricing) ────────────
   /** IDs de ProveedorVermur que el cliente prefiere. */
@@ -89,9 +134,9 @@ export interface ClienteVermur {
   proveedoresVetados?: string[];
 
   // ── Sub-objetos KYC ───────────────────────────────────────────────────────
-  docsAlta: DocsAlta;
-  contrato: ContratoCliente;
-  pagare: PagareCliente;
+  docsAlta?: DocsAlta;
+  contrato?: ContratoCliente;
+  pagare?: PagareCliente;
 }
 
 // ─── Seed de desarrollo (3 clientes ficticios) ────────────────────────────────

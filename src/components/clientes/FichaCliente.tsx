@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ClienteVermur } from './ClientesData';
+import { ClienteVermur, DocsAlta, ContratoCliente, PagareCliente } from './ClientesData';
 import { validarRFC } from '../../lib/validadores';
 import { ChevronRight, Loader2, Check } from 'lucide-react';
 
@@ -8,6 +8,32 @@ interface Props {
   onBack: () => void;
   onUpdate: (id: string, data: Partial<ClienteVermur>) => Promise<void>;
 }
+
+const DOCS_ALTA_DEFAULT: DocsAlta = { acta: false, poder: false, identificacion: false, csf: false, comprobante: false, bancaria: false };
+const CONTRATO_DEFAULT: ContratoCliente = { enviado: false, firmadoCorreo: false, fisicoArchivado: false, fechaEnvio: '' };
+const PAGARE_DEFAULT: PagareCliente = { aplica: false, enviado: false, firmado: false, fisico: false, monto: 0, vencimiento: '' };
+
+/** Fill in defaults for optional fields so the form never reads undefined. */
+const withDefaults = (c: ClienteVermur): ClienteVermur => ({
+  ...c,
+  comercial: c.comercial ?? '',
+  representante: c.representante ?? '',
+  rfc: c.rfc ?? '',
+  domicilio: c.domicilio ?? '',
+  telefono: c.telefono ?? '',
+  correo: c.correo ?? '',
+  tipoCredito: c.tipoCredito ?? 'contado',
+  monto: c.monto ?? 0,
+  divisa: c.divisa ?? 'MXN',
+  interesMoratorio: c.interesMoratorio ?? 0,
+  atradius: c.atradius ?? '',
+  montoAprobado: c.montoAprobado ?? '',
+  expedienteDrive: c.expedienteDrive ?? false,
+  comentarios: c.comentarios ?? '',
+  docsAlta: c.docsAlta ?? DOCS_ALTA_DEFAULT,
+  contrato: c.contrato ?? CONTRATO_DEFAULT,
+  pagare: c.pagare ?? PAGARE_DEFAULT,
+});
 
 type TabId = 'informacion' | 'credito' | 'expediente' | 'contrato';
 
@@ -67,24 +93,24 @@ function SaveBar({ onSave, saving }: { onSave: () => void; saving: boolean }) {
 
 export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
   const [tab, setTab] = useState<TabId>('informacion');
-  const [draft, setDraft] = useState<ClienteVermur>(cliente);
+  const [draft, setDraft] = useState<ClienteVermur>(() => withDefaults(cliente));
   const [saving, setSaving] = useState(false);
   // Feedback inline de formato del RFC (solo en pestaña Información).
   const [rfcError, setRfcError] = useState('');
 
   // Reset draft when Firestore confirms write (onSnapshot pushes fresh cliente)
   useEffect(() => {
-    setDraft(cliente);
+    setDraft(withDefaults(cliente));
     setRfcError('');
   }, [cliente]);
 
   // ¿El usuario modificó el RFC respecto al valor guardado? Solo entonces se valida
   // (backward compat: RFCs heredados intactos nunca bloquean el guardado).
-  const rfcModificado = () => draft.rfc.trim().toUpperCase() !== cliente.rfc.trim().toUpperCase();
+  const rfcModificado = () => (draft.rfc ?? '').trim().toUpperCase() !== (cliente.rfc ?? '').trim().toUpperCase();
 
   // Valida el RFC al salir del campo, solo si fue modificado y tiene contenido.
   const handleRfcBlur = () => {
-    const rfc = draft.rfc.trim();
+    const rfc = (draft.rfc ?? '').trim();
     setRfcError(rfc !== '' && rfcModificado() ? validarRFC(rfc).error : '');
   };
 
@@ -119,7 +145,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
   ];
 
   // ── Docs Alta fields ────────────────────────────────────────────────────────
-  const docsFields: Array<[keyof ClienteVermur['docsAlta'], string]> = [
+  const docsFields: Array<[keyof DocsAlta, string]> = [
     ['acta',           'Acta constitutiva'],
     ['poder',          'Poder notarial del representante'],
     ['identificacion', 'Identificación oficial vigente'],
@@ -170,7 +196,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
             {cliente.comercial && (
               <p className="text-[12px] text-text-muted mt-0.5">{cliente.comercial}</p>
             )}
-            <p className="text-[11px] text-text-muted font-mono mt-1">RFC: {cliente.rfc}</p>
+            <p className="text-[11px] text-text-muted font-mono mt-1">RFC: {cliente.rfc || '—'}</p>
           </div>
         </div>
       </div>

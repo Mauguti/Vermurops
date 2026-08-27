@@ -1,13 +1,18 @@
 // ============================================================
 // ProveedoresData.ts — Modelo de datos del módulo de Proveedores
 //
-// E9.0: Modelo enriquecido con contactos múltiples y días de
-// crédito por tipo de operación.
+// Paso 1.4: Modelo actualizado para 544 proveedores reales de Magaya.
 //
-// Seed: migración de los 5 proveedores de data.ts al modelo nuevo.
+// Campos legacy (rfc, domicilio, modalidades, notas) se mantienen
+// como opcionales para backward compat con registros creados por
+// el formulario interno antes de la migración.
 // ============================================================
 
+import seedData from '../../data/seeds/proveedores.json';
+
 // ─── Sub-objetos ──────────────────────────────────────────────────────────────
+
+export type TipoProveedor = 'proveedor' | 'transportista' | 'agente_carga';
 
 /**
  * Días de crédito que el proveedor otorga a Vermur, por tipo de operación.
@@ -24,22 +29,52 @@ export interface DiasCredito {
   maritimo: number;
   terrestre: number;
   aereo: number;
+  /** Crédito general cuando no aplica desglose por modalidad. */
+  general: number;
 }
 
 /** Contacto dentro de la organización del proveedor. */
 export interface ContactoProveedor {
   id: string;
   nombre: string;
-  puesto: string;
   email: string;
-  telefono: string;
+  /** Tipo de contacto según Magaya: "general", "ventas", etc. */
+  tipo?: string;
   /** Marca cuál es el contacto default / principal. */
   principal: boolean;
+  // Legacy — presentes en registros creados por el formulario interno.
+  puesto?: string;
+  telefono?: string;
 }
 
-// ─── Tipos compartidos ────────────────────────────────────────────────────────
+/** Dirección del proveedor (Magaya). */
+export interface DireccionProveedor {
+  calle: string | null;
+  ciudad: string | null;
+  estado: string | null;
+  pais: string | null;
+  codigoPostal: string | null;
+}
+
+// ─── Tipos compartidos (legacy — usado en filtros de formulario) ──────────────
 
 export type Modalidad = 'maritimo' | 'aereo' | 'terrestre' | 'aduanal';
+
+// ─── Cuenta bancaria del proveedor ────────────────────────────────────────────
+
+/** Cuenta bancaria tipada del proveedor (reemplaza unknown[] legacy). */
+export interface CuentaBancariaProveedor {
+  id: string;                       // UUID
+  banco: string;                    // "BBVA", "Banamex", etc.
+  clabe: string;                    // 18 dígitos CLABE
+  numeroCuenta: string;
+  moneda: 'MXN' | 'USD';
+  /** SWIFT/BIC para transferencias internacionales. */
+  swift: string | null;
+  /** FK → conceptos/ — para sugerir cuenta por concepto al autorizar OC. */
+  conceptoAsociadoId: string | null;
+  activo: boolean;
+}
 
 // ─── Entidad principal ────────────────────────────────────────────────────────
 
@@ -47,28 +82,57 @@ export interface ProveedorVermur {
   /** ID del documento en Firestore. */
   id: string;
 
-  // ── Identificación ─────────────────────────────────────────────────────────
-  nombre: string;       // Razón social
-  rfc: string;
-  domicilio: string;
-  website: string;
+  // ── Identificación (Magaya) ──────────────────────────────────────────────
+  /** Clave semántica derivada del nombre: "PRV-HAPAG_LLOYD", etc. */
+  idSemantico: string;
+  nombre: string;
 
-  // ── Contactos (1..n) ───────────────────────────────────────────────────────
+  // ── Clasificación ────────────────────────────────────────────────────────
+  /** Roles del proveedor: proveedor, transportista, agente_carga. */
+  tipos: TipoProveedor[];
+  esAgenteDeCarga: boolean;
+  /** true cuando este proveedor también figura como cliente en Magaya. */
+  esTambienCliente: boolean;
+
+  // ── Contactos (0..n) ─────────────────────────────────────────────────────
   contactos: ContactoProveedor[];
 
-  // ── Servicios que ofrece ───────────────────────────────────────────────────
-  modalidades: Modalidad[];
-
-  // ── Crédito por tipo de operación ──────────────────────────────────────────
+  // ── Crédito por tipo de operación ────────────────────────────────────────
   diasCredito: DiasCredito;
+  /** Término de pago literal de Magaya: "Net 30", "Due on receipt", etc. */
+  terminoPagoMagaya: string | null;
 
-  // ── Estado ─────────────────────────────────────────────────────────────────
+  // ── Datos fiscales / Magaya ──────────────────────────────────────────────
+  telefono: string | null;
+  website: string | null;
+  direccion: DireccionProveedor;
+  /** Código IATA (aerolíneas). */
+  codigoIATA: string | null;
+  referenciaMagaya: string | null;
+  /** Tax ID / RFC / EIN del proveedor en Magaya. */
+  numeroEntidadMagaya: string | null;
+
+  // ── Bancario ─────────────────────────────────────────────────────────────
+  cuentasBancarias: CuentaBancariaProveedor[];
+
+  // ── Flags de calidad de datos ────────────────────────────────────────────
+  validadoFiscalmente: boolean;
+  tuvoTransacciones: boolean;
+  multiRegistroEnMagaya: boolean;
+
+  // ── Estado ───────────────────────────────────────────────────────────────
   activo: boolean;
-  notas: string;
+  origenDatos: string;
 
-  // ── Auditoría ──────────────────────────────────────────────────────────────
+  // ── Auditoría ────────────────────────────────────────────────────────────
   fechaAlta: string;    // YYYY-MM-DD
   updatedAt: string;    // ISO timestamp
+
+  // ── Legacy (opcionales — registros creados antes de la migración) ────────
+  rfc?: string;
+  domicilio?: string;
+  modalidades?: Modalidad[];
+  notas?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -78,100 +142,7 @@ export function contactoPrincipal(p: ProveedorVermur): ContactoProveedor | undef
   return p.contactos.find(c => c.principal) ?? p.contactos[0];
 }
 
-// ─── Seed de desarrollo ────────────────────────────────────────────────────────
-// Migración de los 5 proveedores de data.ts (initialProviders) al modelo
-// enriquecido. El contacto único se convierte en array de 1 con principal=true.
-// diasCredito usa defaults razonables del levantamiento.
+// ─── Seed ─────────────────────────────────────────────────────────────────────
+// 544 proveedores reales importados de Magaya.
 
-const SEED_FECHA = '2026-01-15';
-const SEED_TS = '2026-01-15T00:00:00.000Z';
-
-/** Defaults del levantamiento: marítimo 45, terrestre 15, aéreo 20. */
-const DIAS_CREDITO_DEFAULT: DiasCredito = {
-  maritimo: 45,
-  terrestre: 15,
-  aereo: 20,
-};
-
-export const initialProveedores: ProveedorVermur[] = [
-  {
-    id: 'PRV-001',
-    nombre: 'Hapag-Lloyd',
-    rfc: 'HLL980101QW1',
-    domicilio: 'Av. Paseo de la Reforma 250, CDMX',
-    website: 'www.hapag-lloyd.com',
-    contactos: [
-      { id: 'cnt-001-1', nombre: 'Roberto Díaz', puesto: 'Key Account Manager', email: 'roberto.diaz@hl.com', telefono: '55 4321 8765', principal: true },
-    ],
-    modalidades: ['maritimo'],
-    diasCredito: { ...DIAS_CREDITO_DEFAULT },
-    activo: true,
-    notas: 'Buenas tarifas para rutas a Asia. Tiempos de respuesta lentos los viernes.',
-    fechaAlta: SEED_FECHA,
-    updatedAt: SEED_TS,
-  },
-  {
-    id: 'PRV-002',
-    nombre: 'Lufthansa Cargo',
-    rfc: 'LCA880222XZ2',
-    domicilio: 'Terminal de Carga AICM, CDMX',
-    website: 'lufthansa-cargo.com',
-    contactos: [
-      { id: 'cnt-002-1', nombre: 'Sandra Meyer', puesto: 'Sales Rep', email: 'smeyer@lufthansa.com', telefono: '55 1122 3344', principal: true },
-    ],
-    modalidades: ['aereo'],
-    diasCredito: { ...DIAS_CREDITO_DEFAULT },
-    activo: true,
-    notas: 'Excelente para consolidados a Europa.',
-    fechaAlta: SEED_FECHA,
-    updatedAt: SEED_TS,
-  },
-  {
-    id: 'PRV-003',
-    nombre: 'Swift Logistics SA de CV',
-    rfc: 'SWL050505AA1',
-    domicilio: 'Carretera a Laredo Km 15, Monterrey',
-    website: 'www.swiftlog.mx',
-    contactos: [
-      { id: 'cnt-003-1', nombre: 'Carlos Mendoza', puesto: 'Despachador', email: 'cmendoza@swiftlog.mx', telefono: '81 5555 9999', principal: true },
-    ],
-    modalidades: ['terrestre'],
-    diasCredito: { ...DIAS_CREDITO_DEFAULT },
-    activo: true,
-    notas: 'Rutas NAFTA exclusivamente.',
-    fechaAlta: SEED_FECHA,
-    updatedAt: SEED_TS,
-  },
-  {
-    id: 'PRV-004',
-    nombre: 'Agencia Aduanal Torres',
-    rfc: 'AAT901010BB2',
-    domicilio: 'Av. Oceanía 100, Manzanillo',
-    website: 'www.aatorres.com.mx',
-    contactos: [
-      { id: 'cnt-004-1', nombre: 'Lucía Torres', puesto: 'Agente Aduanal', email: 'lucia@aatorres.com.mx', telefono: '314 222 1111', principal: true },
-    ],
-    modalidades: ['aduanal'],
-    diasCredito: { ...DIAS_CREDITO_DEFAULT },
-    activo: true,
-    notas: 'Especialistas en despacho de químicos y materiales peligrosos.',
-    fechaAlta: SEED_FECHA,
-    updatedAt: SEED_TS,
-  },
-  {
-    id: 'PRV-005',
-    nombre: 'Grupo Logístico Universal',
-    rfc: 'GLU120304CC3',
-    domicilio: 'Boulevard Puerto Aéreo 500, CDMX',
-    website: 'www.gluniversal.mx',
-    contactos: [
-      { id: 'cnt-005-1', nombre: 'Javier Santos', puesto: 'Ejecutivo Comercial', email: 'jsantos@gluniversal.mx', telefono: '55 9876 5432', principal: true },
-    ],
-    modalidades: ['aereo', 'maritimo', 'terrestre'],
-    diasCredito: { ...DIAS_CREDITO_DEFAULT },
-    activo: false,
-    notas: 'Actualmente en revisión de crédito, no usar.',
-    fechaAlta: SEED_FECHA,
-    updatedAt: SEED_TS,
-  },
-];
+export const initialProveedores: ProveedorVermur[] = seedData as ProveedorVermur[];

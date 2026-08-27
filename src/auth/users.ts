@@ -2,7 +2,7 @@
 // Tipos del sistema de autenticación VermurOps
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type UserRole = 'ventas' | 'pricing' | 'admin';
+export type UserRole = 'ventas' | 'pricing' | 'operaciones' | 'administracion' | 'admin';
 
 export interface AuthUser {
   uid?: string; // Firebase Auth UID
@@ -16,7 +16,9 @@ export interface AuthUser {
 // Rutas/vistas permitidas por rol
 export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
   ventas: ['dashboard', 'quotes', 'clients', 'settings'],
-  pricing: ['dashboard', 'quotes', 'pricing', 'documents', 'puertos', 'settings'],
+  pricing: ['dashboard', 'quotes', 'pricing', 'rates', 'clients', 'documents', 'puertos', 'exchange', 'settings'],
+  operaciones: ['dashboard', 'quotes', 'shipments', 'documents', 'clients', 'puertos', 'exchange', 'settings'],
+  administracion: ['dashboard', 'clients', 'finance', 'shipments', 'documents', 'exchange', 'puertos', 'reports', 'settings'],
   admin: [
     'dashboard', 'quotes', 'pricing', 'bookings', 'pickups',
     'shipments', 'documents', 'finance', 'exchange', 'clients',

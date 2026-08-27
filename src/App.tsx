@@ -30,11 +30,15 @@ import LandingPage from './components/LandingPage';
 import { ChevronDown, User, LogOut, Bell, ArrowRight, CheckCheck } from 'lucide-react';
 import { useProveedores } from './hooks/useProveedores';
 import { usePuertos } from './hooks/usePuertos';
+import { useTerminosPago } from './hooks/useTerminosPago';
+import { useTarifas } from './hooks/useTarifas';
 
 // ─── Role badge labels ────────────────────────────────────────────────────────
 const ROLE_LABEL: Record<string, string> = {
   ventas: 'Ventas',
   pricing: 'Pricing',
+  operaciones: 'Operaciones',
+  administracion: 'Administración',
   admin: 'Admin',
 };
 
@@ -215,6 +219,8 @@ function UserMenu({ onNavigate }: { onNavigate: (view: string) => void }) {
                   ? { background: '#FEE2E2', color: '#B91C1C' }
                   : user.rol === 'pricing'
                   ? { background: '#EFF6FF', color: '#1D4ED8' }
+                  : user.rol === 'administracion'
+                  ? { background: '#F0FDF4', color: '#15803D' }
                   : { background: '#FFF7ED', color: '#C2410C' }
               }
             >
@@ -256,6 +262,10 @@ function AppShell() {
   useProveedores();
   // E10.0: seed de puertos a Firestore.
   usePuertos();
+  // 1.2: seed de términos de pago a Firestore.
+  useTerminosPago();
+  // TA-1: listener acotado de tarifas (activo + vigente ± 60d).
+  useTarifas();
 
   const safeNavigate = (view: string) => {
     // notifications is accessible to all roles

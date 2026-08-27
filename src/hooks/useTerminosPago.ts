@@ -1,26 +1,25 @@
 /**
- * useProveedores.ts
+ * useTerminosPago.ts
  *
- * Hook que sincroniza proveedores con Firestore.
+ * Hook que sincroniza términos de pago con Firestore.
  *
- * Comportamiento (mismo patrón que useClientes):
- *  1. Abre un listener onSnapshot sobre la colección 'proveedores'.
+ * Comportamiento (mismo patrón que useConceptos / usePuertos):
+ *  1. Abre un listener onSnapshot sobre la colección 'terminosPago'.
  *  2. Si la colección está vacía (primera vez), escribe el seed de
- *     initialProveedores (544 registros de Magaya) usando setDoc →
- *     preserva el id como document ID.
- *  3. Expone { proveedores, loading, error, createProveedor, updateProveedor }.
+ *     initialTerminosPago usando setDoc → preserva el id como document ID.
+ *  3. Expone { terminosPago, loading, error, createTerminoPago, updateTerminoPago }.
  */
 
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
-import { ProveedorVermur, initialProveedores } from '../components/proveedores/ProveedoresData';
+import { TerminoPagoVermur, initialTerminosPago } from '../components/terminosPago/TerminosPagoData';
 import { useAuth } from '../auth/AuthContext';
 
-export function useProveedores() {
+export function useTerminosPago() {
   const { user } = useAuth();
 
-  const [proveedores, setProveedores] = useState<ProveedorVermur[]>([]);
+  const [terminosPago, setTerminosPago] = useState<TerminoPagoVermur[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,20 +33,20 @@ export function useProveedores() {
     }
 
     const unsubscribe = onSnapshot(
-      collection(db, 'proveedores'),
+      collection(db, 'terminosPago'),
       async (snapshot) => {
         // ── Colección vacía: seed inicial ─────────────────────────────────
         if (snapshot.empty && !seedAttempted.current) {
           seedAttempted.current = true;
           try {
             await Promise.all(
-              initialProveedores.map(p =>
-                setDoc(doc(db, 'proveedores', p.id), p)
+              initialTerminosPago.map(tp =>
+                setDoc(doc(db, 'terminosPago', tp.id), tp)
               )
             );
-            // onSnapshot disparará de nuevo con los 544 documentos escritos.
+            // onSnapshot disparará de nuevo con los 25 documentos escritos.
           } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Error al sembrar proveedores iniciales';
+            const msg = err instanceof Error ? err.message : 'Error al sembrar términos de pago iniciales';
             setError(msg);
             setLoading(false);
           }
@@ -55,15 +54,15 @@ export function useProveedores() {
         }
 
         // ── Snapshot con datos (normal o post-seed) ───────────────────────
-        const data: ProveedorVermur[] = [];
+        const data: TerminoPagoVermur[] = [];
         snapshot.forEach(docSnap => {
-          data.push({ id: docSnap.id, ...docSnap.data() } as ProveedorVermur);
+          data.push({ id: docSnap.id, ...docSnap.data() } as TerminoPagoVermur);
         });
 
-        // Alfabético por razón social.
-        data.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+        // Ordenar por diasParaPagar ascendente (contado primero).
+        data.sort((a, b) => a.diasParaPagar - b.diasParaPagar);
 
-        setProveedores(data);
+        setTerminosPago(data);
         setLoading(false);
       },
       (err) => {
@@ -77,13 +76,13 @@ export function useProveedores() {
 
   // ── Writes ───────────────────────────────────────────────────────────────
 
-  const createProveedor = async (proveedor: ProveedorVermur): Promise<void> => {
-    await setDoc(doc(db, 'proveedores', proveedor.id), proveedor);
+  const createTerminoPago = async (tp: TerminoPagoVermur): Promise<void> => {
+    await setDoc(doc(db, 'terminosPago', tp.id), tp);
   };
 
-  const updateProveedor = async (id: string, data: Partial<ProveedorVermur>): Promise<void> => {
-    await updateDoc(doc(db, 'proveedores', id), data as Record<string, unknown>);
+  const updateTerminoPago = async (id: string, data: Partial<TerminoPagoVermur>): Promise<void> => {
+    await updateDoc(doc(db, 'terminosPago', id), data as Record<string, unknown>);
   };
 
-  return { proveedores, loading, error, createProveedor, updateProveedor };
+  return { terminosPago, loading, error, createTerminoPago, updateTerminoPago };
 }
