@@ -30,27 +30,36 @@ export interface AuthUser {
 // darlo de alta son cosas distintas. Pricing consulta puertos para capturar la
 // ruta de una tarifa marítima; el alta sigue siendo de Administración.
 // ─────────────────────────────────────────────────────────────────────────────
+//
+// 'documents' NO aparece en ningún rol. El cliente pidió que la sección suelta
+// desaparezca: «los documentos deberían generarse dentro del embarque o
+// cotización» (27-ago-2026). El componente Documents.tsx se conserva en el
+// repo —queda inalcanzable, no borrado— hasta que los Bloques 4 y 5 definan
+// dónde vive cada documento (pendiente §4.8 nº 6).
 export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
   ventas: ['dashboard', 'quotes', 'clients', 'settings'],
 
   // Pricing: cotiza y gestiona tarifas.
   //  - 'rates': la matriz le asigna «Gestionar tarifas» y «Cargar tarifarios».
-  //  - 'documents' se QUITA (cliente, 27-ago-2026): «la sección independiente
-  //    de Documentos no debería existir dentro de Pricing; los documentos
-  //    deberían generarse dentro del embarque o cotización».
   //  - 'puertos' se CONSERVA: la matriz restringe el ALTA de puertos, no su
   //    consulta. Pricing necesita el catálogo para capturar la ruta (puerto
   //    origen/destino) de una tarifa marítima. El botón de alta se oculta con
   //    la capacidad 'puerto.alta' — misma distinción que en proveedores.
   pricing: ['dashboard', 'quotes', 'pricing', 'rates', 'clients', 'puertos', 'exchange', 'settings'],
 
-  operaciones: ['dashboard', 'quotes', 'shipments', 'documents', 'clients', 'puertos', 'exchange', 'settings'],
+  // Operaciones: genera embarques y factura.
+  //  - 'quotes' se QUITA (cliente, 27-ago-2026): «Operaciones no debe crear
+  //    cotizaciones». Se retira el módulo completo, no solo el permiso.
+  //    Consecuencia para el Bloque 4: la conversión cotización → embarque
+  //    tendrá que arrancar desde Embarques, no desde la ficha de cotización.
+  operaciones: ['dashboard', 'shipments', 'clients', 'puertos', 'exchange', 'settings'],
 
-  administracion: ['dashboard', 'clients', 'finance', 'shipments', 'documents', 'exchange', 'puertos', 'reports', 'settings'],
+  // Administración: altas definitivas, finanzas y facturación.
+  administracion: ['dashboard', 'clients', 'finance', 'shipments', 'exchange', 'puertos', 'reports', 'settings'],
 
   admin: [
     'dashboard', 'quotes', 'pricing', 'bookings', 'pickups',
-    'shipments', 'documents', 'finance', 'exchange', 'clients',
+    'shipments', 'finance', 'exchange', 'clients',
     'puertos', 'rates', 'reports', 'settings',
   ],
 };

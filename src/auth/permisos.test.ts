@@ -185,9 +185,26 @@ describe('vista vs. capacidad de alta', () => {
     expect(puede('pricing', 'puerto.alta')).toBe(false);
   });
 
-  it('Pricing NO tiene sección independiente de Documentos', () => {
-    // «Los documentos deberían generarse dentro del embarque o cotización.»
-    expect(isViewAllowed('pricing', 'documents')).toBe(false);
+  it('NINGÚN rol tiene la sección suelta de Documentos', () => {
+    // «Los documentos deberían generarse dentro del embarque o cotización»
+    // (cliente, 27-ago-2026). Decidido con Mau: desaparece para todos, no solo
+    // para Pricing. Vuelve a existir cuando los Bloques 4 y 5 la reubiquen.
+    const ROLES: UserRole[] = ['ventas', 'pricing', 'operaciones', 'administracion', 'admin'];
+    ROLES.forEach(rol => {
+      expect(isViewAllowed(rol, 'documents')).toBe(false);
+    });
+  });
+
+  it('Operaciones no entra al módulo de Cotizaciones', () => {
+    // «Operaciones: quitar creación de cotizaciones». Decidido con Mau: se
+    // retira el módulo completo, no solo el permiso de crear.
+    expect(isViewAllowed('operaciones', 'quotes')).toBe(false);
+    expect(puedeCrearCotizacion('operaciones', 'solicitud_cliente')).toBe(false);
+  });
+
+  it('Administración entra a clientes Y puede darlos de alta', () => {
+    expect(isViewAllowed('administracion', 'clients')).toBe(true);
+    expect(puede('administracion', 'cliente.alta')).toBe(true);
   });
 
   it('Pricing entra al módulo de Tarifas: la matriz le da gestionarlas', () => {
