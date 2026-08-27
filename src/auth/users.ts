@@ -33,9 +33,15 @@ export interface AuthUser {
 export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
   ventas: ['dashboard', 'quotes', 'clients', 'settings'],
 
-  // 'documents' se QUITA (cliente, 27-ago-2026): «la sección independiente de
-  // Documentos no debería existir dentro de Pricing; los documentos deberían
-  // generarse dentro del embarque o cotización».
+  // Pricing: cotiza y gestiona tarifas.
+  //  - 'rates': la matriz le asigna «Gestionar tarifas» y «Cargar tarifarios».
+  //  - 'documents' se QUITA (cliente, 27-ago-2026): «la sección independiente
+  //    de Documentos no debería existir dentro de Pricing; los documentos
+  //    deberían generarse dentro del embarque o cotización».
+  //  - 'puertos' se CONSERVA: la matriz restringe el ALTA de puertos, no su
+  //    consulta. Pricing necesita el catálogo para capturar la ruta (puerto
+  //    origen/destino) de una tarifa marítima. El botón de alta se oculta con
+  //    la capacidad 'puerto.alta' — misma distinción que en proveedores.
   pricing: ['dashboard', 'quotes', 'pricing', 'rates', 'clients', 'puertos', 'exchange', 'settings'],
 
   operaciones: ['dashboard', 'quotes', 'shipments', 'documents', 'clients', 'puertos', 'exchange', 'settings'],

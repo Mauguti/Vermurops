@@ -279,6 +279,30 @@ opción y espera validación**:
 
 ## 6. Deuda técnica conocida
 
+**🔴 CRÍTICO — Las reglas de Firestore no distinguen roles.**
+Hoy toda colección se protege con `allow read, write: if request.auth != null`.
+Cualquier usuario autenticado —da igual su rol— puede leer y escribir cualquier
+documento saltándose la app: desde la consola de Firebase, desde el SDK, o desde
+la consola del navegador con la sesión abierta.
+
+Esto significa que la matriz de permisos de §4.1 **protege la aplicación, no la
+base de datos**. `src/auth/permisos.ts` esconde botones y bloquea las escrituras
+que pasan por los hooks; no bloquea nada que le hable a Firestore directamente.
+Es seguridad aparente, no seguridad real.
+
+Por qué sigue abierto: las reglas no pueden leer el rol, porque el rol se deriva
+en el cliente con `getRolByEmail` (mapa de correos en `AuthContext.tsx`).
+Resolverlo requiere que el rol viva en el token:
+
+  1. Custom claims por usuario (épica de Gestión de Usuarios), o
+  2. Colección `usuarios/{uid}` con el rol, leída desde las reglas con `get()`
+     — más simple, pero cuesta una lectura por evaluación.
+
+Con cualquiera de las dos, las reglas pasan a verificar la capacidad y no solo
+la autenticación. **Toca producción: hay que avisar y publicar con
+`firebase deploy --only firestore:rules`.** Mientras no se cierre, asumir que
+todo dato en Firestore es escribible por cualquier miembro del equipo.
+
 **Falta `trafico` y `ubicacion` en `ServicioSolicitado`.**
 Sin ellos, `calcularIVA` no se puede aplicar en la cotización, aunque la función ya existe y
 está probada. Bloquea el cálculo fiscal correcto. **Prioritario.**

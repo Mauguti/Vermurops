@@ -15,7 +15,7 @@ import {
   TODAS_LAS_CAPACIDADES,
   Capacidad,
 } from './permisos';
-import { UserRole } from './users';
+import { UserRole, isViewAllowed } from './users';
 
 describe('matriz de responsabilidades §4.1', () => {
   // Fila = capacidad, columnas = [ventas, pricing, admin, operaciones]
@@ -134,5 +134,37 @@ describe('integridad de la matriz', () => {
     Object.values(CAPACIDADES_POR_ROL).flat().forEach(cap => {
       expect(TODAS_LAS_CAPACIDADES).toContain(cap);
     });
+  });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ver ≠ dar de alta.
+//
+// Decisiones tomadas con Mau el 27-ago-2026. Están aquí y no solo en un comentario
+// porque un rebase o un refactor de vistas puede borrarlas sin que nadie lo note.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('vista vs. capacidad de alta', () => {
+  it('Pricing VE el catálogo de puertos pero NO puede darlos de alta', () => {
+    // La matriz restringe «Alta de puertos», no la consulta. Pricing necesita el
+    // catálogo para capturar la ruta de una tarifa marítima.
+    expect(isViewAllowed('pricing', 'puertos')).toBe(true);
+    expect(puede('pricing', 'puerto.alta')).toBe(false);
+  });
+
+  it('Pricing NO tiene sección independiente de Documentos', () => {
+    // «Los documentos deberían generarse dentro del embarque o cotización.»
+    expect(isViewAllowed('pricing', 'documents')).toBe(false);
+  });
+
+  it('Pricing entra al módulo de Tarifas: la matriz le da gestionarlas', () => {
+    expect(isViewAllowed('pricing', 'rates')).toBe(true);
+    expect(puede('pricing', 'tarifa.gestionar')).toBe(true);
+    expect(puede('pricing', 'tarifario.cargar')).toBe(true);
+  });
+
+  it('Ventas VE clientes pero NO puede darlos de alta', () => {
+    expect(isViewAllowed('ventas', 'clients')).toBe(true);
+    expect(puede('ventas', 'cliente.alta')).toBe(false);
   });
 });
