@@ -33,6 +33,7 @@ describe('matriz de responsabilidades §4.1', () => {
     ['factura.generar',      ['operaciones', 'administracion', 'admin']],
     ['notaCredito.generar',  ['operaciones', 'administracion', 'admin']],
     ['kanban.ver',           ['ventas', 'admin']],
+    ['catalogo.importarMasivo', ['admin']],
   ];
 
   const ROLES: UserRole[] = ['ventas', 'pricing', 'operaciones', 'administracion', 'admin'];
@@ -96,6 +97,22 @@ describe('reglas duras que el cliente subrayó', () => {
     expect(puede('admin', 'cliente.alta')).toBe(true);
     expect(puede('admin', 'cotizacion.crear')).toBe(true);
     expect(puede('admin', 'embarque.generar')).toBe(true);
+  });
+
+  it('la importación masiva de catálogos es exclusiva de admin', () => {
+    // Sobrescribe ~817 clientes vivos contra la base en uso. Los datos llevan
+    // semanas cargados: el botón ya cumplió su función y hoy solo puede dañar.
+    // Ni siquiera Administración, que sí da altas una por una, lo tiene.
+    const AREAS: UserRole[] = ['ventas', 'pricing', 'operaciones', 'administracion'];
+    AREAS.forEach(rol => {
+      expect(puede(rol, 'catalogo.importarMasivo')).toBe(false);
+    });
+    expect(puede('admin', 'catalogo.importarMasivo')).toBe(true);
+  });
+
+  it('dar altas una por una NO implica poder sobrescribir el catálogo', () => {
+    expect(puede('administracion', 'cliente.alta')).toBe(true);
+    expect(puede('administracion', 'catalogo.importarMasivo')).toBe(false);
   });
 
   it('el alta rápida de proveedor (probable proveedor) sí es de Pricing', () => {

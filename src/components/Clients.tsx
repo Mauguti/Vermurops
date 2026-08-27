@@ -16,19 +16,35 @@ export default function Clients() {
   const { puede } = useAuth();
   const puedeAltaCliente = puede('cliente.alta');
   const puedeAltaProveedor = puede('proveedor.alta');
+  // Herramienta de mantenimiento, no función de negocio: solo superusuario.
+  const puedeImportarCatalogo = puede('catalogo.importarMasivo');
 
-  const { clientes, loading, error, createCliente, updateCliente, importarClientesDesdeJSON } = useClientes();
+  const {
+    clientes, loading, error,
+    createCliente, updateCliente,
+    analizarImportacionClientes, importarClientesDesdeJSON,
+  } = useClientes();
   const [seedingClientes, setSeedingClientes] = useState(false);
 
   const handleSeedClientes = useCallback(async () => {
-    const ok = window.confirm(
-      'Se importarán ~817 clientes de Magaya a Firestore.\n\n' +
-      'Los IDs se preservan — si ya existen, se sobrescriben.\n\n' +
-      '¿Continuar?'
-    );
-    if (!ok) return;
     setSeedingClientes(true);
     try {
+      // Contar primero: la confirmación tiene que decir cuántos registros VIVOS
+      // se pisan, no un aproximado. Es una escritura contra la base en uso.
+      const { total, aSobrescribir, nuevos } = await analizarImportacionClientes();
+
+      const ok = window.confirm(
+        `IMPORTAR CATÁLOGO DE CLIENTES DESDE MAGAYA\n\n` +
+        `Se escribirán ${total} registros:\n` +
+        `  • ${aSobrescribir} SOBRESCRIBEN clientes que ya existen\n` +
+        `  • ${nuevos} son nuevos\n\n` +
+        `Los ${aSobrescribir} que se sobrescriben son registros con los que el ` +
+        `equipo está trabajando ahora mismo. Todo cambio hecho sobre ellos desde ` +
+        `la última carga se pierde.\n\n` +
+        `Esta acción no se puede deshacer. ¿Continuar?`
+      );
+      if (!ok) return;
+
       const count = await importarClientesDesdeJSON();
       window.alert(`Importación completa: ${count} clientes escritos.`);
     } catch (err) {
@@ -36,7 +52,7 @@ export default function Clients() {
     } finally {
       setSeedingClientes(false);
     }
-  }, [importarClientesDesdeJSON]);
+  }, [analizarImportacionClientes, importarClientesDesdeJSON]);
   const { proveedores, loading: loadingProv, error: errorProv, createProveedor, updateProveedor } = useProveedores();
   const { quotes } = useCotizaciones();
   const [viewType, setViewType] = useState<'Clientes' | 'Proveedores'>('Clientes');
@@ -194,26 +210,30 @@ export default function Clients() {
               </label>
               <span className="text-[11px] text-text-muted tabular-nums">{filteredClients.length} de {clientes.length}</span>
             </div>
-            {/* Importar Magaya escribe ~817 clientes: es el alta más masiva
-                que hay en la app. Va detrás de la misma capacidad. */}
-            {puedeAltaCliente && (
-              <div className="flex items-center space-x-[12px]">
+            <div className="flex items-center space-x-[12px]">
+              {/* Importar Magaya sobrescribe el catálogo completo contra la base
+                  en uso. Los datos ya están cargados: hoy solo puede hacer daño.
+                  Mantenimiento, no negocio → solo superusuario. */}
+              {puedeImportarCatalogo && (
                 <button
                   onClick={handleSeedClientes}
                   disabled={seedingClientes}
-                  className="flex items-center bg-white border border-card-border text-text-primary px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-neutral-bg shadow-sm transition-colors shrink-0 disabled:opacity-60"
+                  title="Sobrescribe el catálogo de clientes con el seed de Magaya"
+                  className="flex items-center bg-white border border-danger-text/30 text-danger-text px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-danger-bg shadow-sm transition-colors shrink-0 disabled:opacity-60"
                 >
-                  {seedingClientes ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2 text-text-muted" />}
+                  {seedingClientes ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2" />}
                   {seedingClientes ? 'Importando…' : 'Importar Magaya'}
                 </button>
+              )}
+              {puedeAltaCliente && (
                 <button
                   onClick={() => setShowModal(true)}
                   className="bg-brand text-white px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-brand-hover shadow-sm transition-colors shrink-0"
                 >
                   Nuevo cliente
                 </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[24px]">

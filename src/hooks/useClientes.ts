@@ -7,7 +7,8 @@
  *  1. Abre un listener onSnapshot sobre la colección 'clientes'.
  *  2. Si la colección está vacía (primera vez), escribe el seed de
  *     initialClientes usando setDoc → preserva el id como document ID.
- *  3. Expone { clientes, loading, error, createCliente, updateCliente, importarClientesDesdeJSON }.
+ *  3. Expone { clientes, loading, error, createCliente, updateCliente,
+ *     analizarImportacionClientes, importarClientesDesdeJSON }.
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -94,6 +95,31 @@ export function useClientes() {
   };
 
   /**
+   * Cuenta qué haría la importación ANTES de ejecutarla, para poder confirmar
+   * con números reales en vez de un aproximado.
+   *
+   * 'aSobrescribir' es el dato que importa: son documentos vivos con los que
+   * el equipo está trabajando y que la importación pisa.
+   */
+  const analizarImportacionClientes = useCallback(async (): Promise<{
+    total: number;
+    aSobrescribir: number;
+    nuevos: number;
+  }> => {
+    exigir(user?.rol as UserRole | undefined, 'catalogo.importarMasivo');
+
+    const { default: rawClientes } = await import('../data/seeds/clientes.json');
+    const existentes = new Set(clientes.map(c => c.id));
+    const aSobrescribir = rawClientes.filter(r => existentes.has(r.id)).length;
+
+    return {
+      total: rawClientes.length,
+      aSobrescribir,
+      nuevos: rawClientes.length - aSobrescribir,
+    };
+  }, [user?.rol, clientes]);
+
+  /**
    * Importa clientes desde el JSON de Magaya.
    * - setDoc con id preservado → idempotente (re-ejecutar no duplica).
    * - Mapea diasCredito.general → dias, guarda objeto completo como diasCreditoPorTipo.
@@ -101,9 +127,9 @@ export function useClientes() {
    * - Retorna cantidad importada.
    */
   const importarClientesDesdeJSON = useCallback(async (): Promise<number> => {
-    // Es el alta más masiva de la app (~817 documentos) y no pasa por
-    // createCliente, así que necesita su propia guarda.
-    exigir(user?.rol as UserRole | undefined, 'cliente.alta');
+    // Sobrescribe el catálogo completo contra la base en uso. No es un alta
+    // de negocio sino mantenimiento: exclusiva de 'admin', no de Administración.
+    exigir(user?.rol as UserRole | undefined, 'catalogo.importarMasivo');
 
     const { default: rawClientes } = await import('../data/seeds/clientes.json');
 
@@ -150,5 +176,9 @@ export function useClientes() {
     return count;
   }, [user?.rol]);
 
-  return { clientes, loading, error, createCliente, updateCliente, importarClientesDesdeJSON };
+  return {
+    clientes, loading, error,
+    createCliente, updateCliente,
+    analizarImportacionClientes, importarClientesDesdeJSON,
+  };
 }

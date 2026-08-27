@@ -279,6 +279,26 @@ opción y espera validación**:
 
 ## 6. Deuda técnica conocida
 
+**🔴 CRÍTICO — No hay entorno de desarrollo: localhost escribe en producción.**
+`src/firebase.ts` apunta a `vermur-logistics-app` sin condicionar por entorno.
+`npm run dev` en localhost lee y escribe la MISMA base que el equipo de Vermur
+está usando. No hay staging, ni emuladores, ni proyecto de pruebas.
+
+Consecuencias diarias: cualquier prueba de un alta crea un registro real;
+cualquier prueba de la máquina de estados mueve una cotización real; y una
+importación masiva lanzada «para ver qué hace» sobrescribe el catálogo vivo.
+
+Salidas, de menor a mayor esfuerzo:
+  1. Emuladores de Firebase en local (`firebase emulators:start`) con
+     `connectFirestoreEmulator` cuando `import.meta.env.DEV`. Aísla local sin
+     tocar la infraestructura, pero arranca con la base vacía.
+  2. Segundo proyecto Firebase de staging con una copia de los datos, elegido
+     por variable de entorno. Es lo correcto a mediano plazo; cuesta plan Blaze
+     aparte y mantener la copia.
+
+Mientras no exista: **avisar antes de cualquier prueba que escriba**, y tratar
+toda acción destructiva como si fuera en producción, porque lo es.
+
 **🔴 CRÍTICO — Las reglas de Firestore no distinguen roles.**
 Hoy toda colección se protege con `allow read, write: if request.auth != null`.
 Cualquier usuario autenticado —da igual su rol— puede leer y escribir cualquier

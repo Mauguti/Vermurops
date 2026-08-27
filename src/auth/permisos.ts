@@ -28,6 +28,8 @@ export type Capacidad =
   | 'tarifa.gestionar'        // Alta/edición del catálogo de tarifas
   | 'tarifario.cargar'        // Carga masiva de tarifarios
   | 'proveedor.altaRapida'    // «Probable proveedor» sin RFC, queda en revisión
+  // Solo superusuario
+  | 'catalogo.importarMasivo' // Sobrescribir un catálogo completo desde los seeds
   // Administración
   | 'cliente.alta'            // Alta definitiva de cliente
   | 'proveedor.alta'          // Alta definitiva de proveedor
@@ -45,6 +47,7 @@ export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
   'tarifa.gestionar',
   'tarifario.cargar',
   'proveedor.altaRapida',
+  'catalogo.importarMasivo',
   'cliente.alta',
   'proveedor.alta',
   'puerto.alta',
@@ -75,6 +78,12 @@ export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
  *
  *  - `factura.generar` la comparten Administración y Operaciones: es la única
  *    celda de la matriz con dos áreas marcadas.
+ *
+ *  - `catalogo.importarMasivo` NO está en la matriz del cliente: es una
+ *    herramienta de mantenimiento, no una función del negocio. Sobrescribe
+ *    catálogos completos (~817 clientes) contra la base que el equipo está
+ *    usando. Los datos ya están cargados desde hace semanas, así que hoy solo
+ *    puede hacer daño. Queda exclusiva de 'admin'.
  */
 export const CAPACIDADES_POR_ROL: Record<UserRole, Capacidad[]> = {
   ventas: [
@@ -95,6 +104,7 @@ export const CAPACIDADES_POR_ROL: Record<UserRole, Capacidad[]> = {
     'notaCredito.generar',
   ],
   // El área: concentra las tres altas definitivas y la facturación.
+  // OJO: sin 'catalogo.importarMasivo' — ver la nota de arriba.
   administracion: [
     'cliente.alta',
     'proveedor.alta',
