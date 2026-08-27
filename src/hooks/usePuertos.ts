@@ -15,6 +15,8 @@ import { db } from '../firebase';
 import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { PuertoVermur, initialPuertos } from '../components/puertos/PuertosData';
 import { useAuth } from '../auth/AuthContext';
+import { exigir } from '../auth/permisos';
+import { UserRole } from '../auth/users';
 
 export function usePuertos() {
   const { user } = useAuth();
@@ -76,7 +78,9 @@ export function usePuertos() {
 
   // ── Writes ───────────────────────────────────────────────────────────────
 
+  /** Alta de puerto. Solo Administración (matriz §4.1). */
   const createPuerto = async (puerto: PuertoVermur): Promise<void> => {
+    exigir(user?.rol as UserRole | undefined, 'puerto.alta');
     await setDoc(doc(db, 'puertos', puerto.id), puerto);
   };
 

@@ -16,6 +16,8 @@ import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firesto
 import { ClienteVermur, initialClientes } from '../components/clientes/ClientesData';
 import type { DiasCredito } from '../components/proveedores/ProveedoresData';
 import { useAuth } from '../auth/AuthContext';
+import { exigir } from '../auth/permisos';
+import { UserRole } from '../auth/users';
 
 export function useClientes() {
   const { user } = useAuth();
@@ -78,7 +80,12 @@ export function useClientes() {
 
   // ── Writes ───────────────────────────────────────────────────────────────
 
+  /**
+   * Alta de cliente. Solo Administración (matriz §4.1).
+   * La guarda vive aquí y no en el botón: cualquier call site queda cubierto.
+   */
   const createCliente = async (cliente: ClienteVermur): Promise<void> => {
+    exigir(user?.rol as UserRole | undefined, 'cliente.alta');
     await setDoc(doc(db, 'clientes', cliente.id), cliente);
   };
 

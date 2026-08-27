@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { AuthUser, isViewAllowed, UserRole } from './users';
+import { Capacidad, puede as puedeCapacidad } from './permisos';
 import { auth } from '../firebase';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -11,12 +12,21 @@ interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
   logout: () => Promise<void>;
+  /** ¿El rol tiene acceso a la VISTA/módulo? (ALLOWED_VIEWS_BY_ROLE) */
   isAllowed: (view: string) => boolean;
+  /** ¿El rol puede ejecutar la ACCIÓN? (matriz de capacidades, permisos.ts) */
+  puede: (cap: Capacidad) => boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-/** Mapeo temporal de correo → rol. Se elimina cuando custom claims esté activo (GU). */
+/**
+ * Mapeo temporal de correo → rol. Se elimina cuando custom claims esté activo (GU).
+ *
+ * Cualquier correo NO listado cae en ROL_FALLBACK, que debe ser siempre el rol
+ * de MENOR alcance. Nunca poner aquí un fallback con más permisos: un correo
+ * mal escrito no puede convertirse en un ascenso.
+ */
 const _ROL_POR_EMAIL_RAW: Record<string, UserRole> = {
   // ── Cuentas de prueba ──
   "admin@vermur.com":            "admin",
@@ -36,8 +46,18 @@ const ROL_POR_EMAIL: Record<string, UserRole> = Object.fromEntries(
   Object.entries(_ROL_POR_EMAIL_RAW).map(([k, v]) => [k.toLowerCase().trim(), v]),
 );
 
-const getRolByEmail = (email: string): UserRole =>
-  ROL_POR_EMAIL[email.toLowerCase().trim()] ?? "ventas";
+const ROL_FALLBACK: UserRole = "ventas";
+
+const getRolByEmail = (email: string): UserRole => {
+  const rol = ROL_POR_EMAIL[email.toLowerCase().trim()];
+  if (rol) return rol;
+  // Aviso en consola: un correo fuera del mapa es casi siempre un alta que se
+  // olvidó registrar aquí, y el síntoma (ve de menos) es difícil de diagnosticar.
+  console.warn(
+    `[auth] «${email}» no está en el mapa de roles; se asigna «${ROL_FALLBACK}» (mínimo alcance).`,
+  );
+  return ROL_FALLBACK;
+};
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -83,6 +103,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user]
   );
 
+  const puede = useCallback(
+    (cap: Capacidad) => puedeCapacidad(user?.rol as UserRole | undefined, cap),
+    [user]
+  );
+
   if (loading) return (
     <div style={{
       display: "flex", 
@@ -99,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <AuthContext.Provider value={{ user, loading, logout, isAllowed }}>
+    <AuthContext.Provider value={{ user, loading, logout, isAllowed, puede }}>
       {children}
     </AuthContext.Provider>
   );

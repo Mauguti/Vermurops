@@ -16,6 +16,8 @@ import { db } from '../firebase';
 import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { ProveedorVermur, initialProveedores } from '../components/proveedores/ProveedoresData';
 import { useAuth } from '../auth/AuthContext';
+import { exigir } from '../auth/permisos';
+import { UserRole } from '../auth/users';
 
 export function useProveedores() {
   const { user } = useAuth();
@@ -77,7 +79,19 @@ export function useProveedores() {
 
   // ── Writes ───────────────────────────────────────────────────────────────
 
-  const createProveedor = async (proveedor: ProveedorVermur): Promise<void> => {
+  /**
+   * Alta de proveedor.
+   *
+   *  - modo 'definitiva' (default): alta formal del catálogo. Solo Admin.
+   *  - modo 'rapida': «probable proveedor» que Pricing captura dentro de la
+   *    cotización; queda pendiente de validación por Administración (§6).
+   */
+  const createProveedor = async (
+    proveedor: ProveedorVermur,
+    opts?: { modo?: 'definitiva' | 'rapida' },
+  ): Promise<void> => {
+    const rol = user?.rol as UserRole | undefined;
+    exigir(rol, opts?.modo === 'rapida' ? 'proveedor.altaRapida' : 'proveedor.alta');
     await setDoc(doc(db, 'proveedores', proveedor.id), proveedor);
   };
 

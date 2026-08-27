@@ -10,14 +10,14 @@ import FichaCotizacion from './FichaCotizacion';
 import { useNotifications } from '../../notifications/NotificationsContext';
 import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
 import { generateFolio } from '../../lib/folioService';
-import { puedeTransicionarA } from '../../lib/stateMachine';
+import { puedeTransicionarA, type Rol } from '../../lib/stateMachine';
 
 interface KanbanCotizacionesProps {
   quotes: KanbanQuote[];
   onUpdateQuotes: (quotes: KanbanQuote[]) => void;
   onConvertToShipment: (quote: KanbanQuote) => void;
   /** Rol activo del usuario simulado */
-  rolActivo: 'ventas' | 'pricing' | 'admin';
+  rolActivo: Rol;
   onFichaVisible?: (visible: boolean) => void;
 }
 

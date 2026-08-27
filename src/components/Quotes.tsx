@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { initialQuotes, initialClients, initialProspectos, Prospecto } from '../data';
 import { X, Plus, Search, Filter, Download, Upload, List, LayoutGrid, MessageSquare } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { UserRole } from '../auth/users';
 import KanbanCotizaciones from './quotes/KanbanCotizaciones';
 import BandejaPricing from './quotes/BandejaPricing';
 import KanbanProspeccion from './quotes/KanbanProspeccion';
@@ -26,7 +27,7 @@ import VistaSelector from './table/VistaSelector';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function Quotes() {
-  const { user } = useAuth();
+  const { user, puede } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [showProspectForm, setShowProspectForm] = useState(false);
   const { serviciosActivos } = useServicios();
@@ -35,12 +36,20 @@ export default function Quotes() {
   const chatUnreadCount = notificaciones.filter(n => n.tipo === 'chat' && !n.leida).length;
 
   // Rol activo derivado del usuario autenticado
-  const rolActivo: 'ventas' | 'pricing' | 'admin' = user?.rol === 'admin' ? 'admin' : (user?.rol === 'pricing' ? 'pricing' : 'ventas');
+  const rolActivo: UserRole = user?.rol ?? 'ventas';
   const isAdmin = rolActivo === 'admin';
+
+  // Capacidades (matriz §4.1) — qué acciones habilita la pantalla.
+  const puedeCrearLead     = puede('lead.crear');
+  const puedeSolicitar     = puede('cotizacion.solicitar');
+  const puedeCrear         = puede('cotizacion.crear');
+  const puedeVerKanban     = puede('kanban.ver');
+  const puedeVerBandeja    = puede('cotizacion.crear'); // Bandeja Pricing = quien cotiza
 
   let defaultView: 'kanban' | 'pricing' | 'lista' | 'prospeccion' = 'kanban';
   if (rolActivo === 'ventas') defaultView = 'prospeccion';
-  else if (rolActivo === 'pricing') defaultView = 'kanban';
+  else if (rolActivo === 'pricing') defaultView = 'pricing';
+  else if (rolActivo === 'operaciones') defaultView = 'kanban';
   else if (isAdmin) defaultView = 'prospeccion';
 
   const [viewMode, setViewMode] = useState<'kanban' | 'pricing' | 'lista' | 'prospeccion'>(defaultView);
@@ -368,8 +377,10 @@ export default function Quotes() {
                 <div className="flex items-center gap-3">
                   {(viewMode === 'prospeccion' || viewMode === 'kanban') && (
                     <>
-                      {/* Toggle sub-vista: Lista / Kanban */}
-                      <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                      {/* Toggle sub-vista: Lista / Kanban.
+                          §4.1: «Consultar Kanban» es de Ventas (y Admin).
+                          Pricing trabaja desde Bandeja Pricing y lista. */}
+                      <div className={`items-center bg-gray-100 rounded-lg p-0.5 ${puedeVerKanban ? 'flex' : 'hidden'}`}>
                         <button
                           onClick={() => setSubView('tabla')}
                           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-semibold transition-all ${
@@ -404,26 +415,31 @@ export default function Quotes() {
                         </>
                       )}
 
-                      {rolActivo !== 'pricing' && (
+                      {(puedeCrearLead || puedeSolicitar) && (
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setShowProspectForm(true)}
-                            className="bg-white border border-[#E11D48] text-[#E11D48] px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#E11D48]/5 transition-colors shadow-sm flex items-center gap-2"
-                          >
-                            <Plus className="w-4 h-4" /> Nuevo prospecto
-                          </button>
-                          <button
-                            onClick={() => setShowForm(true)}
-                            className="bg-[#E11D48] text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#BE123C] transition-colors shadow-sm flex items-center gap-2"
-                          >
-                            <Plus className="w-4 h-4" /> Nueva cotización
-                          </button>
+                          {puedeCrearLead && (
+                            <button
+                              onClick={() => setShowProspectForm(true)}
+                              className="bg-white border border-[#E11D48] text-[#E11D48] px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#E11D48]/5 transition-colors shadow-sm flex items-center gap-2"
+                            >
+                              <Plus className="w-4 h-4" /> Nuevo prospecto
+                            </button>
+                          )}
+                          {puedeSolicitar && (
+                            <button
+                              onClick={() => setShowForm(true)}
+                              className="bg-[#E11D48] text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#BE123C] transition-colors shadow-sm flex items-center gap-2"
+                            >
+                              <Plus className="w-4 h-4" />
+                              {puedeCrear ? 'Nueva cotización' : 'Solicitar cotización'}
+                            </button>
+                          )}
                         </div>
                       )}
                     </>
                   )}
 
-                  {viewMode === 'pricing' && rolActivo !== 'pricing' && (
+                  {viewMode === 'pricing' && puedeCrear && (
                     <button
                       onClick={() => setShowForm(true)}
                       className="bg-[#E11D48] text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#BE123C] transition-colors shadow-sm flex items-center gap-2"
@@ -454,22 +470,22 @@ export default function Quotes() {
 
               {/* Fila inferior: Tabs */}
               <div className="flex gap-6 -mb-[1px]">
-                {/* Ventas y Admin ven Prospección — Pricing NO */}
-                {rolActivo !== 'pricing' && (
+                {/* Prospectos: solo quien crea leads (Ventas y Admin) */}
+                {puedeCrearLead && (
                   <ViewButton
                     active={viewMode === 'prospeccion'}
                     onClick={() => setViewMode('prospeccion')}
                     label="Prospectos"
                   />
                 )}
-                {/* Todos ven Negociación */}
+                {/* Cotizaciones: todos los roles con acceso al módulo */}
                 <ViewButton
                   active={viewMode === 'kanban'}
                   onClick={() => setViewMode('kanban')}
                   label="Cotizaciones"
                 />
-                {/* Pricing y Admin ven Bandeja Pricing */}
-                {(rolActivo === 'pricing' || isAdmin) && (
+                {/* Bandeja Pricing: quien cotiza (Pricing y Admin) */}
+                {puedeVerBandeja && (
                   <ViewButton
                     active={viewMode === 'pricing'}
                     onClick={() => setViewMode('pricing')}
@@ -805,7 +821,7 @@ export default function Quotes() {
           />
         ) : (
         <>
-          {subView === 'kanban' ? (
+          {subView === 'kanban' && puedeVerKanban ? (
             /* ── Sub-vista Kanban ── */
             viewMode === 'prospeccion' ? (
               <KanbanProspeccion

@@ -16,7 +16,7 @@ import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
 import { useServicios, renderIcon } from '../../config/serviciosStore';
 import { useClientes } from '../../hooks/useClientes';
 import { calcLinea } from '../../lib/cotizacionCalculator';
-import { puedeTransicionarA, transicionesDisponibles } from '../../lib/stateMachine';
+import { puedeTransicionarA, transicionesDisponibles, type Rol } from '../../lib/stateMachine';
 import { useTarifas } from '../../hooks/useTarifas';
 import { useConceptos } from '../../hooks/useConceptos';
 import { ServicioSection } from './ServicioSection';
@@ -40,7 +40,7 @@ interface FichaCotizacionProps {
   onUpdateQuote: (quote: KanbanQuote) => void;
   onConvertToShipment: (quote: KanbanQuote) => void;
   /** Rol activo del usuario (Ventas o Pricing) */
-  rolActivo: 'ventas' | 'pricing' | 'admin';
+  rolActivo: Rol;
 }
 
 // ─── Forward-advance config (Pre-TA: footer fix) ─────────────────────────────

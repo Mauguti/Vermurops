@@ -9,11 +9,12 @@ import type { ProveedorComparativa } from './ComparativaPricing';
 import type { TarifaVermur } from '../tarifas/TarifasData';
 import type { ConceptoVermur } from '../conceptos/ConceptosData';
 import { ConceptoSection } from './ConceptoSection';
+import { type Rol } from '../../lib/stateMachine';
 
 export interface ServicioSectionProps {
   key?: React.Key;
   servicio: ServicioSolicitado;
-  rolActivo: 'ventas' | 'pricing' | 'admin';
+  rolActivo: Rol;
   onUpdateServicio: (updated: ServicioSolicitado) => void;
   servicios: any[];
   renderIcon: any;

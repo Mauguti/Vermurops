@@ -42,6 +42,15 @@ const ROLE_LABEL: Record<string, string> = {
   admin: 'Admin',
 };
 
+// Color del badge por rol (evita la cadena de ternarios en el markup).
+const ROLE_BADGE_STYLE: Record<string, { background: string; color: string }> = {
+  admin:          { background: '#FEE2E2', color: '#B91C1C' },
+  administracion: { background: '#F0FDF4', color: '#15803D' },
+  pricing:        { background: '#EFF6FF', color: '#1D4ED8' },
+  operaciones:    { background: '#ECFDF5', color: '#047857' },
+  ventas:         { background: '#FFF7ED', color: '#C2410C' },
+};
+
 // ─── View title map ───────────────────────────────────────────────────────────
 const VIEW_LABELS: Record<string, string> = {
   dashboard: 'Vista general',
@@ -214,15 +223,7 @@ function UserMenu({ onNavigate }: { onNavigate: (view: string) => void }) {
             <p className="text-[11px] text-[#71717A] mt-[2px]">{user.email}</p>
             <span
               className="inline-block mt-[6px] text-[10px] font-bold uppercase tracking-wider px-[8px] py-[2px] rounded-[4px]"
-              style={
-                user.rol === 'admin'
-                  ? { background: '#FEE2E2', color: '#B91C1C' }
-                  : user.rol === 'pricing'
-                  ? { background: '#EFF6FF', color: '#1D4ED8' }
-                  : user.rol === 'administracion'
-                  ? { background: '#F0FDF4', color: '#15803D' }
-                  : { background: '#FFF7ED', color: '#C2410C' }
-              }
+              style={ROLE_BADGE_STYLE[user.rol] ?? ROLE_BADGE_STYLE.ventas}
             >
               {roleLabel}
             </span>

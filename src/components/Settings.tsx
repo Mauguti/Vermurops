@@ -21,14 +21,17 @@ export default function Settings() {
   const [newSrvIcono, setNewSrvIcono] = useState('Box');
   const [newSrvDesc, setNewSrvDesc] = useState('');
 
-  const isRestrictedRole = user?.rol === 'ventas' || user?.rol === 'pricing';
+  // Solo 'admin' (superusuario técnico) ve la configuración completa.
+  // 'administracion' es un área de la operación, no un superusuario.
+  const isRestrictedRole = !!user && user.rol !== 'admin';
   const isAdmin = user?.rol === 'admin';
 
   const ROLE_BADGE: Record<string, { label: string; bg: string; color: string }> = {
     ventas:         { label: 'Ventas',         bg: '#FFF7ED', color: '#C2410C' },
     pricing:        { label: 'Pricing',        bg: '#EFF6FF', color: '#1D4ED8' },
+    operaciones:    { label: 'Operaciones',    bg: '#ECFDF5', color: '#047857' },
     administracion: { label: 'Administración', bg: '#F0FDF4', color: '#15803D' },
-    admin:          { label: 'Admin',           bg: '#FEE2E2', color: '#B91C1C' },
+    admin:          { label: 'Admin',          bg: '#FEE2E2', color: '#B91C1C' },
   };
 
   // ── Vista de perfil para roles restringidos ───────────────────────────────

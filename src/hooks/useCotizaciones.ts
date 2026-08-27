@@ -23,6 +23,8 @@ import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firesto
 import { KanbanQuote, initialKanbanQuotes } from '../components/quotes/QuotesData';
 import { initContadorDesdeFolios } from '../lib/folioService';
 import { useAuth } from '../auth/AuthContext';
+import { puedeCrearCotizacion, PermisoDenegadoError } from '../auth/permisos';
+import { UserRole } from '../auth/users';
 
 export function useCotizaciones() {
   const { user } = useAuth();
@@ -95,7 +97,21 @@ export function useCotizaciones() {
 
   // ── Writes ───────────────────────────────────────────────────────────────
 
+  /**
+   * Creación de cotización.
+   *
+   * Ventas SOLICITA (la cotización nace en etapa de solicitud); Pricing y Admin
+   * pueden abrirla en cualquier etapa; Operaciones no crea cotizaciones.
+   */
   const createCotizacion = async (quote: KanbanQuote): Promise<void> => {
+    const rol = user?.rol as UserRole | undefined;
+    if (!puedeCrearCotizacion(rol, quote.etapa)) {
+      throw new PermisoDenegadoError(
+        rol,
+        'cotizacion.crear',
+        `El rol «${rol ?? 'sin sesión'}» no puede crear cotizaciones en la etapa «${quote.etapa}».`,
+      );
+    }
     await setDoc(doc(db, 'cotizaciones', quote.id), quote);
   };
 

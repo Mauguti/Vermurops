@@ -16,7 +16,12 @@ import { KanbanQuote, PipelineStageId } from '../components/quotes/QuotesData';
 
 // ─── Tipos internos ────────────────────────────────────────────────────────────
 
-type Rol = 'ventas' | 'pricing' | 'admin';
+/**
+ * Roles que pueden mover el pipeline.
+ * 'operaciones' se incluye por completitud del tipo: no aparece en ninguna
+ * transición, así que no puede mover cotizaciones — que es lo correcto.
+ */
+export type Rol = 'ventas' | 'pricing' | 'operaciones' | 'admin';
 
 interface TransitionDef {
   hacia: PipelineStageId;

@@ -410,7 +410,8 @@ export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
       {showAltaRapida && (
         <AltaRapidaProveedorModal
           onClose={() => setShowAltaRapida(false)}
-          onCreate={createProveedor}
+          // Alta rápida = «probable proveedor» (Pricing). No es alta definitiva.
+          onCreate={p => createProveedor(p, { modo: 'rapida' })}
           modalidadContexto={altaRapidaModalidad}
           onCreated={(_id, nombre) => {
             setNewProvName(nombre);

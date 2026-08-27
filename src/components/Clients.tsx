@@ -8,8 +8,15 @@ import FichaCliente from './clientes/FichaCliente';
 import NuevoClienteModal from './clientes/NuevoClienteModal';
 import ProveedorFormModal from './proveedores/ProveedorFormModal';
 import FichaProveedor from './proveedores/FichaProveedor';
+import { useAuth } from '../auth/AuthContext';
 
 export default function Clients() {
+  // Matriz §4.1: las altas definitivas de clientes y proveedores son solo de
+  // Administración. Los demás roles entran a consultar.
+  const { puede } = useAuth();
+  const puedeAltaCliente = puede('cliente.alta');
+  const puedeAltaProveedor = puede('proveedor.alta');
+
   const { clientes, loading, error, createCliente, updateCliente, importarClientesDesdeJSON } = useClientes();
   const [seedingClientes, setSeedingClientes] = useState(false);
 
@@ -187,22 +194,26 @@ export default function Clients() {
               </label>
               <span className="text-[11px] text-text-muted tabular-nums">{filteredClients.length} de {clientes.length}</span>
             </div>
-            <div className="flex items-center space-x-[12px]">
-              <button
-                onClick={handleSeedClientes}
-                disabled={seedingClientes}
-                className="flex items-center bg-white border border-card-border text-text-primary px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-neutral-bg shadow-sm transition-colors shrink-0 disabled:opacity-60"
-              >
-                {seedingClientes ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2 text-text-muted" />}
-                {seedingClientes ? 'Importando…' : 'Importar Magaya'}
-              </button>
-              <button
-                onClick={() => setShowModal(true)}
-                className="bg-brand text-white px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-brand-hover shadow-sm transition-colors shrink-0"
-              >
-                Nuevo cliente
-              </button>
-            </div>
+            {/* Importar Magaya escribe ~817 clientes: es el alta más masiva
+                que hay en la app. Va detrás de la misma capacidad. */}
+            {puedeAltaCliente && (
+              <div className="flex items-center space-x-[12px]">
+                <button
+                  onClick={handleSeedClientes}
+                  disabled={seedingClientes}
+                  className="flex items-center bg-white border border-card-border text-text-primary px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-neutral-bg shadow-sm transition-colors shrink-0 disabled:opacity-60"
+                >
+                  {seedingClientes ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Database className="w-4 h-4 mr-2 text-text-muted" />}
+                  {seedingClientes ? 'Importando…' : 'Importar Magaya'}
+                </button>
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="bg-brand text-white px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-brand-hover shadow-sm transition-colors shrink-0"
+                >
+                  Nuevo cliente
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[24px]">
@@ -314,14 +325,16 @@ export default function Clients() {
                 className="w-full pl-[36px] pr-[12px] py-[10px] outline-none text-[14px] bg-card border border-card-border rounded-[8px] focus:border-brand focus:ring-1 focus:ring-brand shadow-sm text-text-primary"
               />
             </div>
-            <div className="flex items-center space-x-[12px]">
-              <button
-                onClick={() => setShowProvModal('crear')}
-                className="bg-brand text-white px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-brand-hover shadow-sm transition-colors shrink-0"
-              >
-                Nuevo proveedor
-              </button>
-            </div>
+            {puedeAltaProveedor && (
+              <div className="flex items-center space-x-[12px]">
+                <button
+                  onClick={() => setShowProvModal('crear')}
+                  className="bg-brand text-white px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-brand-hover shadow-sm transition-colors shrink-0"
+                >
+                  Nuevo proveedor
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Grid de proveedores */}

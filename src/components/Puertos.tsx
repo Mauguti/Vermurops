@@ -3,8 +3,13 @@ import { Plus, Search, Pencil, Anchor } from 'lucide-react';
 import { usePuertos } from '../hooks/usePuertos';
 import { PuertoVermur } from './puertos/PuertosData';
 import PuertoFormModal from './puertos/PuertoFormModal';
+import { useAuth } from '../auth/AuthContext';
 
 export default function Puertos() {
+  // Matriz §4.1: el alta de puertos es solo de Administración.
+  const { puede } = useAuth();
+  const puedeAltaPuerto = puede('puerto.alta');
+
   const { puertos, loading, error, createPuerto, updatePuerto } = usePuertos();
 
   const [search, setSearch] = useState('');
@@ -59,13 +64,15 @@ export default function Puertos() {
             {filtered.length} puerto{filtered.length !== 1 ? 's' : ''} · {puertos.filter(p => p.activo).length} activos
           </p>
         </div>
-        <button
-          onClick={() => setModal({ mode: 'crear' })}
-          className="flex items-center gap-2 bg-brand text-white px-4 py-2 rounded-[8px] text-[13px] font-medium hover:bg-brand-hover transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          Nuevo puerto
-        </button>
+        {puedeAltaPuerto && (
+          <button
+            onClick={() => setModal({ mode: 'crear' })}
+            className="flex items-center gap-2 bg-brand text-white px-4 py-2 rounded-[8px] text-[13px] font-medium hover:bg-brand-hover transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo puerto
+          </button>
+        )}
       </div>
 
       {/* ── Filters ────────────────────────────────────────────────────────── */}
