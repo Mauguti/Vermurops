@@ -122,6 +122,22 @@ patrón que usamos: helper que intenta el campo nuevo y cae al viejo (ver `getOf
 por correo y Pricing la abre directamente, sin forzar el paso de solicitud previa). Recibe
 solicitudes de clientes directos y agentes de carga, no solo de Ventas.
 
+**Corrección a la matriz (28-ago-2026): Pricing tambien CIERRA sus cotizaciones.**
+La maquina de estados restringia `ganada` a Ventas y Admin. Era incoherente con
+el matiz de arriba: si Pricing abre cotizaciones directas de clientes y agentes
+de carga sin pasar por Ventas, no puede depender de Ventas para cerrarlas.
+
+Pricing quedo agregado a:
+  - `ganada` desde `enviada_cliente` y desde `negociacion`
+  - `perdida` desde toda etapa en la que ya participa: `solicitado_pricing`,
+    `pricing_solicitando`, `cotizaciones_recibidas`, `consolidada`,
+    `enviada_cliente` y `negociacion`
+
+NO se agrego a `perdida` desde `solicitud_cliente`: esa es etapa pura de Ventas
+y la cotizacion todavia no le llega a Pricing.
+
+Fijado en `stateMachine.test.ts`, bloque G.
+
 ### 4.2 El IVA se deriva, no se captura
 
 Regla espejo: se grava al 16% **únicamente lo que ocurre en territorio nacional**.

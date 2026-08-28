@@ -83,7 +83,7 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
     },
     {
       hacia: 'perdida',
-      roles: ['ventas', 'admin'],
+      roles: ['ventas', 'pricing', 'admin'],
     },
   ],
 
@@ -142,7 +142,7 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
     },
     {
       hacia: 'perdida',
-      roles: ['ventas', 'admin'],
+      roles: ['ventas', 'pricing', 'admin'],
     },
   ],
 
@@ -153,12 +153,15 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
       roles: ['ventas', 'admin'],
     },
     {
+      // 'pricing' incluido por §4.1: Pricing abre cotizaciones directas de
+      // clientes y agentes de carga sin pasar por Ventas, así que no puede
+      // depender de Ventas para cerrarlas. Corregido el 28-ago-2026.
       hacia: 'ganada',
-      roles: ['ventas', 'admin'],
+      roles: ['ventas', 'pricing', 'admin'],
     },
     {
       hacia: 'perdida',
-      roles: ['ventas', 'admin'],
+      roles: ['ventas', 'pricing', 'admin'],
     },
     {
       // Devolver: reenviar propuesta corregida (Luis: enviada → cotizada)
@@ -170,12 +173,15 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
   // ── 7. En negociación (enviada) ─────────────────────────────────────────────
   negociacion: [
     {
+      // 'pricing' incluido por §4.1: Pricing abre cotizaciones directas de
+      // clientes y agentes de carga sin pasar por Ventas, así que no puede
+      // depender de Ventas para cerrarlas. Corregido el 28-ago-2026.
       hacia: 'ganada',
-      roles: ['ventas', 'admin'],
+      roles: ['ventas', 'pricing', 'admin'],
     },
     {
       hacia: 'perdida',
-      roles: ['ventas', 'admin'],
+      roles: ['ventas', 'pricing', 'admin'],
     },
     {
       // Devolver: reenviar propuesta corregida

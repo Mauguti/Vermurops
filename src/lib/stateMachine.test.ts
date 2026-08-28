@@ -208,9 +208,13 @@ describe('D. Bloqueos por rol incorrecto', () => {
     expect(puedeTransicionarA('consolidada', 'enviada_cliente', 'pricing', q).ok).toBe(false);
   });
 
-  it('pricing NO puede marcar ganada desde negociacion', () => {
+  // NOTA: hasta el 28-ago-2026 aquí se afirmaba lo contrario —que Pricing NO
+  // podía marcar ganada—. El cliente lo corrigió: si Pricing abre cotizaciones
+  // directas sin pasar por Ventas, no puede depender de Ventas para cerrarlas.
+  // El caso positivo vive ahora en el bloque G.
+  it('pricing SÍ puede marcar ganada desde negociacion (corregido 28-ago-2026)', () => {
     const q = makeQuote({ etapa: 'negociacion' });
-    expect(puedeTransicionarA('negociacion', 'ganada', 'pricing', q).ok).toBe(false);
+    expect(puedeTransicionarA('negociacion', 'ganada', 'pricing', q).ok).toBe(true);
   });
 });
 
@@ -300,5 +304,61 @@ describe('F. transicionesDisponibles()', () => {
     expect(disp).toContain('perdida');
     expect(disp).toContain('enviada_cliente');
     expect(disp).not.toContain('solicitud_cliente');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// G. Pricing puede cerrar sus propias cotizaciones
+//
+// Corrección del 28-ago-2026. §4.1 dice que Pricing abre cotizaciones directas
+// de clientes y agentes de carga sin pasar por Ventas; dependía de Ventas para
+// cerrarlas, lo cual era incoherente.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('G. Cierre de cotizaciones por Pricing', () => {
+  it('pricing puede marcar GANADA desde enviada_cliente', () => {
+    const q = makeQuote({ etapa: 'enviada_cliente' });
+    expect(puedeTransicionarA('enviada_cliente', 'ganada', 'pricing', q).ok).toBe(true);
+  });
+
+  it('pricing puede marcar GANADA desde negociacion', () => {
+    const q = makeQuote({ etapa: 'negociacion' });
+    expect(puedeTransicionarA('negociacion', 'ganada', 'pricing', q).ok).toBe(true);
+  });
+
+  it('pricing puede marcar PERDIDA desde toda etapa en la que ya participa', () => {
+    // Si puede cerrar ganada, debe poder cerrar perdida.
+    const etapas = [
+      'solicitado_pricing', 'pricing_solicitando', 'cotizaciones_recibidas',
+      'consolidada', 'enviada_cliente', 'negociacion',
+    ] as const;
+    etapas.forEach(etapa => {
+      const q = makeQuote({ etapa });
+      expect(puedeTransicionarA(etapa, 'perdida', 'pricing', q).ok).toBe(true);
+    });
+  });
+
+  it('pricing NO descarta un lead que todavía no ha visto', () => {
+    // solicitud_cliente es etapa pura de Ventas: la cotización aún no le llega.
+    const q = makeQuote({ etapa: 'solicitud_cliente' });
+    expect(puedeTransicionarA('solicitud_cliente', 'perdida', 'pricing', q).ok).toBe(false);
+  });
+
+  it('ventas conserva el cierre: la corrección suma, no reemplaza', () => {
+    const q = makeQuote({ etapa: 'negociacion' });
+    expect(puedeTransicionarA('negociacion', 'ganada', 'ventas', q).ok).toBe(true);
+    expect(puedeTransicionarA('negociacion', 'perdida', 'ventas', q).ok).toBe(true);
+  });
+
+  it('operaciones y administracion siguen sin cerrar cotizaciones', () => {
+    const q = makeQuote({ etapa: 'negociacion' });
+    expect(puedeTransicionarA('negociacion', 'ganada', 'operaciones', q).ok).toBe(false);
+    expect(puedeTransicionarA('negociacion', 'ganada', 'administracion', q).ok).toBe(false);
+  });
+
+  it('pricing ve ganada y perdida entre sus transiciones disponibles', () => {
+    const q = makeQuote({ etapa: 'negociacion' });
+    const disp = transicionesDisponibles('negociacion', 'pricing', q);
+    expect(disp).toContain('ganada');
+    expect(disp).toContain('perdida');
   });
 });
