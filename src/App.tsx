@@ -62,7 +62,7 @@ const VIEW_LABELS: Record<string, string> = {
   documents: 'Documentos',
   finance: 'Finanzas',
   exchange: 'Tipo de cambio',
-  clients: 'Clientes',
+  clients: 'Altas',
   puertos: 'Puertos',
   rates: 'Tarifas',
   reports: 'Reportes',

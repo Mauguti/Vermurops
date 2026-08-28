@@ -487,7 +487,7 @@ export default function Quotes() {
               {/* Fila superior: Título y Acciones */}
               <div className="flex justify-between items-center w-full">
                 <h2 className="text-[24px] font-bold text-[#18181B] tracking-tight">
-                  Cotizaciones
+                  CRM
                 </h2>
                 
                 <div className="flex items-center gap-3">

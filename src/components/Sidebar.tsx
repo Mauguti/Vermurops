@@ -13,13 +13,13 @@ interface SidebarProps {
 
 const ROLE_ITEMS = [
   { id: 'dashboard',  label: 'Dashboard',       icon: <Home        className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
-  { id: 'quotes',     label: 'Cotizaciones',     icon: <FileText    className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
+  { id: 'quotes',     label: 'CRM',              icon: <FileText    className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   { id: 'pricing',    label: 'Pricing',          icon: <Tag         className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   { id: 'shipments',  label: 'Embarques',        icon: <Ship        className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   { id: 'documents',  label: 'Documentos',       icon: <Files       className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   { id: 'finance',    label: 'Finanzas',         icon: <DollarSign  className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   { id: 'exchange',   label: 'Tipo de cambio',   icon: <Calculator  className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
-  { id: 'clients',    label: 'Clientes',         icon: <Users       className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
+  { id: 'clients',    label: 'Altas',            icon: <Users       className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   { id: 'puertos',    label: 'Puertos',          icon: <Anchor      className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   { id: 'rates',      label: 'Tarifas',          icon: <BookmarkMinus className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   { id: 'reports',    label: 'Reportes',         icon: <BarChart2   className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },

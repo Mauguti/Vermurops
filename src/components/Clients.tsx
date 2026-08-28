@@ -147,7 +147,7 @@ export default function Clients() {
       {!selectedClientId && !selectedProvider && (
         <div className="flex justify-between items-center mb-[12px] bg-card p-4 rounded-xl border border-card-border shadow-sm">
           <h2 className="text-[18px] font-semibold text-text-primary tracking-tight">
-            Directorio Empresarial
+            Altas
           </h2>
           <div className="bg-canvas border border-card-border p-1 rounded-lg flex items-center shadow-2xs">
             <button

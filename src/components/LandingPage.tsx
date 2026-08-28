@@ -62,7 +62,7 @@ export default function LandingPage({ onShowLogin }: LandingPageProps) {
             onClick={onShowLogin}
             className="px-5 py-2.5 bg-vermur-accent hover:bg-[#c1321d] text-white text-xs font-bold uppercase tracking-wider rounded-lg transition-all duration-200 shadow-sm hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vermur-accent"
           >
-            Cotizar ahora
+            Iniciar sesión
           </button>
         </div>
       </nav>
@@ -107,7 +107,7 @@ export default function LandingPage({ onShowLogin }: LandingPageProps) {
               onClick={onShowLogin}
               className="px-8 py-4 bg-vermur-accent hover:bg-[#c1321d] text-white text-sm font-bold uppercase tracking-wider rounded-lg transition-all duration-350 shadow-md hover:shadow-xl hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vermur-accent"
             >
-              Comenzar Cotización
+              Solicitar cotización
             </button>
             <button
               onClick={onShowLogin}
