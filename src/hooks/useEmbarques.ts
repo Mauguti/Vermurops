@@ -27,7 +27,7 @@ import { db } from '../firebase';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { EmbarqueCompleto } from '../components/shipments/EmbarquesData';
 import { useAuth } from '../auth/AuthContext';
-import { exigir } from '../auth/permisos';
+import { PermisoDenegadoError, capacidadParaGuardarEmbarque, puedeGuardarEmbarque } from '../auth/permisos';
 import { UserRole } from '../auth/users';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
@@ -76,9 +76,14 @@ export function useEmbarques() {
    * pago y administrativo (§4.7). Afinar permisos por campo es trabajo aparte.
    */
   const guardarEmbarque = async (embarque: EmbarqueCompleto): Promise<void> => {
+    const rol = user?.rol as UserRole | undefined;
     const esNuevo = !embarques.some(e => e.id === embarque.id);
-    if (esNuevo) {
-      exigir(user?.rol as UserRole | undefined, 'embarque.generar');
+
+    if (!puedeGuardarEmbarque(rol, esNuevo)) {
+      throw new PermisoDenegadoError(
+        rol,
+        capacidadParaGuardarEmbarque(esNuevo) ?? 'embarque.generar',
+      );
     }
 
     // Sin esto, cualquier campo opcional en undefined tumba la escritura entera.

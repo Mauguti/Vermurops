@@ -9,6 +9,8 @@ import { describe, it, expect } from 'vitest';
 import {
   puede,
   puedeCrearCotizacion,
+  puedeGuardarEmbarque,
+  capacidadParaGuardarEmbarque,
   exigir,
   PermisoDenegadoError,
   CAPACIDADES_POR_ROL,
@@ -233,5 +235,40 @@ describe('vista vs. capacidad de alta', () => {
   it('Ventas VE clientes pero NO puede darlos de alta', () => {
     expect(isViewAllowed('ventas', 'clients')).toBe(true);
     expect(puede('ventas', 'cliente.alta')).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Guardado de embarques — crear no es lo mismo que editar.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('permiso para guardar un embarque', () => {
+  it('crear un embarque exige la capacidad; editar no', () => {
+    expect(capacidadParaGuardarEmbarque(true)).toBe('embarque.generar');
+    expect(capacidadParaGuardarEmbarque(false)).toBeNull();
+  });
+
+  it('Administración NO crea embarques', () => {
+    expect(puedeGuardarEmbarque('administracion', true)).toBe(false);
+  });
+
+  it('Administración SÍ edita un embarque existente: le tocan dos de los tres cierres', () => {
+    // §4.7: operativo → Operaciones, de pago → Admin, administrativo → Admin.
+    // Si esto se pone en false, Julio se queda sin poder cerrar nada.
+    expect(puedeGuardarEmbarque('administracion', false)).toBe(true);
+  });
+
+  it('Operaciones crea y edita', () => {
+    expect(puedeGuardarEmbarque('operaciones', true)).toBe(true);
+    expect(puedeGuardarEmbarque('operaciones', false)).toBe(true);
+  });
+
+  it('Ventas y Pricing no crean embarques', () => {
+    expect(puedeGuardarEmbarque('ventas', true)).toBe(false);
+    expect(puedeGuardarEmbarque('pricing', true)).toBe(false);
+  });
+
+  it('sin sesión no se guarda nada, ni siquiera una edición', () => {
+    expect(puedeGuardarEmbarque(undefined, false)).toBe(false);
+    expect(puedeGuardarEmbarque(null, true)).toBe(false);
   });
 });

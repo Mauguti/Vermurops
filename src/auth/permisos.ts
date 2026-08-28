@@ -170,3 +170,35 @@ export class PermisoDenegadoError extends Error {
 export function exigir(rol: UserRole | undefined | null, cap: Capacidad): void {
   if (!puede(rol, cap)) throw new PermisoDenegadoError(rol, cap);
 }
+
+// ─── Guardado de embarques ────────────────────────────────────────────────────
+
+/**
+ * Qué capacidad hace falta para guardar un embarque.
+ *
+ * Crear uno es de Operaciones (y Admin). EDITAR uno existente no exige
+ * capacidad: Administración no tiene 'embarque.generar' pero sí debe poder
+ * registrar el cierre de pago y el administrativo, que son suyos por §4.7
+ * («operativo → Operaciones, de pago → Admin, administrativo → Admin»).
+ *
+ * Exigir 'embarque.generar' para toda escritura dejaría a Administración sin
+ * poder cerrar nada. La regla vive aquí, y no dentro del hook, para que la
+ * distinción quede fijada por un test y no dependa de un `if` que alguien
+ * pueda endurecer sin darse cuenta.
+ *
+ * Afinar el permiso por cierre —que Operaciones no marque el de pago, por
+ * ejemplo— es trabajo aparte y necesita decisión del cliente.
+ */
+export function capacidadParaGuardarEmbarque(esNuevo: boolean): Capacidad | null {
+  return esNuevo ? 'embarque.generar' : null;
+}
+
+/** ¿Este rol puede guardar este embarque? */
+export function puedeGuardarEmbarque(
+  rol: UserRole | undefined | null,
+  esNuevo: boolean,
+): boolean {
+  const cap = capacidadParaGuardarEmbarque(esNuevo);
+  if (cap === null) return !!rol; // basta con tener sesión
+  return puede(rol, cap);
+}
