@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { EmbarqueCompleto } from './shipments/EmbarquesData';
+import { EmbarqueCompleto, recalcularCargos } from './shipments/EmbarquesData';
 import EmbarquesList from './shipments/EmbarquesList';
 import FichaEmbarque from './shipments/FichaEmbarque';
 import { useEmbarques } from '../hooks/useEmbarques';
@@ -106,13 +106,7 @@ export default function Shipments() {
         pago: false,
         administrativo: false
       },
-      cargos: {
-        ingresos: 0,
-        gastos: 0,
-        ganancia: 0,
-        moneda: 'USD',
-        detalles: []
-      },
+      cargos: recalcularCargos([]),
       documentos: [],
       eventos: [
         {

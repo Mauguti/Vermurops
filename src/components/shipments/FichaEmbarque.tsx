@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChevronRight, Save, X, Calendar, Plus, Check, FileText, Landmark, ShieldCheck, DollarSign, Activity, GitCommit, Ship, Plane, Truck, ArrowRight, Trash2, Package, Layers } from 'lucide-react';
-import { EmbarqueCompleto, TIPOS_DOCUMENTO, EVENT_TYPES, CargoDetalle, EmbarqueEvento, EmbarqueDocumento, recalcularCargos, EmbarqueProducto } from './EmbarquesData';
+import { EmbarqueCompleto, TIPOS_DOCUMENTO, EVENT_TYPES, CargoDetalle, EmbarqueEvento, EmbarqueDocumento, recalcularCargos, EmbarqueProducto, totalesDe, monedasConMovimiento } from './EmbarquesData';
 import EntidadesEmbarque from './EntidadesEmbarque';
 import RutaEmbarque from './RutaEmbarque';
 import DocumentosEmbarque from './DocumentosEmbarque';
@@ -105,7 +105,9 @@ export default function FichaEmbarque({
       concepto: newCargoConcept,
       tipo: newCargoTipo,
       monto: Number(newCargoMonto),
-      moneda: newCargoMoneda
+      moneda: newCargoMoneda,
+      origen: 'manual',
+      facturaId: null,
     };
 
     const newDetalles = [...(embarque.cargos.detalles || []), newCargo];
@@ -206,6 +208,10 @@ export default function FichaEmbarque({
   };
 
   // Master / Hijos Handlers
+  // §4.3 — totales por moneda, con fallback para embarques anteriores a E-2.
+  const totales = totalesDe(embarque.cargos);
+  const monedasActivas = monedasConMovimiento(embarque.cargos.detalles ?? []);
+
   const hijos = allEmbarques.filter(e => e.masterId === embarque.id);
   const master = allEmbarques.find(e => e.id === embarque.masterId);
 
@@ -713,27 +719,47 @@ export default function FichaEmbarque({
                     Resumen Financiero
                   </h4>
 
-                  <div className="space-y-3 text-xs">
-                    <div className="flex justify-between font-semibold">
-                      <span className="text-gray-400">Total Ingresos:</span>
-                      <span className="font-mono text-emerald-600">${embarque.cargos.ingresos.toLocaleString()} USD</span>
+                  {/* §4.3: un bloque por moneda, sin convertir. Antes esto
+                      mostraba un solo total mezclando USD y MXN a una tasa fija
+                      de 18.00 escrita en el código. */}
+                  {monedasActivas.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">Sin cargos capturados.</p>
+                  ) : (
+                    <div className="space-y-5">
+                      {monedasActivas.map(m => (
+                        <div key={m} className="space-y-3 text-xs">
+                          <div className="flex justify-between items-baseline">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{m}</span>
+                          </div>
+                          <div className="flex justify-between font-semibold">
+                            <span className="text-gray-400">Ingresos:</span>
+                            <span className="font-mono text-emerald-600">
+                              ${totales[m].ingresos.toLocaleString()} {m}
+                            </span>
+                          </div>
+                          <div className="flex justify-between font-semibold">
+                            <span className="text-gray-400">Gastos:</span>
+                            <span className="font-mono text-rose-500">
+                              ${totales[m].gastos.toLocaleString()} {m}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-baseline border-t border-gray-200 pt-2">
+                            <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Utilidad</span>
+                            <span className="text-base font-black text-gray-800 font-mono tracking-tight">
+                              ${totales[m].ganancia.toLocaleString()} {m}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                    <div className="flex justify-between font-semibold">
-                      <span className="text-gray-400">Total Gastos:</span>
-                      <span className="font-mono text-rose-500">${embarque.cargos.gastos.toLocaleString()} USD</span>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
                 <div className="border-t border-gray-200 pt-4 mt-6">
-                  <div className="flex justify-between items-baseline">
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Margen Neto (Utilidad):</span>
-                    <span className="text-lg font-black text-gray-800 font-mono tracking-tight">
-                      ${embarque.cargos.ganancia.toLocaleString()} USD
-                    </span>
-                  </div>
-                  <p className="text-[9px] text-gray-400 mt-2 font-semibold italic">
-                    * Conversión simulada a un tipo de cambio de 1 USD = 18.00 MXN.
+                  <p className="text-[9px] text-gray-400 font-semibold italic">
+                    {monedasActivas.length > 1
+                      ? 'Los totales no se suman entre monedas: convertirlos exige un tipo de cambio real con su fecha.'
+                      : 'Cada moneda se totaliza por separado.'}
                   </p>
                 </div>
               </div>

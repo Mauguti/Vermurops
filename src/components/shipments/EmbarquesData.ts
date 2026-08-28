@@ -56,20 +56,88 @@ export interface EmbarqueCierres {
   administrativo: boolean;
 }
 
+export type MonedaCargo = 'USD' | 'MXN';
+
+/** De dónde salió la línea: heredada de la cotización o capturada a mano. */
+export type OrigenCargo = 'heredado' | 'manual';
+
+/** Enlace a la línea de la cotización que originó este cargo. */
+export interface OrigenCotizacion {
+  cotizacionId: string;
+  servicioId: string;
+  conceptoId: string;
+}
+
 export interface CargoDetalle {
   id: string;
   concepto: string;
   tipo: 'ingreso' | 'gasto';
   monto: number;
-  moneda: 'USD' | 'MXN';
+  moneda: MonedaCargo;
+
+  // ── E-2: trazabilidad hacia la cotización ────────────────────────────────
+  /** FK al catálogo conceptos/. Necesaria para las claves SAT al timbrar. */
+  conceptoId?: string;
+  /** A quién se le paga. Solo en líneas de gasto. */
+  proveedorId?: string;
+  /** Qué tarifa se aplicó. */
+  tarifaId?: string;
+  /** Línea de la cotización de la que se heredó. */
+  origenCotizacion?: OrigenCotizacion;
+  /** Por defecto 'manual', para no romper las líneas ya capturadas. */
+  origen?: OrigenCargo;
+
+  // ── E-2: facturación general o separada ──────────────────────────────────
+  /**
+   * Agrupa líneas para emitir facturas separadas. Sin valor, la línea entra
+   * en la factura general.
+   */
+  grupoFacturacion?: string;
+  /**
+   * En qué factura quedó cubierta esta línea. `null`/ausente = sin facturar.
+   *
+   * La marca vive en la LÍNEA y no como lista dentro de la factura: así una
+   * línea no puede acabar en dos facturas, que es como se cobra dos veces lo
+   * mismo. Misma regla que usamos para no pagar dos veces una OC.
+   */
+  facturaId?: string | null;
 }
 
-export interface EmbarqueCargos {
+/** Totales de una sola moneda. Nunca mezclados con otra. */
+export interface TotalesMoneda {
   ingresos: number;
   gastos: number;
   ganancia: number;
-  moneda: string;
+}
+
+export interface EmbarqueCargos {
+  /**
+   * Totales por moneda — la fuente de verdad.
+   *
+   * §4.3: los totales nunca se mezclan. El flete internacional va en USD y los
+   * gastos nacionales en MXN con IVA; sumarlos con un tipo de cambio inventado
+   * produce un número creíble y falso.
+   *
+   * Opcional porque hay documentos escritos antes de E-2 que no lo traen.
+   * NO leerlo directo: usar `totalesDe(cargos)`, que recalcula desde las
+   * líneas cuando falta. Mismo patrón de fallback que getOficialIds (§3).
+   */
+  totalesPorMoneda?: Record<MonedaCargo, TotalesMoneda>;
+
   detalles: CargoDetalle[];
+
+  // ── Campos heredados ─────────────────────────────────────────────────────
+  /**
+   * @deprecated Usar totalesPorMoneda. Se mantienen poblados con los totales
+   * en USD —sin convertir nada— para no romper el código que ya los lee.
+   */
+  ingresos: number;
+  /** @deprecated Usar totalesPorMoneda. */
+  gastos: number;
+  /** @deprecated Usar totalesPorMoneda. */
+  ganancia: number;
+  /** @deprecated Usar totalesPorMoneda. */
+  moneda: string;
 }
 
 export interface EmbarqueDocumento {
@@ -246,25 +314,97 @@ export const EVENT_TYPES = {
 // Helper para calcular ganancia
 // ────────────────────────────────────────────────────────────
 
-export function recalcularCargos(detalles: CargoDetalle[], tasaCambio: number = 18.0): EmbarqueCargos {
-  let ingresosUSD = 0;
-  let gastosUSD = 0;
+const MONEDAS: MonedaCargo[] = ['USD', 'MXN'];
+
+const redondear = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Totales por moneda, sin conversión.
+ *
+ * Antes esta función convertía MXN a USD con una tasa fija de 18.0 y devolvía
+ * un único total. Eso viola §4.3 y encima usaba un tipo de cambio inventado,
+ * que es justo lo que el cliente reportó del módulo de Tipo de Cambio.
+ *
+ * Aquí no se convierte nada: cada moneda lleva su cuenta. Convertir es una
+ * decisión de presentación y necesita una tasa real con su fecha.
+ */
+export function calcularTotalesPorMoneda(
+  detalles: CargoDetalle[],
+): Record<MonedaCargo, TotalesMoneda> {
+  const totales = {} as Record<MonedaCargo, TotalesMoneda>;
+  MONEDAS.forEach(m => { totales[m] = { ingresos: 0, gastos: 0, ganancia: 0 }; });
 
   detalles.forEach(c => {
-    const montoUSD = c.moneda === 'MXN' ? c.monto / tasaCambio : c.monto;
-    if (c.tipo === 'ingreso') {
-      ingresosUSD += montoUSD;
-    } else {
-      gastosUSD += montoUSD;
-    }
+    const t = totales[c.moneda];
+    if (!t) return; // moneda fuera del catálogo: se ignora, no se suma a otra
+    if (c.tipo === 'ingreso') t.ingresos += c.monto;
+    else                      t.gastos   += c.monto;
   });
 
+  MONEDAS.forEach(m => {
+    totales[m].ingresos = redondear(totales[m].ingresos);
+    totales[m].gastos   = redondear(totales[m].gastos);
+    totales[m].ganancia = redondear(totales[m].ingresos - totales[m].gastos);
+  });
+
+  return totales;
+}
+
+/** Monedas que realmente aparecen en los cargos, para no pintar ceros vacíos. */
+export function monedasConMovimiento(detalles: CargoDetalle[]): MonedaCargo[] {
+  return MONEDAS.filter(m => detalles.some(c => c.moneda === m));
+}
+
+/**
+ * Líneas que una factura cubriría.
+ *
+ * §4.8 (28-ago-2026): al facturar se elige entre una factura general —todo el
+ * embarque— o separadas por grupo de conceptos. Las dos salen de aquí.
+ * En ambos casos se excluye lo ya facturado: `facturaId` con valor.
+ */
+export function lineasFacturables(
+  detalles: CargoDetalle[],
+  grupo?: string,
+): CargoDetalle[] {
+  return detalles.filter(c =>
+    c.tipo === 'ingreso' &&
+    !c.facturaId &&
+    (grupo === undefined || c.grupoFacturacion === grupo)
+  );
+}
+
+/** Grupos de facturación presentes, para ofrecer la opción de factura separada. */
+export function gruposDeFacturacion(detalles: CargoDetalle[]): string[] {
+  const set = new Set<string>();
+  detalles.forEach(c => {
+    if (c.tipo === 'ingreso' && c.grupoFacturacion) set.add(c.grupoFacturacion);
+  });
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
+}
+
+/**
+ * Totales de un embarque, venga el documento de antes o después de E-2.
+ *
+ * Los embarques creados durante la validación de E-1 se guardaron sin
+ * `totalesPorMoneda`. Aquí se recalculan desde las líneas, que son la verdad.
+ */
+export function totalesDe(cargos: EmbarqueCargos): Record<MonedaCargo, TotalesMoneda> {
+  return cargos.totalesPorMoneda ?? calcularTotalesPorMoneda(cargos.detalles ?? []);
+}
+
+export function recalcularCargos(detalles: CargoDetalle[]): EmbarqueCargos {
+  const totalesPorMoneda = calcularTotalesPorMoneda(detalles);
+  const usd = totalesPorMoneda.USD;
+
   return {
-    ingresos: Math.round(ingresosUSD * 100) / 100,
-    gastos: Math.round(gastosUSD * 100) / 100,
-    ganancia: Math.round((ingresosUSD - gastosUSD) * 100) / 100,
+    totalesPorMoneda,
+    detalles,
+    // Campos deprecados: se pueblan con USD sin convertir. Antes traían una
+    // mezcla de USD y MXN a tasa 18.0, que era un número inventado.
+    ingresos: usd.ingresos,
+    gastos: usd.gastos,
+    ganancia: usd.ganancia,
     moneda: 'USD',
-    detalles
   };
 }
 
