@@ -12,7 +12,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, updateDoc, getDocsFromServer } from 'firebase/firestore';
+import { evaluarSeed } from '../lib/seedGuard';
 import { ConceptoVermur, initialConceptos } from '../components/conceptos/ConceptosData';
 import { useAuth } from '../auth/AuthContext';
 
@@ -35,16 +36,28 @@ export function useConceptos() {
     const unsubscribe = onSnapshot(
       collection(db, 'conceptos'),
       async (snapshot) => {
-        // ── Colección vacía: seed inicial ─────────────────────────────────
-        if (snapshot.empty && !seedAttempted.current) {
+        // ── ¿Se puede sembrar? ────────────────────────────────────────────
+        // evaluarSeed descarta los snapshots de caché: uno vacío NO prueba que
+        // la colección esté vacía en el servidor, solo que este cliente aún no
+        // la bajó. Ver src/lib/seedGuard.ts.
+        if (evaluarSeed(snapshot, seedAttempted.current).sembrar) {
           seedAttempted.current = true;
           try {
+            // Segunda barrera, ya con el servidor de por medio: confirma que
+            // 'conceptos' sigue vacía justo antes de escribir. Cubre la carrera
+            // con otra pestaña sembrando al mismo tiempo, y falla si no hay red
+            // en vez de sembrar a ciegas.
+            const enServidor = await getDocsFromServer(collection(db, 'conceptos'));
+            if (!enServidor.empty) {
+              console.warn('[seed] conceptos: el servidor ya tiene ' + enServidor.size + ' documentos. No se siembra.');
+              return;
+            }
+
             await Promise.all(
               initialConceptos.map(c =>
                 setDoc(doc(db, 'conceptos', c.id), c)
               )
             );
-            // onSnapshot disparará de nuevo con los 105 documentos escritos.
           } catch (err) {
             const msg = err instanceof Error ? err.message : 'Error al sembrar conceptos iniciales';
             setError(msg);
@@ -52,6 +65,9 @@ export function useConceptos() {
           }
           return;
         }
+
+        // Snapshot que no autoriza sembrar: se pinta tal cual. Si venía de
+        // caché, el snapshot del servidor llegará después y volverá a evaluar.
 
         // ── Snapshot con datos (normal o post-seed) ───────────────────────
         const data: ConceptoVermur[] = [];

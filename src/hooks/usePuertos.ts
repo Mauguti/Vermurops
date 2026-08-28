@@ -12,7 +12,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, updateDoc, getDocsFromServer } from 'firebase/firestore';
+import { evaluarSeed } from '../lib/seedGuard';
 import { PuertoVermur, initialPuertos } from '../components/puertos/PuertosData';
 import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
@@ -37,16 +38,28 @@ export function usePuertos() {
     const unsubscribe = onSnapshot(
       collection(db, 'puertos'),
       async (snapshot) => {
-        // ── Colección vacía: seed inicial ─────────────────────────────────
-        if (snapshot.empty && !seedAttempted.current) {
+        // ── ¿Se puede sembrar? ────────────────────────────────────────────
+        // evaluarSeed descarta los snapshots de caché: uno vacío NO prueba que
+        // la colección esté vacía en el servidor, solo que este cliente aún no
+        // la bajó. Ver src/lib/seedGuard.ts.
+        if (evaluarSeed(snapshot, seedAttempted.current).sembrar) {
           seedAttempted.current = true;
           try {
+            // Segunda barrera, ya con el servidor de por medio: confirma que
+            // 'puertos' sigue vacía justo antes de escribir. Cubre la carrera
+            // con otra pestaña sembrando al mismo tiempo, y falla si no hay red
+            // en vez de sembrar a ciegas.
+            const enServidor = await getDocsFromServer(collection(db, 'puertos'));
+            if (!enServidor.empty) {
+              console.warn('[seed] puertos: el servidor ya tiene ' + enServidor.size + ' documentos. No se siembra.');
+              return;
+            }
+
             await Promise.all(
               initialPuertos.map(p =>
                 setDoc(doc(db, 'puertos', p.id), p)
               )
             );
-            // onSnapshot disparará de nuevo con los documentos escritos.
           } catch (err) {
             const msg = err instanceof Error ? err.message : 'Error al sembrar puertos iniciales';
             setError(msg);
@@ -54,6 +67,9 @@ export function usePuertos() {
           }
           return;
         }
+
+        // Snapshot que no autoriza sembrar: se pinta tal cual. Si venía de
+        // caché, el snapshot del servidor llegará después y volverá a evaluar.
 
         // ── Snapshot con datos (normal o post-seed) ───────────────────────
         const data: PuertoVermur[] = [];
