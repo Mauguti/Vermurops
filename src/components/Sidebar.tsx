@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Home, FileText, Users, BarChart2, BookmarkMinus, Ship,
-  DollarSign, Files, Settings as Settings2, Calculator, Tag, Bell, Anchor,
+  DollarSign, Settings as Settings2, Calculator, Tag, Bell, Anchor,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useNotifications } from '../notifications/NotificationsContext';
@@ -16,7 +16,6 @@ const ROLE_ITEMS = [
   { id: 'quotes',     label: 'CRM',              icon: <FileText    className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   { id: 'pricing',    label: 'Pricing',          icon: <Tag         className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   { id: 'shipments',  label: 'Embarques',        icon: <Ship        className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
-  { id: 'documents',  label: 'Documentos',       icon: <Files       className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   { id: 'finance',    label: 'Finanzas',         icon: <DollarSign  className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   { id: 'exchange',   label: 'Tipo de cambio',   icon: <Calculator  className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },
   { id: 'clients',    label: 'Altas',            icon: <Users       className="w-[18px] h-[18px] mr-3 stroke-[1.5px]" /> },

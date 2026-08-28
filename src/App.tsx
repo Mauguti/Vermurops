@@ -17,7 +17,6 @@ import Bookings from './components/Bookings';
 import Pickups from './components/Pickups';
 import Shipments from './components/Shipments';
 import Finance from './components/Finance';
-import Documents from './components/Documents';
 import ClientPortal from './components/ClientPortal';
 import Clients from './components/Clients';
 import Reports from './components/Reports';
@@ -52,6 +51,8 @@ const ROLE_BADGE_STYLE: Record<string, { background: string; color: string }> = 
 };
 
 // ─── View title map ───────────────────────────────────────────────────────────
+// Sin 'documents': la sección suelta se retiró para todos los roles. Los
+// documentos viven dentro de la cotización y del embarque (§4.8).
 const VIEW_LABELS: Record<string, string> = {
   dashboard: 'Vista general',
   quotes: 'CRM',
@@ -59,7 +60,6 @@ const VIEW_LABELS: Record<string, string> = {
   bookings: 'Reservas',
   pickups: 'Recolecciones',
   shipments: 'Embarques',
-  documents: 'Documentos',
   finance: 'Finanzas',
   exchange: 'Tipo de cambio',
   clients: 'Altas',
@@ -293,7 +293,6 @@ function AppShell() {
       case 'bookings':   return <Bookings />;
       case 'pickups':    return <Pickups />;
       case 'shipments':  return <Shipments />;
-      case 'documents':  return <Documents />;
       case 'finance':    return <Finance />;
       case 'exchange':   return <ExchangeRates />;
       case 'clients':    return <Clients />;
