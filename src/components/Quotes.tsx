@@ -15,7 +15,10 @@ import {
 import { useServicios, renderIcon } from '../config/serviciosStore';
 import { useNotifications } from '../notifications/NotificationsContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
-import { generateFolio } from '../lib/folioService';
+import { useProspectos } from '../hooks/useProspectos';
+import { useClientes } from '../hooks/useClientes';
+import { generateFolio, generateFolioProspecto } from '../lib/folioService';
+import Toast, { TipoToast } from './ui/Toast';
 import SpreadsheetTable, { type VistaConfig } from './table/SpreadsheetTable';
 import { COTIZACION_COLUMNS, VISTA_DEFAULT_COTIZACIONES } from './quotes/cotizacionColumns';
 import { useVistasUsuario } from '../hooks/useVistasUsuario';
@@ -80,13 +83,50 @@ export default function Quotes() {
     if (changed) await updateCotizacion(changed.id, changed);
   };
 
-  const filteredInitialProspectos = initialProspectos.filter(p => {
+  // ── Prospectos ───────────────────────────────────────────────────────────
+  // Antes vivían en useState sembrados desde el mock de src/data.ts y no se
+  // escribían en ningún lado: se perdían al recargar. Ahora vienen de Firestore.
+  const {
+    prospectos: todosLosProspectos,
+    createProspecto,
+    updateProspecto,
+  } = useProspectos();
+
+  // Para que una empresa que ya es cliente no se recapture como texto libre.
+  const { clientes } = useClientes();
+
+  // Ventas solo ve los suyos; los demás roles ven todos.
+  const prospectos = todosLosProspectos.filter(p => {
     if (rolActivo === 'ventas') {
       return p.responsable === user?.nombre || p.responsable === user?.uid;
     }
     return true;
   });
-  const [prospectos, setProspectos] = useState<Prospecto[]>(filteredInitialProspectos);
+
+  /**
+   * Shim con forma de setState para los hijos que ya reciben `setProspectos`
+   * (KanbanProspeccion arrastra tarjetas entre etapas). Calcula el array nuevo,
+   * detecta qué documento cambió y persiste solo ese — mismo patrón que
+   * handleUpdateQuotes.
+   */
+  const setProspectos: React.Dispatch<React.SetStateAction<Prospecto[]>> = (accion) => {
+    const siguiente = typeof accion === 'function'
+      ? (accion as (prev: Prospecto[]) => Prospecto[])(prospectos)
+      : accion;
+
+    const previos = new Map(prospectos.map(p => [p.id, p]));
+    siguiente.forEach(p => {
+      const antes = previos.get(p.id);
+      if (antes && antes !== p) {
+        updateProspecto(p.id, p).catch(err => {
+          setToast({ mensaje: `No se pudo guardar el cambio: ${err.message}`, tipo: 'error' });
+        });
+      }
+    });
+  };
+
+  // Aviso visible de que algo ocurrió (bug 1.1: no había confirmación alguna).
+  const [toast, setToast] = useState<{ mensaje: string; tipo: TipoToast } | null>(null);
 
   // Filtro de visibilidad por rol (Ventas solo ve lo suyo)
   const permittedQuotes = kanbanQuotes.filter(q => {
@@ -215,6 +255,47 @@ export default function Quotes() {
   const [formOrigen, setFormOrigen] = useState<KanbanQuote['prospecto']['origen']>('web');
   const [formVendedor, setFormVendedor] = useState(VENDEDORES[0].nombre);
   const [formServicios, setFormServicios] = useState<string[]>(['maritimo']);
+
+  /**
+   * Origen de la empresa en el formulario de cotización:
+   * '' sin elegir · 'prospecto:<id>' · 'cliente:<id>' · '__nuevo__' texto libre.
+   *
+   * Guardar de dónde salió permite enlazar la cotización con el prospecto y,
+   * más adelante, no volver a pedir el alta de un cliente que ya existe
+   * (pendiente §4.8 nº 1).
+   */
+  const [formProspectoOrigenId, setFormProspectoOrigenId] = useState('');
+
+  const aplicarSeleccionEmpresa = (valor: string) => {
+    setFormProspectoOrigenId(valor);
+
+    if (valor === '__nuevo__' || valor === '') {
+      setFormEmpresa('');
+      setFormContacto('');
+      setFormTelefono('');
+      setFormEmail('');
+      return;
+    }
+
+    const [tipo, id] = valor.split(':');
+    if (tipo === 'prospecto') {
+      const p = prospectos.find(x => x.id === id);
+      if (!p) return;
+      setFormEmpresa(p.empresa);
+      setFormContacto(p.contactoNombre ?? '');
+      setFormTelefono(p.contactoTel ?? '');
+      setFormEmail(p.contactoEmail ?? '');
+      setFormOrigen(p.origenLead as typeof formOrigen);
+    } else if (tipo === 'cliente') {
+      const c = clientes.find(x => x.id === id);
+      if (!c) return;
+      setFormEmpresa(c.nombre);
+      // El cliente ya existe: sus contactos viven en su ficha, no aquí.
+      setFormContacto('');
+      setFormTelefono('');
+      setFormEmail('');
+    }
+  };
   const [formOrigenRuta, setFormOrigenRuta] = useState('');
   const [formDestinoRuta, setFormDestinoRuta] = useState('');
   const [formIncoterm, setFormIncoterm] = useState('FOB');
@@ -228,34 +309,69 @@ export default function Quotes() {
   const [formProspectoTel, setFormProspectoTel] = useState('');
   const [formProspectoEmail, setFormProspectoEmail] = useState('');
 
-  const handleCreateProspecto = () => {
+  const [guardandoProspecto, setGuardandoProspecto] = useState(false);
+
+  const handleCreateProspecto = async () => {
     if (!formProspectoEmpresa.trim()) {
-      alert('Por favor introduce la empresa.');
+      setToast({ mensaje: 'La razón social es obligatoria.', tipo: 'error' });
       return;
     }
-    const nextNumber = kanbanQuotes.length + prospectos.length + 1;
-    const newId = `PR-${String(nextNumber).padStart(4, '0')}`;
-    const nuevo: Prospecto = {
-      id: newId,
-      etapa: 'nuevo_lead',
-      empresa: formProspectoEmpresa,
-      contactoNombre: formProspectoContacto || 'Por definir',
-      contactoTel: formProspectoTel || '—',
-      contactoEmail: formProspectoEmail || '—',
-      origenLead: 'web',
-      servicioPotencial: ['maritimo'],
-      responsable: user?.nombre || 'Vendedor',
-      fechaRegistro: new Date().toISOString().split('T')[0],
-      ultimoContacto: new Date().toISOString().split('T')[0],
-      probabilidadCierre: 10,
-    };
-    setProspectos([nuevo, ...prospectos]);
+
+    setGuardandoProspecto(true);
+    try {
+      // Folio transaccional en vez de un id derivado de la longitud del array,
+      // que colisionaba en cuanto dos personas creaban a la vez.
+      const folio = await generateFolioProspecto();
+      const hoy = new Date().toISOString().split('T')[0];
+
+      const nuevo: Prospecto = {
+        id: folio,
+        folio,
+        etapa: 'nuevo_lead',
+        empresa: formProspectoEmpresa.trim(),
+        contactoNombre: formProspectoContacto.trim() || 'Por definir',
+        contactoTel: formProspectoTel.trim() || '',
+        contactoEmail: formProspectoEmail.trim() || '',
+        origenLead: 'web',
+        servicioPotencial: ['maritimo'],
+        responsable: user?.nombre || 'Vendedor',
+        fechaCreacion: hoy,
+        actividades: [],
+      };
+
+      await createProspecto(nuevo);
+
+      agregarNotificacion({
+        id: `notif-${Date.now()}`,
+        tipo: 'cambio_etapa',
+        titulo: 'Nuevo Prospecto',
+        mensaje: `Se ha registrado el prospecto ${nuevo.empresa}`,
+        cotizacionId: nuevo.id,
+        etapaAnterior: 'nuevo_lead',
+        etapaNueva: 'nuevo_lead',
+        destinatarios: ['ventas', 'admin'],
+        leida: false,
+        fecha: new Date().toISOString(),
+      });
+
+      setToast({
+        mensaje: `Prospecto ${folio} registrado: ${nuevo.empresa}. Ya está disponible para solicitar cotización.`,
+        tipo: 'exito',
+      });
+    } catch (err) {
+      setToast({
+        mensaje: `No se pudo registrar el prospecto: ${err instanceof Error ? err.message : err}`,
+        tipo: 'error',
+      });
+      setGuardandoProspecto(false);
+      return;
+    }
+    setGuardandoProspecto(false);
     setShowProspectForm(false);
     setFormProspectoEmpresa('');
     setFormProspectoContacto('');
     setFormProspectoTel('');
     setFormProspectoEmail('');
-    agregarNotificacion({ id: `notif-${Date.now()}`, tipo: 'cambio_etapa', titulo: 'Nuevo Prospecto', mensaje: `Se ha registrado el prospecto ${nuevo.empresa}`, cotizacionId: nuevo.id, etapaAnterior: 'nuevo_lead', etapaNueva: 'nuevo_lead', destinatarios: ['ventas', 'admin'], leida: false, fecha: new Date().toISOString() });
   };
 
   const toggleServicioForm = (id: string) => {
@@ -573,9 +689,10 @@ export default function Quotes() {
             <button
               type="button"
               onClick={handleCreateProspecto}
-              className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-xs transition-colors"
+              disabled={guardandoProspecto}
+              className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-xs transition-colors disabled:opacity-60"
             >
-              Guardar Prospecto
+              {guardandoProspecto ? 'Guardando…' : 'Guardar Prospecto'}
             </button>
           </div>
         </div>
@@ -598,15 +715,48 @@ export default function Quotes() {
                 Datos del Prospecto / Cliente
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Bug 1.2: aquí no había selector, solo un campo de texto libre.
+                    Por eso «el prospecto recién creado no aparece»: nunca hubo
+                    dónde apareciera. Ahora se elige de la lista y los datos de
+                    contacto se rellenan solos. */}
                 <div>
                   <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">Razón Social (Empresa) *</label>
-                  <input
-                    type="text" required
-                    placeholder="Ej. Alfa Corporativo S.A."
-                    value={formEmpresa}
-                    onChange={e => setFormEmpresa(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
-                  />
+                  <select
+                    value={formProspectoOrigenId}
+                    onChange={e => aplicarSeleccionEmpresa(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] bg-white"
+                  >
+                    <option value="">— Selecciona o captura —</option>
+                    {prospectos.length > 0 && (
+                      <optgroup label="Prospectos">
+                        {prospectos.map(p => (
+                          <option key={p.id} value={`prospecto:${p.id}`}>
+                            {p.empresa}{p.folio ? ` · ${p.folio}` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {clientes.length > 0 && (
+                      <optgroup label="Clientes existentes">
+                        {clientes.map(c => (
+                          <option key={c.id} value={`cliente:${c.id}`}>{c.nombre}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <option value="__nuevo__">+ Capturar empresa nueva…</option>
+                  </select>
+
+                  {/* El texto libre sigue existiendo, pero como excepción y no
+                      como única opción. */}
+                  {formProspectoOrigenId === '__nuevo__' && (
+                    <input
+                      type="text" required autoFocus
+                      placeholder="Ej. Alfa Corporativo S.A."
+                      value={formEmpresa}
+                      onChange={e => setFormEmpresa(e.target.value)}
+                      className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">Contacto Principal</label>
@@ -931,6 +1081,12 @@ export default function Quotes() {
         user={user}
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
+      />
+      {/* Confirmación visible de las acciones (bug 1.1) */}
+      <Toast
+        mensaje={toast?.mensaje ?? null}
+        tipo={toast?.tipo}
+        onClose={() => setToast(null)}
       />
     </div>
   );

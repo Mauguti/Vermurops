@@ -18,6 +18,16 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Prospectos / leads ────────────────────────────────────────────────
+    // Antes vivían solo en memoria: se perdían al recargar. Mismo patrón que
+    // cotizaciones — un lead perdido se marca, no se borra del historial.
+    match /prospectos/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // ── Contadores (usado por folioService.generateFolio) ─────────────────
     // generateFolio() hace runTransaction: necesita leer Y escribir.
     // Solo usuarios autenticados pueden tocar el contador.

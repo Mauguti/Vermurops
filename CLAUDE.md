@@ -227,6 +227,14 @@ opción y espera validación**:
 2. Cómo debe llamarse el módulo de cotizaciones
 3. Cuándo exactamente se convierte una cotización en embarque
 4. Qué tipo de cambio usa la empresa y cuál es la fuente oficial
+   → **Propuesta pendiente de confirmar (28-ago-2026):** el FIX del DOF del día
+   hábil anterior a la operación, que es el que el SAT exige para CFDI, leído
+   de la API del SIE de Banxico (serie SF43718) y guardado con su fecha en
+   Firestore, para que una cotización vieja conserve la tasa con la que se
+   calculó. Falta confirmar si Pricing cotiza con esa misma tasa o le carga un
+   diferencial, y quién puede capturarla a mano cuando la API no responda.
+   El módulo quedó en estado «en desarrollo» hasta tener respuesta: mostraba
+   tasas fijas en el código e historial de octubre de 2023.
 5. Dónde se generan y administran las notas de crédito
 6. Qué documentos pertenecen a la cotización y cuáles al embarque
 7. Qué le falta al catálogo de servicios (dicen que está «confuso e incompleto»)

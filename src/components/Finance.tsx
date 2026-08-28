@@ -4,6 +4,7 @@ import { DollarSign, FileText, CheckCircle, Clock, AlertCircle, Plus, Search, Fi
 import FichaFactura from './finance/FichaFactura';
 import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import BandejaOC from './ordenesCompra/BandejaOC';
+import ModuloEnDesarrollo from './ui/ModuloEnDesarrollo';
 
 export default function Finance() {
   const [activeTab, setActiveTab] = useState('Facturas (CFDI)');
@@ -80,31 +81,18 @@ export default function Finance() {
               <h2 className="text-[24px] font-semibold text-text-primary tracking-tight">Facturación y Finanzas</h2>
               <p className="text-[13px] text-text-secondary mt-[4px]">Control de pagos, facturación CFDI 4.0 y cuentas por cobrar.</p>
             </div>
-            {activeTab === 'Facturas (CFDI)' && (
-              <button 
-                onClick={() => setShowForm(true)}
-                className="bg-brand text-white px-[16px] py-[10px] rounded-[8px] text-[13px] font-medium hover:bg-brand-hover shadow-sm transition-colors flex items-center shrink-0"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Nueva factura (CFDI)
-              </button>
-            )}
+            {/* El botón «Nueva factura» abría un formulario mock que no
+                timbraba nada. Se retira hasta que la facturación exista dentro
+                del embarque (Bloque 5). */}
           </div>
 
-          {/* KPIs */}
+          {/* KPIs
+              Aquí había cuatro tarjetas: tres con cifras inventadas
+              ($145,250 facturado, $62,400 por cobrar, $18,250 vencido) que
+              nunca se conectaron a nada. Cifras financieras falsas que se ven
+              creíbles son peor que no tener el dato. Se conserva solo la que
+              sale de datos reales: por pagar a proveedores, desde las OC. */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-[16px]">
-            <div className="bg-white p-[20px] rounded-[12px] border border-card-border shadow-sm">
-               <p className="text-[11px] font-medium text-text-muted uppercase tracking-[0.05em] mb-[4px]">Facturado del mes</p>
-               <p className="text-[24px] font-semibold text-text-primary tabular-nums">$145,250 <span className="text-[14px] text-text-muted font-normal">USD</span></p>
-            </div>
-            <div className="bg-white p-[20px] rounded-[12px] border border-card-border shadow-sm">
-               <p className="text-[11px] font-medium text-text-muted uppercase tracking-[0.05em] mb-[4px]">Por cobrar</p>
-               <p className="text-[24px] font-semibold text-info-text tabular-nums">$62,400 <span className="text-[14px] text-info-text/70 font-normal">USD</span></p>
-            </div>
-            <div className="bg-white p-[20px] rounded-[12px] border border-warning-bg shadow-sm bg-warning-bg/10">
-               <p className="text-[11px] font-medium text-warning-text uppercase tracking-[0.05em] mb-[4px]">Vencido</p>
-               <p className="text-[24px] font-semibold text-error-text tabular-nums">$18,250 <span className="text-[14px] text-error-text/70 font-normal">USD</span></p>
-            </div>
             <div className="bg-white p-[20px] rounded-[12px] border border-card-border shadow-sm">
                <p className="text-[11px] font-medium text-text-muted uppercase tracking-[0.05em] mb-[4px]">Por pagar (Prov.)</p>
                <p className="text-[24px] font-semibold text-text-primary tabular-nums">
@@ -113,6 +101,13 @@ export default function Finance() {
                  ) : (
                    <>${totalPorPagar.toLocaleString()} <span className="text-[14px] text-text-muted font-normal">USD</span></>
                  )}
+               </p>
+            </div>
+            <div className="col-span-1 md:col-span-3 bg-white p-[20px] rounded-[12px] border border-dashed border-card-border shadow-sm flex items-center">
+               <p className="text-[12px] text-text-secondary leading-snug">
+                 Los indicadores de facturado, por cobrar y vencido todavía no
+                 están conectados. Se muestran en cuanto la facturación viva
+                 dentro del embarque.
                </p>
             </div>
           </div>
@@ -138,123 +133,18 @@ export default function Finance() {
 
              <div className="p-[24px]">
                 {activeTab === 'Facturas (CFDI)' && (
-                   <div className="space-y-[20px]">
-                      <div className="flex gap-[12px] items-center mb-[16px]">
-                        <div className="relative max-w-[400px] flex-1">
-                          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-                          <input 
-                            type="text" 
-                            placeholder="Buscar folio, UUID, cliente..." 
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full pl-[36px] bg-white border border-card-border rounded-[8px] p-[8px] text-[13px] focus:outline-none focus:border-brand shadow-sm text-text-primary" 
-                          />
-                        </div>
-                        <button className="flex items-center text-[13px] font-medium text-text-secondary bg-white border border-card-border rounded-[8px] px-[12px] py-[8px] hover:bg-neutral-bg transition-colors shadow-sm">
-                          <Filter className="w-4 h-4 mr-2" /> Filtros
-                        </button>
-                        <button onClick={handleExportCSV} className="flex items-center text-[13px] font-medium text-text-secondary bg-white border border-card-border rounded-[8px] px-[12px] py-[8px] hover:bg-neutral-bg transition-colors shadow-sm">
-                          <Download className="w-4 h-4 mr-2" /> Exportar a CSV
-                        </button>
-                      </div>
-
-                      <div className="overflow-x-auto border border-divider rounded-[8px]">
-                         <table className="w-full border-collapse">
-                            <thead>
-                               <tr>
-                                  <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Folio</th>
-                                  <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">UUID</th>
-                                  <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Cliente / RFC</th>
-                                  <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Concepto</th>
-                                  <th className="bg-canvas text-right px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Total (Mon)</th>
-                                  <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Estatus CFDI</th>
-                                  <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Estatus Pago</th>
-                                  <th className="bg-canvas border-b border-divider"></th>
-                               </tr>
-                            </thead>
-                            <tbody className="divide-y divide-divider bg-white">
-                               {invoices.map(inv => (
-                                  <tr key={inv.id} className="hover:bg-neutral-bg transition-colors group">
-                                     <td className="px-[16px] py-[12px] text-[13px] font-medium text-text-primary whitespace-nowrap">{inv.id}</td>
-                                     <td className="px-[16px] py-[12px] text-[12px] text-text-muted font-mono whitespace-nowrap">{inv.uuid}</td>
-                                     <td className="px-[16px] py-[12px] text-[13px] truncate max-w-[200px]">
-                                        <span className="block text-text-primary font-medium truncate">{inv.client}</span>
-                                        <span className="block text-text-secondary text-[11px]">{inv.rfc}</span>
-                                     </td>
-                                     <td className="px-[16px] py-[12px] text-[13px] text-text-secondary truncate max-w-[200px]">{inv.concept}</td>
-                                     <td className="px-[16px] py-[12px] text-[13px] font-medium text-text-primary text-right tabular-nums whitespace-nowrap">
-                                        ${inv.total.toLocaleString()} {inv.currency}
-                                     </td>
-                                     <td className="px-[16px] py-[12px]">{getCfdiBadge(inv.cfdiStatus)}</td>
-                                     <td className="px-[16px] py-[12px]">{getPaymentBadge(inv.paymentStatus)}</td>
-                                     <td className="px-[16px] py-[12px] text-right space-x-[4px] whitespace-nowrap">
-                                        <button onClick={() => setSelectedInvoice(inv)} className="text-text-muted hover:text-text-primary transition-colors p-[4px] rounded hover:bg-canvas" title="Ver PDF/XML">
-                                           <FileText className="w-[14px] h-[14px]" />
-                                        </button>
-                                        {inv.cfdiStatus === 'Borrador' && (
-                                          <button className="text-text-muted hover:text-brand transition-colors p-[4px] rounded hover:bg-canvas" title="Timbrar">
-                                             <ShieldCheck className="w-[14px] h-[14px]" />
-                                          </button>
-                                        )}
-                                        {inv.paymentStatus === 'Pendiente' || inv.paymentStatus === 'Vencida' ? (
-                                          <button className="text-text-muted hover:text-success-text transition-colors p-[4px] rounded hover:bg-canvas" title="Registrar pago">
-                                             <DollarSign className="w-[14px] h-[14px]" />
-                                          </button>
-                                        ) : null}
-                                     </td>
-                                  </tr>
-                               ))}
-                            </tbody>
-                         </table>
-                      </div>
-                   </div>
+                   <ModuloEnDesarrollo
+                     descripcion="La emisión de CFDI todavía no está conectada. La factura se generará dentro del embarque, asociada a la operación, para no capturar dos veces los conceptos."
+                     pendiente="el timbrado CFDI y dónde se administran las notas de crédito."
+                   />
                 )}
 
                 {activeTab === 'Cuentas por cobrar' && (
-                   <div className="space-y-[20px]">
-                      <div className="flex justify-between items-center mb-[16px]">
-                         <h3 className="text-[15px] font-semibold text-text-primary">Antigüedad de saldos (Aging)</h3>
-                         <button className="flex items-center text-[12px] text-brand hover:underline font-medium">
-                            <Download className="w-[14px] h-[14px] mr-[6px]" /> Exportar reporte
-                         </button>
-                      </div>
-                      <div className="overflow-x-auto border border-divider rounded-[8px]">
-                         <table className="w-full border-collapse">
-                            <thead>
-                               <tr>
-                                  <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Cliente</th>
-                                  <th className="bg-canvas text-right px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Corriente</th>
-                                  <th className="bg-canvas text-right px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">1 - 30 Días</th>
-                                  <th className="bg-canvas text-right px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">31 - 60 Días</th>
-                                  <th className="bg-canvas text-right px-[16px] py-[12px] text-[11px] font-medium text-warning-text border-b border-divider uppercase">60+ Días</th>
-                                  <th className="bg-canvas text-right px-[16px] py-[12px] text-[11px] font-bold text-text-primary border-b border-divider uppercase">Total Deuda</th>
-                               </tr>
-                            </thead>
-                            <tbody className="divide-y divide-divider bg-white">
-                               {receivables.map((rec, idx) => {
-                                  const hasOverdue = rec.days60 > 0 || rec.days90 > 0 || rec.days30 > 0;
-                                  return (
-                                  <tr key={idx} className={`hover:bg-neutral-bg transition-colors ${rec.client === 'Comercial del Norte' ? 'bg-warning-bg/5' : ''}`}>
-                                     <td className="px-[16px] py-[12px] text-[13px] font-medium text-text-primary">{rec.client}</td>
-                                     <td className="px-[16px] py-[12px] text-[13px] text-text-secondary text-right tabular-nums">${rec.current.toLocaleString()}</td>
-                                     <td className="px-[16px] py-[12px] text-[13px] text-text-secondary text-right tabular-nums">${rec.days30.toLocaleString()}</td>
-                                     <td className="px-[16px] py-[12px] text-[13px] text-text-secondary text-right tabular-nums">
-                                        <span className={rec.days60 > 0 ? 'text-warning-text font-medium' : ''}>${rec.days60.toLocaleString()}</span>
-                                     </td>
-                                     <td className="px-[16px] py-[12px] text-[13px] text-text-secondary text-right tabular-nums">
-                                        <span className={rec.days90 > 0 ? 'text-error-text font-medium' : ''}>${rec.days90.toLocaleString()}</span>
-                                     </td>
-                                     <td className={`px-[16px] py-[12px] text-[13px] font-semibold text-right tabular-nums ${hasOverdue ? 'text-error-text' : 'text-text-primary'}`}>
-                                        ${rec.total.toLocaleString()}
-                                     </td>
-                                  </tr>
-                               )})}
-                            </tbody>
-                         </table>
-                      </div>
-                   </div>
+                   <ModuloEnDesarrollo
+                     descripcion="La cartera por cobrar se alimentará de las facturas emitidas desde el embarque. Hoy no hay facturas reales que mostrar."
+                   />
                 )}
-                
+
                 {activeTab === 'Cuentas por pagar' && (
                    <BandejaOC
                      ordenes={ordenes}
@@ -264,11 +154,9 @@ export default function Finance() {
                 )}
 
                 {activeTab === 'Estados de cuenta' && (
-                   <div className="flex flex-col items-center justify-center p-[60px] border border-dashed border-card-border rounded-[8px] bg-white">
-                      <Calculator className="w-[32px] h-[32px] text-text-muted mb-[16px]" />
-                      <p className="text-[14px] font-medium text-text-primary mb-[4px]">Módulo en desarrollo</p>
-                      <p className="text-[13px] text-text-secondary text-center max-w-[300px]">Esta sección estará disponible próximamente en la plataforma.</p>
-                   </div>
+                   <ModuloEnDesarrollo
+                     descripcion="El estado de cuenta por cliente requiere las facturas emitidas y los pagos aplicados."
+                   />
                 )}
              </div>
           </div>

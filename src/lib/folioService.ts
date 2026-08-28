@@ -102,3 +102,27 @@ export async function initContadorDesdeFolios(folios: string[]): Promise<void> {
     }
   });
 }
+
+// ─── Folios de prospectos (PRO-2026-XXXX) ────────────────────────────────────
+//
+// Contador propio para no compartir secuencia con las cotizaciones: un
+// prospecto y una cotización son entidades distintas y el cliente los numera
+// por separado. Mismo mecanismo transaccional.
+//
+const COUNTER_DOC_PROSPECTOS = doc(db, 'contadores', 'prospectos');
+
+export function formatFolioProspecto(n: number): string {
+  const num = String(n).padStart(FOLIO_CONFIG.padding, '0');
+  const anio = new Date().getFullYear();
+  return `PRO${FOLIO_CONFIG.separador}${anio}${FOLIO_CONFIG.separador}${num}`;
+}
+
+export async function generateFolioProspecto(): Promise<string> {
+  const siguiente = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(COUNTER_DOC_PROSPECTOS);
+    const next = (snap.exists() ? (snap.data().ultimo as number) : 0) + 1;
+    tx.set(COUNTER_DOC_PROSPECTOS, { ultimo: next }, { merge: true });
+    return next;
+  });
+  return formatFolioProspecto(siguiente);
+}
