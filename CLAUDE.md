@@ -225,7 +225,8 @@ opción y espera validación**:
 
 1. Qué pasa cuando un cliente existente pide una nueva cotización (evitar repetir el alta)
 2. Cómo debe llamarse el módulo de cotizaciones
-3. Cuándo exactamente se convierte una cotización en embarque
+3. ~~Cuándo exactamente se convierte una cotización en embarque~~ → **RESUELTO
+   28-ago-2026:** automático al marcarla ganada. Ver «Respuestas del cliente».
 4. Qué tipo de cambio usa la empresa y cuál es la fuente oficial
    → **Propuesta pendiente de confirmar (28-ago-2026):** el FIX del DOF del día
    hábil anterior a la operación, que es el que el SAT exige para CFDI, leído
@@ -238,6 +239,29 @@ opción y espera validación**:
 5. Dónde se generan y administran las notas de crédito
 6. Qué documentos pertenecen a la cotización y cuáles al embarque
 7. Qué le falta al catálogo de servicios (dicen que está «confuso e incompleto»)
+
+### Respuestas del cliente — 28 de agosto de 2026
+
+Resuelven tres de los pendientes anteriores. **Son decisiones firmes.**
+
+**Disparador cotización → embarque: automático, sin paso intermedio.**
+Textual: *«una cotización ganada se crea un embarque de a huevo, no hay paso
+intermedio»*. Al marcar la cotización como ganada, el embarque se crea solo,
+heredando los conceptos a cobrar y a pagar. No hay bandeja de «por convertir»
+ni botón de generar.
+
+**La cotización se congela al generar embarque.**
+Textual: *«no, una vez que pasa a embarques ya así se queda»*. Los conceptos
+quedan bloqueados para edición. No puede haber divergencia entre cotización y
+embarque, así que no hace falta detectarla.
+
+**Facturación: dos modalidades, a elección al facturar.**
+Textual: *«da las 2 opciones al facturar, que sea una general o separada»*.
+  - **General:** una sola factura que cubre todo el embarque.
+  - **Separada:** facturas independientes por concepto o por grupo de conceptos.
+El modelo de cargos debe soportar ambas desde el inicio: cada línea de cargo
+necesita saber a qué factura pertenece (y una línea no puede estar en dos), o
+después hay que rehacerlo. Se construye en el Bloque 5.
 
 ### Otros requerimientos
 
