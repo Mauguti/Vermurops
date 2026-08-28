@@ -97,6 +97,17 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Embarques (E-1) ──────────────────────────────────────────────────
+    // Antes vivían en memoria y se perdían al recargar.
+    // Eliminar está prohibido: un embarque cancelado se marca en sus cierres,
+    // nunca se borra — es el respaldo de lo que se cobró y se pagó.
+    match /embarques/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // ── Órdenes de Compra (OC-1) ─────────────────────────────────────────
     // Cualquier usuario autenticado puede leer y crear/actualizar.
     // Eliminar está prohibido: una OC cancelada se marca activo=false.

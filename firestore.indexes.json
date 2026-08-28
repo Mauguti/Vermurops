@@ -4,32 +4,70 @@
       "collectionGroup": "tarifas",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "activo", "order": "ASCENDING" },
-        { "fieldPath": "fechaFin", "order": "ASCENDING" }
+        {
+          "fieldPath": "activo",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "fechaFin",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "ordenesCompra",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "activo", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "activo",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "vistasUsuario",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "usuarioId", "order": "ASCENDING" },
-        { "fieldPath": "modulo", "order": "ASCENDING" }
+        {
+          "fieldPath": "usuarioId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "modulo",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "vistasUsuario",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "compartida", "order": "ASCENDING" },
-        { "fieldPath": "modulo", "order": "ASCENDING" }
+        {
+          "fieldPath": "compartida",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "modulo",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "embarques",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "cotizacionId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],

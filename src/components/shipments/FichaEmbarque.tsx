@@ -6,6 +6,7 @@ import RutaEmbarque from './RutaEmbarque';
 import DocumentosEmbarque from './DocumentosEmbarque';
 import ProductosEmbarque from './ProductosEmbarque';
 import { useClientes } from '../../hooks/useClientes';
+import { generateFolioEmbarque, parseFolioNumero } from '../../lib/folioService';
 
 interface FichaEmbarqueProps {
   embarque: EmbarqueCompleto;
@@ -208,11 +209,21 @@ export default function FichaEmbarque({
   const hijos = allEmbarques.filter(e => e.masterId === embarque.id);
   const master = allEmbarques.find(e => e.id === embarque.masterId);
 
-  const handleCrearHijo = () => {
-    const nextNum = allEmbarques.length + 1;
+  const handleCrearHijo = async () => {
+    // E-1: con los embarques en Firestore, `allEmbarques.length + 1` deja de
+    // ser solo un id repetido y pasa a SOBRESCRIBIR un documento real.
+    let nuevoId: string;
+    try {
+      nuevoId = await generateFolioEmbarque();
+    } catch (err) {
+      // Sin esto el onClick deja una promesa rechazada sin atrapar en consola.
+      alert(`No se pudo generar el folio del HBL hijo: ${err instanceof Error ? err.message : err}`);
+      return;
+    }
+    const nextNum = parseFolioNumero(nuevoId);
     const nuevoHijo: EmbarqueCompleto = {
-      id: `SHP-2026-${String(nextNum).padStart(4, '0')}`,
-      folio: `SHP-26-${String(nextNum).padStart(4, '0')}`,
+      id: nuevoId,
+      folio: nuevoId.replace('SHP-20', 'SHP-'),
       cotizacionId: embarque.cotizacionId,
       modalidad: embarque.modalidad,
       tipo: 'hijo',

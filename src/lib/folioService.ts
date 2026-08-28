@@ -126,3 +126,28 @@ export async function generateFolioProspecto(): Promise<string> {
   });
   return formatFolioProspecto(siguiente);
 }
+
+// ─── Folios de embarques (SHP-2026-XXXX) ─────────────────────────────────────
+//
+// Antes los ids se derivaban de `embarques.length + 1`, tanto al crear un
+// embarque como al crear un HBL hijo. Mientras la lista vivía en memoria eso
+// solo duplicaba una fila; con los embarques en Firestore, un id repetido
+// SOBRESCRIBE un documento real. De ahí el contador transaccional.
+//
+const COUNTER_DOC_EMBARQUES = doc(db, 'contadores', 'embarques');
+
+export function formatFolioEmbarque(n: number): string {
+  const num = String(n).padStart(FOLIO_CONFIG.padding, '0');
+  const anio = new Date().getFullYear();
+  return `SHP${FOLIO_CONFIG.separador}${anio}${FOLIO_CONFIG.separador}${num}`;
+}
+
+export async function generateFolioEmbarque(): Promise<string> {
+  const siguiente = await runTransaction(db, async (tx) => {
+    const snap = await tx.get(COUNTER_DOC_EMBARQUES);
+    const next = (snap.exists() ? (snap.data().ultimo as number) : 0) + 1;
+    tx.set(COUNTER_DOC_EMBARQUES, { ultimo: next }, { merge: true });
+    return next;
+  });
+  return formatFolioEmbarque(siguiente);
+}
