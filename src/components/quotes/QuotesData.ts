@@ -191,6 +191,14 @@ export interface KanbanQuote {
   estadoFinal: 'ganada' | 'perdida' | null;
   motivoPerdida: string | null;
 
+  /**
+   * Embarques generados desde esta cotización (E-4).
+   * Con al menos uno, la cotización queda CONGELADA: sus conceptos ya no se
+   * editan. Decisión del cliente: «una vez que pasa a embarques ya así se
+   * queda». Sin divergencia posible entre lo cotizado y lo que se va a cobrar.
+   */
+  embarqueIds?: string[];
+
   // Timestamps y auditoría
   createdAt: string;
   updatedAt: string;

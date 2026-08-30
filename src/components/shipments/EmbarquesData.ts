@@ -286,6 +286,27 @@ export interface EmbarqueCompleto {
   fechaEnTransito?: string;       // Timestamp del paso a En Tránsito
   productos?: EmbarqueProducto[]; // Detalle de mercancías/productos (hijo/BOL)
   tipoEntrega?: string;           // "Entrega Exprés" / "Entrega Estándar" — modo de entrega en Magaya
+
+  // ── E-4: embarques nacidos de una cotización ganada ─────────────────────
+  /**
+   * 'automatico' = nació al marcar la cotización ganada; 'manual' = lo creó
+   * Operaciones. Gobierna qué permiso se exige al guardarlo: el manual pide
+   * 'embarque.generar', el automático ya lo validó la transición a ganada.
+   */
+  origen?: 'automatico' | 'manual';
+  /** Quién lo disparó. En el automático, quien cerró la venta. */
+  generadoPor?: string;
+  fechaGeneracion?: string;
+  /**
+   * Nació solo y le falta la captura operativa (guía, booking, buque, fechas).
+   * Alimenta la bandeja «Por capturar» de Operaciones.
+   */
+  requiereCaptura?: boolean;
+  /**
+   * Lo que el mapeo detectó al heredar los cargos. Viaja con el embarque
+   * porque quien disparó la generación no vio el resultado.
+   */
+  advertenciasHeredadas?: unknown[];
 }
 
 // ────────────────────────────────────────────────────────────

@@ -512,3 +512,39 @@ export function quitarLinea(quote: KanbanQuote, lineaId: string): KanbanQuote {
     ),
   };
 }
+
+// ─── Congelado ────────────────────────────────────────────────────────────────
+
+/**
+ * ¿La cotización ya generó embarque y por tanto está congelada?
+ *
+ * Decisión del cliente (28-ago-2026): «no, una vez que pasa a embarques ya así
+ * se queda». Los conceptos dejan de editarse, así que no puede haber
+ * divergencia entre lo cotizado y lo que el embarque va a cobrar y pagar.
+ */
+export function estaCongelada(quote: { embarqueIds?: string[] | null }): boolean {
+  return (quote.embarqueIds?.length ?? 0) > 0;
+}
+
+/**
+ * Campos que SÍ se pueden seguir tocando en una cotización congelada.
+ *
+ * Se usa lista blanca y no un diff profundo porque los componentes mandan la
+ * cotización entera en cada guardado: `servicios` siempre viene, cambie o no,
+ * así que «bloquear solo si cambió servicios» no se puede distinguir. La lista
+ * blanca es predecible y deja viva la conversación con el cliente después de
+ * ganada, que es lo que uno querría.
+ */
+export const CAMPOS_EDITABLES_CONGELADA = [
+  'chat',
+  'actividades',
+  'historialEtapas',
+  'embarqueIds',
+  'updatedAt',
+] as const;
+
+/** Campos del patch que la cotización congelada NO acepta. Vacío = todo bien. */
+export function camposBloqueados(patch: Record<string, unknown>): string[] {
+  const permitidos = new Set<string>(CAMPOS_EDITABLES_CONGELADA);
+  return Object.keys(patch).filter(k => !permitidos.has(k));
+}
