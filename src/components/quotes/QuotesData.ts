@@ -365,6 +365,25 @@ export function getCostoOficial(concepto: ConceptoCotizacion): number {
     .reduce((acc, t) => acc + t.monto, 0);
 }
 
+/**
+ * Costo total de un concepto: tarifas oficiales + subconceptos.
+ *
+ * Si el concepto no tiene ninguna de las dos cosas, cae al campo `costo`
+ * capturado a mano. Ese fallback corrige un hueco real: un concepto tecleado
+ * sin tarifas aportaba su profit al total de la cotización pero NO su costo,
+ * así que el total salía de menos y el margen inflado.
+ *
+ * Punto único de verdad: lo usan `calcularTotalConsolidado` y el adaptador de
+ * la tabla plana (lib/lineasCotizacion.ts). Si cada uno calculara por su lado,
+ * la tabla y el Kanban mostrarían totales distintos.
+ */
+export function costoDeConcepto(concepto: ConceptoCotizacion): number {
+  const oficial = getCostoOficial(concepto);
+  const subs = concepto.subconceptos?.reduce((acc, s) => acc + s.costo, 0) ?? 0;
+  if (oficial > 0 || subs > 0) return oficial + subs;
+  return concepto.costo ?? 0;
+}
+
 // ============================================================
 // Helper: calcular total consolidado de una cotización
 // ============================================================
@@ -390,10 +409,7 @@ export function calcularTotalConsolidado(servicios: ServicioSolicitado[]): numbe
 
     // ── Ruta 2: vista detallada (FichaCotizacion / lineas_cotizacion) ─────
     for (const concepto of srv.conceptos) {
-      const costoOficial = getCostoOficial(concepto);
-      const costoSubs    = concepto.subconceptos?.reduce((acc, s) => acc + s.costo, 0) ?? 0;
-      const costoTotal   = costoOficial + costoSubs;
-      total += calcLinea(costoTotal, concepto.profit).venta;
+      total += calcLinea(costoDeConcepto(concepto), concepto.profit).venta;
     }
   }
   return Math.round(total * 100) / 100;
