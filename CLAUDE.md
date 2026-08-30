@@ -375,6 +375,20 @@ todo dato en Firestore es escribible por cualquier miembro del equipo.
 Sin ellos, `calcularIVA` no se puede aplicar en la cotización, aunque la función ya existe y
 está probada. Bloquea el cálculo fiscal correcto. **Prioritario.**
 
+**`getCostoOficial` suma tarifas sin mirar la moneda.**
+Con multi-selección de tarifas, `getCostoOficial` hace `reduce((a, t) => a + t.monto)`
+sin comparar `t.moneda`. Un concepto con una tarifa de 1,000 USD y otra de
+5,000 MXN da un costo de 6,000 «de algo», y sobre esa suma se calcularon la
+venta y el margen. Viola §4.3: un total revuelto se ve creíble y es basura.
+
+No se corrige todavía porque cambiaría el costo —y por tanto el margen— de
+cotizaciones vivas. El mapeo a embarques (`lib/cotizacionAEmbarque.ts`) ya lo
+detecta y emite la advertencia `monedas_mezcladas` cuando ocurre, así que el
+caso no pasa desapercibido aunque el dato viejo siga mal.
+
+Para medir el alcance antes de arreglarlo: `scripts/auditarMonedasMezcladas.ts`
+(solo lectura). Al 30-ago-2026 no se había corrido.
+
 **Dualidad de `CotizacionProveedor`.**
 BandejaPricing guarda en `servicio.cotizacionesProveedor` (sin `proveedorId`); FichaCotizacion
 guarda en `concepto.tarifas` (con `proveedorId`). Los helpers recorren ambos niveles con
