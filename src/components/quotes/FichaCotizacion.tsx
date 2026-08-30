@@ -33,7 +33,13 @@ import {
   visibilidadDe, tabsVisibles, LINEA_TIEMPO_VENTAS,
   indicePasoVentas, lineaTiempoColapsada,
 } from '../../lib/visibilidadCotizacion';
-import { aplanarCotizacion } from '../../lib/lineasCotizacion';
+import {
+  aplanarCotizacion, aplicarEdicionLinea, quitarLinea, agregarLinea,
+  reordenarLinea, aplicarOrden, estaCongelada,
+} from '../../lib/lineasCotizacion';
+import { agruparPorModalidad } from '../../lib/agrupacionModalidad';
+import TarjetaModalidad from './TarjetaModalidad';
+import ResumenFinancieroInline from './ResumenFinancieroInline';
 import { calcTotales } from '../../lib/cotizacionCalculator';
 
 // ─── Re-exports for backward compat (other files may import these from here) ──
@@ -542,6 +548,55 @@ export default function FichaCotizacion({
     return margen_real;
   }, [quote]);
 
+  // ── Vista plana para las tarjetas por modalidad ─────────────────────────
+  const lineasPlanas = useMemo(() => aplanarCotizacion(quote), [quote]);
+  const tarjetasModalidad = useMemo(
+    () => agruparPorModalidad(lineasPlanas, servicios ?? []),
+    [lineasPlanas, servicios],
+  );
+
+  /** Aplica una edición de la tabla plana sobre el árbol anidado. */
+  const handleEditarLineaPlana = (
+    lineaId: string,
+    campo: 'concepto' | 'costo' | 'profit' | 'target',
+    valor: string | number,
+  ) => {
+    const edicion = campo === 'concepto'
+      ? { concepto: String(valor) }
+      : { [campo]: Number(valor) };
+    onUpdateQuote(aplicarEdicionLinea(quote, lineaId, edicion));
+  };
+
+  const handleQuitarLineaPlana = (lineaId: string) => {
+    onUpdateQuote(quitarLinea(quote, lineaId));
+  };
+
+  const handleMoverLineaPlana = (lineaId: string, direccion: 'arriba' | 'abajo') => {
+    const movidas = reordenarLinea(lineasPlanas, lineaId, direccion);
+    onUpdateQuote(aplicarOrden(quote, movidas));
+  };
+
+  /**
+   * Agrega un concepto a la modalidad indicada.
+   *
+   * Se cuelga del primer servicio que ya pertenezca a esa modalidad. Si no hay
+   * ninguno, del primer servicio de la cotización: el concepto tiene que
+   * existir en algún lado y es preferible eso a bloquear la captura.
+   */
+  const handleAgregarLineaPlana = (modalidad: string) => {
+    const lineaDeEsaModalidad = tarjetasModalidad.find(t => t.modalidad === modalidad)?.lineas[0];
+    const servicioId = lineaDeEsaModalidad?.servicioId ?? quote.servicios[0]?.id;
+    if (!servicioId) return;
+    onUpdateQuote(agregarLinea(quote, { servicioId, concepto: 'Nuevo concepto' }));
+  };
+
+  /** Abre la comparativa para elegir proveedor de esa línea. */
+  const handleCompararProveedor = (lineaId: string) => {
+    const linea = lineasPlanas.find(l => l.id === lineaId);
+    if (!linea?.conceptoLocalId) return;
+    handleConceptoActivate(linea.conceptoLocalId, linea.servicioId);
+  };
+
   const serviciosConProveedor = quote.servicios.filter(
     s => (s.cotizacionesProveedor ?? []).some(cp => cp.seleccionada)
   );
@@ -744,25 +799,52 @@ export default function FichaCotizacion({
         <div className="flex-1 flex min-h-0">
           {/* Columna izquierda: servicios */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest flex items-center gap-1.5">
-                <FileText className="w-4 h-4" /> Servicios Solicitados
-              </h3>
-              {/* Chips de resumen */}
-              <div className="flex flex-wrap gap-1">
-                {Array.from(new Set(quote.servicios.map(s => s.tipo))).map(tipo => {
-                  const def = (servicios ?? []).find(s => s.id === tipo);
-                  return (
-                    <span key={tipo} className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[8px] font-bold border bg-gray-50 border-gray-200 text-gray-700 uppercase`}>
-                      {renderIcon(def?.icono || 'HelpCircle', "w-2.5 h-2.5")}
-                      {def?.nombre || tipo}
-                    </span>
-                  );
-                })}
-              </div>
+            {/* ── Tarjetas por modalidad (sesión 30-ago-2026) ──────────────
+                Reemplaza el árbol de servicios → conceptos → cotizaciones de
+                proveedor. Luis: «no me queda claro por qué estamos segmentando
+                los servicios». Una tarjeta por modalidad, con su tabla de
+                conceptos dentro. */}
+            <div className="space-y-4">
+              {tarjetasModalidad.map(t => (
+                <TarjetaModalidad
+                  key={t.modalidad}
+                  tarjeta={t}
+                  moneda={quote.moneda}
+                  editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
+                  onEditarLinea={handleEditarLineaPlana}
+                  onQuitarLinea={handleQuitarLineaPlana}
+                  onMoverLinea={handleMoverLineaPlana}
+                  onAgregarLinea={() => handleAgregarLineaPlana(t.modalidad)}
+                  onCompararProveedor={handleCompararProveedor}
+                />
+              ))}
+
+              {tarjetasModalidad.length === 0 && (
+                <div className="border-2 border-dashed border-gray-200 rounded-xl py-10 text-center">
+                  <p className="text-[12px] text-gray-400">
+                    Esta cotización todavía no tiene conceptos.
+                  </p>
+                </div>
+              )}
             </div>
 
-            {/* Servicios accordion */}
+            {/* Resumen financiero DENTRO de la ficha: «mientras cotizan no lo
+                pueden ver, se tendrían que salir de lo que están haciendo». */}
+            {lineasPlanas.length > 0 && (
+              <ResumenFinancieroInline
+                lineas={lineasPlanas}
+                moneda={quote.moneda}
+                diasCredito={clienteVinculado?.dias ?? 0}
+              />
+            )}
+
+            {/* Detalle avanzado por servicio — se conserva plegado para no
+                perder la captura de datos de embarque (FCL/LCL, tráfico). */}
+            <details className="pt-2">
+              <summary className="text-[10px] font-bold text-gray-400 uppercase tracking-widest cursor-pointer hover:text-gray-600">
+                Datos de la operación por servicio
+              </summary>
+              <div className="space-y-4 pt-3">
             {quote.servicios.map(srv => (
               <ServicioSection
                 key={srv.id}
@@ -784,6 +866,8 @@ export default function FichaCotizacion({
                 conceptosActivos={conceptosActivos}
               />
             ))}
+              </div>
+            </details>
 
             {/* Botón para agregar nuevo servicio (Solo Pricing/Admin) */}
             {rolActivo !== 'ventas' && (

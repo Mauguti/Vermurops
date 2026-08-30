@@ -530,7 +530,10 @@ export default function Quotes() {
   }
 
   return (
-    <div className={`space-y-[32px] animate-fade-in pb-12 ${chatOpen ? 'xl:pr-[320px]' : ''}`} onClick={() => setActiveMenu(null)}>
+    // El div raíz llamaba a setActiveMenu(null), una función que no existe en
+    // este componente: cada clic dentro del módulo lanzaba un ReferenceError.
+    // No hay ningún menú que cerrar, así que el handler se retira.
+    <div className={`space-y-[32px] animate-fade-in pb-12 ${chatOpen ? 'xl:pr-[320px]' : ''}`}>
       {/* ── Header principal (oculto cuando hay una ficha abierta) ──── */}
       {!showForm && !selectedQuote && !fichaAbierta && (
         <div className="flex flex-col gap-4">
