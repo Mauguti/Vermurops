@@ -371,9 +371,22 @@ la autenticación. **Toca producción: hay que avisar y publicar con
 `firebase deploy --only firestore:rules`.** Mientras no se cierre, asumir que
 todo dato en Firestore es escribible por cualquier miembro del equipo.
 
-**Falta `trafico` y `ubicacion` en `ServicioSolicitado`.**
-Sin ellos, `calcularIVA` no se puede aplicar en la cotización, aunque la función ya existe y
-está probada. Bloquea el cálculo fiscal correcto. **Prioritario.**
+**~~Falta `trafico` y `ubicacion` en `ServicioSolicitado`~~ → CERRADA (30-ago-2026).**
+`ServicioSolicitado` ya tiene `trafico: 'importacion' | 'exportacion'` y
+`ubicacion: 'origen' | 'destino'`. Se cerró porque el campo hacía falta dos
+veces: para el IVA (§4.2) y para el folio del embarque, que codifica el tráfico
+(VLIM impo marítimo vs VLEM expo marítimo).
+
+`lib/ivaCotizacion.ts` conecta `calcularIVA` con las líneas. Devuelve null con
+motivo cuando falta el dato, en vez de asumir 0% o 16%: un IVA inventado se ve
+igual de creíble que uno correcto y sale en una factura.
+
+Las cotizaciones anteriores no traen el campo. `lib/traficoServicio.ts` intenta
+derivarlo de la ruta —destino en México es importación— y si no puede, lo marca
+como desconocido con su motivo. El cotejo es por token y no por subcadena:
+«Laredo, USA» es Texas, «Nuevo Laredo» es México.
+
+Pendiente de este trabajo: mostrar el desglose de IVA en la ficha y en el PDF.
 
 **`getCostoOficial` suma tarifas sin mirar la moneda.**
 Con multi-selección de tarifas, `getCostoOficial` hace `reduce((a, t) => a + t.monto)`

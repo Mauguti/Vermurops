@@ -4,6 +4,9 @@ import * as Icons from 'lucide-react';
 
 export type CategoriaServicio = 'transporte' | 'aduana' | 'carga' | 'otros';
 
+/** Modalidad de embarque a la que pertenece un servicio. */
+export type ModalidadServicio = 'maritimo' | 'terrestre' | 'aereo';
+
 export interface Servicio {
   id: string;
   nombre: string;
@@ -12,19 +15,34 @@ export interface Servicio {
   icono: string;
   descripcion?: string;
   esDefault?: boolean; // Permite identificar los que no se pueden borrar
+
+  /**
+   * A qué modalidad de embarque pertenece este servicio.
+   *
+   * `null` = no define modalidad por sí solo (despacho aduanal, seguro,
+   * maniobras): esas líneas se pegan al embarque de mayor venta.
+   *
+   * Vive en el catálogo y no en un mapeo por id fijo para que los servicios
+   * que Administración cree después también declaren su modalidad. Un mapeo
+   * `srv-def-2 → terrestre` funciona hoy y truena con el primer servicio nuevo.
+   */
+  modalidad?: ModalidadServicio | null;
 }
 
 const DEFAULT_SERVICIOS: Servicio[] = [
-  { id: 'srv-def-1',  nombre: 'Flete Internacional',      categoria: 'transporte', activo: true, icono: 'Ship', esDefault: true },
-  { id: 'srv-def-2',  nombre: 'Transporte Terrestre',     categoria: 'transporte', activo: true, icono: 'Truck', esDefault: true },
-  { id: 'srv-def-3',  nombre: 'Transporte Aéreo',         categoria: 'transporte', activo: true, icono: 'Plane', esDefault: true },
-  { id: 'srv-def-4',  nombre: 'Maniobras',                categoria: 'carga',      activo: true, icono: 'Package', esDefault: true },
-  { id: 'srv-def-5',  nombre: 'Almacenaje Nacional',      categoria: 'carga',      activo: true, icono: 'Warehouse', esDefault: true },
-  { id: 'srv-def-6',  nombre: 'Almacenaje Internacional', categoria: 'carga',      activo: true, icono: 'Warehouse', esDefault: true },
-  { id: 'srv-def-7',  nombre: 'Seguro de Mercancía',      categoria: 'otros',      activo: true, icono: 'Shield', esDefault: true },
-  { id: 'srv-def-8',  nombre: 'Recolección',              categoria: 'transporte', activo: true, icono: 'MapPin', esDefault: true },
-  { id: 'srv-def-9',  nombre: 'Asesoría Aduanal',         categoria: 'aduana',     activo: true, icono: 'FileCheck', esDefault: true },
-  { id: 'srv-def-10', nombre: 'Otros Servicios',          categoria: 'otros',      activo: true, icono: 'MoreHorizontal', esDefault: true },
+  { id: 'srv-def-1',  nombre: 'Flete Internacional',      categoria: 'transporte', activo: true, icono: 'Ship', esDefault: true, modalidad: 'maritimo' },
+  { id: 'srv-def-2',  nombre: 'Transporte Terrestre',     categoria: 'transporte', activo: true, icono: 'Truck', esDefault: true, modalidad: 'terrestre' },
+  { id: 'srv-def-3',  nombre: 'Transporte Aéreo',         categoria: 'transporte', activo: true, icono: 'Plane', esDefault: true, modalidad: 'aereo' },
+  { id: 'srv-def-4',  nombre: 'Maniobras',                categoria: 'carga',      activo: true, icono: 'Package', esDefault: true, modalidad: null },
+  { id: 'srv-def-5',  nombre: 'Almacenaje Nacional',      categoria: 'carga',      activo: true, icono: 'Warehouse', esDefault: true, modalidad: null },
+  { id: 'srv-def-6',  nombre: 'Almacenaje Internacional', categoria: 'carga',      activo: true, icono: 'Warehouse', esDefault: true, modalidad: null },
+  { id: 'srv-def-7',  nombre: 'Seguro de Mercancía',      categoria: 'otros',      activo: true, icono: 'Shield', esDefault: true, modalidad: null },
+  // ⚠️ Recolección queda en null a propósito: una recolección dentro de una
+  // operación marítima es parte de ese embarque, no un VLIT aparte. Pendiente
+  // de confirmar con el cliente — ver reporte.
+  { id: 'srv-def-8',  nombre: 'Recolección',              categoria: 'transporte', activo: true, icono: 'MapPin', esDefault: true, modalidad: null },
+  { id: 'srv-def-9',  nombre: 'Asesoría Aduanal',         categoria: 'aduana',     activo: true, icono: 'FileCheck', esDefault: true, modalidad: null },
+  { id: 'srv-def-10', nombre: 'Otros Servicios',          categoria: 'otros',      activo: true, icono: 'MoreHorizontal', esDefault: true, modalidad: null },
 ];
 
 export const STORAGE_KEY = 'vermurops_servicios';

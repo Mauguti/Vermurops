@@ -151,3 +151,54 @@ export async function generateFolioEmbarque(): Promise<string> {
   });
   return formatFolioEmbarque(siguiente);
 }
+
+// ─── Folios por serie de embarque ─────────────────────────────────────────────
+//
+// Cada serie lleva su propio consecutivo. Los embarques reales de Magaya lo
+// confirman: VLIT-24-107 y VLIA-24-020 conviven con números muy distintos, o
+// sea que terrestre y aéreo numeran aparte. Coincide con el levantamiento:
+// «VL + tipo + año + consecutivo de tres dígitos», con las carpetas
+// organizadas por año/modalidad/mes.
+//
+// Formato: PREFIJO-YY-NNN  →  VLIT-26-001
+//
+const PADDING_EMBARQUE = 3;
+
+export function formatFolioSerie(prefijo: string, n: number, anio = new Date().getFullYear()): string {
+  const yy = String(anio).slice(-2);
+  return `${prefijo}-${yy}-${String(n).padStart(PADDING_EMBARQUE, '0')}`;
+}
+
+/** Documento contador de una serie. Uno por prefijo: contadores/embarques_VLIM. */
+export function docContadorSerie(prefijo: string) {
+  return doc(db, 'contadores', `embarques_${prefijo}`);
+}
+
+/**
+ * Reserva N folios consecutivos de una serie en una sola transacción.
+ *
+ * Pensado para llamarse DENTRO de un runTransaction mayor —el que crea la
+ * cotización ganada y sus N embarques—, por eso recibe la transacción en vez
+ * de abrir la suya: todo tiene que caer junto o no caer.
+ */
+export async function reservarFoliosSerie(
+  tx: { get: (ref: ReturnType<typeof docContadorSerie>) => Promise<{ exists: () => boolean; data: () => Record<string, unknown> | undefined }>;
+        set: (ref: ReturnType<typeof docContadorSerie>, data: Record<string, unknown>, opts?: { merge: boolean }) => unknown },
+  prefijo: string,
+  cuantos: number,
+  anio = new Date().getFullYear(),
+): Promise<string[]> {
+  if (cuantos <= 0) return [];
+
+  const ref = docContadorSerie(prefijo);
+  const snap = await tx.get(ref);
+  const ultimo = snap.exists() ? ((snap.data()?.ultimo as number) ?? 0) : 0;
+
+  const folios: string[] = [];
+  for (let i = 1; i <= cuantos; i++) {
+    folios.push(formatFolioSerie(prefijo, ultimo + i, anio));
+  }
+
+  tx.set(ref, { ultimo: ultimo + cuantos }, { merge: true });
+  return folios;
+}

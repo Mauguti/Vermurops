@@ -102,9 +102,32 @@ export interface ConceptoCotizacion {
   orden?: number;
 }
 
+/**
+ * Sentido de la operación. Pricing lo define de entrada: es de lo primero
+ * que se sabe de un requerimiento.
+ *
+ * Cierra la deuda prioritaria de §6. Hace falta dos veces:
+ *   - fiscal: `calcularIVA` no podía aplicarse sin él (§4.2);
+ *   - operativa: el folio del embarque codifica el tráfico (VLIM impo marítimo
+ *     vs VLEM expo marítimo).
+ */
+export type TraficoServicio = 'importacion' | 'exportacion';
+
+/** Dónde ocurre el servicio. Segunda mitad de la regla espejo del IVA. */
+export type UbicacionServicio = 'origen' | 'destino';
+
 export interface ServicioSolicitado {
   id: string;
   tipo: TipoServicio;
+
+  /**
+   * Sentido de la operación. Opcional por compatibilidad: las cotizaciones
+   * anteriores a esto no lo tienen. Para ellas se intenta derivar de la ruta
+   * y, si no se puede, se marca con advertencia en vez de inventar el dato.
+   */
+  trafico?: TraficoServicio;
+  /** Dónde ocurre. Junto con `trafico` habilita la regla espejo del IVA. */
+  ubicacion?: UbicacionServicio;
   ruta: {
     origen: string;
     destino: string;
