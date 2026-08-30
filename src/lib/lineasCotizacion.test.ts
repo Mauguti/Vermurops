@@ -414,3 +414,77 @@ describe('concepto capturado a mano, sin tarifas', () => {
     expect(aplanarCotizacion(quote([conAmbos]))[0].costo).toBe(2000);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Desglose de costos: a quién se le paga.
+// El agregado sirve para cotizar; para PAGAR hace falta el desglose.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('desglose de costos por proveedor', () => {
+  it('INVARIANTE: la suma del desglose es igual al costo de la línea', () => {
+    const q = quote([SRV_FICHA, SRV_BANDEJA]);
+    aplanarCotizacion(q).forEach(l => {
+      const suma = l.costos.reduce((a, c) => a + c.monto, 0);
+      expect(suma).toBeCloseTo(l.costo, 6);
+    });
+  });
+
+  it('multi-proveedor: una entrada por cada uno, con su id', () => {
+    const srv = servicio({
+      id: 'srv-m',
+      conceptos: [concepto({
+        id: 'cm', nombre: 'Maniobras', profit: 100,
+        tarifas: [
+          tarifa({ id: 'ta', monto: 600, proveedor: 'Terminal A', proveedorId: 'PRV-A' }),
+          tarifa({ id: 'tb', monto: 400, proveedor: 'Terminal B', proveedorId: 'PRV-B' }),
+        ],
+        proveedoresOficialIds: ['ta', 'tb'],
+      })],
+    });
+    const [l] = aplanarCotizacion(quote([srv]));
+    expect(l.costos).toHaveLength(2);
+    expect(l.costos.map(c => c.proveedorId)).toEqual(['PRV-A', 'PRV-B']);
+    expect(l.costos.reduce((a, c) => a + c.monto, 0)).toBe(l.costo);
+  });
+
+  it('los subconceptos entran como componentes sin proveedor', () => {
+    const srv = servicio({
+      id: 'srv-s',
+      conceptos: [concepto({
+        id: 'cs', nombre: 'Flete', profit: 0,
+        tarifas: [tarifa({ id: 't', monto: 1000, proveedor: 'Maersk', proveedorId: 'PRV-1' })],
+        proveedoresOficialIds: ['t'],
+        subconceptos: [{ id: 's1', nombre: 'Combustible', costo: 150, moneda: 'USD' }],
+      })],
+    });
+    const [l] = aplanarCotizacion(quote([srv]));
+    expect(l.costos.map(c => c.tipo)).toEqual(['tarifa', 'subconcepto']);
+    expect(l.costos[1].proveedorId).toBeNull();
+    expect(l.costos.reduce((a, c) => a + c.monto, 0)).toBe(1150);
+  });
+
+  it('un costo tecleado a mano queda como una sola entrada manual', () => {
+    const srv = servicio({
+      id: 'srv-x',
+      conceptos: [concepto({ id: 'cx', nombre: 'Gestoría', costo: 700, profit: 100 })],
+    });
+    const [l] = aplanarCotizacion(quote([srv]));
+    expect(l.costos).toHaveLength(1);
+    expect(l.costos[0].tipo).toBe('manual');
+    expect(l.costos[0].monto).toBe(700);
+  });
+
+  it('la ruta B trae su única entrada, con el proveedor nombrado', () => {
+    const [l] = aplanarCotizacion(quote([SRV_BANDEJA]));
+    expect(l.costos).toHaveLength(1);
+    expect(l.costos[0].proveedorNombre).toBe('Lufthansa Cargo');
+    expect(l.costos[0].monto).toBe(1500);
+  });
+
+  it('una línea sin costo no inventa componentes', () => {
+    const srv = servicio({
+      id: 'srv-0',
+      conceptos: [concepto({ id: 'c0', nombre: 'Sin costo', costo: 0, profit: 200 })],
+    });
+    expect(aplanarCotizacion(quote([srv]))[0].costos).toEqual([]);
+  });
+});

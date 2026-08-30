@@ -45,6 +45,27 @@ import { calcLinea } from './cotizacionCalculator';
 export type OrigenLinea = 'concepto' | 'servicio';
 
 /**
+ * Un componente del costo de la línea: a quién se le paga y cuánto.
+ *
+ * El costo de una línea puede repartirse entre varios proveedores (carga
+ * dividida entre terminales, por ejemplo) y sumar subconceptos que no tienen
+ * proveedor. Para PAGAR hace falta el desglose, no el agregado.
+ *
+ * Invariante: la suma de los montos es igual a `LineaPlana.costo`.
+ */
+export interface CostoLinea {
+  id: string;
+  /** 'tarifa' = de una tarifa elegida · 'subconcepto' · 'manual' = tecleado. */
+  tipo: 'tarifa' | 'subconcepto' | 'manual';
+  descripcion: string;
+  proveedorId?: string | null;
+  proveedorNombre: string;
+  monto: number;
+  moneda: 'MXN' | 'USD';
+  tarifaOrigenId?: string | null;
+}
+
+/**
  * Un renglón de la tabla plana. Equivale a `lineas_cotizacion` del modelo de
  * Luis, más lo que necesitamos para escribir de regreso en el árbol.
  */
@@ -85,6 +106,12 @@ export interface LineaPlana {
   tarifasCount: number;
   /** Trazabilidad a la tarifa del catálogo, cuando hay una sola. */
   tarifaOrigenId?: string | null;
+
+  /**
+   * Desglose de a quién se le paga. Suma exactamente `costo`.
+   * Es lo que el embarque necesita para generar sus líneas de gasto (E-3).
+   */
+  costos: CostoLinea[];
 }
 
 // ─── Aplanado ─────────────────────────────────────────────────────────────────
@@ -127,6 +154,42 @@ function lineaDesdeConcepto(
   const { proveedorId, proveedorNombre, tarifaOrigenId } = nombreProveedorDeConcepto(concepto);
   const { venta, margen } = calcLinea(costo, concepto.profit);
 
+  // Desglose: una entrada por tarifa oficial, una por subconcepto, o una sola
+  // entrada 'manual' cuando el costo se tecleó sin respaldo de tarifas.
+  const costos: CostoLinea[] = [
+    ...oficiales.map(t => ({
+      id: t.id,
+      tipo: 'tarifa' as const,
+      descripcion: concepto.nombre,
+      proveedorId: t.proveedorId ?? null,
+      proveedorNombre: t.proveedor,
+      monto: t.monto,
+      moneda: t.moneda,
+      tarifaOrigenId: t.tarifaOrigenId ?? null,
+    })),
+    ...(concepto.subconceptos ?? []).map(sc => ({
+      id: sc.id,
+      tipo: 'subconcepto' as const,
+      descripcion: sc.nombre,
+      proveedorId: null,
+      proveedorNombre: '',
+      monto: sc.costo,
+      moneda: sc.moneda,
+    })),
+  ];
+
+  if (costos.length === 0 && costo > 0) {
+    costos.push({
+      id: `${concepto.id}-manual`,
+      tipo: 'manual',
+      descripcion: concepto.nombre,
+      proveedorId: null,
+      proveedorNombre: '',
+      monto: costo,
+      moneda: 'USD',
+    });
+  }
+
   return {
     id: `${srv.id}::${concepto.id}`,
     servicioId: srv.id,
@@ -147,6 +210,7 @@ function lineaDesdeConcepto(
     costoDerivado: oficiales.length > 0 || costoSubs > 0,
     tarifasCount: oficiales.length,
     tarifaOrigenId,
+    costos,
   };
 }
 
@@ -175,6 +239,16 @@ function lineaDesdeServicio(srv: ServicioSolicitado, indice: number): LineaPlana
     costoDerivado: true,
     tarifasCount: 1,
     tarifaOrigenId: seleccionada.tarifaOrigenId ?? null,
+    costos: [{
+      id: seleccionada.id,
+      tipo: 'tarifa',
+      descripcion: srv.tipo,
+      proveedorId: seleccionada.proveedorId ?? null,
+      proveedorNombre: seleccionada.proveedor,
+      monto: seleccionada.monto,
+      moneda: seleccionada.moneda,
+      tarifaOrigenId: seleccionada.tarifaOrigenId ?? null,
+    }],
   };
 }
 
