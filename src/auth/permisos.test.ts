@@ -232,8 +232,10 @@ describe('vista vs. capacidad de alta', () => {
     expect(puede('pricing', 'tarifario.cargar')).toBe(true);
   });
 
-  it('Ventas VE clientes pero NO puede darlos de alta', () => {
-    expect(isViewAllowed('ventas', 'clients')).toBe(true);
+  it('Ventas NO entra al módulo de Altas: solo prospectos', () => {
+    // Corregido el 30-ago-2026. Antes se le dejaba la vista en modo consulta;
+    // el cliente pidió quitarla: «solo con el de prospectos».
+    expect(isViewAllowed('ventas', 'clients')).toBe(false);
     expect(puede('ventas', 'cliente.alta')).toBe(false);
   });
 });

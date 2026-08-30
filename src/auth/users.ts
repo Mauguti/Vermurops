@@ -37,7 +37,10 @@ export interface AuthUser {
 // repo —queda inalcanzable, no borrado— hasta que los Bloques 4 y 5 definan
 // dónde vive cada documento (pendiente §4.8 nº 6).
 export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
-  ventas: ['dashboard', 'quotes', 'clients', 'settings'],
+  // 'clients' se QUITA (sesión 30-ago-2026). Textual de Luis: «ellos no
+  // deberían de tener este módulo de altas, solo con el de prospectos». Y de
+  // Gabi: «veo un sistema para todo Vermur, menos para mí».
+  ventas: ['dashboard', 'quotes', 'settings'],
 
   // Pricing: cotiza y gestiona tarifas.
   //  - 'rates': la matriz le asigna «Gestionar tarifas» y «Cargar tarifarios».

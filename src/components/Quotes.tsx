@@ -638,27 +638,28 @@ export default function Quotes() {
                         </>
                       )}
 
-                      {(puedeCrearLead || puedeSolicitar) && (
-                        <div className="flex items-center gap-2">
-                          {puedeCrearLead && (
-                            <button
-                              onClick={() => setShowProspectForm(true)}
-                              className="bg-white border border-[#E11D48] text-[#E11D48] px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#E11D48]/5 transition-colors shadow-sm flex items-center gap-2"
-                            >
-                              <Plus className="w-4 h-4" /> Nuevo prospecto
-                            </button>
-                          )}
-                          {puedeSolicitar && (
-                            <button
-                              onClick={() => setShowForm(true)}
-                              className="bg-[#E11D48] text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#BE123C] transition-colors shadow-sm flex items-center gap-2"
-                            >
-                              <Plus className="w-4 h-4" />
-                              {puedeCrear ? 'Nueva cotización' : 'Solicitar cotización'}
-                            </button>
-                          )}
-                        </div>
-                      )}
+                      {/* 2.4 · Botón contextual: en Prospectos solo se crean
+                          prospectos; en Cotizaciones solo cotizaciones. Antes
+                          aparecían los dos en las dos pestañas. */}
+                      <div className="flex items-center gap-2">
+                        {viewMode === 'prospeccion' && puedeCrearLead && (
+                          <button
+                            onClick={() => setShowProspectForm(true)}
+                            className="bg-[#E11D48] text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#BE123C] transition-colors shadow-sm flex items-center gap-2"
+                          >
+                            <Plus className="w-4 h-4" /> Nuevo prospecto
+                          </button>
+                        )}
+                        {viewMode === 'kanban' && puedeSolicitar && (
+                          <button
+                            onClick={() => setShowForm(true)}
+                            className="bg-[#E11D48] text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#BE123C] transition-colors shadow-sm flex items-center gap-2"
+                          >
+                            <Plus className="w-4 h-4" />
+                            {puedeCrear ? 'Nueva cotización' : 'Solicitar cotización'}
+                          </button>
+                        )}
+                      </div>
                     </>
                   )}
 

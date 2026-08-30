@@ -29,6 +29,12 @@ import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
   type DragStartEvent, type DragEndEvent,
 } from '@dnd-kit/core';
+import {
+  visibilidadDe, tabsVisibles, LINEA_TIEMPO_VENTAS,
+  indicePasoVentas, lineaTiempoColapsada,
+} from '../../lib/visibilidadCotizacion';
+import { aplanarCotizacion } from '../../lib/lineasCotizacion';
+import { calcTotales } from '../../lib/cotizacionCalculator';
 
 // ─── Re-exports for backward compat (other files may import these from here) ──
 export { ServicioSection } from './ServicioSection';
@@ -516,6 +522,26 @@ export default function FichaCotizacion({
     ? quote.valorTotalConsolidado
     : calcularTotalConsolidado(quote.servicios);
 
+  /**
+   * Margen de la OPERACIÓN COMPLETA, no de un concepto.
+   *
+   * Es el número con el que Pricing juega: pueden bajar el margen de un
+   * concepto y subirlo en otro. «El margen de mi concepto no va a ser bueno,
+   * pero el margen de mi operación sí.» Es también lo único de rentabilidad
+   * que Ventas ve.
+   */
+  const margenGeneralOperacion = useMemo(() => {
+    const lineas = aplanarCotizacion(quote);
+    const { margen_real } = calcTotales(
+      lineas.map(l => ({ costo: l.costo, profit: l.profit })),
+      // El financiamiento por días de crédito afecta el profit real, no el
+      // margen bruto de la operación, así que aquí va en cero. El profit real
+      // con financiamiento vive en el resumen financiero de Pricing.
+      0,
+    );
+    return margen_real;
+  }, [quote]);
+
   const serviciosConProveedor = quote.servicios.filter(
     s => (s.cotizacionesProveedor ?? []).some(cp => cp.seleccionada)
   );
@@ -538,13 +564,20 @@ export default function FichaCotizacion({
     ? clientes.find(c => c.id === quote.clienteId) ?? null
     : null;
 
-  const TABS = [
+  // Sesión 30-ago-2026: Ventas ve la cotización y el margen, no el desglose
+  // de costos ni los proveedores. Ver lib/visibilidadCotizacion.ts.
+  const visible = visibilidadDe(rolActivo);
+  const tabsPermitidas = tabsVisibles(rolActivo);
+
+  const TODAS_LAS_TABS = [
     { id: 'info', label: 'Información' },
     { id: 'servicios', label: `Servicios (${quote.servicios.length})` },
     { id: 'actividades', label: 'Actividades' },
     { id: 'historial', label: 'Historial / Notas' },
     { id: 'chat', label: 'Chat Interno' }
   ] as const;
+
+  const TABS = TODAS_LAS_TABS.filter(t => (tabsPermitidas as string[]).includes(t.id));
 
   const renderConsolidadoPanel = () => {
     if (totalConsolidado === 0) return null;
@@ -665,13 +698,19 @@ export default function FichaCotizacion({
                 quote.etapa === 'perdida' ? 'bg-red-100 text-red-800' :
                 'bg-[#E11D48]/10 text-[#E11D48]'}`}
             >
-              {PIPELINE_STAGES.find(s => s.id === quote.etapa)?.label}
+              {lineaTiempoColapsada(rolActivo)
+                ? (LINEA_TIEMPO_VENTAS[indicePasoVentas(quote.etapa)]?.label ?? quote.etapa)
+                : PIPELINE_STAGES.find(s => s.id === quote.etapa)?.label}
             </span>
             {/* Rol activo */}
             <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide border
               ${rolActivo === 'pricing' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-[#E11D48]/5 text-[#E11D48] border-[#E11D48]/20'}`}
             >
-              Vista: {rolActivo === 'pricing' ? 'Pricing' : rolActivo === 'admin' ? 'Admin' : 'Ventas'}
+              Vista: {rolActivo === 'pricing' ? 'Pricing'
+                : rolActivo === 'admin' ? 'Admin'
+                : rolActivo === 'operaciones' ? 'Operaciones'
+                : rolActivo === 'administracion' ? 'Administración'
+                : 'Ventas'}
             </span>
           </div>
           {/* Total consolidado si existe */}
@@ -700,7 +739,7 @@ export default function FichaCotizacion({
       </div>
 
       {/* ── Contenido: Servicios (dos columnas FC-2 + drag&drop FC-3) ───────── */}
-      {activeTab === 'servicios' && (
+      {activeTab === 'servicios' && visible.desglosePorConcepto && (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
         <div className="flex-1 flex min-h-0">
           {/* Columna izquierda: servicios */}
@@ -835,6 +874,60 @@ export default function FichaCotizacion({
       <div className="flex-1 overflow-y-auto p-6">
 
         {/* ────────────── Tab: Información ────────────── */}
+        {activeTab === 'info' && lineaTiempoColapsada(rolActivo) && (
+          <div className="mb-6 space-y-4">
+            {/* Línea del tiempo de Ventas: cinco pasos. Las tres etapas
+                internas de Pricing se colapsan en «En pricing» — a Ventas le
+                importa que está con Pricing, no en cuál paso interno va. */}
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
+                Avance de la cotización
+              </h4>
+              <div className="flex items-center gap-1">
+                {LINEA_TIEMPO_VENTAS.map((paso, i) => {
+                  const actual = indicePasoVentas(quote.etapa);
+                  const hecho = i < actual;
+                  const esActual = i === actual;
+                  const perdida = quote.etapa === 'perdida' && i === LINEA_TIEMPO_VENTAS.length - 1;
+                  return (
+                    <React.Fragment key={paso.id}>
+                      <div className="flex flex-col items-center flex-1 min-w-0">
+                        <div className={`w-full h-1.5 rounded-full ${
+                          perdida ? 'bg-red-400'
+                          : hecho || esActual ? 'bg-[#E11D48]'
+                          : 'bg-gray-200'}`} />
+                        <span className={`mt-1.5 text-[10px] text-center leading-tight truncate w-full ${
+                          esActual ? 'font-bold text-[#18181B]' : 'text-gray-400'}`}>
+                          {paso.label}
+                        </span>
+                      </div>
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Margen de la OPERACIÓN, sin desglose. Es lo único de rentabilidad
+                que Ventas necesita: «que vean la coti y el margen. Eso es todo». */}
+            {visible.margenGeneral && totalConsolidado > 0 && (
+              <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Valor de la operación</p>
+                  <p className="text-xl font-black text-[#18181B] tabular-nums mt-0.5">
+                    ${totalConsolidado.toLocaleString()} <span className="text-sm font-medium text-gray-400">{quote.moneda}</span>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Margen de la operación</p>
+                  <p className="text-xl font-black text-emerald-600 tabular-nums mt-0.5">
+                    {(margenGeneralOperacion * 100).toFixed(1)}%
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {activeTab === 'info' && (
           <div className="max-w-3xl mx-auto space-y-6">
 
