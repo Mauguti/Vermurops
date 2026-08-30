@@ -63,6 +63,11 @@ export interface CostoLinea {
   monto: number;
   moneda: 'MXN' | 'USD';
   tarifaOrigenId?: string | null;
+  /**
+   * Vigencia de la tarifa (ISO). La vigencia vencida es fuente de reclamos
+   * según el levantamiento, así que viaja hasta el embarque para poder avisar.
+   */
+  vigencia?: string | null;
 }
 
 /**
@@ -166,6 +171,7 @@ function lineaDesdeConcepto(
       monto: t.monto,
       moneda: t.moneda,
       tarifaOrigenId: t.tarifaOrigenId ?? null,
+      vigencia: t.vigencia ?? null,
     })),
     ...(concepto.subconceptos ?? []).map(sc => ({
       id: sc.id,
@@ -248,6 +254,7 @@ function lineaDesdeServicio(srv: ServicioSolicitado, indice: number): LineaPlana
       monto: seleccionada.monto,
       moneda: seleccionada.moneda,
       tarifaOrigenId: seleccionada.tarifaOrigenId ?? null,
+      vigencia: seleccionada.vigencia ?? null,
     }],
   };
 }

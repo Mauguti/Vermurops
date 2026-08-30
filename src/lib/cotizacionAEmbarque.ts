@@ -25,6 +25,7 @@
  */
 
 import { KanbanQuote } from '../components/quotes/QuotesData';
+import { ClienteVermur } from '../components/clientes/ClientesData';
 import { CargoDetalle, MonedaCargo } from '../components/shipments/EmbarquesData';
 import { aplanarCotizacion, LineaPlana } from './lineasCotizacion';
 
@@ -40,7 +41,19 @@ export type TipoAdvertencia =
   /** Se cobra sin costo asociado: puede ser correcto, o faltar la tarifa. */
   | 'venta_sin_costo'
   /** La venta quedó por debajo del costo. */
-  | 'margen_negativo';
+  | 'margen_negativo'
+  /**
+   * Alguna tarifa que originó un costo ya venció.
+   * La vigencia vencida es fuente de reclamos (§4.7): el proveedor puede
+   * negarse a respetar el precio con el que se cotizó.
+   */
+  | 'tarifa_vencida'
+  /**
+   * El cliente no tiene expediente validado. Regla dura del negocio: no se
+   * opera un embarque con cliente sin validar. Operaciones tiene que saberlo
+   * al recibir un embarque que Ventas generó al cerrar la venta.
+   */
+  | 'cliente_sin_expediente';
 
 export interface Advertencia {
   tipo: TipoAdvertencia;
@@ -52,6 +65,23 @@ export interface Advertencia {
 export interface ResultadoMapeo {
   cargos: CargoDetalle[];
   advertencias: Advertencia[];
+}
+
+/**
+ * Datos externos a la cotización que el mapeo necesita para revisar.
+ *
+ * Se pasan como contexto en vez de leerlos aquí para que la función siga
+ * siendo pura y testeable sin Firestore.
+ */
+export interface ContextoMapeo {
+  /**
+   * El cliente de la cotización, si ya está dado de alta.
+   * `null`/ausente significa que la venta se cerró contra un prospecto que
+   * nunca pasó por el alta — que es justo el caso que hay que avisar.
+   */
+  cliente?: ClienteVermur | null;
+  /** Fecha contra la que se evalúa la vigencia. ISO. Default: hoy. */
+  fechaReferencia?: string;
 }
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
@@ -77,7 +107,15 @@ function grupoDe(linea: LineaPlana): string {
 
 // ─── Mapeo ────────────────────────────────────────────────────────────────────
 
-function revisarLinea(linea: LineaPlana): Advertencia[] {
+/** ¿La vigencia quedó atrás de la fecha de referencia? */
+function estaVencida(vigencia: string | null | undefined, fechaRef: string): boolean {
+  if (!vigencia) return false;              // sin vigencia declarada, no se opina
+  const v = Date.parse(vigencia);
+  if (Number.isNaN(v)) return false;        // texto libre del proveedor, no es fecha
+  return v < Date.parse(fechaRef);
+}
+
+function revisarLinea(linea: LineaPlana, fechaRef: string): Advertencia[] {
   const avisos: Advertencia[] = [];
   const base = { lineaId: linea.id, concepto: linea.concepto };
 
@@ -110,6 +148,18 @@ function revisarLinea(linea: LineaPlana): Advertencia[] {
       ...base,
       tipo: 'margen_negativo',
       detalle: `Venta ${linea.venta} por debajo del costo ${linea.costo}.`,
+    });
+  }
+
+  const vencidas = linea.costos.filter(c => estaVencida(c.vigencia, fechaRef));
+  if (vencidas.length > 0) {
+    const detalle = vencidas
+      .map(c => `${c.proveedorNombre || 'proveedor sin identificar'} (venció ${c.vigencia})`)
+      .join(', ');
+    avisos.push({
+      ...base,
+      tipo: 'tarifa_vencida',
+      detalle: `Tarifa vencida al generar el embarque: ${detalle}. El proveedor puede no respetar el precio cotizado.`,
     });
   }
 
@@ -167,12 +217,61 @@ function cargosDeLinea(linea: LineaPlana, cotizacionId: string): CargoDetalle[] 
 }
 
 /**
+ * Revisa el expediente del cliente.
+ *
+ * Regla dura del negocio: no se opera un embarque con cliente sin validar.
+ * El caso más común y más grave es que la cotización siga apuntando solo al
+ * prospecto: Ventas cerró la venta con alguien que nunca pasó por el alta.
+ */
+function revisarCliente(
+  quote: KanbanQuote,
+  cliente: ClienteVermur | null | undefined,
+): Advertencia | null {
+  const base = {
+    lineaId: '',
+    concepto: quote.prospecto?.empresa ?? '',
+    tipo: 'cliente_sin_expediente' as const,
+  };
+
+  if (!quote.clienteId) {
+    return {
+      ...base,
+      detalle: `«${quote.prospecto?.empresa ?? 'Sin nombre'}» sigue siendo prospecto: la cotización no está ligada a un cliente dado de alta. Administración tiene que abrir el expediente antes de operar.`,
+    };
+  }
+
+  if (!cliente) {
+    return {
+      ...base,
+      detalle: `La cotización apunta al cliente ${quote.clienteId}, pero no se pudo leer su expediente para verificarlo.`,
+    };
+  }
+
+  const faltantes: string[] = [];
+  if (cliente.statusOperativo === 'INACTIVO') faltantes.push('está marcado como INACTIVO');
+  if (!cliente.rfc?.trim()) faltantes.push('no tiene RFC');
+  if (cliente.validadoFiscalmente !== true) faltantes.push('no está validado fiscalmente');
+
+  if (faltantes.length === 0) return null;
+
+  return {
+    ...base,
+    concepto: cliente.nombre,
+    detalle: `El expediente de «${cliente.nombre}» ${faltantes.join(', ')}.`,
+  };
+}
+
+/**
  * Convierte la cotización en los cargos del embarque.
  *
  * Un ingreso por línea (la venta) y un gasto por cada componente de costo
  * (a cada proveedor lo suyo).
  */
-export function mapearCotizacionAEmbarque(quote: KanbanQuote): ResultadoMapeo {
+export function mapearCotizacionAEmbarque(
+  quote: KanbanQuote,
+  contexto: ContextoMapeo = {},
+): ResultadoMapeo {
+  const fechaRef = contexto.fechaReferencia ?? new Date().toISOString().slice(0, 10);
   const lineas = aplanarCotizacion(quote);
 
   const cargos: CargoDetalle[] = [];
@@ -180,8 +279,11 @@ export function mapearCotizacionAEmbarque(quote: KanbanQuote): ResultadoMapeo {
 
   lineas.forEach(linea => {
     cargos.push(...cargosDeLinea(linea, quote.id));
-    advertencias.push(...revisarLinea(linea));
+    advertencias.push(...revisarLinea(linea, fechaRef));
   });
+
+  const avisoCliente = revisarCliente(quote, contexto.cliente);
+  if (avisoCliente) advertencias.push(avisoCliente);
 
   if (lineas.length === 0) {
     advertencias.push({

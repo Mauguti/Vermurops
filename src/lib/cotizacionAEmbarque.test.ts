@@ -19,6 +19,7 @@ import { aplanarCotizacion, totalVenta } from './lineasCotizacion';
 import {
   KanbanQuote, ServicioSolicitado, ConceptoCotizacion, CotizacionProveedor,
 } from '../components/quotes/QuotesData';
+import { ClienteVermur } from '../components/clientes/ClientesData';
 
 // ─── Fixtures (mismos que FC-1, para que los casos sean comparables) ─────────
 
@@ -39,6 +40,9 @@ function quote(servicios: ServicioSolicitado[]): KanbanQuote {
   return {
     id: 'COT-2026-0042', etapa: 'ganada',
     prospecto: { empresa: 'Alfa', contacto: 'A', telefono: '', email: '', origen: 'web' },
+    // Una cotización sana está ligada a un cliente dado de alta: sin eso, el
+    // mapeo avisa —con razón— de que se cerró la venta contra un prospecto.
+    clienteId: 'CLI-001',
     vendedorId: 'v1', pricingId: 'p1', servicios,
     valorTotalConsolidado: 0, moneda: 'USD', estadoFinal: 'ganada', motivoPerdida: null,
     createdAt: '', updatedAt: '', historialEtapas: [], actividades: [], chat: [],
@@ -70,6 +74,13 @@ const SRV_BANDEJA = servicio({
     tarifa({ id: 'cp2', monto: 1700, proveedor: 'AeroMéxico', seleccionada: false }),
   ],
 });
+
+const CLIENTE_OK: ClienteVermur = {
+  id: 'CLI-001', nombre: 'Industrias Alfa', rfc: 'IAL890315AB2',
+  statusOperativo: 'ACTIVO', validadoFiscalmente: true,
+} as ClienteVermur;
+
+const CTX_SANO = { cliente: CLIENTE_OK, fechaReferencia: '2026-08-30' };
 
 describe('INVARIANTE: no se pierde dinero en el camino', () => {
   const casos: Array<[string, ServicioSolicitado[]]> = [
@@ -254,19 +265,146 @@ describe('advertencias: lo que Ventas no va a ver al cerrar la venta', () => {
   });
 
   it('avisa si la cotización no tiene líneas', () => {
-    const { cargos, advertencias } = mapearCotizacionAEmbarque(quote([]));
+    const { cargos, advertencias } = mapearCotizacionAEmbarque(quote([]), CTX_SANO);
     expect(cargos).toEqual([]);
+    expect(advertencias.map(a => a.tipo)).toEqual(['sin_venta']);
     expect(advertencias[0].detalle).toContain('sin cargos');
   });
 
   it('una cotización sana no genera advertencias', () => {
-    expect(mapearCotizacionAEmbarque(quote([SRV_FICHA])).advertencias).toEqual([]);
+    expect(mapearCotizacionAEmbarque(quote([SRV_FICHA]), CTX_SANO).advertencias).toEqual([]);
   });
 
   it('las advertencias no bloquean: los cargos se generan igual', () => {
     // El embarque se crea de todos modos. Si esto abortara, una cotización
     // ganada se quedaría sin embarque y el cliente ya la aceptó.
     const { cargos } = mapearCotizacionAEmbarque(quote([SRV_BANDEJA]));
+    expect(cargos.length).toBeGreaterThan(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Las dos advertencias que pidió Operaciones.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const HOY = '2026-08-30';
+
+function conVigencia(vigencia: string | undefined): KanbanQuote {
+  return quote([servicio({
+    id: 'srv-v',
+    conceptos: [concepto({
+      id: 'cv', nombre: 'Flete', profit: 500,
+      tarifas: [tarifa({ id: 'tv', monto: 2000, proveedor: 'Maersk', proveedorId: 'PRV-1', vigencia })],
+      proveedoresOficialIds: ['tv'],
+    })],
+  })]);
+}
+
+const tiposDe = (q: KanbanQuote, ctx = {}) =>
+  mapearCotizacionAEmbarque(q, { fechaReferencia: HOY, cliente: CLIENTE_OK, ...ctx })
+    .advertencias.map(a => a.tipo);
+
+describe('advertencia: tarifa vencida', () => {
+  it('avisa cuando la vigencia quedó atrás', () => {
+    expect(tiposDe(conVigencia('2026-07-15'))).toContain('tarifa_vencida');
+  });
+
+  it('no avisa si la tarifa sigue vigente', () => {
+    expect(tiposDe(conVigencia('2026-12-31'))).not.toContain('tarifa_vencida');
+  });
+
+  it('el mismo día de vencimiento todavía es válido', () => {
+    expect(tiposDe(conVigencia(HOY))).not.toContain('tarifa_vencida');
+  });
+
+  it('sin vigencia declarada no opina', () => {
+    expect(tiposDe(conVigencia(undefined))).not.toContain('tarifa_vencida');
+  });
+
+  it('una vigencia en texto libre no se interpreta como fecha', () => {
+    // §4.7: la vigencia es campo abierto, «como lo dice el proveedor».
+    // Marcar «sujeto a confirmación» como vencida sería un falso positivo.
+    expect(tiposDe(conVigencia('sujeto a confirmación'))).not.toContain('tarifa_vencida');
+  });
+
+  it('el aviso nombra al proveedor y la fecha, para poder actuar', () => {
+    const { advertencias } = mapearCotizacionAEmbarque(conVigencia('2026-07-15'), { fechaReferencia: HOY });
+    const a = advertencias.find(x => x.tipo === 'tarifa_vencida')!;
+    expect(a.detalle).toContain('Maersk');
+    expect(a.detalle).toContain('2026-07-15');
+  });
+
+  it('avisa aunque solo una de varias tarifas esté vencida', () => {
+    const q = quote([servicio({
+      id: 'srv-mv',
+      conceptos: [concepto({
+        id: 'cmv', nombre: 'Maniobras', profit: 100,
+        tarifas: [
+          tarifa({ id: 'v1', monto: 600, proveedor: 'A', proveedorId: 'P1', vigencia: '2026-12-31' }),
+          tarifa({ id: 'v2', monto: 400, proveedor: 'B', proveedorId: 'P2', vigencia: '2026-01-01' }),
+        ],
+        proveedoresOficialIds: ['v1', 'v2'],
+      })],
+    })]);
+    const a = mapearCotizacionAEmbarque(q, { fechaReferencia: HOY })
+      .advertencias.find(x => x.tipo === 'tarifa_vencida')!;
+    expect(a.detalle).toContain('B');
+    expect(a.detalle).not.toContain('A (');
+  });
+});
+
+describe('advertencia: cliente sin expediente validado', () => {
+  const clienteOk = CLIENTE_OK;
+
+  const conCliente = (clienteId: string | null) => ({ ...quote([SRV_FICHA]), clienteId } as KanbanQuote);
+
+  it('avisa cuando la venta se cerró contra un prospecto sin alta', () => {
+    // El caso más común: la cotización nunca se ligó a un cliente.
+    const tipos = tiposDe(conCliente(null));
+    expect(tipos).toContain('cliente_sin_expediente');
+  });
+
+  it('el aviso nombra a la empresa, para que Administración sepa a quién dar de alta', () => {
+    const { advertencias } = mapearCotizacionAEmbarque(conCliente(null), { fechaReferencia: HOY });
+    expect(advertencias.find(a => a.tipo === 'cliente_sin_expediente')!.detalle).toContain('Alfa');
+  });
+
+  it('no avisa con un expediente completo', () => {
+    expect(tiposDe(conCliente('CLI-001'), { cliente: clienteOk })).not.toContain('cliente_sin_expediente');
+  });
+
+  it('avisa si el cliente está INACTIVO', () => {
+    const inactivo = { ...clienteOk, statusOperativo: 'INACTIVO' } as ClienteVermur;
+    const { advertencias } = mapearCotizacionAEmbarque(conCliente('CLI-001'), { fechaReferencia: HOY, cliente: inactivo });
+    expect(advertencias.find(a => a.tipo === 'cliente_sin_expediente')!.detalle).toContain('INACTIVO');
+  });
+
+  it('avisa si no tiene RFC — la ausencia de RFC es la señal de no validado', () => {
+    const sinRfc = { ...clienteOk, rfc: '' } as ClienteVermur;
+    const { advertencias } = mapearCotizacionAEmbarque(conCliente('CLI-001'), { fechaReferencia: HOY, cliente: sinRfc });
+    expect(advertencias.find(a => a.tipo === 'cliente_sin_expediente')!.detalle).toContain('RFC');
+  });
+
+  it('avisa si no está validado fiscalmente', () => {
+    const sinValidar = { ...clienteOk, validadoFiscalmente: false } as ClienteVermur;
+    expect(tiposDe(conCliente('CLI-001'), { cliente: sinValidar })).toContain('cliente_sin_expediente');
+  });
+
+  it('acumula todo lo que falta en un solo aviso', () => {
+    const malo = { ...clienteOk, rfc: '', validadoFiscalmente: false, statusOperativo: 'INACTIVO' } as ClienteVermur;
+    const avisos = mapearCotizacionAEmbarque(conCliente('CLI-001'), { fechaReferencia: HOY, cliente: malo })
+      .advertencias.filter(a => a.tipo === 'cliente_sin_expediente');
+    expect(avisos).toHaveLength(1);
+    expect(avisos[0].detalle).toContain('INACTIVO');
+    expect(avisos[0].detalle).toContain('RFC');
+  });
+
+  it('avisa si la cotización apunta a un cliente que no se pudo leer', () => {
+    expect(tiposDe(conCliente('CLI-999'), { cliente: null })).toContain('cliente_sin_expediente');
+  });
+
+  it('ninguna de las dos bloquea: los cargos se generan igual', () => {
+    const { cargos } = mapearCotizacionAEmbarque(conVigencia('2020-01-01'), { fechaReferencia: HOY });
     expect(cargos.length).toBeGreaterThan(0);
   });
 });
