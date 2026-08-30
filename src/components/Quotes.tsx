@@ -430,7 +430,7 @@ export default function Quotes() {
     );
   };
 
-  const handleCreateQuote = async (stage: 'solicitud_cliente' | 'solicitado_pricing') => {
+  const handleCreateQuote = async (stage: 'solicitud_cliente' | 'solicitado_pricing' | 'pricing_solicitando') => {
     if (!formEmpresa.trim() || formServicios.length === 0) {
       alert('Por favor introduce la empresa y selecciona al menos un servicio requerido.');
       return;
@@ -450,7 +450,9 @@ export default function Quotes() {
         origen: formOrigen,
       },
       vendedorId: formVendedor,
-      pricingId: null,
+      // Si la crea Pricing, es suya desde el inicio: no entra al carrusel, que
+      // es solo para clientes nuevos que llegan por la página.
+      pricingId: puedeCrear ? (user?.uid ?? user?.nombre ?? null) : null,
       servicios: formServicios.map(id => ({
         id: `srv-${folio}-${id}`,
         tipo: id as TipoServicio,
@@ -479,6 +481,15 @@ export default function Quotes() {
 
     await createCotizacion(newQuote);
     setShowForm(false);
+
+    // 4.2 y 4.3 · Pricing crea directo: no se envía a nadie ni se notifica —
+    // ya son ellos. Gabi: «me lo pide el cliente, yo lo trabajo. No me lo pide
+    // el cliente, yo me lo pido a mí y después yo lo trabajo. Porque eso es
+    // doble tarea». La cotización queda asignada a quien la creó y se abre la
+    // ficha para empezar a cotizar.
+    if (puedeCrear) {
+      setSelectedQuote(newQuote);
+    }
 
     // Reset
     setFormEmpresa('');
@@ -1051,20 +1062,34 @@ export default function Quotes() {
             >
               Cancelar
             </button>
-            <button
-              type="button"
-              onClick={() => handleCreateQuote('solicitud_cliente')}
-              className="border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-2xs transition-colors"
-            >
-              Guardar borrador
-            </button>
-            <button
-              type="button"
-              onClick={() => handleCreateQuote('solicitado_pricing')}
-              className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-xs transition-colors"
-            >
-              Enviar a Pricing
-            </button>
+            {/* 4.1 · Pricing no «envía a Pricing»: ya son ellos. Crea y abre
+                la ficha directo. Los demás roles sí solicitan. */}
+            {puedeCrear ? (
+              <button
+                type="button"
+                onClick={() => handleCreateQuote('pricing_solicitando')}
+                className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-xs transition-colors"
+              >
+                Crear y cotizar
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => handleCreateQuote('solicitud_cliente')}
+                  className="border border-gray-200 hover:bg-gray-50 text-gray-700 text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-2xs transition-colors"
+                >
+                  Guardar borrador
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCreateQuote('solicitado_pricing')}
+                  className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-xs transition-colors"
+                >
+                  Enviar a Pricing
+                </button>
+              </>
+            )}
           </div>
         </div>
 

@@ -274,3 +274,15 @@ describe('permiso para guardar un embarque', () => {
     expect(puedeGuardarEmbarque(null, true)).toBe(false);
   });
 });
+
+describe('Pricing crea cotizaciones directo (sesión 30-ago-2026)', () => {
+  it('puede abrir la cotización directamente en su propia etapa de trabajo', () => {
+    // Gabi: «me lo pide el cliente, yo lo trabajo. No me lo pide el cliente, yo
+    // me lo pido a mí y después yo lo trabajo. Porque eso es doble tarea».
+    expect(puedeCrearCotizacion('pricing', 'pricing_solicitando')).toBe(true);
+  });
+
+  it('Ventas NO puede saltarse el paso de solicitud', () => {
+    expect(puedeCrearCotizacion('ventas', 'pricing_solicitando')).toBe(false);
+  });
+});
