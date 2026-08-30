@@ -201,94 +201,134 @@ export type ResolverModalidad = (servicioTipo: string) => ModalidadEmbarque | nu
 export const resolverModalidadCanonica: ResolverModalidad = (tipo) =>
   MODALIDADES[tipo] ?? null;
 
-export interface GrupoModalidad {
+export interface GrupoEmbarque {
+  /** 'principal' o el id del servicio que se opera aparte. */
+  clave: string;
+  esPrincipal: boolean;
   modalidad: ModalidadEmbarque;
+  servicioIds: string[];
   lineas: LineaPlana[];
   ventaTotal: number;
 }
 
-export interface AgrupacionModalidad {
-  grupos: GrupoModalidad[];
+export interface AgrupacionEmbarques {
+  grupos: GrupoEmbarque[];
   advertencias: Advertencia[];
 }
 
 /**
- * Reparte las líneas de la cotización en un grupo por modalidad.
+ * Reparte las líneas de la cotización en los embarques que se van a generar.
  *
- * Las líneas que no pertenecen a ninguna modalidad de transporte —despacho
- * aduanal, seguro de mercancía, asesoría— se asignan al embarque de MAYOR
- * venta, que es el que domina la operación.
+ * Decisión del cliente (30-ago-2026): por defecto TODO va a un solo embarque,
+ * cuya modalidad es la del servicio de mayor venta. Un acarreo dentro de una
+ * operación marítima es parte de ella, no un VLIT aparte.
  *
- * Solo se avisa cuando la asignación es realmente ambigua, es decir cuando hay
- * dos o más modalidades y por tanto había dónde elegir. Con una sola modalidad
- * no hay decisión que tomar y avisar sería ruido: una advertencia que se
- * equivoca seguido es una advertencia que se ignora.
+ * Pricing marca `generaEmbarquePropio` en los servicios que sí se operan por
+ * separado, y cada uno de esos genera su propio embarque con su folio. La
+ * decisión vive en la cotización porque al ganarla no puede haber preguntas:
+ * el cliente pidió generación automática «sin paso intermedio».
  *
  * INVARIANTE: cada línea cae en exactamente un grupo. Ninguna se pierde ni se
  * duplica, o el embarque cobraría de menos o de más.
  */
-export function agruparLineasPorModalidad(
+export function agruparParaEmbarques(
   lineas: LineaPlana[],
+  serviciosIndependientes: Set<string>,
   resolver: ResolverModalidad = resolverModalidadCanonica,
-): AgrupacionModalidad {
+): AgrupacionEmbarques {
   const advertencias: Advertencia[] = [];
-  const porModalidad = new Map<ModalidadEmbarque, LineaPlana[]>();
-  const huerfanas: LineaPlana[] = [];
+  if (lineas.length === 0) return { grupos: [], advertencias };
+
+  const independientes: LineaPlana[] = [];
+  const principales: LineaPlana[] = [];
 
   lineas.forEach(l => {
-    const m = resolver(l.servicioTipo);
-    if (m) {
-      porModalidad.set(m, [...(porModalidad.get(m) ?? []), l]);
-    } else {
-      huerfanas.push(l);
-    }
+    (serviciosIndependientes.has(l.servicioId) ? independientes : principales).push(l);
   });
 
-  // Sin ninguna modalidad de transporte no hay a qué colgar los cargos.
-  if (porModalidad.size === 0) {
-    if (lineas.length > 0) {
+  // ── Un grupo por cada servicio marcado como independiente ───────────────
+  const grupos: GrupoEmbarque[] = [];
+  const porServicio = new Map<string, LineaPlana[]>();
+  independientes.forEach(l => {
+    porServicio.set(l.servicioId, [...(porServicio.get(l.servicioId) ?? []), l]);
+  });
+
+  const devueltasAlPrincipal: LineaPlana[] = [];
+
+  porServicio.forEach((ls, servicioId) => {
+    const modalidad = resolver(ls[0].servicioTipo);
+    if (!modalidad) {
+      // Sin modalidad no hay prefijo de folio posible. Se reintegra al
+      // principal y se explica, en vez de inventar una serie.
       advertencias.push({
+        tipo: 'independiente_sin_modalidad',
+        lineaId: '',
+        concepto: ls[0].servicioTipo,
+        detalle: `El servicio «${ls[0].servicioTipo}» está marcado para operarse por separado, pero no define una modalidad de transporte y sin ella no hay folio posible. Sus líneas se integraron al embarque principal.`,
+      });
+      devueltasAlPrincipal.push(...ls);
+      return;
+    }
+    grupos.push({
+      clave: servicioId,
+      esPrincipal: false,
+      modalidad,
+      servicioIds: [servicioId],
+      lineas: ls,
+      ventaTotal: sumaVenta(ls),
+    });
+  });
+
+  // ── El embarque principal: todo lo demás ────────────────────────────────
+  const delPrincipal = [...principales, ...devueltasAlPrincipal];
+  if (delPrincipal.length > 0) {
+    const { modalidad, aviso } = modalidadDelPrincipal(delPrincipal, resolver);
+    if (aviso) advertencias.push(aviso);
+    grupos.unshift({
+      clave: 'principal',
+      esPrincipal: true,
+      modalidad,
+      servicioIds: [...new Set(delPrincipal.map(l => l.servicioId))],
+      lineas: delPrincipal,
+      ventaTotal: sumaVenta(delPrincipal),
+    });
+  }
+
+  return { grupos, advertencias };
+}
+
+function sumaVenta(ls: LineaPlana[]): number {
+  return Math.round(ls.reduce((a, l) => a + l.venta, 0) * 100) / 100;
+}
+
+/**
+ * Modalidad del embarque principal: la del servicio de MAYOR VENTA entre los
+ * que sí definen una. Si ninguno la define, se avisa fuerte y se usa marítimo,
+ * porque una cotización ganada no puede quedarse sin embarque.
+ */
+function modalidadDelPrincipal(
+  lineas: LineaPlana[],
+  resolver: ResolverModalidad,
+): { modalidad: ModalidadEmbarque; aviso?: Advertencia } {
+  const ventaPorModalidad = new Map<ModalidadEmbarque, number>();
+  lineas.forEach(l => {
+    const m = resolver(l.servicioTipo);
+    if (m) ventaPorModalidad.set(m, (ventaPorModalidad.get(m) ?? 0) + l.venta);
+  });
+
+  if (ventaPorModalidad.size === 0) {
+    return {
+      modalidad: 'maritimo',
+      aviso: {
         tipo: 'sin_modalidad_transporte',
         lineaId: '',
         concepto: '',
-        detalle: `Ninguna línea corresponde a una modalidad de transporte (${[...new Set(lineas.map(l => l.servicioTipo))].join(', ')}). Se genera un solo embarque marítimo y Operaciones debe corregir la modalidad.`,
-      });
-      porModalidad.set('maritimo', lineas);
-    }
-    return { grupos: construirGrupos(porModalidad), advertencias };
+        detalle: `Ninguna línea corresponde a una modalidad de transporte (${[...new Set(lineas.map(l => l.servicioTipo))].join(', ')}). El embarque se genera como marítimo y Operaciones debe corregir la modalidad antes de tramitarlo.`,
+      },
+    };
   }
 
-  if (huerfanas.length > 0) {
-    const destino = modalidadConMayorVenta(porModalidad);
-    porModalidad.set(destino, [...(porModalidad.get(destino) ?? []), ...huerfanas]);
-
-    if (porModalidad.size > 1) {
-      huerfanas.forEach(l => {
-        advertencias.push({
-          tipo: 'linea_sin_modalidad',
-          lineaId: l.id,
-          concepto: l.concepto,
-          detalle: `«${l.concepto}» (${l.servicioTipo}) no pertenece a una modalidad de transporte y se asignó al embarque ${destino}, que es el de mayor venta. Verificar si corresponde.`,
-        });
-      });
-    }
-  }
-
-  return { grupos: construirGrupos(porModalidad), advertencias };
+  const modalidad = [...ventaPorModalidad.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  return { modalidad };
 }
 
-function modalidadConMayorVenta(mapa: Map<ModalidadEmbarque, LineaPlana[]>): ModalidadEmbarque {
-  return [...mapa.entries()]
-    .map(([m, ls]) => [m, ls.reduce((a, l) => a + l.venta, 0)] as const)
-    .sort((a, b) => b[1] - a[1])[0][0];
-}
-
-function construirGrupos(mapa: Map<ModalidadEmbarque, LineaPlana[]>): GrupoModalidad[] {
-  return [...mapa.entries()]
-    .map(([modalidad, ls]) => ({
-      modalidad,
-      lineas: ls,
-      ventaTotal: Math.round(ls.reduce((a, l) => a + l.venta, 0) * 100) / 100,
-    }))
-    .sort((a, b) => b.ventaTotal - a.ventaTotal);
-}

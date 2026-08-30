@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { 
   Building2, Users, Database, Link as LinkIcon, FileCheck, 
   Settings2, Plus, Search, Shield, Zap, Mail, MessageSquare, 
-  Table2, Terminal, CheckCircle2, AlertCircle, LogOut, Package, Trash2
+  Table2, Terminal, CheckCircle2, AlertCircle, LogOut, Package, Trash2, Hash
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { useServicios, renderIcon, CategoriaServicio } from '../config/serviciosStore';
+import ContadoresFolio from './settings/ContadoresFolio';
 
 export default function Settings() {
   const { user, logout } = useAuth();
@@ -123,6 +124,9 @@ export default function Settings() {
     { id: 'users', label: 'Usuarios y roles', icon: <Users className="w-[18px] h-[18px]" /> },
     { id: 'catalogs', label: 'Catálogos base', icon: <Database className="w-[18px] h-[18px]" /> },
     ...(isAdmin ? [{ id: 'services_catalog', label: 'Catálogo de servicios', icon: <Package className="w-[18px] h-[18px]" /> }] : []),
+    // Mantenimiento, no función del negocio: solo superusuario, igual que la
+    // importación masiva de catálogos.
+    ...(isAdmin ? [{ id: 'folios', label: 'Consecutivos de folio', icon: <Hash className="w-[18px] h-[18px]" /> }] : []),
     { id: 'integrations', label: 'Integraciones', icon: <LinkIcon className="w-[18px] h-[18px]" /> },
     { id: 'billing', label: 'Facturación SAT / PAC', icon: <FileCheck className="w-[18px] h-[18px]" /> },
     { id: 'preferences', label: 'Preferencias', icon: <Settings2 className="w-[18px] h-[18px]" /> },
@@ -396,6 +400,10 @@ export default function Settings() {
                   )}
                </div>
             )}
+
+           {activeSection === 'folios' && isAdmin && (
+              <ContadoresFolio />
+           )}
 
            {activeSection === 'integrations' && (
               <div>

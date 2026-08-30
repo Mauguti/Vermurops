@@ -174,12 +174,41 @@ export function docContadorSerie(prefijo: string) {
   return doc(db, 'contadores', `embarques_${prefijo}`);
 }
 
+/** Series de embarque que el sistema conoce. */
+export const SERIES_EMBARQUE = ['VLIM', 'VLEM', 'VLIT', 'VLET', 'VLIA', 'VLEA'] as const;
+export type SerieEmbarque = typeof SERIES_EMBARQUE[number];
+
+export interface EstadoContadorSerie {
+  serie: string;
+  ultimo: number;
+  /**
+   * true si alguien fijó el consecutivo a mano desde Configuración.
+   *
+   * Importa porque Vermur trae folios históricos de Magaya: VLIT iba en 107.
+   * Un contador sin sembrar arranca en 0 y su primer folio sería VLIT-26-001,
+   * que puede colisionar con uno que ya existe en papel.
+   */
+  sembrado: boolean;
+  fechaSiembra?: string;
+  sembradoPor?: string;
+}
+
+export interface ResultadoReserva {
+  folios: string[];
+  /** false = el contador nunca se sembró; el folio puede colisionar. */
+  sembrado: boolean;
+}
+
 /**
  * Reserva N folios consecutivos de una serie en una sola transacción.
  *
  * Pensado para llamarse DENTRO de un runTransaction mayor —el que crea la
  * cotización ganada y sus N embarques—, por eso recibe la transacción en vez
  * de abrir la suya: todo tiene que caer junto o no caer.
+ *
+ * Devuelve también si el contador estaba sembrado. Un contador vacío NO
+ * bloquea la generación —una cotización ganada no puede quedarse sin
+ * embarque—, pero el embarque nace con la advertencia correspondiente.
  */
 export async function reservarFoliosSerie(
   tx: { get: (ref: ReturnType<typeof docContadorSerie>) => Promise<{ exists: () => boolean; data: () => Record<string, unknown> | undefined }>;
@@ -187,18 +216,22 @@ export async function reservarFoliosSerie(
   prefijo: string,
   cuantos: number,
   anio = new Date().getFullYear(),
-): Promise<string[]> {
-  if (cuantos <= 0) return [];
+): Promise<ResultadoReserva> {
+  if (cuantos <= 0) return { folios: [], sembrado: true };
 
   const ref = docContadorSerie(prefijo);
   const snap = await tx.get(ref);
-  const ultimo = snap.exists() ? ((snap.data()?.ultimo as number) ?? 0) : 0;
+  const data = snap.exists() ? snap.data() : undefined;
+
+  const ultimo = (data?.ultimo as number) ?? 0;
+  const sembrado = (data?.sembrado as boolean) ?? false;
 
   const folios: string[] = [];
   for (let i = 1; i <= cuantos; i++) {
     folios.push(formatFolioSerie(prefijo, ultimo + i, anio));
   }
 
+  // merge: true conserva `sembrado` y los datos de auditoría de la siembra.
   tx.set(ref, { ultimo: ultimo + cuantos }, { merge: true });
-  return folios;
+  return { folios, sembrado };
 }

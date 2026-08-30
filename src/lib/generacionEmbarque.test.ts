@@ -12,7 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   construirEmbarqueDesdeCotizacion, modalidadDominante,
-  agruparLineasPorModalidad, prefijoFolio, PREFIJO_FOLIO,
+  agruparParaEmbarques, prefijoFolio, PREFIJO_FOLIO,
 } from './generacionEmbarque';
 import { aplanarCotizacion, totalVenta } from './lineasCotizacion';
 import {
@@ -288,7 +288,9 @@ const SRV_ADUANAL = servicio({
   })],
 });
 
-const agrupar = (q: KanbanQuote) => agruparLineasPorModalidad(aplanarCotizacion(q));
+/** Agrupa sin ningún servicio marcado: el caso por defecto. */
+const agrupar = (q: KanbanQuote, independientes: string[] = []) =>
+  agruparParaEmbarques(aplanarCotizacion(q), new Set(independientes));
 
 describe('prefijo de folio', () => {
   it('codifica modalidad y tráfico como en Magaya', () => {
@@ -305,13 +307,19 @@ describe('prefijo de folio', () => {
   });
 });
 
-describe('agrupación por modalidad', () => {
+// ─────────────────────────────────────────────────────────────────────────────
+// Agrupación (30-ago-2026).
+//
+// Cambió respecto al diseño anterior: ya NO se genera un embarque por modalidad
+// automáticamente. Por defecto va todo a uno solo, y Pricing marca en la
+// cotización los servicios que sí se operan aparte. Un acarreo dentro de una
+// operación marítima es parte de ella, no un VLIT suelto.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('agrupación por defecto: un solo embarque', () => {
   it('INVARIANTE: ninguna línea se pierde ni se duplica', () => {
     const q = quote([SRV_MAR, SRV_TER, SRV_ADUANAL]);
     const lineas = aplanarCotizacion(q);
-    const { grupos } = agrupar(q);
-
-    const repartidas = grupos.flatMap(g => g.lineas.map(l => l.id));
+    const repartidas = agrupar(q).grupos.flatMap(g => g.lineas.map(l => l.id));
     expect(repartidas.sort()).toEqual(lineas.map(l => l.id).sort());
     expect(new Set(repartidas).size).toBe(lineas.length);
   });
@@ -322,63 +330,84 @@ describe('agrupación por modalidad', () => {
     expect(suma).toBeCloseTo(totalVenta(aplanarCotizacion(q)), 2);
   });
 
-  it('una cotización de una sola modalidad da un solo grupo', () => {
-    const { grupos } = agrupar(quote([SRV_MAR]));
-    expect(grupos).toHaveLength(1);
-    expect(grupos[0].modalidad).toBe('maritimo');
-  });
-
-  it('marítimo y terrestre se separan en dos grupos', () => {
+  it('marítimo + terrestre sin marcar dan UN solo embarque', () => {
     const { grupos } = agrupar(quote([SRV_MAR, SRV_TER]));
-    expect(grupos.map(g => g.modalidad).sort()).toEqual(['maritimo', 'terrestre']);
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0].esPrincipal).toBe(true);
   });
 
-  it('los grupos vienen ordenados por venta, el dominante primero', () => {
-    const { grupos } = agrupar(quote([SRV_TER, SRV_MAR]));
-    expect(grupos[0].modalidad).toBe('maritimo');
+  it('la modalidad del principal es la del servicio de mayor venta', () => {
+    // Terrestre va primero en el array pero marítimo vende más.
+    expect(agrupar(quote([SRV_TER, SRV_MAR])).grupos[0].modalidad).toBe('maritimo');
   });
-});
 
-describe('líneas que no son de transporte', () => {
-  it('con una sola modalidad se asignan sin ruido', () => {
-    // No hay dónde elegir: avisar sería una advertencia que se ignora.
+  it('el aduanal se integra sin avisar: no había decisión que tomar', () => {
     const { grupos, advertencias } = agrupar(quote([SRV_MAR, SRV_ADUANAL]));
     expect(grupos).toHaveLength(1);
     expect(grupos[0].lineas).toHaveLength(2);
     expect(advertencias).toEqual([]);
   });
 
-  it('con dos modalidades van al embarque de mayor venta Y se avisa', () => {
-    const { grupos, advertencias } = agrupar(quote([SRV_MAR, SRV_TER, SRV_ADUANAL]));
-    const maritimo = grupos.find(g => g.modalidad === 'maritimo')!;
-    expect(maritimo.lineas.map(l => l.concepto)).toContain('Despacho aduanal');
-
-    const aviso = advertencias.find(a => a.tipo === 'linea_sin_modalidad')!;
-    expect(aviso.detalle).toContain('Despacho aduanal');
-    expect(aviso.detalle).toContain('maritimo');
-  });
-
-  it('sin ninguna modalidad de transporte avisa y no deja la venta sin embarque', () => {
+  it('sin ninguna modalidad de transporte avisa y genera igual', () => {
     const { grupos, advertencias } = agrupar(quote([SRV_ADUANAL]));
     expect(grupos).toHaveLength(1);
     expect(advertencias.map(a => a.tipo)).toContain('sin_modalidad_transporte');
-    // Aun así se genera: una cotización ganada no puede quedarse sin embarque.
-    expect(grupos[0].lineas).toHaveLength(1);
   });
 
-  it('una cotización vacía no genera grupos ni advertencias', () => {
-    const { grupos, advertencias } = agrupar(quote([]));
-    expect(grupos).toEqual([]);
-    expect(advertencias).toEqual([]);
+  it('una cotización vacía no genera grupos', () => {
+    expect(agrupar(quote([])).grupos).toEqual([]);
+  });
+});
+
+describe('servicios marcados para operarse aparte', () => {
+  it('el terrestre marcado genera su propio embarque', () => {
+    const { grupos } = agrupar(quote([SRV_MAR, SRV_TER]), ['srv-2']);
+    expect(grupos).toHaveLength(2);
+
+    const principal = grupos.find(g => g.esPrincipal)!;
+    const aparte = grupos.find(g => !g.esPrincipal)!;
+    expect(principal.modalidad).toBe('maritimo');
+    expect(aparte.modalidad).toBe('terrestre');
+    expect(aparte.servicioIds).toEqual(['srv-2']);
   });
 
-  it('un tipo desconocido cuenta como línea sin modalidad, no revienta', () => {
-    const raro = servicio({ id: 'srv-r', tipo: 'srv-def-2', conceptos: [
-      concepto({ id: 'cr', nombre: 'Algo', costo: 100, profit: 10 }),
-    ]});
-    const { grupos, advertencias } = agrupar(quote([SRV_MAR, raro]));
+  it('el principal viene primero, para que sea el que encabeza', () => {
+    expect(agrupar(quote([SRV_MAR, SRV_TER]), ['srv-2']).grupos[0].esPrincipal).toBe(true);
+  });
+
+  it('el invariante se mantiene con servicios separados', () => {
+    const q = quote([SRV_MAR, SRV_TER, SRV_ADUANAL]);
+    const { grupos } = agrupar(q, ['srv-2']);
+    const repartidas = grupos.flatMap(g => g.lineas.map(l => l.id));
+    expect(repartidas.sort()).toEqual(aplanarCotizacion(q).map(l => l.id).sort());
+    expect(grupos.reduce((a, g) => a + g.ventaTotal, 0))
+      .toBeCloseTo(totalVenta(aplanarCotizacion(q)), 2);
+  });
+
+  it('lo NO marcado se queda junto en el principal', () => {
+    const { grupos } = agrupar(quote([SRV_MAR, SRV_TER, SRV_ADUANAL]), ['srv-2']);
+    const principal = grupos.find(g => g.esPrincipal)!;
+    expect(principal.servicioIds.sort()).toEqual(['srv-1', 'srv-3']);
+  });
+
+  it('marcar un servicio sin modalidad lo devuelve al principal, con aviso', () => {
+    // Sin modalidad no hay prefijo de folio posible; inventar una serie sería
+    // peor que integrarlo y explicarlo.
+    const { grupos, advertencias } = agrupar(quote([SRV_MAR, SRV_ADUANAL]), ['srv-3']);
     expect(grupos).toHaveLength(1);
-    expect(grupos[0].lineas).toHaveLength(2);
-    expect(advertencias).toEqual([]); // una sola modalidad: sin ambigüedad
+    expect(grupos[0].esPrincipal).toBe(true);
+    expect(advertencias.map(a => a.tipo)).toContain('independiente_sin_modalidad');
+  });
+
+  it('marcar TODOS los servicios deja solo embarques aparte, sin principal', () => {
+    const { grupos } = agrupar(quote([SRV_MAR, SRV_TER]), ['srv-1', 'srv-2']);
+    expect(grupos).toHaveLength(2);
+    expect(grupos.every(g => !g.esPrincipal)).toBe(true);
+  });
+
+  it('marcar un servicio que no existe no altera nada', () => {
+    const { grupos } = agrupar(quote([SRV_MAR]), ['srv-inexistente']);
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0].esPrincipal).toBe(true);
   });
 });

@@ -56,6 +56,13 @@ export type TipoAdvertencia =
   | 'cliente_sin_expediente'
   /** Una línea que no es de transporte se asignó al embarque dominante. */
   | 'linea_sin_modalidad'
+  /** Un servicio marcado para operarse aparte no define modalidad. */
+  | 'independiente_sin_modalidad'
+  /**
+   * El contador de la serie nunca se sembró con el consecutivo de Magaya, así
+   * que el folio arranca en 001 y puede duplicar uno histórico.
+   */
+  | 'contador_sin_sembrar'
   /** Ninguna línea corresponde a una modalidad de transporte. */
   | 'sin_modalidad_transporte';
 

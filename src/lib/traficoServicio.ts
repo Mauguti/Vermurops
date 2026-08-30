@@ -78,15 +78,35 @@ export interface ResolucionTrafico {
  */
 const PISTAS_MEXICO_TOKEN = new Set([
   'méxico', 'mexico', 'mex', 'mx', 'mexicana', 'mexicano',
+  // Puertos
   'manzanillo', 'veracruz', 'altamira', 'ensenada', 'progreso',
-  'tampico', 'mazatlán', 'mazatlan', 'guaymas', 'coatzacoalcos',
+  'tampico', 'tuxpan', 'mazatlán', 'mazatlan', 'guaymas',
+  'topolobampo', 'coatzacoalcos',
+  // Interior
   'cdmx', 'monterrey', 'guadalajara', 'querétaro', 'queretaro',
   'tijuana', 'juárez', 'juarez', 'aicm', 'toluca', 'puebla', 'saltillo',
 ]);
 
+/**
+ * Ciudades de Estados Unidos que aparecen en las rutas de Vermur.
+ *
+ * Se listan explícitamente para que un extremo estadounidense cuente como NO
+ * mexicano de forma inequívoca, y no dependa solo de la ausencia de pistas.
+ */
+const PISTAS_EXTRANJERO_TOKEN = new Set([
+  'houston', 'savannah', 'charleston', 'miami', 'usa', 'eua', 'us',
+  'laredo', 'oakland', 'seattle', 'norfolk', 'baltimore', 'chicago',
+]);
+
+const PISTAS_EXTRANJERO_FRASE = [
+  'long beach', 'los angeles', 'los ángeles',
+  'nueva york', 'new york', 'new jersey',
+];
+
 /** Nombres de más de una palabra, que se buscan completos. */
 const PISTAS_MEXICO_FRASE = [
   'lázaro cárdenas', 'lazaro cardenas',
+  'salina cruz', 'dos bocas', 'puerto morelos',
   'nuevo laredo',
   'ciudad de méxico', 'ciudad de mexico',
   'puerto vallarta',
@@ -98,17 +118,26 @@ function normalizar(texto: string): string {
   return texto.trim().toLowerCase();
 }
 
+function tokens(l: string): string[] {
+  return l.split(/[^a-záéíóúñ]+/i).filter(Boolean);
+}
+
 function pareceMexico(lugar: string | undefined): boolean {
   if (!lugar) return false;
   const l = normalizar(lugar);
   if (SIN_DATO.has(l)) return false;
 
+  // Las frases van primero: «Nuevo Laredo» es México aunque el token 'laredo'
+  // esté en la lista de extranjero.
   if (PISTAS_MEXICO_FRASE.some(f => l.includes(f))) return true;
+  if (PISTAS_EXTRANJERO_FRASE.some(f => l.includes(f))) return false;
 
-  // Cotejo por token: «Laredo, USA» se parte en ['laredo','usa'] y ninguno
-  // está en la lista, mientras que «Nuevo Laredo» sí entra por frase.
-  const tokens = l.split(/[^a-záéíóúñ]+/i).filter(Boolean);
-  return tokens.some(t => PISTAS_MEXICO_TOKEN.has(t));
+  const ts = tokens(l);
+  if (ts.some(t => PISTAS_EXTRANJERO_TOKEN.has(t))) return false;
+
+  // Cotejo por token y no por subcadena: «Laredo, USA» se parte en
+  // ['laredo','usa'], y 'mex' dentro de «Mexborough» no cuenta.
+  return ts.some(t => PISTAS_MEXICO_TOKEN.has(t));
 }
 
 /**

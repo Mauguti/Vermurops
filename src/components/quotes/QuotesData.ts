@@ -128,6 +128,20 @@ export interface ServicioSolicitado {
   trafico?: TraficoServicio;
   /** Dónde ocurre. Junto con `trafico` habilita la regla espejo del IVA. */
   ubicacion?: UbicacionServicio;
+
+  /**
+   * ¿Este servicio se opera como embarque aparte?
+   *
+   * Por defecto false: todos los servicios de la cotización van al MISMO
+   * embarque, cuya modalidad es la del servicio de mayor venta. Es el caso
+   * normal — un acarreo dentro de una operación marítima es parte de ella.
+   *
+   * Pricing lo marca cuando el tramo se opera por separado y necesita su
+   * propio folio. La decisión se toma aquí, al armar la cotización, y no al
+   * ganarla: el cliente pidió que la generación del embarque sea automática y
+   * «sin paso intermedio», así que no puede haber una pregunta en ese momento.
+   */
+  generaEmbarquePropio?: boolean;
   ruta: {
     origen: string;
     destino: string;
