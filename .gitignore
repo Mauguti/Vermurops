@@ -9,3 +9,6 @@ dist/
 # Caché local del CLI de Firebase (se regenera en cada deploy).
 # Ojo: NO ignorar .firebaserc, que sí es configuración del proyecto.
 .firebase/
+
+# Clave de cuenta de servicio de Firebase — NUNCA se commitea.
+serviceAccountKey.json
