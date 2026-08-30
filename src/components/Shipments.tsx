@@ -3,6 +3,14 @@ import { EmbarqueCompleto, recalcularCargos } from './shipments/EmbarquesData';
 import EmbarquesList from './shipments/EmbarquesList';
 import FichaEmbarque from './shipments/FichaEmbarque';
 import { useEmbarques } from '../hooks/useEmbarques';
+import { useCotizaciones } from '../hooks/useCotizaciones';
+import { useClientes } from '../hooks/useClientes';
+import CotizacionesGanadas from './shipments/CotizacionesGanadas';
+import { agruparPorEstado, estadoDe, ETAPAS_EMBARQUE } from '../lib/estadoEmbarque';
+import { mapearCotizacionAEmbarque } from '../lib/cotizacionAEmbarque';
+import { construirEmbarqueDesdeCotizacion, agruparParaEmbarques, prefijoFolio, modalidadDominante } from '../lib/generacionEmbarque';
+import { aplanarCotizacion } from '../lib/lineasCotizacion';
+import { useAuth } from '../auth/AuthContext';
 import { generateFolioEmbarque } from '../lib/folioService';
 import Toast, { TipoToast } from './ui/Toast';
 
@@ -10,7 +18,12 @@ export default function Shipments() {
   // E-1: los embarques viven en Firestore. Antes eran useState sembrado desde
   // el mock y se perdían al recargar.
   const { embarques, loading, error, guardarEmbarque } = useEmbarques();
+  const { quotes } = useCotizaciones();
+  const { clientes } = useClientes();
+  const { user, puede } = useAuth();
   const [selectedEmbarqueId, setSelectedEmbarqueId] = useState<string | null>(null);
+  /** 5.3 · Vista del módulo: lista, kanban por estado, o cotizaciones por abrir. */
+  const [vista, setVista] = useState<'bandeja' | 'kanban' | 'lista'>('bandeja');
   const [toast, setToast] = useState<{ mensaje: string; tipo: TipoToast } | null>(null);
   const [creando, setCreando] = useState(false);
 
@@ -151,15 +164,131 @@ export default function Shipments() {
     );
   }
 
+  const ganadas = quotes.filter(q => q.etapa === 'ganada');
+  const yaConEmbarque = new Set(embarques.map(e => e.cotizacionId).filter(Boolean));
+  const puedeGenerar = puede('embarque.generar');
+
+  /**
+   * 5.1 · Abre el embarque desde una cotización ganada.
+   *
+   * Hereda los conceptos a cobrar y a pagar con el mapeo de E-3, y arrastra
+   * sus advertencias: quien cerró la venta no vio el resultado.
+   */
+  const abrirEmbarqueDesdeCotizacion = async (quote: typeof quotes[number]) => {
+    if (creando) return;
+    setCreando(true);
+    try {
+      const cliente = clientes.find(c => c.id === quote.clienteId) ?? null;
+      const { cargos, advertencias } = mapearCotizacionAEmbarque(quote, { cliente });
+      const folio = await generateFolioEmbarque();
+
+      const nuevo = construirEmbarqueDesdeCotizacion({
+        quote, folio, cargos, advertencias,
+        origen: 'automatico',
+        generadoPor: user?.nombre ?? user?.email ?? '',
+        ahora: new Date().toISOString(),
+      });
+
+      await guardarEmbarque(nuevo);
+      setSelectedEmbarqueId(nuevo.id);
+      setToast({
+        mensaje: advertencias.length > 0
+          ? `Embarque ${folio} abierto con ${advertencias.length} advertencia(s). Revísalas en la ficha.`
+          : `Embarque ${folio} abierto desde ${quote.id}.`,
+        tipo: advertencias.length > 0 ? 'error' : 'exito',
+      });
+    } catch (err) {
+      setToast({
+        mensaje: `No se pudo abrir el embarque: ${err instanceof Error ? err.message : err}`,
+        tipo: 'error',
+      });
+    } finally {
+      setCreando(false);
+    }
+  };
+
+  const grupos = agruparPorEstado(embarques);
+
   return (
-    <div className="space-y-[32px]">
-      {!selectedEmbarque ? (
+    <div className="space-y-[24px]">
+      {!selectedEmbarque && (
+        <div className="flex items-center gap-1 border-b border-gray-200">
+          {([
+            ['bandeja', `Por abrir (${ganadas.filter(q => !yaConEmbarque.has(q.id)).length})`],
+            ['kanban', 'Tablero'],
+            ['lista', 'Todos los embarques'],
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setVista(id)}
+              className={`px-4 py-2.5 text-[13px] font-semibold border-b-2 -mb-[1px] transition-colors ${
+                vista === id
+                  ? 'border-[#E11D48] text-[#18181B]'
+                  : 'border-transparent text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!selectedEmbarque && vista === 'bandeja' && (
+        <CotizacionesGanadas
+          ganadas={ganadas}
+          yaConEmbarque={yaConEmbarque}
+          onAbrirEmbarque={abrirEmbarqueDesdeCotizacion}
+          puedeGenerar={puedeGenerar}
+        />
+      )}
+
+      {!selectedEmbarque && vista === 'kanban' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {grupos.map(g => (
+            <div key={g.estado} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-3 py-2.5 border-b border-gray-200 bg-white flex items-center justify-between">
+                <span className="text-[11px] font-bold text-[#18181B] uppercase tracking-wider">{g.label}</span>
+                <span className="text-[11px] font-bold text-gray-400">{g.embarques.length}</span>
+              </div>
+              <div className="p-2 space-y-2 min-h-[120px]">
+                {g.embarques.map(e => (
+                  <button
+                    key={e.id}
+                    onClick={() => setSelectedEmbarqueId(e.id)}
+                    className="w-full text-left bg-white border border-gray-200 rounded-lg p-3 hover:border-[#E11D48]/40 hover:shadow-sm transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[12px] font-semibold text-gray-900">{e.folio}</span>
+                      {e.origen === 'automatico' && e.requiereCaptura && (
+                        <span className="text-[8px] font-bold uppercase tracking-wider bg-[#E11D48]/10 text-[#E11D48] px-1.5 py-0.5 rounded">
+                          Nuevo
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                      {e.entidades?.clienteCobrar || 'Sin cliente'}
+                    </p>
+                    {e.cotizacionId && (
+                      <p className="text-[10px] text-gray-400 mt-0.5 font-mono">← {e.cotizacionId}</p>
+                    )}
+                  </button>
+                ))}
+                {g.embarques.length === 0 && (
+                  <p className="text-[11px] text-gray-300 text-center py-6">Sin embarques</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!selectedEmbarque && vista === 'lista' ? (
         <EmbarquesList
           embarques={embarques}
           onSelectEmbarque={e => setSelectedEmbarqueId(e.id)}
           onCrearEmbarque={handleCrearEmbarque}
         />
-      ) : (
+      ) : selectedEmbarque ? (
         <FichaEmbarque
           embarque={selectedEmbarque}
           allEmbarques={embarques}
@@ -167,7 +296,7 @@ export default function Shipments() {
           onUpdateEmbarque={handleUpdateEmbarque}
           onSelectEmbarqueById={setSelectedEmbarqueId}
         />
-      )}
+      ) : null}
 
       <Toast
         mensaje={toast?.mensaje ?? null}
