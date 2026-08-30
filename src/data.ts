@@ -181,7 +181,14 @@ export interface Prospecto {
   contactoTel?: string;
   origenLead: "referido" | "web" | "llamada" | "visita" | "linkedin" | "otro";
   servicioPotencial: string[];  // servicios del catálogo
-  etapa: "nuevo_lead" | "contactado" | "calificado" | "convertido";
+  etapa: "nuevo_lead" | "contactado" | "calificado" | "convertido" | "perdido";
+  /**
+   * Por qué se perdió. Un prospecto que desaparece sin motivo es una venta
+   * perdida sobre la que no se puede aprender nada. Mismo catálogo que las
+   * cotizaciones perdidas (lib/motivosPerdida.ts).
+   */
+  motivoPerdida?: string | null;
+  fechaPerdida?: string;
   responsable: string;
   fechaCreacion: string;
   proximaActividad?: string;

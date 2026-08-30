@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Calendar, DollarSign, Mail, Phone, User, MessageSquare, Clock } from 'lucide-react';
 import { Prospecto, ProspectoActivity } from '../../data';
 import { ORIGENES_PROSPECTO, VENDEDORES } from './QuotesData';
+import ModalMotivoPerdida from './ModalMotivoPerdida';
 
 interface FichaProspectoProps {
   prospecto: Prospecto | null;
@@ -19,6 +20,10 @@ const STAGES = [
 ] as const;
 
 export default function FichaProspecto({ prospecto, isOpen, onClose, onUpdate, onConvert }: FichaProspectoProps) {
+  // Antes «Eliminar prospecto» solo pedía confirmación y tenía un TODO: no
+  // hacía nada. Ahora se marca como perdido con su motivo, igual que una
+  // cotización perdida — no se borra, se registra por qué se perdió.
+  const [pidiendoMotivo, setPidiendoMotivo] = useState(false);
   const [newActivityDesc, setNewActivityDesc] = useState('');
   const [newActivityType, setNewActivityType] = useState<ProspectoActivity['tipo']>('nota');
   const [newActivityDate, setNewActivityDate] = useState(new Date().toISOString().split('T')[0]);
@@ -327,19 +332,40 @@ export default function FichaProspecto({ prospecto, isOpen, onClose, onUpdate, o
           <div className="text-[9px] text-gray-400 uppercase font-bold tracking-wider space-y-1">
             <p>Creado: {prospecto.fechaCreacion}</p>
           </div>
-          <button 
-            onClick={() => {
-              if (window.confirm('¿Seguro que deseas eliminar este prospecto?')) {
-                // TODO remove
-              }
-            }}
-            className="text-xs font-bold text-red-500 border border-red-200 bg-white hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
-          >
-            Eliminar prospecto
-          </button>
+          {prospecto.etapa === 'perdido' ? (
+            <div className="text-right">
+              <p className="text-[10px] font-bold text-red-500 uppercase tracking-wider">Perdido</p>
+              <p className="text-[11px] text-gray-500 max-w-[280px]">{prospecto.motivoPerdida}</p>
+            </div>
+          ) : (
+            <button
+              onClick={() => setPidiendoMotivo(true)}
+              className="text-xs font-bold text-red-500 border border-red-200 bg-white hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Marcar como perdido
+            </button>
+          )}
         </div>
 
       </div>
+
+      {pidiendoMotivo && prospecto && (
+        <ModalMotivoPerdida
+          titulo="Marcar prospecto como perdido"
+          descripcion={`«${prospecto.empresa}» dejará de aparecer en el pipeline activo. No se borra: queda en el histórico con su motivo, que es lo que permite saber por qué se pierden las oportunidades.`}
+          onCancelar={() => setPidiendoMotivo(false)}
+          onConfirmar={(motivo) => {
+            onUpdate({
+              ...prospecto,
+              etapa: 'perdido',
+              motivoPerdida: motivo,
+              fechaPerdida: new Date().toISOString().slice(0, 10),
+            });
+            setPidiendoMotivo(false);
+            onClose();
+          }}
+        />
+      )}
     </div>
   );
 }

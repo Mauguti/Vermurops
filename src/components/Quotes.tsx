@@ -9,7 +9,7 @@ import KanbanProspeccion from './quotes/KanbanProspeccion';
 import FichaCotizacion from './quotes/FichaCotizacion';
 import RightChatPanel from './quotes/RightChatPanel';
 import {
-  KanbanQuote, TipoServicio,
+  KanbanQuote, TipoServicio, PIPELINE_STAGES,
   ORIGENES_PROSPECTO, VENDEDORES, INCOTERMS,
 } from './quotes/QuotesData';
 import { useServicios, renderIcon } from '../config/serviciosStore';
@@ -21,6 +21,8 @@ import { generateFolio, generateFolioProspecto } from '../lib/folioService';
 import Toast, { TipoToast } from './ui/Toast';
 import SpreadsheetTable, { type VistaConfig } from './table/SpreadsheetTable';
 import { COTIZACION_COLUMNS, VISTA_DEFAULT_COTIZACIONES } from './quotes/cotizacionColumns';
+import { PROSPECTO_COLUMNS, VISTA_DEFAULT_PROSPECTOS } from './quotes/prospectoColumns';
+import FichaProspecto from './quotes/FichaProspecto';
 import { useVistasUsuario } from '../hooks/useVistasUsuario';
 import VistaSelector from './table/VistaSelector';
 
@@ -60,6 +62,21 @@ export default function Quotes() {
 
   // Sub-vista dentro de Prospectos/Negociación: 'tabla' o 'kanban'
   const [subView, setSubView] = useState<'tabla' | 'kanban'>('tabla');
+
+  /**
+   * Búsqueda y filtro de la vista de Lista.
+   *
+   * Bug 1.3: el input de búsqueda no tenía `value` ni `onChange` y el botón
+   * «Filtros» no tenía `onClick`. Eran decorativos, de ahí el «no me deja
+   * seleccionar nada» del cliente.
+   */
+  const [busqueda, setBusqueda] = useState('');
+  /** Vista de columnas de la tabla de prospectos, independiente de la de cotizaciones. */
+  const [vistaProspectos, setVistaProspectos] = useState<VistaConfig>(VISTA_DEFAULT_PROSPECTOS);
+  /** Prospecto abierto desde la lista. */
+  const [prospectoAbierto, setProspectoAbierto] = useState<Prospecto | null>(null);
+  const [filtroEtapa, setFiltroEtapa] = useState('');
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
 
   // Cotización seleccionada para abrir la ficha de detalle
   const [selectedQuote, setSelectedQuote] = useState<KanbanQuote | null>(null);
@@ -207,18 +224,45 @@ export default function Quotes() {
     }
   }, [eliminarVista, vistaActivaId, vistaDefault]);
 
+  const coincide = (texto: string) =>
+    busqueda.trim() === '' || texto.toLowerCase().includes(busqueda.trim().toLowerCase());
+
   // Cotizaciones filtradas para la vista de tabla (SpreadsheetTable)
   const filteredTableQuotes = useMemo(() => {
     return permittedQuotes.filter(q => {
-      if (viewMode === 'prospeccion') {
-        return ['solicitud_cliente', 'solicitado_pricing'].includes(q.etapa);
-      }
       if (viewMode === 'kanban') {
-        return ['enviada_cliente', 'negociacion', 'ganada', 'perdida', 'pricing_solicitando', 'cotizaciones_recibidas', 'consolidada'].includes(q.etapa);
+        const etapasCotizacion = ['enviada_cliente', 'negociacion', 'ganada', 'perdida', 'pricing_solicitando', 'cotizaciones_recibidas', 'consolidada', 'solicitud_cliente', 'solicitado_pricing'];
+        if (!etapasCotizacion.includes(q.etapa)) return false;
       }
-      return true;
+      if (filtroEtapa && q.etapa !== filtroEtapa) return false;
+      return coincide(`${q.id} ${q.prospecto?.empresa ?? ''} ${q.prospecto?.contacto ?? ''}`);
     });
-  }, [permittedQuotes, viewMode]);
+  }, [permittedQuotes, viewMode, busqueda, filtroEtapa]);
+
+  /**
+   * Prospectos para la vista de Lista.
+   *
+   * Bug 1.1: esta vista mostraba `filteredTableQuotes` —cotizaciones— así que
+   * un prospecto recién creado aparecía en Kanban y nunca en Lista. La tabla
+   * no estaba mirando la colección de prospectos.
+   */
+  const filteredTableProspectos = useMemo(() => {
+    return prospectos.filter(p => {
+      if (filtroEtapa && p.etapa !== filtroEtapa) return false;
+      return coincide(`${p.folio ?? ''} ${p.empresa} ${p.contactoNombre ?? ''} ${p.responsable ?? ''}`);
+    });
+  }, [prospectos, busqueda, filtroEtapa]);
+
+  /** Etapas ofrecidas en el filtro, según la pestaña activa. */
+  const etapasDelFiltro = viewMode === 'prospeccion'
+    ? [
+        { id: 'nuevo_lead', label: 'Nuevo lead' },
+        { id: 'contactado', label: 'Contactado' },
+        { id: 'calificado', label: 'Calificado' },
+        { id: 'convertido', label: 'Convertido' },
+        { id: 'perdido', label: 'Perdido' },
+      ]
+    : PIPELINE_STAGES.map(s => ({ id: s.id, label: s.label }));
 
   const handleExportCSVQuotes = () => {
     const headers = ['Cotización', 'Cliente', 'Detalles', 'Fecha', 'Valor', 'Estatus'];
@@ -531,11 +575,66 @@ export default function Quotes() {
                         <>
                           <div className="relative w-[250px]">
                             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input type="text" placeholder="Filtrar cotizaciones..." className="w-full pl-[36px] bg-white border border-gray-200 rounded-lg p-2 text-[13px] focus:outline-none focus:border-[#E11D48] focus:ring-1 focus:ring-[#E11D48] text-gray-700 shadow-sm" />
+                            <input
+                              type="text"
+                              value={busqueda}
+                              onChange={e => setBusqueda(e.target.value)}
+                              placeholder={viewMode === 'prospeccion' ? 'Buscar prospecto...' : 'Buscar cotización...'}
+                              className="w-full pl-[36px] pr-8 bg-white border border-gray-200 rounded-lg p-2 text-[13px] focus:outline-none focus:border-[#E11D48] focus:ring-1 focus:ring-[#E11D48] text-gray-700 shadow-sm"
+                            />
+                            {busqueda && (
+                              <button
+                                onClick={() => setBusqueda('')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                aria-label="Limpiar búsqueda"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                           </div>
-                          <button className="flex items-center text-[13px] font-bold text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2 hover:bg-gray-50 transition-colors shadow-sm">
-                            <Filter className="w-4 h-4 mr-2" /> Filtros
-                          </button>
+
+                          <div className="relative">
+                            <button
+                              onClick={() => setFiltrosAbiertos(v => !v)}
+                              className={`flex items-center text-[13px] font-bold rounded-lg px-3 py-2 border transition-colors shadow-sm ${
+                                filtroEtapa
+                                  ? 'bg-[#E11D48]/10 border-[#E11D48]/30 text-[#E11D48]'
+                                  : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                              }`}
+                            >
+                              <Filter className="w-4 h-4 mr-2" />
+                              {filtroEtapa
+                                ? etapasDelFiltro.find(e => e.id === filtroEtapa)?.label ?? 'Filtros'
+                                : 'Filtros'}
+                            </button>
+
+                            {filtrosAbiertos && (
+                              <div className="absolute right-0 top-[calc(100%+6px)] z-40 w-[240px] bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+                                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2">Etapa</p>
+                                <div className="space-y-0.5 max-h-[260px] overflow-y-auto">
+                                  <button
+                                    onClick={() => { setFiltroEtapa(''); setFiltrosAbiertos(false); }}
+                                    className={`w-full text-left px-2 py-1.5 rounded text-[12px] transition-colors ${
+                                      filtroEtapa === '' ? 'bg-[#E11D48]/10 text-[#E11D48] font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    Todas
+                                  </button>
+                                  {etapasDelFiltro.map(e => (
+                                    <button
+                                      key={e.id}
+                                      onClick={() => { setFiltroEtapa(e.id); setFiltrosAbiertos(false); }}
+                                      className={`w-full text-left px-2 py-1.5 rounded text-[12px] transition-colors ${
+                                        filtroEtapa === e.id ? 'bg-[#E11D48]/10 text-[#E11D48] font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                                      }`}
+                                    >
+                                      {e.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
                         </>
                       )}
 
@@ -1053,15 +1152,29 @@ export default function Quotes() {
                 )}
               </div>
 
-              <SpreadsheetTable<KanbanQuote>
-                data={filteredTableQuotes}
-                columns={COTIZACION_COLUMNS}
-                pinnedColumnIds={['folio']}
-                vista={vistaTabla}
-                onVistaChange={setVistaTabla}
-                onRowClick={(quote) => setSelectedQuote(quote)}
-                maxHeight="calc(100vh - 220px)"
-              />
+              {/* Bug 1.1: en Prospectos, la Lista mostraba cotizaciones. Ahora
+                  cada pestaña lista su propia entidad. */}
+              {viewMode === 'prospeccion' ? (
+                <SpreadsheetTable<Prospecto>
+                  data={filteredTableProspectos}
+                  columns={PROSPECTO_COLUMNS}
+                  pinnedColumnIds={['folio']}
+                  vista={vistaProspectos}
+                  onVistaChange={setVistaProspectos}
+                  onRowClick={(p) => setProspectoAbierto(p)}
+                  maxHeight="calc(100vh - 220px)"
+                />
+              ) : (
+                <SpreadsheetTable<KanbanQuote>
+                  data={filteredTableQuotes}
+                  columns={COTIZACION_COLUMNS}
+                  pinnedColumnIds={['folio']}
+                  vista={vistaTabla}
+                  onVistaChange={setVistaTabla}
+                  onRowClick={(quote) => setSelectedQuote(quote)}
+                  maxHeight="calc(100vh - 220px)"
+                />
+              )}
 
               {showQuoteImportModal && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
@@ -1102,6 +1215,20 @@ export default function Quotes() {
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
       />
+      {prospectoAbierto && (
+        <FichaProspecto
+          prospecto={prospectoAbierto}
+          isOpen={true}
+          onClose={() => setProspectoAbierto(null)}
+          onUpdate={(actualizado) => {
+            updateProspecto(actualizado.id, actualizado).catch(err =>
+              setToast({ mensaje: `No se pudo guardar: ${err.message}`, tipo: 'error' }));
+            setProspectoAbierto(actualizado);
+          }}
+          onConvert={() => { /* la conversión vive en el Kanban */ }}
+        />
+      )}
+
       {/* Confirmación visible de las acciones (bug 1.1) */}
       <Toast
         mensaje={toast?.mensaje ?? null}
