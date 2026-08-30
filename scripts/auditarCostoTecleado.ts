@@ -11,11 +11,17 @@
  * Importa las funciones REALES del código en vez de reimplementar las
  * fórmulas: si el script y la app calcularan distinto, la medición no serviría.
  *
+ * ⚠️ TIENE QUE CORRER DESDE LA RAMA claude/client-production-feedback-ef16c0.
+ * Compara el cálculo viejo contra el nuevo, y el nuevo (costoDeConcepto) solo
+ * existe en esa rama. Desde main compararía viejo contra viejo y todo saldría
+ * en cero: concluiríamos que no hay bug cuando sí lo hay.
+ *
  * Uso:
- *   1. Firebase Console → Configuración del proyecto → Cuentas de servicio
- *      → «Generar nueva clave privada». Guardar como serviceAccountKey.json
- *      en la raíz del repo (ya está en .gitignore).
- *   2. npx vite-node scripts/auditarCostoTecleado.ts
+ *   SERVICE_ACCOUNT=/ruta/a/serviceAccountKey.json \
+ *     npx vite-node scripts/auditarCostoTecleado.ts
+ *
+ * Sin SERVICE_ACCOUNT busca serviceAccountKey.json en la raíz del repo.
+ * La clave se lee y nada más: el script no escribe en Firestore.
  */
 
 import { readFileSync } from 'fs';
@@ -59,9 +65,39 @@ const fmt = (n: number) =>
   n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 async function main() {
-  const cred = JSON.parse(readFileSync(new URL('../serviceAccountKey.json', import.meta.url), 'utf8'));
+  const ruta = process.env.SERVICE_ACCOUNT
+    ? process.env.SERVICE_ACCOUNT
+    : new URL('../serviceAccountKey.json', import.meta.url);
+
+  let cred;
+  try {
+    cred = JSON.parse(readFileSync(ruta as string, 'utf8'));
+  } catch {
+    console.error(
+      `\nNo se encontró la clave de servicio.\n\n` +
+      `  Buscada en: ${ruta}\n\n` +
+      `  Indica otra ruta con:\n` +
+      `  SERVICE_ACCOUNT=/ruta/serviceAccountKey.json npx vite-node scripts/auditarCostoTecleado.ts\n`,
+    );
+    process.exit(1);
+  }
   initializeApp({ credential: cert(cred) });
   const db = getFirestore();
+
+  // Comprobación de rama: si costoDeConcepto no está aplicado, el script
+  // compararía viejo contra viejo y reportaría un falso "sin afectación".
+  const sonda = { id: 'sonda', nombre: 'sonda', costo: 100, profit: 0, venta: 0, margen: 0,
+                  subconceptos: [], tarifas: [] } as unknown as ConceptoCotizacion;
+  const sondaSrv = [{ id: 's', tipo: 'x', conceptos: [sonda], cotizacionesProveedor: [], profit: 0 }];
+  if (calcularTotalConsolidado(sondaSrv as KanbanQuote['servicios']) === 0) {
+    console.error(
+      '\n⚠️  Esta copia del código NO tiene el arreglo de costoDeConcepto.\n' +
+      '   El script compararía el cálculo viejo contra sí mismo y diría que no\n' +
+      '   hay cotizaciones afectadas, lo cual sería falso.\n\n' +
+      '   Córrelo desde la rama claude/client-production-feedback-ef16c0.\n',
+    );
+    process.exit(1);
+  }
 
   const snap = await db.collection('cotizaciones').get();
   const quotes: KanbanQuote[] = [];
