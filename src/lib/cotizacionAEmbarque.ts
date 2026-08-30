@@ -53,7 +53,11 @@ export type TipoAdvertencia =
    * opera un embarque con cliente sin validar. Operaciones tiene que saberlo
    * al recibir un embarque que Ventas generó al cerrar la venta.
    */
-  | 'cliente_sin_expediente';
+  | 'cliente_sin_expediente'
+  /** Una línea que no es de transporte se asignó al embarque dominante. */
+  | 'linea_sin_modalidad'
+  /** Ninguna línea corresponde a una modalidad de transporte. */
+  | 'sin_modalidad_transporte';
 
 export interface Advertencia {
   tipo: TipoAdvertencia;

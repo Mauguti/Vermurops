@@ -12,7 +12,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   construirEmbarqueDesdeCotizacion, modalidadDominante,
+  agruparLineasPorModalidad, prefijoFolio, PREFIJO_FOLIO,
 } from './generacionEmbarque';
+import { aplanarCotizacion, totalVenta } from './lineasCotizacion';
 import {
   estaCongelada, camposBloqueados, CAMPOS_EDITABLES_CONGELADA,
 } from './lineasCotizacion';
@@ -269,5 +271,114 @@ describe('requisito para E-4: la transacción tiene que leer el cliente', () => 
 
   it('con el expediente leído, no hay aviso', () => {
     expect(generar(quote([SRV_MAR]), 'automatico', CLIENTE_OK).advertenciasHeredadas).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Un embarque POR MODALIDAD (decisión del cliente, 30-ago-2026).
+// Marítimo y terrestre son embarques distintos, y el folio lo codifica.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const SRV_ADUANAL = servicio({
+  id: 'srv-3', tipo: 'aduanal',
+  conceptos: [concepto({
+    id: 'c3', nombre: 'Despacho aduanal', profit: 200,
+    tarifas: [tarifa({ id: 't3', monto: 800, proveedor: 'Agencia Z', proveedorId: 'PRV-003' })],
+    proveedoresOficialIds: ['t3'],
+  })],
+});
+
+const agrupar = (q: KanbanQuote) => agruparLineasPorModalidad(aplanarCotizacion(q));
+
+describe('prefijo de folio', () => {
+  it('codifica modalidad y tráfico como en Magaya', () => {
+    expect(prefijoFolio('maritimo', 'impo')).toBe('VLIM');
+    expect(prefijoFolio('terrestre', 'impo')).toBe('VLIT');
+    expect(prefijoFolio('terrestre', 'expo')).toBe('VLET');
+    expect(prefijoFolio('aereo', 'impo')).toBe('VLIA');
+  });
+
+  it('las seis combinaciones tienen prefijo y ninguno se repite', () => {
+    const todos = Object.values(PREFIJO_FOLIO).flatMap(m => Object.values(m));
+    expect(todos).toHaveLength(6);
+    expect(new Set(todos).size).toBe(6);
+  });
+});
+
+describe('agrupación por modalidad', () => {
+  it('INVARIANTE: ninguna línea se pierde ni se duplica', () => {
+    const q = quote([SRV_MAR, SRV_TER, SRV_ADUANAL]);
+    const lineas = aplanarCotizacion(q);
+    const { grupos } = agrupar(q);
+
+    const repartidas = grupos.flatMap(g => g.lineas.map(l => l.id));
+    expect(repartidas.sort()).toEqual(lineas.map(l => l.id).sort());
+    expect(new Set(repartidas).size).toBe(lineas.length);
+  });
+
+  it('INVARIANTE: la suma de los grupos es igual al total de la cotización', () => {
+    const q = quote([SRV_MAR, SRV_TER, SRV_ADUANAL]);
+    const suma = agrupar(q).grupos.reduce((a, g) => a + g.ventaTotal, 0);
+    expect(suma).toBeCloseTo(totalVenta(aplanarCotizacion(q)), 2);
+  });
+
+  it('una cotización de una sola modalidad da un solo grupo', () => {
+    const { grupos } = agrupar(quote([SRV_MAR]));
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0].modalidad).toBe('maritimo');
+  });
+
+  it('marítimo y terrestre se separan en dos grupos', () => {
+    const { grupos } = agrupar(quote([SRV_MAR, SRV_TER]));
+    expect(grupos.map(g => g.modalidad).sort()).toEqual(['maritimo', 'terrestre']);
+  });
+
+  it('los grupos vienen ordenados por venta, el dominante primero', () => {
+    const { grupos } = agrupar(quote([SRV_TER, SRV_MAR]));
+    expect(grupos[0].modalidad).toBe('maritimo');
+  });
+});
+
+describe('líneas que no son de transporte', () => {
+  it('con una sola modalidad se asignan sin ruido', () => {
+    // No hay dónde elegir: avisar sería una advertencia que se ignora.
+    const { grupos, advertencias } = agrupar(quote([SRV_MAR, SRV_ADUANAL]));
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0].lineas).toHaveLength(2);
+    expect(advertencias).toEqual([]);
+  });
+
+  it('con dos modalidades van al embarque de mayor venta Y se avisa', () => {
+    const { grupos, advertencias } = agrupar(quote([SRV_MAR, SRV_TER, SRV_ADUANAL]));
+    const maritimo = grupos.find(g => g.modalidad === 'maritimo')!;
+    expect(maritimo.lineas.map(l => l.concepto)).toContain('Despacho aduanal');
+
+    const aviso = advertencias.find(a => a.tipo === 'linea_sin_modalidad')!;
+    expect(aviso.detalle).toContain('Despacho aduanal');
+    expect(aviso.detalle).toContain('maritimo');
+  });
+
+  it('sin ninguna modalidad de transporte avisa y no deja la venta sin embarque', () => {
+    const { grupos, advertencias } = agrupar(quote([SRV_ADUANAL]));
+    expect(grupos).toHaveLength(1);
+    expect(advertencias.map(a => a.tipo)).toContain('sin_modalidad_transporte');
+    // Aun así se genera: una cotización ganada no puede quedarse sin embarque.
+    expect(grupos[0].lineas).toHaveLength(1);
+  });
+
+  it('una cotización vacía no genera grupos ni advertencias', () => {
+    const { grupos, advertencias } = agrupar(quote([]));
+    expect(grupos).toEqual([]);
+    expect(advertencias).toEqual([]);
+  });
+
+  it('un tipo desconocido cuenta como línea sin modalidad, no revienta', () => {
+    const raro = servicio({ id: 'srv-r', tipo: 'srv-def-2', conceptos: [
+      concepto({ id: 'cr', nombre: 'Algo', costo: 100, profit: 10 }),
+    ]});
+    const { grupos, advertencias } = agrupar(quote([SRV_MAR, raro]));
+    expect(grupos).toHaveLength(1);
+    expect(grupos[0].lineas).toHaveLength(2);
+    expect(advertencias).toEqual([]); // una sola modalidad: sin ambigüedad
   });
 });
