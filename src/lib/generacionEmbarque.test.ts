@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest';
 import {
   construirEmbarqueDesdeCotizacion, modalidadDominante,
   agruparParaEmbarques, prefijoFolio, PREFIJO_FOLIO,
+  esFolioProvisional, SERIE_PROVISIONAL,
 } from './generacionEmbarque';
 import { aplanarCotizacion, totalVenta } from './lineasCotizacion';
 import {
@@ -304,6 +305,19 @@ describe('prefijo de folio', () => {
     const todos = Object.values(PREFIJO_FOLIO).flatMap(m => Object.values(m));
     expect(todos).toHaveLength(6);
     expect(new Set(todos).size).toBe(6);
+  });
+
+  it('sin tráfico cae a la serie provisional, no a un folio inventado', () => {
+    // Un embarque sin folio no se puede referir en un correo ni en una carta
+    // de encomienda. Nace identificable y Operaciones lo reasigna al capturar.
+    expect(prefijoFolio('maritimo', null)).toBe(SERIE_PROVISIONAL);
+    expect(prefijoFolio('terrestre', undefined)).toBe('VL');
+  });
+
+  it('esFolioProvisional distingue la serie genérica de las definitivas', () => {
+    expect(esFolioProvisional('VL-26-001')).toBe(true);
+    expect(esFolioProvisional('VLIM-26-001')).toBe(false);
+    expect(esFolioProvisional('VLIT-24-107')).toBe(false);
   });
 });
 

@@ -63,6 +63,11 @@ export type TipoAdvertencia =
    * que el folio arranca en 001 y puede duplicar uno histórico.
    */
   | 'contador_sin_sembrar'
+  /**
+   * No se pudo determinar el tráfico, así que el folio salió de la serie
+   * genérica VL. Operaciones debe reasignarlo a su serie al capturar.
+   */
+  | 'folio_provisional'
   /** Ninguna línea corresponde a una modalidad de transporte. */
   | 'sin_modalidad_transporte';
 

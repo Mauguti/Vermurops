@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Plus, BarChart2 } from 'lucide-react';
 import {
   ServicioSolicitado, ConceptoCotizacion, CotizacionProveedor, TipoServicio,
@@ -10,6 +10,7 @@ import type { TarifaVermur } from '../tarifas/TarifasData';
 import type { ConceptoVermur } from '../conceptos/ConceptosData';
 import { ConceptoSection } from './ConceptoSection';
 import { type Rol } from '../../lib/stateMachine';
+import { resolverTrafico } from '../../lib/traficoServicio';
 
 export interface ServicioSectionProps {
   key?: React.Key;
@@ -48,6 +49,14 @@ function getModality(tipo: string, icono: string): 'maritimo' | 'terrestre' | 'o
 }
 
 export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servicios, renderIcon, moneda, clientePreferidos, clienteVetados, diasCredito, catalogoTarifas, onCrearTarifaSpot, activeConceptoId, onConceptoActivate, panelVisible, onComparativaToggle, conceptosActivos, onCrearConcepto }: ServicioSectionProps) {
+  // Si la ruta permite deducir el tráfico, se propone y Pricing solo confirma.
+  // No se guarda solo: lo sugerido y lo declarado no son lo mismo, y el folio
+  // del embarque depende de este dato.
+  const traficoSugerido = useMemo(() => {
+    const r = resolverTrafico(servicio);
+    return r.fuente === 'derivado' ? r.trafico : null;
+  }, [servicio.trafico, servicio.ruta?.origen, servicio.ruta?.destino]);
+
   const [expanded, setExpanded] = useState(true);
   const [srvComparativaOpen, setSrvComparativaOpen] = useState(false);
 
@@ -157,6 +166,37 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
               <input type="text" value={servicio.ruta?.aduanaRecepcion || ''} onChange={e => handleFieldChange('ruta_aduana_recepcion', e.target.value)} className={inputCls} />
             </div>
             <div>
+              <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">
+                Tráfico
+                {traficoSugerido && !servicio.trafico && (
+                  <span className="ml-1.5 font-semibold normal-case text-[9px] text-[#E11D48]">
+                    sugerido por la ruta
+                  </span>
+                )}
+              </label>
+              <select
+                value={servicio.trafico ?? traficoSugerido ?? ''}
+                onChange={e => handleFieldChange('trafico', e.target.value || undefined)}
+                className={inputCls}
+              >
+                <option value="">— Definir —</option>
+                <option value="importacion">Importación</option>
+                <option value="exportacion">Exportación</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Ubicación</label>
+              <select
+                value={servicio.ubicacion ?? ''}
+                onChange={e => handleFieldChange('ubicacion', e.target.value || undefined)}
+                className={inputCls}
+              >
+                <option value="">— Definir —</option>
+                <option value="origen">Origen</option>
+                <option value="destino">Destino</option>
+              </select>
+            </div>
+            <div>
               <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Incoterm</label>
               <select value={servicio.incoterm} onChange={e => handleFieldChange('incoterm', e.target.value)} className={inputCls}>
                 {INCOTERMS.map(inc => <option key={inc} value={inc}>{inc}</option>)}
@@ -175,6 +215,24 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
               <input type="number" value={servicio.volumen || ''} onChange={e => handleFieldChange('volumen', Number(e.target.value))} className={inputCls} />
             </div>
           </div>
+
+          {/* Excepción, no norma: casi ninguna cotización necesita esto. Va
+              discreta a propósito — si se ve prominente, Pricing creería que
+              tiene que decidir algo en cada servicio. */}
+          <label className="flex items-start gap-2 pt-1 cursor-pointer group w-fit">
+            <input
+              type="checkbox"
+              checked={!!servicio.generaEmbarquePropio}
+              onChange={e => handleFieldChange('generaEmbarquePropio', e.target.checked)}
+              className="mt-[2px] accent-[#E11D48] w-3.5 h-3.5 shrink-0"
+            />
+            <span className="text-[11px] text-gray-400 group-hover:text-gray-600 leading-snug transition-colors">
+              Generar un embarque independiente para este servicio
+              <span className="block text-[10px] text-gray-300 group-hover:text-gray-400">
+                Por defecto todos los servicios de la cotización van al mismo embarque.
+              </span>
+            </span>
+          </label>
 
           {/* ── E4: Campos condicionales de embarque ──────────────────────── */}
           {modality === 'maritimo' && (

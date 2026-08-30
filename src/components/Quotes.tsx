@@ -299,6 +299,12 @@ export default function Quotes() {
   const [formOrigenRuta, setFormOrigenRuta] = useState('');
   const [formDestinoRuta, setFormDestinoRuta] = useState('');
   const [formIncoterm, setFormIncoterm] = useState('FOB');
+  /**
+   * Tráfico de la solicitud. Pricing lo sabe de entrada, así que se captura
+   * aquí y no se deja a la derivación por ruta, que es el respaldo para las
+   * cotizaciones viejas. De este dato depende el folio del embarque.
+   */
+  const [formTrafico, setFormTrafico] = useState<'importacion' | 'exportacion' | ''>('');
   const [formMercancia, setFormMercancia] = useState('');
   const [formPeso, setFormPeso] = useState(0);
   const [formVolumen, setFormVolumen] = useState(0);
@@ -414,6 +420,7 @@ export default function Quotes() {
         profit: 0,
         cotizacionesProveedor: [],
         conceptos: [],
+        ...(formTrafico ? { trafico: formTrafico } : {}),
       })),
       valorTotalConsolidado: 0,
       moneda: 'USD',
@@ -439,6 +446,7 @@ export default function Quotes() {
     setFormOrigenRuta('');
     setFormDestinoRuta('');
     setFormIncoterm('FOB');
+    setFormTrafico('');
     setFormMercancia('');
     setFormPeso(0);
     setFormVolumen(0);
@@ -767,6 +775,18 @@ export default function Quotes() {
                     onChange={e => setFormContacto(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
                   />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">Tráfico</label>
+                  <select
+                    value={formTrafico}
+                    onChange={e => setFormTrafico(e.target.value as typeof formTrafico)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] bg-white"
+                  >
+                    <option value="">— Definir después —</option>
+                    <option value="importacion">Importación</option>
+                    <option value="exportacion">Exportación</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">Origen del lead</label>

@@ -175,7 +175,7 @@ export function docContadorSerie(prefijo: string) {
 }
 
 /** Series de embarque que el sistema conoce. */
-export const SERIES_EMBARQUE = ['VLIM', 'VLEM', 'VLIT', 'VLET', 'VLIA', 'VLEA'] as const;
+export const SERIES_EMBARQUE = ['VLIM', 'VLEM', 'VLIT', 'VLET', 'VLIA', 'VLEA', 'VL'] as const;
 export type SerieEmbarque = typeof SERIES_EMBARQUE[number];
 
 export interface EstadoContadorSerie {

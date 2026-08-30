@@ -183,8 +183,27 @@ export const PREFIJO_FOLIO: Record<ModalidadEmbarque, Record<Trafico, string>> =
   aereo:     { impo: 'VLIA', expo: 'VLEA' },
 };
 
-export function prefijoFolio(modalidad: ModalidadEmbarque, trafico: Trafico): string {
+/**
+ * Serie genérica para cuando no se sabe el tráfico.
+ *
+ * Un embarque sin folio no se puede referir en un correo ni en una carta de
+ * encomienda: «el embarque de Grupo Textil» funciona hasta que hay dos. Así
+ * que nace identificable con prefijo VL y su propio contador, marcado como
+ * provisional para que Operaciones lo reasigne a la serie correcta al capturar.
+ */
+export const SERIE_PROVISIONAL = 'VL';
+
+export function prefijoFolio(
+  modalidad: ModalidadEmbarque,
+  trafico: Trafico | null | undefined,
+): string {
+  if (!trafico) return SERIE_PROVISIONAL;
   return PREFIJO_FOLIO[modalidad][trafico];
+}
+
+/** ¿Este folio salió de la serie provisional? */
+export function esFolioProvisional(folio: string): boolean {
+  return folio.startsWith(`${SERIE_PROVISIONAL}-`);
 }
 
 /**
