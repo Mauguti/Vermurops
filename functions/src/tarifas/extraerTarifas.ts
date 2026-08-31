@@ -41,6 +41,15 @@ export const extraerTarifas = onRequest(
     memory: '512MiB',
     cors: true,
     maxInstances: 10,
+    /**
+     * Invocable sin credencial de IAM: la autenticación la hace ESTA función
+     * verificando el token de Firebase Auth y la capacidad `tarifario.cargar`.
+     *
+     * Sin esto, Cloud Run rechaza en su capa y la petición ni siquiera llega
+     * al código — el cliente recibe un 403 en HTML de Google, no el JSON con
+     * el motivo. Público en la red, cerrado en el código.
+     */
+    invoker: 'public',
   },
   async (req, res) => {
     if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
