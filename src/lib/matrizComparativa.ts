@@ -32,6 +32,10 @@
 import {
   KanbanQuote, ConceptoCotizacion, CotizacionProveedor,
 } from '../components/quotes/QuotesData';
+import {
+  totalComparable, type MonedaCotizacion, type MontoConMoneda,
+  type TipoCambioCotizacion, type TotalComparable,
+} from './monedaComparativa';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -76,6 +80,13 @@ export interface FilaMatriz {
   servicioId: string;
   /** agenteId → valor. Ausente o null = ese agente no cotizó ese concepto. */
   celdas: Record<string, number | null>;
+  /**
+   * agenteId → moneda de ese monto.
+   *
+   * Va por celda y no por fila: un mismo concepto puede llegar en USD de un
+   * agente y en MXN de otro, que es justo el caso que §4.3 describe.
+   */
+  monedas: Record<string, MonedaCotizacion>;
 }
 
 export interface MatrizComparativa {
@@ -197,6 +208,8 @@ export function construirMatriz(
     (srv.conceptos ?? []).forEach(c => {
       const celdas: Record<string, number | null> = {};
 
+      const monedas: Record<string, MonedaCotizacion> = {};
+
       (c.tarifas ?? []).forEach(t => {
         const clave = claveAgente(t);
         if (!porClave.has(clave)) {
@@ -211,6 +224,7 @@ export function construirMatriz(
         // Si un agente cotizó dos veces el mismo concepto, gana la última:
         // es la corrección más reciente que mandó.
         celdas[clave] = t.monto;
+        monedas[clave] = (t.moneda === 'MXN' ? 'MXN' : 'USD');
       });
 
       filas.push({
@@ -220,6 +234,7 @@ export function construirMatriz(
         conceptoId: c.conceptoId ?? null,
         servicioId: srv.id,
         celdas,
+        monedas,
       });
     });
   });
@@ -247,6 +262,40 @@ export function totalDeAgente(filas: FilaMatriz[], agenteId: string): number {
     .filter(f => f.tipo === 'importe')
     .reduce((acc, f) => acc + (f.celdas[agenteId] ?? 0), 0);
   return redondear(suma);
+}
+
+/**
+ * Montos de una columna con su moneda, para totalComparable().
+ *
+ * Solo filas de importe: una fecha o unos días de tránsito no son dinero y no
+ * tienen moneda que respetar.
+ */
+export function montosDeAgente(filas: FilaMatriz[], agenteId: string): MontoConMoneda[] {
+  return filas
+    .filter(f => f.tipo === 'importe')
+    .map(f => ({
+      monto: f.celdas[agenteId] ?? 0,
+      moneda: f.monedas?.[agenteId] ?? ('USD' as MonedaCotizacion),
+    }))
+    .filter(m => m.monto !== 0);
+}
+
+/**
+ * Totales comparables de toda la matriz, respetando las monedas.
+ *
+ * Reemplaza a `calcularTotales` cuando hay monedas mixtas: aquel suma a ciegas
+ * y sirve solo si todo está en la misma.
+ */
+export function totalesComparables(
+  matriz: Pick<MatrizComparativa, 'filas' | 'agentes'>,
+  monedaReferencia: MonedaCotizacion,
+  tc: TipoCambioCotizacion | null | undefined,
+): Record<string, TotalComparable> {
+  const salida: Record<string, TotalComparable> = {};
+  matriz.agentes.forEach(a => {
+    salida[a.id] = totalComparable(montosDeAgente(matriz.filas, a.id), monedaReferencia, tc);
+  });
+  return salida;
 }
 
 export function calcularTotales(
@@ -311,6 +360,7 @@ export function filaVigencia(agentes: AgenteColumna[]): FilaMatriz {
     conceptoId: null,
     servicioId: '',
     celdas,
+    monedas: {},
   };
 }
 
@@ -335,6 +385,7 @@ export function escribirCelda(
   filaId: string,
   agente: AgenteColumna,
   valor: number | null,
+  moneda: MonedaCotizacion = 'USD',
 ): KanbanQuote {
   const [servicioId, conceptoLocalId] = filaId.split('::');
 
@@ -365,7 +416,7 @@ export function escribirCelda(
             return {
               ...c,
               tarifas: tarifas.map(t =>
-                claveAgente(t) === agente.id ? { ...t, monto: valor } : t),
+                claveAgente(t) === agente.id ? { ...t, monto: valor, moneda } : t),
             };
           }
 
@@ -374,7 +425,7 @@ export function escribirCelda(
             proveedor: agente.nombre,
             contacto: '',
             monto: valor,
-            moneda: 'USD',
+            moneda,
             seleccionada: false,
             proveedorId: agente.proveedorId ?? null,
             // Clave AUSENTE, no clave en undefined: Firestore rechaza undefined

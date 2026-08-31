@@ -15,9 +15,11 @@ import {
   escribirCelda, quitarAgenteDeCotizacion,
   lineasDesdeAgente, elegirAgente, conceptosSinCotizar,
   CONCEPTOS_POR_PLANTILLA, matricesPorServicio,
+  montosDeAgente, totalesComparables,
   AgenteColumna, FilaMatriz,
 } from './matrizComparativa';
 import { aplanarCotizacion } from './lineasCotizacion';
+import { compararColumnas } from './monedaComparativa';
 import {
   KanbanQuote, ServicioSolicitado, ConceptoCotizacion, CotizacionProveedor,
 } from '../components/quotes/QuotesData';
@@ -143,16 +145,16 @@ describe('el total: solo suma dinero', () => {
   it('una fila de FECHA no suma', () => {
     // Es el bug del sistema de referencia: floatval("2026-09-15") = 2026.
     const filas: FilaMatriz[] = [
-      { id: 'f1', etiqueta: 'Flete', tipo: 'importe', conceptoId: null, servicioId: 's', celdas: { a: 1500 } },
-      { id: 'f2', etiqueta: 'Validez', tipo: 'fecha', conceptoId: null, servicioId: 's', celdas: { a: 2026 } },
+      { id: 'f1', etiqueta: 'Flete', tipo: 'importe', conceptoId: null, servicioId: 's', celdas: { a: 1500 }, monedas: {} },
+      { id: 'f2', etiqueta: 'Validez', tipo: 'fecha', conceptoId: null, servicioId: 's', celdas: { a: 2026 }, monedas: {} },
     ];
     expect(totalDeAgente(filas, 'a')).toBe(1500);
   });
 
   it('una fila de DATO tampoco: los días de tránsito no son dinero', () => {
     const filas: FilaMatriz[] = [
-      { id: 'f1', etiqueta: 'Flete', tipo: 'importe', conceptoId: null, servicioId: 's', celdas: { a: 1500 } },
-      { id: 'f2', etiqueta: 'Días de tránsito', tipo: 'dato', conceptoId: null, servicioId: 's', celdas: { a: 28 } },
+      { id: 'f1', etiqueta: 'Flete', tipo: 'importe', conceptoId: null, servicioId: 's', celdas: { a: 1500 }, monedas: {} },
+      { id: 'f2', etiqueta: 'Días de tránsito', tipo: 'dato', conceptoId: null, servicioId: 's', celdas: { a: 28 }, monedas: {} },
     ];
     expect(totalDeAgente(filas, 'a')).toBe(1500);
   });
@@ -161,8 +163,8 @@ describe('el total: solo suma dinero', () => {
     // La inversión de ganador del sistema de referencia: quien fue diligente
     // cargaba 2026 fantasma y perdía la comparación.
     const filas: FilaMatriz[] = [
-      { id: 'f1', etiqueta: 'Flete', tipo: 'importe', conceptoId: null, servicioId: 's', celdas: { diligente: 1500, omiso: 1600 } },
-      { id: 'f2', etiqueta: 'Validez', tipo: 'fecha', conceptoId: null, servicioId: 's', celdas: { diligente: 2026, omiso: null } },
+      { id: 'f1', etiqueta: 'Flete', tipo: 'importe', conceptoId: null, servicioId: 's', celdas: { diligente: 1500, omiso: 1600 }, monedas: {} },
+      { id: 'f2', etiqueta: 'Validez', tipo: 'fecha', conceptoId: null, servicioId: 's', celdas: { diligente: 2026, omiso: null }, monedas: {} },
     ];
     const totales = calcularTotales(filas, [
       { id: 'diligente', proveedorId: null, nombre: 'D', vigencia: null, orden: 0 },
@@ -173,8 +175,8 @@ describe('el total: solo suma dinero', () => {
 
   it('redondea a dos decimales sin arrastrar punto flotante', () => {
     const filas: FilaMatriz[] = [
-      { id: 'a', etiqueta: 'A', tipo: 'importe', conceptoId: null, servicioId: 's', celdas: { x: 0.1 } },
-      { id: 'b', etiqueta: 'B', tipo: 'importe', conceptoId: null, servicioId: 's', celdas: { x: 0.2 } },
+      { id: 'a', etiqueta: 'A', tipo: 'importe', conceptoId: null, servicioId: 's', celdas: { x: 0.1 }, monedas: {} },
+      { id: 'b', etiqueta: 'B', tipo: 'importe', conceptoId: null, servicioId: 's', celdas: { x: 0.2 }, monedas: {} },
     ];
     expect(totalDeAgente(filas, 'x')).toBe(0.3);
   });
@@ -547,5 +549,82 @@ describe('lo escrito tiene que ser guardable en Firestore', () => {
 
   it('quitar una columna no deja undefined', () => {
     expect(sinUndefined(quitarAgenteDeCotizacion(COMPARATIVA, 'PRV-B'))).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Monedas mixtas en la matriz (MO-2).
+// ─────────────────────────────────────────────────────────────────────────────
+describe('moneda por celda', () => {
+  const mixta = quote([
+    concepto({
+      id: 'cf', nombre: 'Flete internacional', tarifas: [
+        cp({ id: 'f1', monto: 1500, proveedor: 'A', proveedorId: 'P-A', moneda: 'USD' }),
+        cp({ id: 'f2', monto: 1600, proveedor: 'B', proveedorId: 'P-B', moneda: 'USD' }),
+      ],
+    }),
+    concepto({
+      id: 'cm', nombre: 'Maniobras', tarifas: [
+        cp({ id: 'm1', monto: 8000, proveedor: 'A', proveedorId: 'P-A', moneda: 'MXN' }),
+        cp({ id: 'm2', monto: 5000, proveedor: 'B', proveedorId: 'P-B', moneda: 'MXN' }),
+      ],
+    }),
+  ]);
+
+  const TC = {
+    valor: 18.5, base: 'USD' as const, destino: 'MXN' as const,
+    fuente: 'banxico' as const, fecha: '2026-08-31',
+  };
+
+  it('cada celda conserva la moneda de su tarifa', () => {
+    const m = construirMatriz(mixta);
+    expect(m.filas[0].monedas['P-A']).toBe('USD');
+    expect(m.filas[1].monedas['P-A']).toBe('MXN');
+  });
+
+  it('montosDeAgente devuelve montos con su moneda, sin sumar', () => {
+    const m = construirMatriz(mixta);
+    expect(montosDeAgente(m.filas, 'P-A')).toEqual([
+      { monto: 1500, moneda: 'USD' },
+      { monto: 8000, moneda: 'MXN' },
+    ]);
+  });
+
+  it('SIN tasa ninguna columna es comparable', () => {
+    const m = construirMatriz(mixta);
+    const totales = totalesComparables(m, 'USD', null);
+    expect(totales['P-A'].requiereTipoCambio).toBe(true);
+    expect(compararColumnas(totales).menorId).toBeNull();
+  });
+
+  it('CON tasa compara correctamente el paquete completo', () => {
+    // A: 1500 USD + 8000 MXN = 1932.43 USD
+    // B: 1600 USD + 5000 MXN = 1870.27 USD  ← más barato pese al flete mayor
+    const m = construirMatriz(mixta);
+    const totales = totalesComparables(m, 'USD', TC);
+    expect(totales['P-A'].equivalente).toBe(1932.43);
+    expect(totales['P-B'].equivalente).toBe(1870.27);
+    expect(compararColumnas(totales).menorId).toBe('P-B');
+  });
+
+  it('el desglose por moneda sobrevive: nunca se pierde el original', () => {
+    const totales = totalesComparables(construirMatriz(mixta), 'USD', TC);
+    expect(totales['P-A'].porMoneda).toEqual({ USD: 1500, MXN: 8000 });
+    expect(totales['P-A'].detalle).toContain('MXN 8,000.00');
+  });
+
+  it('escribirCelda guarda la moneda que se eligió', () => {
+    const agente: AgenteColumna = {
+      id: 'P-A', proveedorId: 'P-A', nombre: 'A', vigencia: null, orden: 0,
+    };
+    const q = escribirCelda(mixta, 'srv-1::cm', agente, 9000, 'MXN');
+    expect(construirMatriz(q).filas[1].monedas['P-A']).toBe('MXN');
+    expect(construirMatriz(q).filas[1].celdas['P-A']).toBe(9000);
+  });
+
+  it('las filas que no son importe no aportan moneda', () => {
+    const m = construirMatriz(mixta);
+    // Solo hay filas de importe en este fixture; la de vigencia es sintética.
+    expect(montosDeAgente(m.filas, 'P-A').every(x => x.moneda)).toBe(true);
   });
 });

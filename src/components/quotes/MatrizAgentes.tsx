@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, ChevronUp, ChevronDown, AlertTriangle, Check, Download } from 'lucide-react';
+import { Plus, Trash2, ChevronUp, ChevronDown, AlertTriangle, Download, Coins } from 'lucide-react';
 import type {
   MatrizComparativa, AgenteColumna, FilaMatriz,
 } from '../../lib/matrizComparativa';
 import { filaVigencia, agentesIncompletos } from '../../lib/matrizComparativa';
+import type {
+  TotalComparable, ResultadoComparacion, MonedaCotizacion,
+} from '../../lib/monedaComparativa';
 
 /**
  * Comparativa de agentes: conceptos en filas, agentes en columnas, total del
@@ -21,14 +24,33 @@ import { filaVigencia, agentesIncompletos } from '../../lib/matrizComparativa';
 const money = (n: number) =>
   n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+/** El total comparable, o el aviso de que falta la tasa para calcularlo. */
+function fmtEquivalente(t: TotalComparable | undefined): string {
+  if (!t) return '—';
+  if (t.equivalente === null) return 'sin comparar';
+  return `${money(t.equivalente)} ${t.monedaReferencia}`;
+}
+
 export interface MatrizAgentesProps {
   matriz: MatrizComparativa;
+  /** Servicio activo, para el encabezado. */
   titulo: string;
+  /** Concepto activo cuando la matriz está enfocada en uno. */
+  subtitulo?: string;
+  /** Servicios entre los que se puede cambiar. Una sola matriz, contextual. */
+  servicios: { id: string; etiqueta: string }[];
+  servicioActivoId: string;
+  onCambiarServicio: (id: string) => void;
+  /** Totales que respetan la moneda. */
+  totalesComparables: Record<string, TotalComparable>;
+  comparacion: ResultadoComparacion;
+  tipoCambio: React.ReactNode;
+  onEditarMoneda: (filaId: string, agente: AgenteColumna, moneda: MonedaCotizacion) => void;
   editable: boolean;
   /** Agente preseleccionado para cargar. Por defecto, el menor. */
   agenteElegidoId: string | null;
   onElegirAgente: (agenteId: string) => void;
-  onEditarCelda: (filaId: string, agente: AgenteColumna, valor: number | null) => void;
+  onEditarCelda: (filaId: string, agente: AgenteColumna, valor: number | null, moneda: MonedaCotizacion) => void;
   onEditarVigencia: (agenteId: string, vigencia: string | null) => void;
   onEditarEtiqueta: (filaId: string, etiqueta: string) => void;
   onQuitarAgente: (agenteId: string) => void;
@@ -39,39 +61,81 @@ export interface MatrizAgentesProps {
 }
 
 export default function MatrizAgentes({
-  matriz, titulo, editable, agenteElegidoId,
+  matriz, titulo, subtitulo, servicios, servicioActivoId, onCambiarServicio,
+  totalesComparables, comparacion, tipoCambio, onEditarMoneda,
+  editable, agenteElegidoId,
   onElegirAgente, onEditarCelda, onEditarVigencia, onEditarEtiqueta,
   onQuitarAgente, onQuitarFila, onAgregarAgente, onAgregarFila, onCargarEnLineas,
 }: MatrizAgentesProps) {
   const [abierta, setAbierta] = useState(true);
 
-  const { agentes, filas, totales, agenteMenorId } = matriz;
+  const { agentes, filas } = matriz;
   const incompletos = agentesIncompletos(matriz);
   const idsIncompletos = new Set(incompletos.map(i => i.agenteId));
-  const elegido = agenteElegidoId ?? agenteMenorId;
+  const menorId = comparacion.menorId;
+  const elegido = agenteElegidoId ?? menorId;
 
-  const resumenPlegado = agenteMenorId
+  const resumenPlegado = menorId
     ? `${agentes.length} agente${agentes.length !== 1 ? 's' : ''} · menor: ${
-        agentes.find(a => a.id === agenteMenorId)?.nombre} $${money(totales[agenteMenorId] ?? 0)}`
+        agentes.find(a => a.id === menorId)?.nombre} ${
+        fmtEquivalente(totalesComparables[menorId])}`
     : `${agentes.length} agente${agentes.length !== 1 ? 's' : ''}`;
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-      {/* Encabezado */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/60">
-        <button onClick={() => setAbierta(v => !v)} className="flex items-center gap-2 min-w-0">
-          <span className="text-[13px] font-bold text-[#18181B]">Comparativa · {titulo}</span>
-          <span className="text-[11px] text-gray-400 truncate">{resumenPlegado}</span>
-          {abierta ? <ChevronUp className="w-3.5 h-3.5 text-gray-400" /> : <ChevronDown className="w-3.5 h-3.5 text-gray-400" />}
-        </button>
-
-        {editable && abierta && (
-          <button
-            onClick={onAgregarAgente}
-            className="flex items-center gap-1.5 text-[11px] font-bold text-[#E11D48] hover:bg-[#E11D48]/5 px-2 py-1 rounded-lg transition-colors shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" /> Agregar agente
+      {/* Encabezado: de qué es esta comparativa, y con qué tasa */}
+      <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60 space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <button onClick={() => setAbierta(v => !v)} className="flex items-center gap-2 min-w-0">
+            {abierta ? <ChevronUp className="w-4 h-4 text-gray-400 shrink-0" /> : <ChevronDown className="w-4 h-4 text-gray-400 shrink-0" />}
+            <span className="text-[13px] font-bold text-[#18181B] shrink-0">Comparativa de agentes</span>
+            {!abierta && <span className="text-[11px] text-gray-400 truncate">{resumenPlegado}</span>}
           </button>
+
+          {editable && abierta && (
+            <button
+              onClick={onAgregarAgente}
+              className="flex items-center gap-1.5 text-[11px] font-bold text-[#E11D48] hover:bg-[#E11D48]/5 px-2.5 py-1 rounded-lg transition-colors shrink-0"
+            >
+              <Plus className="w-3.5 h-3.5" /> Agregar proveedor
+            </button>
+          )}
+        </div>
+
+        {abierta && (
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            {/* Una sola matriz que cambia de contenido: se elige el servicio.
+                Mismo patrón que el panel lateral de tarifas. */}
+            <div className="flex items-center gap-1.5 min-w-0">
+              {servicios.length > 1 ? (
+                <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
+                  {servicios.map(sv => (
+                    <button
+                      key={sv.id}
+                      onClick={() => onCambiarServicio(sv.id)}
+                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold capitalize transition-all ${
+                        sv.id === servicioActivoId
+                          ? 'bg-white text-[#18181B] shadow-sm'
+                          : 'text-gray-400 hover:text-gray-600'
+                      }`}
+                    >
+                      {sv.etiqueta}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-[11px] font-semibold text-gray-500 capitalize">{titulo}</span>
+              )}
+              {subtitulo && (
+                <span className="text-[11px] text-gray-400 truncate">· {subtitulo}</span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] text-gray-400">Montos antes de IVA</span>
+              {tipoCambio}
+            </div>
+          </div>
         )}
       </div>
 
@@ -85,6 +149,14 @@ export default function MatrizAgentes({
             </div>
           ) : (
             <>
+              {/* Sin tasa no se compara: totales separados y sin ✓Menor. */}
+              {comparacion.bloqueadaPorTipoCambio && (
+                <div className="mx-4 mt-3 flex items-start gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50/60">
+                  <Coins className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-[1px]" />
+                  <p className="text-[11px] text-amber-800 leading-snug">{comparacion.motivo}</p>
+                </div>
+              )}
+
               {/* Aviso de paquetes incompletos */}
               {incompletos.length > 0 && (
                 <div className="mx-4 mt-3 flex items-start gap-2 px-3 py-2 rounded-lg border border-amber-200 bg-amber-50/60">
@@ -140,6 +212,7 @@ export default function MatrizAgentes({
                         agentes={agentes}
                         editable={editable}
                         onEditarCelda={onEditarCelda}
+                        onEditarMoneda={onEditarMoneda}
                         onEditarEtiqueta={onEditarEtiqueta}
                         onQuitar={onQuitarFila}
                       />
@@ -178,7 +251,8 @@ export default function MatrizAgentes({
                         Total
                       </td>
                       {agentes.map(a => {
-                        const esMenor = a.id === agenteMenorId;
+                        const t = totalesComparables[a.id];
+                        const esMenor = a.id === menorId;
                         const esElegido = a.id === elegido;
                         return (
                           <td key={a.id} className="px-3 py-2.5 text-center">
@@ -190,15 +264,23 @@ export default function MatrizAgentes({
                               }`}
                               title={editable ? `Elegir a ${a.nombre}` : undefined}
                             >
+                              {/* El equivalente manda; el desglose original
+                                  queda debajo, siempre visible (§4.3). */}
                               <span className={`block font-mono text-[13px] font-bold tabular-nums ${
-                                esMenor ? 'text-emerald-700' : 'text-[#18181B]'}`}>
-                                ${money(totales[a.id] ?? 0)}
+                                t?.requiereTipoCambio ? 'text-amber-600'
+                                : esMenor ? 'text-emerald-700' : 'text-[#18181B]'}`}>
+                                {fmtEquivalente(t)}
                               </span>
+                              {t && t.monedasPresentes.length > 1 && (
+                                <span className="block text-[9px] text-gray-400 font-mono leading-tight mt-0.5">
+                                  {t.monedasPresentes.map(m => `${m} ${money(t.porMoneda[m])}`).join(' + ')}
+                                </span>
+                              )}
                               {esMenor && (
-                                <span className="block text-[9px] font-bold text-emerald-600">✓ Menor</span>
+                                <span className="block text-[9px] font-bold text-emerald-600 mt-0.5">✓ Menor</span>
                               )}
                               {esElegido && !esMenor && (
-                                <span className="block text-[9px] font-bold text-[#E11D48]">Elegido</span>
+                                <span className="block text-[9px] font-bold text-[#E11D48] mt-0.5">Elegido</span>
                               )}
                             </button>
                           </td>
@@ -249,11 +331,12 @@ interface RenglonProps {
   agentes: AgenteColumna[];
   editable: boolean;
   onEditarCelda: MatrizAgentesProps['onEditarCelda'];
+  onEditarMoneda: MatrizAgentesProps['onEditarMoneda'];
   onEditarEtiqueta: (filaId: string, etiqueta: string) => void;
   onQuitar: (filaId: string) => void;
 }
 
-function Renglon({ fila, agentes, editable, onEditarCelda, onEditarEtiqueta, onQuitar }: RenglonProps) {
+function Renglon({ fila, agentes, editable, onEditarCelda, onEditarMoneda, onEditarEtiqueta, onQuitar }: RenglonProps) {
   const esDato = fila.tipo === 'dato';
 
   return (
@@ -275,22 +358,44 @@ function Renglon({ fila, agentes, editable, onEditarCelda, onEditarEtiqueta, onQ
 
       {agentes.map(a => {
         const v = fila.celdas[a.id];
+        const moneda = fila.monedas?.[a.id] ?? 'USD';
+        const hayValor = v !== null && v !== undefined;
         return (
-          <td key={a.id} className="px-3 py-1.5 text-center">
+          <td key={a.id} className="px-2 py-1.5">
             {editable ? (
-              <input
-                type="number"
-                value={v ?? ''}
-                placeholder="—"
-                onChange={e => onEditarCelda(
-                  fila.id, a,
-                  e.target.value === '' ? null : Number(e.target.value),
-                )}
-                className="w-full px-1.5 py-1 text-[12px] text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-[#E11D48] focus:bg-white bg-transparent rounded outline-none"
-              />
+              <div className="flex items-center gap-0.5">
+                <input
+                  type="number"
+                  value={v ?? ''}
+                  placeholder="—"
+                  onChange={e => onEditarCelda(
+                    fila.id, a,
+                    e.target.value === '' ? null : Number(e.target.value),
+                    moneda,
+                  )}
+                  className="w-full min-w-0 px-1.5 py-1 text-[12px] text-right tabular-nums bg-white border border-gray-150 rounded hover:border-gray-300 focus:border-[#E11D48] focus:ring-1 focus:ring-[#E11D48]/20 outline-none"
+                />
+                {/* La moneda va por celda: el mismo concepto puede llegar en
+                    USD de un agente y en MXN de otro (§4.3). */}
+                <select
+                  value={moneda}
+                  onChange={e => onEditarMoneda(fila.id, a, e.target.value as MonedaCotizacion)}
+                  disabled={!hayValor}
+                  className={`shrink-0 text-[9px] font-bold rounded px-0.5 py-1 outline-none cursor-pointer transition-colors ${
+                    hayValor
+                      ? moneda === 'MXN'
+                        ? 'text-amber-700 bg-amber-50 hover:bg-amber-100'
+                        : 'text-gray-500 bg-gray-50 hover:bg-gray-100'
+                      : 'text-gray-300 bg-transparent'
+                  }`}
+                >
+                  <option value="USD">USD</option>
+                  <option value="MXN">MXN</option>
+                </select>
+              </div>
             ) : (
-              <span className="tabular-nums text-gray-700">
-                {v === null || v === undefined ? '—' : money(v)}
+              <span className="block text-right tabular-nums text-gray-700">
+                {hayValor ? `${money(v!)} ${moneda}` : '—'}
               </span>
             )}
           </td>

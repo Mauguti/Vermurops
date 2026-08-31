@@ -45,6 +45,9 @@ import {
 } from '../../lib/matrizComparativa';
 import MatrizAgentes from './MatrizAgentes';
 import ModalAgregarAgente from './ModalAgregarAgente';
+import CapturaTipoCambio from './CapturaTipoCambio';
+import { totalesComparables } from '../../lib/matrizComparativa';
+import { compararColumnas, type MonedaCotizacion } from '../../lib/monedaComparativa';
 import {
   evaluarProntitud, faltantesPorLinea, resumenFaltantes, textoFaltantesLinea,
 } from '../../lib/prontitudCotizacion';
@@ -129,6 +132,13 @@ export default function FichaCotizacion({
   /** Agente elegido por servicio. Sin elección explícita manda el menor. */
   const [agenteElegido, setAgenteElegido] = useState<Record<string, string>>({});
   const [modalAgente, setModalAgente] = useState<string | null>(null);
+  /**
+   * Servicio activo de la comparativa.
+   *
+   * Una sola matriz que cambia de contenido, no una por servicio: cuatro
+   * tablas saturan la pantalla. Mismo patrón que el panel lateral de tarifas.
+   */
+  const [servicioComparativa, setServicioComparativa] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [newChatMessage, setNewChatMessage] = useState('');
@@ -648,9 +658,39 @@ export default function FichaCotizacion({
     [quote, agentesGuardados],
   );
 
-  /** Escribe el precio de un concepto para un agente. */
-  const handleEditarCelda = (filaId: string, agente: AgenteColumna, valor: number | null) => {
-    onUpdateQuote(escribirCelda(quote, filaId, agente, valor));
+  const servicioActivoId = servicioComparativa ?? quote.servicios?.[0]?.id ?? '';
+  const matrizActiva = useMemo(
+    () => matrices.find(m => m.servicioId === servicioActivoId) ?? matrices[0],
+    [matrices, servicioActivoId],
+  );
+
+  /** Totales que respetan la moneda de cada celda (MO-1/MO-2). */
+  const totalesConMoneda = useMemo(
+    () => matrizActiva
+      ? totalesComparables(matrizActiva.matriz, quote.moneda === 'MXN' ? 'MXN' : 'USD', quote.tipoCambio)
+      : {},
+    [matrizActiva, quote.moneda, quote.tipoCambio],
+  );
+
+  const comparacionMatriz = useMemo(
+    () => compararColumnas(totalesConMoneda),
+    [totalesConMoneda],
+  );
+
+  /** Escribe el precio de un concepto para un agente, con su moneda. */
+  const handleEditarCelda = (
+    filaId: string, agente: AgenteColumna, valor: number | null,
+    moneda: MonedaCotizacion = 'USD',
+  ) => {
+    onUpdateQuote(escribirCelda(quote, filaId, agente, valor, moneda));
+  };
+
+  /** Cambia solo la moneda, conservando el monto. */
+  const handleEditarMoneda = (filaId: string, agente: AgenteColumna, moneda: MonedaCotizacion) => {
+    const fila = matrizActiva?.matriz.filas.find(f => f.id === filaId);
+    const valor = fila?.celdas[agente.id];
+    if (valor === null || valor === undefined) return;
+    onUpdateQuote(escribirCelda(quote, filaId, agente, valor, moneda));
   };
 
   /** La vigencia es de la COLUMNA: se propaga a las tarifas de ese agente. */
@@ -993,25 +1033,43 @@ export default function FichaCotizacion({
                 Arriba de la tabla: se compara, se elige, y se cotiza. Pricing
                 pide la misma ruta «a entre 7 y 10» proveedores, y un agente
                 marítimo no compite contra un transportista terrestre. */}
-            {matrices.map(({ servicioId, servicioTipo, matriz }) => (
+            {matrizActiva && (
               <MatrizAgentes
-                key={servicioId}
-                matriz={matriz}
-                titulo={servicioTipo}
+                matriz={matrizActiva.matriz}
+                titulo={matrizActiva.servicioTipo}
+                servicios={matrices.map(m => ({ id: m.servicioId, etiqueta: m.servicioTipo }))}
+                servicioActivoId={matrizActiva.servicioId}
+                onCambiarServicio={setServicioComparativa}
+                totalesComparables={totalesConMoneda}
+                comparacion={comparacionMatriz}
+                tipoCambio={
+                  <CapturaTipoCambio
+                    tipoCambio={quote.tipoCambio}
+                    editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
+                    onCambiar={(tc) => onUpdateQuote({
+                      ...quote,
+                      ...(tc ? { tipoCambio: tc } : { tipoCambio: undefined }),
+                    })}
+                  />
+                }
                 editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
-                agenteElegidoId={agenteElegido[servicioId] ?? matriz.agenteMenorId}
-                onElegirAgente={(id) => setAgenteElegido(p => ({ ...p, [servicioId]: id }))}
+                agenteElegidoId={agenteElegido[matrizActiva.servicioId] ?? comparacionMatriz.menorId}
+                onElegirAgente={(id) =>
+                  setAgenteElegido(p => ({ ...p, [matrizActiva.servicioId]: id }))}
                 onEditarCelda={handleEditarCelda}
+                onEditarMoneda={handleEditarMoneda}
                 onEditarVigencia={handleEditarVigencia}
                 onEditarEtiqueta={(filaId, etiqueta) =>
                   onUpdateQuote(aplicarEdicionLinea(quote, filaId, { concepto: etiqueta }))}
                 onQuitarAgente={handleQuitarAgente}
                 onQuitarFila={(filaId) => onUpdateQuote(quitarLinea(quote, filaId))}
-                onAgregarAgente={() => setModalAgente(servicioId)}
-                onAgregarFila={() => onUpdateQuote(agregarLinea(quote, { servicioId, concepto: '' }))}
-                onCargarEnLineas={() => handleCargarEnLineas(servicioId, matriz)}
+                onAgregarAgente={() => setModalAgente(matrizActiva.servicioId)}
+                onAgregarFila={() => onUpdateQuote(
+                  agregarLinea(quote, { servicioId: matrizActiva.servicioId, concepto: '' }))}
+                onCargarEnLineas={() =>
+                  handleCargarEnLineas(matrizActiva.servicioId, matrizActiva.matriz)}
               />
-            ))}
+            )}
 
             {/* ── Tarjetas por modalidad (sesión 30-ago-2026) ──────────────
                 Reemplaza el árbol de servicios → conceptos → cotizaciones de

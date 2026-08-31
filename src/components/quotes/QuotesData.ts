@@ -3,6 +3,7 @@
 // Proceso comercial real: Ventas → Pricing → Proveedores → Consolidación
 // ============================================================
 import { calcLinea } from '../../lib/cotizacionCalculator';
+import type { TipoCambioCotizacion } from '../../lib/monedaComparativa';
 
 // ------------------------------------------------------------
 // Tipos base
@@ -241,6 +242,19 @@ export interface KanbanQuote {
   // Final
   estadoFinal: 'ganada' | 'perdida' | null;
   motivoPerdida: string | null;
+
+  /**
+   * Tipo de cambio con el que se cotiza (MO-3).
+   *
+   * Se guarda CON la cotización y no se relee: si se tomara el vigente en cada
+   * apertura, reabrir el documento el mes que viene podría reordenar a los
+   * agentes de la comparativa y contradecir una decisión ya tomada.
+   *
+   * Normalmente es el «pricing rate»: no la tasa de mercado, sino la que
+   * Pricing usa con su colchón. «Ahorita el dólar está en 20, ellos cotizan en
+   * 20.50.»
+   */
+  tipoCambio?: TipoCambioCotizacion;
 
   /**
    * Embarques generados desde esta cotización (E-4).
