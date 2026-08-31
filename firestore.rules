@@ -101,6 +101,22 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Importaciones de tarifarios (TA-2) ───────────────────────────────
+    // Borradores de la carga de tarifarios con IA.
+    // Eliminar está prohibido: una importación descartada se MARCA, no se
+    // borra. Si mañana aparece una tarifa rara en el catálogo, el rastro de
+    // qué se subió y qué se decidió es lo que permite reconstruir qué pasó.
+    //
+    // La capacidad 'tarifario.cargar' (Pricing) se exige en la capa de datos,
+    // no aquí: las reglas todavía no distinguen roles — ver §6 del CLAUDE.md.
+    match /importacionesTarifas/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.creadoPor == request.auth.uid;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // ── Embarques (E-1) ──────────────────────────────────────────────────
     // Antes vivían en memoria y se perdían al recargar.
     // Eliminar está prohibido: un embarque cancelado se marca en sus cierres,

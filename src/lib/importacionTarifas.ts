@@ -451,9 +451,15 @@ export function vigenciasSeTraslapan(
 /**
  * Busca tarifas activas que ya cubran lo mismo.
  *
- * Llave natural: proveedor + concepto + ruta + traslape de vigencia. Sin esta
- * detección, subir el tarifario de septiembre encima del de agosto duplica
- * todo y el panel empieza a ofrecer dos precios para el mismo servicio.
+ * Llave natural: proveedor + concepto + ruta + UNIDAD + traslape de vigencia.
+ *
+ * La unidad forma parte de la llave porque en Vermur un flete cotizado por
+ * contenedor y el mismo por metro cúbico son tarifas distintas, no un
+ * duplicado. El tipo de contenedor no hace falta: el modelo ya distingue
+ * monto (20'), montoPor40 y montoPor40HC dentro de una misma tarifa.
+ *
+ * Sin esta detección, subir el tarifario de septiembre encima del de agosto
+ * duplica todo y el panel empieza a ofrecer dos precios para el mismo servicio.
  */
 export function detectarColisiones(
   lineas: LineaEnRevision[],
@@ -470,6 +476,7 @@ export function detectarColisiones(
       t.conceptoId === l.conceptoId &&
       t.puertoOrigenId === l.puertoOrigenId &&
       t.puertoDestinoId === l.puertoDestinoId &&
+      t.precios?.unidad === l.unidad &&
       vigenciasSeTraslapan(vigencia.fechaInicio, vigencia.fechaFin, t.fechaInicio, t.fechaFin)
     );
 
@@ -477,10 +484,91 @@ export function detectarColisiones(
       colisiones.push({
         lineaId: l.lineaId,
         tarifaExistente: existente,
-        detalle: `Ya existe una tarifa activa de este proveedor para «${l.conceptoNombre}» en la misma ruta, vigente ${existente.fechaInicio} → ${existente.fechaFin ?? 'sin fin'}.`,
+        detalle: `Ya existe una tarifa activa de este proveedor para «${l.conceptoNombre}» en la misma ruta y unidad, vigente ${existente.fechaInicio} → ${existente.fechaFin ?? 'sin fin'}.`,
       });
     }
   });
 
   return colisiones;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6 · De la respuesta validada a la pantalla de revisión
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Traduce la unidad que escribió la IA a la del catálogo.
+ *
+ * Devuelve null si no la reconoce, en vez de adivinar: la unidad decide cómo
+ * se multiplica el precio, así que equivocarla cambia el monto de la
+ * cotización entera.
+ */
+export function normalizarUnidad(texto: string | undefined): UnidadTarifa | null {
+  if (!texto?.trim()) return null;
+  const t = norm(texto);
+
+  const MAPA: Record<string, UnidadTarifa> = {
+    contenedor: 'CONTENEDOR', container: 'CONTENEDOR', ctr: 'CONTENEDOR', teu: 'CONTENEDOR',
+    cbm: 'CBM', m3: 'CBM', 'metro cubico': 'CBM', 'metros cubicos': 'CBM', volumen: 'CBM',
+    ton: 'TON', tonelada: 'TON', toneladas: 'TON', kg: 'TON', peso: 'TON',
+    wm: 'WM', 'w/m': 'WM',
+    pedimento: 'PEDIMENTO', despacho: 'PEDIMENTO',
+    viaje: 'VIAJE', flete: 'VIAJE', camion: 'VIAJE',
+    bl: 'BL', 'bill of lading': 'BL', embarque: 'BL',
+    fijo: 'FIJO', 'monto fijo': 'FIJO', servicio: 'FIJO',
+    dia: 'DIA', dias: 'DIA', diario: 'DIA',
+  };
+
+  return MAPA[t] ?? null;
+}
+
+export interface CatalogosResolucion {
+  conceptos: ConceptoMatch[];
+  puertos: PuertoMatch[];
+}
+
+/**
+ * Arma las líneas para la pantalla de revisión.
+ *
+ * Todo lo que la IA resolvió con certeza llega pre-cargado; todo lo demás
+ * llega vacío y marcado. Nada nace confirmado: `monedaConfirmada` y
+ * `unidadConfirmada` empiezan en false incluso cuando el dato vino, porque un
+ * dato que se ve bien es justo el que nadie revisa.
+ */
+export function construirLineasEnRevision(
+  datos: RespuestaN8N,
+  catalogos: CatalogosResolucion,
+): LineaEnRevision[] {
+  return (datos.tarifas ?? []).map(ex => {
+    const concepto = resolverConcepto(ex.concepto, catalogos.conceptos);
+    const origen = resolverPuerto(ex.puertoOrigen, catalogos.puertos);
+    const destino = resolverPuerto(ex.puertoDestino, catalogos.puertos);
+
+    // Los puertos que no se resolvieron no se pierden: caen a rutaTexto, que
+    // el modelo admite para rutas no portuarias (terrestre, aéreo).
+    const sinResolver = [
+      origen.match ? null : ex.puertoOrigen,
+      destino.match ? null : ex.puertoDestino,
+    ].filter(Boolean);
+
+    return {
+      lineaId: ex.lineaId,
+      extraida: ex,
+      conceptoId: concepto.match?.id ?? null,
+      conceptoNombre: concepto.match?.nombre ?? ex.concepto,
+      nivelConcepto: concepto.nivel,
+      puertoOrigenId: origen.match?.id ?? null,
+      puertoDestinoId: destino.match?.id ?? null,
+      rutaTexto: sinResolver.length > 0 ? sinResolver.join(' → ') : null,
+      monto: ex.monto,
+      montoPor40: ex.montoPor40,
+      montoPor40HC: ex.montoPor40HC,
+      montoMinimo: ex.montoMinimo,
+      moneda: (ex.moneda === 'USD' || ex.moneda === 'MXN') ? ex.moneda : null,
+      unidad: normalizarUnidad(ex.unidad),
+      monedaConfirmada: false,
+      unidadConfirmada: false,
+      descartada: false,
+    };
+  });
 }

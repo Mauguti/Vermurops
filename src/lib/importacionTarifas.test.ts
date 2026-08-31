@@ -8,7 +8,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  validarRespuestaN8N, textoDeAviso,
+  validarRespuestaN8N, textoDeAviso, normalizarUnidad, construirLineasEnRevision,
   resolverConcepto, resolverPuerto, resolverProveedor,
   motivosNoGuardable, esGuardable, resumenRevision, ordenarParaRevision,
   vigenciasSeTraslapan, detectarColisiones,
@@ -227,7 +227,7 @@ const linea = (p: Partial<LineaEnRevision> = {}): LineaEnRevision => ({
   rutaTexto: null,
   monto: 1200,
   moneda: 'USD',
-  unidad: 'CONTENEDOR' as LineaEnRevision['unidad'],
+  unidad: 'CONTENEDOR',
   monedaConfirmada: true,
   unidadConfirmada: true,
   descartada: false,
@@ -333,6 +333,7 @@ describe('detección de duplicados contra el catálogo vivo', () => {
     id: 'TAR-0001', activo: true,
     proveedorId: 'PRV-001', conceptoId: 'CON-001',
     puertoOrigenId: 'PTO-002', puertoDestinoId: 'PTO-001',
+    precios: { monto: 1200, unidad: 'CONTENEDOR' },
     fechaInicio: '2026-08-01', fechaFin: '2026-12-31',
   } as TarifaVermur;
 
@@ -363,8 +364,98 @@ describe('detección de duplicados contra el catálogo vivo', () => {
     expect(detectarColisiones([linea()], 'PRV-001', vigencia, [vieja])).toEqual([]);
   });
 
+  it('la MISMA tarifa en otra unidad NO es duplicado', () => {
+    // Un flete por contenedor y el mismo por metro cúbico son tarifas
+    // distintas. La unidad forma parte de la llave natural.
+    const porM3 = linea({ unidad: 'CBM' });
+    expect(detectarColisiones([porM3], 'PRV-001', vigencia, [existente])).toEqual([]);
+  });
+
+  it('misma unidad sí colisiona', () => {
+    expect(detectarColisiones([linea()], 'PRV-001', vigencia, [existente])).toHaveLength(1);
+  });
+
   it('las descartadas y las que no tienen concepto no se cotejan', () => {
     expect(detectarColisiones([linea({ descartada: true })], 'PRV-001', vigencia, [existente])).toEqual([]);
     expect(detectarColisiones([linea({ conceptoId: null })], 'PRV-001', vigencia, [existente])).toEqual([]);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('normalización de la unidad', () => {
+  it('reconoce las formas comunes de cada unidad', () => {
+    expect(normalizarUnidad('contenedor')).toBe('CONTENEDOR');
+    expect(normalizarUnidad('CONTAINER')).toBe('CONTENEDOR');
+    expect(normalizarUnidad('m3')).toBe('CBM');
+    expect(normalizarUnidad('metro cúbico')).toBe('CBM');
+    expect(normalizarUnidad('tonelada')).toBe('TON');
+    expect(normalizarUnidad('pedimento')).toBe('PEDIMENTO');
+    expect(normalizarUnidad('día')).toBe('DIA');
+  });
+
+  it('NO adivina cuando no reconoce: la unidad decide cómo se multiplica', () => {
+    // Equivocar la unidad cambia el monto de la cotización entera.
+    expect(normalizarUnidad('por bulto')).toBeNull();
+    expect(normalizarUnidad('')).toBeNull();
+    expect(normalizarUnidad(undefined)).toBeNull();
+  });
+});
+
+describe('construcción de las líneas de revisión', () => {
+  const catalogos = { conceptos: CONCEPTOS, puertos: PUERTOS };
+
+  const datos = validarRespuestaN8N(respuestaOk({
+    tarifas: [
+      { lineaId: 'a', concepto: 'Flete marítimo', puertoOrigen: 'Shanghai',
+        puertoDestino: 'Manzanillo', monto: 1200, moneda: 'USD', unidad: 'contenedor' },
+      { lineaId: 'b', concepto: 'Almacenaje', puertoOrigen: 'Puerto raro',
+        monto: 50, unidad: 'por bulto' },
+    ],
+  })).datos!;
+
+  it('pre-carga lo que se resolvió con certeza', () => {
+    const [a] = construirLineasEnRevision(datos, catalogos);
+    expect(a.conceptoId).toBe('CON-001');
+    expect(a.nivelConcepto).toBe('exacto');
+    expect(a.puertoOrigenId).toBe('PTO-002');
+    expect(a.puertoDestinoId).toBe('PTO-001');
+    expect(a.unidad).toBe('CONTENEDOR');
+  });
+
+  it('NADA nace confirmado, ni siquiera lo que vino completo', () => {
+    // Un dato que se ve bien es justo el que nadie revisa.
+    const lineas = construirLineasEnRevision(datos, catalogos);
+    expect(lineas.every(l => !l.monedaConfirmada && !l.unidadConfirmada)).toBe(true);
+    expect(lineas.every(l => !esGuardable(l))).toBe(true);
+  });
+
+  it('un concepto parecido llega marcado como sugerido', () => {
+    const [, b] = construirLineasEnRevision(datos, catalogos);
+    expect(b.nivelConcepto).toBe('sugerido');
+    expect(motivosNoGuardable(b)).toContain('concepto_sin_confirmar');
+  });
+
+  it('los puertos que no se resolvieron NO se pierden: caen a rutaTexto', () => {
+    const [, b] = construirLineasEnRevision(datos, catalogos);
+    expect(b.puertoOrigenId).toBeNull();
+    expect(b.rutaTexto).toContain('Puerto raro');
+  });
+
+  it('una unidad no reconocida llega vacía y bloquea el guardado', () => {
+    const [, b] = construirLineasEnRevision(datos, catalogos);
+    expect(b.unidad).toBeNull();
+    expect(motivosNoGuardable(b)).toContain('sin_unidad');
+  });
+
+  it('conserva la línea original para poder comparar con lo guardado', () => {
+    const [a] = construirLineasEnRevision(datos, catalogos);
+    expect(a.extraida.monto).toBe(1200);
+    expect(a.extraida.concepto).toBe('Flete marítimo');
+  });
+
+  it('confirmar moneda y unidad vuelve guardable la línea completa', () => {
+    const [a] = construirLineasEnRevision(datos, catalogos);
+    const confirmada = { ...a, monedaConfirmada: true, unidadConfirmada: true };
+    expect(esGuardable(confirmada)).toBe(true);
   });
 });
