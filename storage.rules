@@ -1,0 +1,30 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Firebase Storage — VermurOps
+//
+// Hoy solo se guardan los tarifarios y evidencias: el documento del que salió
+// un costo. Son PDFs, Excels, capturas y correos de proveedores.
+//
+// ⚠️ Igual que en Firestore, estas reglas NO distinguen roles: el rol se deriva
+// en el cliente y no viaja en el token (ver §6 del CLAUDE.md). La capacidad
+// 'tarifario.cargar' se exige en la capa de datos y en la Cloud Function.
+// ─────────────────────────────────────────────────────────────────────────────
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Denegar todo lo no declarado.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Tarifarios y evidencias, agrupados por año/mes.
+    match /tarifarios/{anio}/{mes}/{archivo} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.size < 10 * 1024 * 1024;
+      // No se sobrescriben ni se borran: la evidencia de un costo no se edita.
+      allow update, delete: if false;
+    }
+  }
+}

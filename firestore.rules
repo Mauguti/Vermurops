@@ -101,6 +101,18 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Documentos de tarifario / evidencias (TA-3, MC-6) ────────────────
+    // El documento del que se extrajo una tarifa ES la evidencia: no hay dos
+    // sistemas de adjuntos. Eliminar está prohibido — borrar la evidencia de
+    // dónde salió un costo deja la tarifa sin respaldo.
+    match /documentosTarifario/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.subidoPor == request.auth.uid;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // ── Importaciones de tarifarios (TA-2) ───────────────────────────────
     // Borradores de la carga de tarifarios con IA.
     // Eliminar está prohibido: una importación descartada se MARCA, no se

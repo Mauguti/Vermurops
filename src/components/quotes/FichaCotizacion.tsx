@@ -46,6 +46,10 @@ import {
 import MatrizAgentes from './MatrizAgentes';
 import ModalAgregarAgente from './ModalAgregarAgente';
 import CapturaTipoCambio from './CapturaTipoCambio';
+import EvidenciasTarifas from './EvidenciasTarifas';
+import RevisionTarifasExtraidas from '../tarifas/RevisionTarifasExtraidas';
+import { usePuertos } from '../../hooks/usePuertos';
+import { useDocumentosTarifario } from '../../hooks/useDocumentosTarifario';
 import { totalesComparables } from '../../lib/matrizComparativa';
 import { compararColumnas, type MonedaCotizacion } from '../../lib/monedaComparativa';
 import {
@@ -117,6 +121,7 @@ export default function FichaCotizacion({
   const { clientes } = useClientes();
   const { tarifas: catalogoTarifas, createTarifa } = useTarifas();
   const { proveedores } = useProveedores();
+  const { puertos } = usePuertos();
   const { conceptos: conceptosCatalogo } = useConceptos();
   const conceptosActivos = useMemo(() => conceptosCatalogo.filter(c => c.activo), [conceptosCatalogo]);
 
@@ -132,6 +137,12 @@ export default function FichaCotizacion({
   /** Agente elegido por servicio. Sin elección explícita manda el menor. */
   const [agenteElegido, setAgenteElegido] = useState<Record<string, string>>({});
   const [modalAgente, setModalAgente] = useState<string | null>(null);
+  /** Extracción recién llegada, esperando la pantalla de revisión (TA-4). */
+  const [toastLocal, setToastLocal] = useState<string | null>(null);
+  /** Proveedor al que se atribuyen las tarifas extraídas. */
+  const [proveedorDelDocumento] = useState<string | null>(null);
+  const [extraccionPendiente, setExtraccionPendiente] =
+    useState<{ documento: import('../../lib/documentoTarifario').DocumentoTarifario; respuesta: unknown } | null>(null);
   /**
    * Servicio activo de la comparativa.
    *
@@ -139,6 +150,14 @@ export default function FichaCotizacion({
    * tablas saturan la pantalla. Mismo patrón que el panel lateral de tarifas.
    */
   const [servicioComparativa, setServicioComparativa] = useState<string | null>(null);
+
+  /**
+   * Evidencias: los documentos de los que salieron los costos.
+   * Es la misma pieza que sube los tarifarios — una subida, dos usos.
+   */
+  const {
+    documentos, subiendo: subiendoDoc, subirDocumento, registrarExtraccion,
+  } = useDocumentosTarifario(quote.id);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [newChatMessage, setNewChatMessage] = useState('');
@@ -779,6 +798,62 @@ export default function FichaCotizacion({
     onUpdateQuote(elegirAgente(quote, agenteId));
   };
 
+  /**
+   * Guarda las tarifas revisadas en el catálogo general (TA-5).
+   *
+   * Entran al catálogo GENERAL —una tarifa sirve para todas las cotizaciones—
+   * pero se registra de qué documento salieron: es la vuelta completa de la
+   * trazabilidad. Desde la tarifa se puede ver el PDF del proveedor.
+   */
+  const guardarTarifasExtraidas = async (
+    lineasListas: import('../../lib/importacionTarifas').LineaEnRevision[],
+    documento: import('../../lib/documentoTarifario').DocumentoTarifario,
+  ) => {
+    let creadas = 0;
+    for (const l of lineasListas) {
+      try {
+        await createTarifa({
+          id: `TAR-${Date.now()}-${creadas}`,
+          tipo: 'estandar',
+          conceptoId: l.conceptoId!,
+          proveedorId: proveedorDelDocumento ?? '',
+          puertoOrigenId: l.puertoOrigenId,
+          puertoDestinoId: l.puertoDestinoId,
+          terminalId: null,
+          rutaTexto: l.rutaTexto,
+          precios: {
+            monto: l.monto, unidad: l.unidad!,
+            ...(l.montoPor40 ? { montoPor40: l.montoPor40 } : {}),
+            ...(l.montoPor40HC ? { montoPor40HC: l.montoPor40HC } : {}),
+            ...(l.montoMinimo ? { montoMinimo: l.montoMinimo } : {}),
+          },
+          moneda: l.moneda!,
+          vigenciaTexto: '',
+          fechaInicio: new Date().toISOString().slice(0, 10),
+          fechaFin: null,
+          tiempoTransitoDias: l.extraida.tiempoTransito ?? null,
+          freeTimeDias: l.extraida.freeTime ?? null,
+          condiciones: l.extraida.condiciones ?? '',
+          activo: true,
+          origenDatos: 'ocr',
+          documentoOrigen: {
+            path: documento.path,
+            nombreArchivo: documento.nombreArchivo,
+            importacionId: documento.id,
+          },
+          creadoPor: user?.uid ?? '',
+          fechaAlta: new Date().toISOString().slice(0, 10),
+          updatedAt: new Date().toISOString(),
+        } as never);
+        creadas++;
+      } catch {
+        // conAviso ya reportó; se sigue con las demás en vez de abortar todo.
+      }
+    }
+    await registrarExtraccion(documento.id, documento.id, creadas);
+    setToastLocal(`${creadas} tarifa${creadas !== 1 ? 's' : ''} guardada${creadas !== 1 ? 's' : ''} en el catálogo.`);
+  };
+
   /** Abre la comparativa para elegir proveedor de esa línea. */
   const handleCompararProveedor = (lineaId: string) => {
     const linea = lineasPlanas.find(l => l.id === lineaId);
@@ -1110,6 +1185,31 @@ export default function FichaCotizacion({
                 lineas={lineasPlanas}
                 moneda={quote.moneda}
                 diasCredito={clienteVinculado?.dias ?? 0}
+              />
+            )}
+
+            {/* Evidencias: «¿de dónde saqué este costo?». Solo pricing/admin,
+                porque son costos de proveedor. */}
+            {visible.adjuntosTarifa && (
+              <EvidenciasTarifas
+                documentos={documentos}
+                editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
+                subiendo={subiendoDoc}
+                onSubir={(file, procesarConIA) => {
+                  subirDocumento(file, { procesarConIA, cotizacionId: quote.id })
+                    .then(({ documento, extraccion, duplicadoDe }) => {
+                      if (duplicadoDe) {
+                        window.alert(
+                          `Este archivo ya se había subido el ${duplicadoDe.fechaSubida.slice(0, 10)}` +
+                          ` por ${duplicadoDe.subidoPorNombre}. Se guardó de todos modos.`,
+                        );
+                      }
+                      if (procesarConIA && extraccion) {
+                        setExtraccionPendiente({ documento, respuesta: extraccion });
+                      }
+                    })
+                    .catch(err => window.alert(err instanceof Error ? err.message : String(err)));
+                }}
               />
             )}
 
