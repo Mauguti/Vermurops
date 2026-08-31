@@ -3,7 +3,15 @@ import { X, Search, Plus, Building2 } from 'lucide-react';
 import type { ProveedorVermur } from '../proveedores/ProveedoresData';
 
 /**
- * Elegir el agente que entra como columna de la comparativa.
+ * Elegir el proveedor que entra como columna de la comparativa.
+ *
+ * Se llama «agregar proveedor», no «agregar agente»: en la matriz «agente» no
+ * significa agente de carga, sino cualquier proveedor al que le pediste precio
+ * para ese servicio —naviera, transportista, aduanal, almacén—. El nombre
+ * viene del sistema anterior, donde el caso típico eran agentes de carga.
+ *
+ * Por lo mismo NO se filtra por `tipos[]` ni por modalidad: eso dejaba la
+ * lista vacía cuando el catálogo no estaba etiquetado. La modalidad ordena.
  *
  * Con buscador porque son muchos —544 proveedores en el catálogo— y porque
  * Pricing pide la misma ruta «a entre 7 y 10» de ellos. Una lista sin filtro
@@ -15,6 +23,8 @@ import type { ProveedorVermur } from '../proveedores/ProveedoresData';
 
 interface Props {
   proveedores: ProveedorVermur[];
+  /** Modalidad del servicio: ordena la lista, NO la filtra. */
+  modalidadRelevante?: string;
   /** Ya son columnas: no se ofrecen otra vez. */
   yaEnMatriz: string[];
   onCerrar: () => void;
@@ -27,7 +37,7 @@ const norm = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 
 export default function ModalAgregarAgente({
-  proveedores, yaEnMatriz, onCerrar, onAgregar, onAltaRapida,
+  proveedores, yaEnMatriz, modalidadRelevante, onCerrar, onAgregar, onAltaRapida,
 }: Props) {
   const [busqueda, setBusqueda] = useState('');
 
@@ -38,8 +48,14 @@ export default function ModalAgregarAgente({
     return proveedores
       .filter(p => p.activo && !yaEsta.has(p.id))
       .filter(p => !q || norm(p.nombre).includes(q) || norm(p.rfc ?? '').includes(q))
+      // Los de la modalidad del servicio primero; los demás siguen accesibles.
+      .sort((a, b) => {
+        const ra = modalidadRelevante && a.modalidades?.includes(modalidadRelevante as never) ? 0 : 1;
+        const rb = modalidadRelevante && b.modalidades?.includes(modalidadRelevante as never) ? 0 : 1;
+        return ra !== rb ? ra - rb : a.nombre.localeCompare(b.nombre, 'es');
+      })
       .slice(0, 40);
-  }, [proveedores, busqueda, yaEsta]);
+  }, [proveedores, busqueda, yaEsta, modalidadRelevante]);
 
   const nombreLibre = busqueda.trim();
   const hayExacto = proveedores.some(p => norm(p.nombre) === norm(nombreLibre));
@@ -48,7 +64,7 @@ export default function ModalAgregarAgente({
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
         <div className="px-5 py-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50 shrink-0">
-          <h3 className="text-[14px] font-bold text-[#18181B]">Agregar agente a la comparativa</h3>
+          <h3 className="text-[14px] font-bold text-[#18181B]">Agregar proveedor a comparar</h3>
           <button onClick={onCerrar} className="text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
           </button>

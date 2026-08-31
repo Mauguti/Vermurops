@@ -166,19 +166,28 @@ export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
             const nombreSrv = def?.nombre || srv.modality;
             const iconSrv = def?.icono || 'HelpCircle';
             
-            // Filtro de proveedores según la categoría
-            const availableProviders = proveedores.filter(p => {
-              if (!p.activo) return false;
-              if (!p.modalidades?.length) return true; // Sin clasificar → mostrar en todos
-              if (def?.categoria === 'transporte') {
-                return p.modalidades.includes('maritimo') || p.modalidades.includes('aereo') || p.modalidades.includes('terrestre');
-              } else if (def?.categoria === 'aduana') {
-                return p.modalidades.includes('aduanal');
-              } else {
-                // carga y otros -> todos los activos
-                return true;
-              }
-            });
+            /**
+             * TODOS los proveedores activos.
+             *
+             * Antes esto EXCLUÍA por `modalidades`: si un proveedor no tenía
+             * la modalidad etiquetada desaparecía, y con un catálogo poco
+             * etiquetado la lista salía vacía y no dejaba seleccionar nada.
+             *
+             * A quién le pides precio no lo decide una etiqueta del catálogo.
+             * La modalidad ORDENA —los relevantes primero— pero no excluye.
+             */
+            const relevante: string | undefined =
+              def?.categoria === 'aduana' ? 'aduanal'
+              : def?.categoria === 'transporte' ? (srv.modality as string)
+              : undefined;
+
+            const availableProviders = proveedores
+              .filter(p => p.activo)
+              .sort((a, b) => {
+                const ra = relevante && a.modalidades?.includes(relevante as never) ? 0 : 1;
+                const rb = relevante && b.modalidades?.includes(relevante as never) ? 0 : 1;
+                return ra !== rb ? ra - rb : a.nombre.localeCompare(b.nombre, 'es');
+              });
 
             return (
               <div key={srv.id} className="bg-white border border-card-border rounded-[10px] overflow-hidden shadow-sm">

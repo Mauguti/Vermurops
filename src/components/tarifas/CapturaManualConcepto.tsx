@@ -15,6 +15,7 @@ import { useProveedores } from '../../hooks/useProveedores';
 import { useConceptos } from '../../hooks/useConceptos';
 import { contactoPrincipal } from '../proveedores/ProveedoresData';
 import { useAuth } from '../../auth/AuthContext';
+import SelectorProveedor from '../proveedores/SelectorProveedor';
 
 interface Props {
   conceptoNombre: string;
@@ -124,14 +125,14 @@ export default function CapturaManualConcepto({ conceptoNombre, onGuardar, onCre
       <div className="flex items-end gap-2 flex-wrap">
         <div className="flex-1 min-w-[140px]">
           <label className="block text-[9px] text-gray-400 font-bold uppercase mb-0.5">Proveedor</label>
-          <select
-            className="w-full text-[11px] border border-gray-200 rounded px-2 py-1 bg-white focus:border-[#E11D48] outline-none"
-            value={proveedorId}
-            onChange={e => setProveedorId(e.target.value)}
-          >
-            <option value="">Seleccionar...</option>
-            {provActivos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-          </select>
+          {/* Eran 544 en un <select> plano. Mismo criterio que el
+              ConceptoSelector: con muchas opciones, la lista estorba. */}
+          <SelectorProveedor
+            compacto
+            proveedores={provActivos}
+            valorId={proveedorId || null}
+            onSelect={p => setProveedorId(p.id)}
+          />
         </div>
         <div className="w-[90px]">
           <label className="block text-[9px] text-gray-400 font-bold uppercase mb-0.5">Monto</label>
