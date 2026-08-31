@@ -55,7 +55,12 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
   //    cotizaciones». Se retira el módulo completo, no solo el permiso.
   //    Consecuencia para el Bloque 4: la conversión cotización → embarque
   //    tendrá que arrancar desde Embarques, no desde la ficha de cotización.
-  operaciones: ['dashboard', 'shipments', 'clients', 'puertos', 'exchange', 'settings'],
+  //  - 'finance' se AGREGA (C-2): en el flujo de las órdenes de compra
+  //    Operaciones GESTIONA lo que Pricing solicita, y la bandeja vive dentro
+  //    de Finanzas por decisión del cliente («una OC autorizada ES una cuenta
+  //    por pagar»). Sin el módulo, el paso del medio del flujo no tenía
+  //    pantalla: la orden se quedaba en «solicitada» para siempre.
+  operaciones: ['dashboard', 'shipments', 'clients', 'puertos', 'exchange', 'finance', 'settings'],
 
   // Administración: altas definitivas, finanzas y facturación.
   administracion: ['dashboard', 'clients', 'finance', 'shipments', 'exchange', 'puertos', 'reports', 'settings'],

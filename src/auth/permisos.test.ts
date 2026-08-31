@@ -286,3 +286,50 @@ describe('Pricing crea cotizaciones directo (sesión 30-ago-2026)', () => {
     expect(puedeCrearCotizacion('ventas', 'pricing_solicitando')).toBe(false);
   });
 });
+
+// ─── Órdenes de compra: el flujo de tres áreas (C-2) ────────────────────────
+//
+// Cada paso del flujo necesita DOS cosas: la capacidad y la pantalla donde
+// ejercerla. Faltó la segunda y el paso del medio se quedó sin lugar:
+// Operaciones podía gestionar y no tenía cómo llegar a la bandeja.
+
+describe('Órdenes de compra · capacidad y pantalla', () => {
+  it('Pricing solicita', () => {
+    expect(puede('pricing', 'ordenCompra.solicitar')).toBe(true);
+  });
+
+  it('Operaciones solicita y gestiona, pero no autoriza el pago', () => {
+    expect(puede('operaciones', 'ordenCompra.solicitar')).toBe(true);
+    expect(puede('operaciones', 'ordenCompra.gestionar')).toBe(true);
+    expect(puede('operaciones', 'ordenCompra.autorizar')).toBe(false);
+  });
+
+  it('Administración autoriza y también solicita: carga los gastos de oficina', () => {
+    expect(puede('administracion', 'ordenCompra.autorizar')).toBe(true);
+    expect(puede('administracion', 'ordenCompra.solicitar')).toBe(true);
+  });
+
+  it('Administración NO gestiona: ese paso es de Operaciones', () => {
+    expect(puede('administracion', 'ordenCompra.gestionar')).toBe(false);
+  });
+
+  it('Ventas no toca las órdenes de compra', () => {
+    expect(puede('ventas', 'ordenCompra.solicitar')).toBe(false);
+    expect(puede('ventas', 'ordenCompra.gestionar')).toBe(false);
+    expect(puede('ventas', 'ordenCompra.autorizar')).toBe(false);
+  });
+
+  it('quien gestiona o autoriza llega al módulo donde vive la bandeja', () => {
+    expect(isViewAllowed('operaciones', 'finance')).toBe(true);
+    expect(isViewAllowed('administracion', 'finance')).toBe(true);
+  });
+
+  it('Ventas sigue sin ver Finanzas', () => {
+    expect(isViewAllowed('ventas', 'finance')).toBe(false);
+  });
+
+  it('Operaciones sigue sin ver Cotizaciones: agregar Finanzas no aflojó lo demás', () => {
+    expect(isViewAllowed('operaciones', 'quotes')).toBe(false);
+  });
+});
+
