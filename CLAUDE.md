@@ -388,6 +388,31 @@ como desconocido con su motivo. El cotejo es por token y no por subcadena:
 
 Pendiente de este trabajo: mostrar el desglose de IVA en la ficha y en el PDF.
 
+**🔴 Escrituras que fallan en silencio — pendiente de auditar.**
+Firestore rechaza `undefined` con «Unsupported field value» y tumba la
+escritura ENTERA. Si además nadie atrapa la promesa rechazada, el estado de
+React ya se actualizó y en pantalla parece guardado: el trabajo se pierde al
+recargar sin que nada avise.
+
+Es el mismo patrón que ya mordió tres veces —prospectos, embarques y los
+conceptos de la matriz—. Los dos primeros no guardaban nada; el tercero
+guardaba a medias, que es peor porque se ve bien.
+
+De 13 hooks que escriben, **solo 3 sanitizan**:
+
+  Sanitizan:    useCotizaciones · useEmbarques · useImportacionesTarifas
+  NO sanitizan: useClientes · useConceptos · useContadoresSerie ·
+                useOrdenesCompra · useProspectos · useProveedores ·
+                usePuertos · useTarifas · useTerminosPago · useVistasUsuario
+
+Pendiente de revisar en cada uno:
+  1. ¿Sanitiza con `sanitizarParaFirestore` antes de escribir?
+  2. ¿El call site atrapa la promesa y avisa, o se la traga?
+
+La segunda importa más que la primera: sin sanitizar pero avisando, el error se
+ve y se corrige. Sanitizando pero tragándose el error, cualquier otro fallo de
+escritura —permisos, red, reglas— sigue siendo invisible.
+
 **`getCostoOficial` suma tarifas sin mirar la moneda.**
 Con multi-selección de tarifas, `getCostoOficial` hace `reduce((a, t) => a + t.monto)`
 sin comparar `t.moneda`. Un concepto con una tarifa de 1,000 USD y otra de
