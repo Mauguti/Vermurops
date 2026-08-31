@@ -31,6 +31,8 @@ import {
   TarifaVermur, buscarTarifasVigentes, FiltroTarifas, restarDias, hoyISO,
 } from '../components/tarifas/TarifasData';
 import { useAuth } from '../auth/AuthContext';
+import { conAviso } from '../lib/erroresEscritura';
+import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
 export function useTarifas() {
   const { user } = useAuth();
@@ -106,11 +108,11 @@ export function useTarifas() {
   // ── Writes ─────────────────────────────────────────────────────────────────
 
   const createTarifa = async (tarifa: TarifaVermur): Promise<void> => {
-    await setDoc(doc(db, 'tarifas', tarifa.id), tarifa);
+    await conAviso('la tarifa', () => setDoc(doc(db, 'tarifas', tarifa.id), sanitizarParaFirestore(tarifa)));
   };
 
   const updateTarifa = async (id: string, data: Partial<TarifaVermur>): Promise<void> => {
-    await updateDoc(doc(db, 'tarifas', id), data as Record<string, unknown>);
+    await conAviso('la tarifa', () => updateDoc(doc(db, 'tarifas', id), sanitizarParaFirestore(data) as Record<string, unknown>));
   };
 
   // ── Lookup helper (filtra el array en memoria) ─────────────────────────────

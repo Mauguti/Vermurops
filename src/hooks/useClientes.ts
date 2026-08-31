@@ -20,6 +20,8 @@ import type { DiasCredito } from '../components/proveedores/ProveedoresData';
 import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
+import { conAviso, reportarErrorEscritura } from '../lib/erroresEscritura';
+import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
 export function useClientes() {
   const { user } = useAuth();
@@ -58,11 +60,11 @@ export function useClientes() {
               return;
             }
 
-            await Promise.all(
+            await conAviso('los clientes iniciales', () => Promise.all(
               initialClientes.map(c =>
-                setDoc(doc(db, 'clientes', c.id), c)
+                setDoc(doc(db, 'clientes', c.id), sanitizarParaFirestore(c))
               )
-            );
+            ));
           } catch (err) {
             const msg = err instanceof Error ? err.message : 'Error al sembrar clientes iniciales';
             setError(msg);
@@ -103,11 +105,11 @@ export function useClientes() {
    */
   const createCliente = async (cliente: ClienteVermur): Promise<void> => {
     exigir(user?.rol as UserRole | undefined, 'cliente.alta');
-    await setDoc(doc(db, 'clientes', cliente.id), cliente);
+    await conAviso('el cliente', () => setDoc(doc(db, 'clientes', cliente.id), sanitizarParaFirestore(cliente)));
   };
 
   const updateCliente = async (id: string, data: Partial<ClienteVermur>): Promise<void> => {
-    await updateDoc(doc(db, 'clientes', id), data as Record<string, unknown>);
+    await conAviso('el cliente', () => updateDoc(doc(db, 'clientes', id), sanitizarParaFirestore(data) as Record<string, unknown>));
   };
 
   /**
@@ -184,8 +186,8 @@ export function useClientes() {
           proveedoresPreferidos: raw.proveedoresPreferidos ?? [],
           proveedoresVetados: raw.proveedoresVetados ?? [],
         };
-        return setDoc(doc(db, 'clientes', cliente.id), cliente);
-      }));
+        return setDoc(doc(db, 'clientes', cliente.id), sanitizarParaFirestore(cliente));
+      })).catch(err => { reportarErrorEscritura('el lote de clientes importados', err); throw err; });
       count += batch.length;
     }
 

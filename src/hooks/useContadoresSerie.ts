@@ -20,6 +20,8 @@ import { SERIES_EMBARQUE, EstadoContadorSerie } from '../lib/folioService';
 import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
+import { conAviso } from '../lib/erroresEscritura';
+import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
 export function useContadoresSerie() {
   const { user } = useAuth();
@@ -66,12 +68,12 @@ export function useContadoresSerie() {
     if (!Number.isInteger(ultimo) || ultimo < 0) {
       throw new Error('El consecutivo debe ser un entero mayor o igual a cero.');
     }
-    await setDoc(doc(db, 'contadores', `embarques_${serie}`), {
+    await conAviso('el consecutivo de folio', () => setDoc(doc(db, 'contadores', `embarques_${serie}`), sanitizarParaFirestore({
       ultimo,
       sembrado: true,
       fechaSiembra: new Date().toISOString(),
       sembradoPor: user?.email ?? '',
-    }, { merge: true });
+    }), { merge: true }));
   };
 
   return { contadores, loading, sembrarContador };

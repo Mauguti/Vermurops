@@ -388,30 +388,41 @@ como desconocido con su motivo. El cotejo es por token y no por subcadena:
 
 Pendiente de este trabajo: mostrar el desglose de IVA en la ficha y en el PDF.
 
-**🔴 Escrituras que fallan en silencio — pendiente de auditar.**
+**~~Escrituras que fallan en silencio~~ → CERRADA (31-ago-2026).**
 Firestore rechaza `undefined` con «Unsupported field value» y tumba la
 escritura ENTERA. Si además nadie atrapa la promesa rechazada, el estado de
 React ya se actualizó y en pantalla parece guardado: el trabajo se pierde al
 recargar sin que nada avise.
 
-Es el mismo patrón que ya mordió tres veces —prospectos, embarques y los
-conceptos de la matriz—. Los dos primeros no guardaban nada; el tercero
-guardaba a medias, que es peor porque se ve bien.
+El patrón mordió tres veces —prospectos, embarques y los conceptos de la
+matriz—. Los dos primeros no guardaban nada; el tercero guardaba a medias, que
+es peor porque se ve bien.
 
-De 13 hooks que escriben, **solo 3 sanitizan**:
+Resuelto en dos capas, en ese orden:
 
-  Sanitizan:    useCotizaciones · useEmbarques · useImportacionesTarifas
-  NO sanitizan: useClientes · useConceptos · useContadoresSerie ·
-                useOrdenesCompra · useProspectos · useProveedores ·
-                usePuertos · useTarifas · useTerminosPago · useVistasUsuario
+  1. **Atrapar** — `lib/erroresEscritura.ts` con `conAviso()`, que envuelve
+     cada escritura de los 13 hooks: reporta y relanza. Los avisos se pintan
+     con `<AvisosEscritura />`, montado una vez en la raíz, y NO se cierran
+     solos: un toast que dice «tu cambio no se guardó» espera a que lo lean.
+     Hay además una red de seguridad sobre `unhandledrejection` para lo que se
+     escape.
+  2. **Sanitizar** — los 13 hooks pasan por `sanitizarParaFirestore` antes de
+     escribir.
 
-Pendiente de revisar en cada uno:
-  1. ¿Sanitiza con `sanitizarParaFirestore` antes de escribir?
-  2. ¿El call site atrapa la promesa y avisa, o se la traga?
+Atrapar rinde más que sanitizar y por eso fue primero: sanitizar arregla ESE
+modo de fallo, atrapar hace visibles todos —permisos, red, reglas, cuota—.
 
-La segunda importa más que la primera: sin sanitizar pero avisando, el error se
-ve y se corrige. Sanitizando pero tragándose el error, cualquier otro fallo de
-escritura —permisos, red, reglas— sigue siendo invisible.
+## ESTÁNDAR PARA HOOKS NUEVOS
+
+Todo hook que escriba a Firestore **sanitiza y atrapa**:
+
+```ts
+await conAviso('el cliente', () =>
+  setDoc(doc(db, 'clientes', c.id), sanitizarParaFirestore(c)));
+```
+
+Sin las dos cosas, un fallo de escritura vuelve a ser invisible y el usuario
+pierde trabajo sin enterarse.
 
 **`getCostoOficial` suma tarifas sin mirar la moneda.**
 Con multi-selección de tarifas, `getCostoOficial` hace `reduce((a, t) => a + t.monto)`

@@ -30,6 +30,7 @@ import { useAuth } from '../auth/AuthContext';
 import { PermisoDenegadoError, capacidadParaGuardarEmbarque, puedeGuardarEmbarque } from '../auth/permisos';
 import { UserRole } from '../auth/users';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
+import { conAviso } from '../lib/erroresEscritura';
 
 export function useEmbarques() {
   const { user } = useAuth();
@@ -92,7 +93,7 @@ export function useEmbarques() {
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
     });
 
-    await setDoc(doc(db, 'embarques', embarque.id), limpio);
+    await conAviso('el embarque', () => setDoc(doc(db, 'embarques', embarque.id), limpio));
   };
 
   return { embarques, loading, error, guardarEmbarque };

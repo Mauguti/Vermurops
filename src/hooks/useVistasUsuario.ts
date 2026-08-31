@@ -27,6 +27,8 @@ import { useAuth } from '../auth/AuthContext';
 import type { VistaUsuario, ModuloVista } from '../components/table/VistasData';
 import { crearVistaVacia } from '../components/table/VistasData';
 import type { ColumnaVista } from '../components/table/SpreadsheetTable';
+import { conAviso } from '../lib/erroresEscritura';
+import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
 const COL = 'vistasUsuario';
 
@@ -125,7 +127,7 @@ export function useVistasUsuario(modulo: ModuloVista) {
       await desmarcarDefaults();
     }
 
-    const ref = await addDoc(collection(db, COL), data);
+    const ref = await conAviso('la vista', () => addDoc(collection(db, COL), sanitizarParaFirestore(data)));
     return ref.id;
   }, [user, modulo]);
 
@@ -146,10 +148,10 @@ export function useVistasUsuario(modulo: ModuloVista) {
       await desmarcarDefaults();
     }
 
-    await updateDoc(doc(db, COL, id), {
+    await conAviso('la vista', () => updateDoc(doc(db, COL, id), sanitizarParaFirestore({
       ...cambios,
       updatedAt: new Date().toISOString(),
-    });
+    }) as Record<string, unknown>));
   }, [user, vistas]);
 
   const eliminarVista = useCallback(async (id: string) => {
@@ -161,7 +163,7 @@ export function useVistasUsuario(modulo: ModuloVista) {
       throw new Error('Solo el creador puede eliminar esta vista');
     }
 
-    await deleteDoc(doc(db, COL, id));
+    await conAviso('la vista', () => deleteDoc(doc(db, COL, id)));
   }, [user, vistas]);
 
   // ── Helpers internos ──────────────────────────────────────────────────
@@ -172,7 +174,7 @@ export function useVistasUsuario(modulo: ModuloVista) {
       v => v.esDefault && v.usuarioId === user?.uid,
     );
     await Promise.all(
-      defaults.map(v => updateDoc(doc(db, COL, v.id), { esDefault: false })),
+      defaults.map(v => conAviso('la vista por defecto', () => updateDoc(doc(db, COL, v.id), sanitizarParaFirestore({ esDefault: false }) as Record<string, unknown>))),
     );
   }, [vistas, user]);
 

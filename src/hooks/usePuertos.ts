@@ -18,6 +18,8 @@ import { PuertoVermur, initialPuertos } from '../components/puertos/PuertosData'
 import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
+import { conAviso } from '../lib/erroresEscritura';
+import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
 export function usePuertos() {
   const { user } = useAuth();
@@ -55,11 +57,11 @@ export function usePuertos() {
               return;
             }
 
-            await Promise.all(
+            await conAviso('los puertos iniciales', () => Promise.all(
               initialPuertos.map(p =>
-                setDoc(doc(db, 'puertos', p.id), p)
+                setDoc(doc(db, 'puertos', p.id), sanitizarParaFirestore(p))
               )
-            );
+            ));
           } catch (err) {
             const msg = err instanceof Error ? err.message : 'Error al sembrar puertos iniciales';
             setError(msg);
@@ -97,11 +99,11 @@ export function usePuertos() {
   /** Alta de puerto. Solo Administración (matriz §4.1). */
   const createPuerto = async (puerto: PuertoVermur): Promise<void> => {
     exigir(user?.rol as UserRole | undefined, 'puerto.alta');
-    await setDoc(doc(db, 'puertos', puerto.id), puerto);
+    await conAviso('el puerto', () => setDoc(doc(db, 'puertos', puerto.id), sanitizarParaFirestore(puerto)));
   };
 
   const updatePuerto = async (id: string, data: Partial<PuertoVermur>): Promise<void> => {
-    await updateDoc(doc(db, 'puertos', id), data as Record<string, unknown>);
+    await conAviso('el puerto', () => updateDoc(doc(db, 'puertos', id), sanitizarParaFirestore(data) as Record<string, unknown>));
   };
 
   return { puertos, loading, error, createPuerto, updatePuerto };

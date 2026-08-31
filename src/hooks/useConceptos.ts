@@ -16,6 +16,8 @@ import { collection, onSnapshot, doc, setDoc, updateDoc, getDocsFromServer } fro
 import { evaluarSeed } from '../lib/seedGuard';
 import { ConceptoVermur, initialConceptos } from '../components/conceptos/ConceptosData';
 import { useAuth } from '../auth/AuthContext';
+import { conAviso } from '../lib/erroresEscritura';
+import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
 export function useConceptos() {
   const { user } = useAuth();
@@ -53,11 +55,11 @@ export function useConceptos() {
               return;
             }
 
-            await Promise.all(
+            await conAviso('los conceptos iniciales', () => Promise.all(
               initialConceptos.map(c =>
-                setDoc(doc(db, 'conceptos', c.id), c)
+                setDoc(doc(db, 'conceptos', c.id), sanitizarParaFirestore(c))
               )
-            );
+            ));
           } catch (err) {
             const msg = err instanceof Error ? err.message : 'Error al sembrar conceptos iniciales';
             setError(msg);
@@ -93,11 +95,11 @@ export function useConceptos() {
   // ── Writes ───────────────────────────────────────────────────────────────
 
   const createConcepto = async (concepto: ConceptoVermur): Promise<void> => {
-    await setDoc(doc(db, 'conceptos', concepto.id), concepto);
+    await conAviso('el concepto', () => setDoc(doc(db, 'conceptos', concepto.id), sanitizarParaFirestore(concepto)));
   };
 
   const updateConcepto = async (id: string, data: Partial<ConceptoVermur>): Promise<void> => {
-    await updateDoc(doc(db, 'conceptos', id), data as Record<string, unknown>);
+    await conAviso('el concepto', () => updateDoc(doc(db, 'conceptos', id), sanitizarParaFirestore(data) as Record<string, unknown>));
   };
 
   return { conceptos, loading, error, createConcepto, updateConcepto };

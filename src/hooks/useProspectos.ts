@@ -28,6 +28,8 @@ import { Prospecto } from '../data';
 import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
+import { conAviso } from '../lib/erroresEscritura';
+import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
 export function useProspectos() {
   const { user } = useAuth();
@@ -68,11 +70,11 @@ export function useProspectos() {
   /** Alta de lead. Matriz §4.1: Ventas (y Admin). */
   const createProspecto = async (prospecto: Prospecto): Promise<void> => {
     exigir(user?.rol as UserRole | undefined, 'lead.crear');
-    await setDoc(doc(db, 'prospectos', prospecto.id), prospecto);
+    await conAviso('el prospecto', () => setDoc(doc(db, 'prospectos', prospecto.id), sanitizarParaFirestore(prospecto)));
   };
 
   const updateProspecto = async (id: string, data: Partial<Prospecto>): Promise<void> => {
-    await updateDoc(doc(db, 'prospectos', id), data as Record<string, unknown>);
+    await conAviso('el prospecto', () => updateDoc(doc(db, 'prospectos', id), sanitizarParaFirestore(data) as Record<string, unknown>));
   };
 
   return { prospectos, loading, error, createProspecto, updateProspecto };

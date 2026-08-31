@@ -31,6 +31,7 @@ import { useProveedores } from './hooks/useProveedores';
 import { usePuertos } from './hooks/usePuertos';
 import { useTerminosPago } from './hooks/useTerminosPago';
 import { useTarifas } from './hooks/useTarifas';
+import AvisosEscritura from './components/ui/AvisosEscritura';
 
 // ─── Role badge labels ────────────────────────────────────────────────────────
 const ROLE_LABEL: Record<string, string> = {
@@ -341,6 +342,10 @@ function AppShell() {
             <UserMenu onNavigate={safeNavigate} />
           </div>
         </header>
+
+        {/* Avisos de fallo de escritura: montado una vez, visible desde
+            cualquier pantalla. Un guardado que falla es pérdida de trabajo. */}
+        <AvisosEscritura />
 
         {/* ── Content ── */}
         <main className="flex-1 overflow-y-auto p-[24px] md:p-[32px]">

@@ -19,6 +19,8 @@ import { ProveedorVermur, initialProveedores } from '../components/proveedores/P
 import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
+import { conAviso } from '../lib/erroresEscritura';
+import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
 export function useProveedores() {
   const { user } = useAuth();
@@ -56,11 +58,11 @@ export function useProveedores() {
               return;
             }
 
-            await Promise.all(
+            await conAviso('los proveedores iniciales', () => Promise.all(
               initialProveedores.map(p =>
-                setDoc(doc(db, 'proveedores', p.id), p)
+                setDoc(doc(db, 'proveedores', p.id), sanitizarParaFirestore(p))
               )
-            );
+            ));
           } catch (err) {
             const msg = err instanceof Error ? err.message : 'Error al sembrar proveedores iniciales';
             setError(msg);
@@ -108,11 +110,11 @@ export function useProveedores() {
   ): Promise<void> => {
     const rol = user?.rol as UserRole | undefined;
     exigir(rol, opts?.modo === 'rapida' ? 'proveedor.altaRapida' : 'proveedor.alta');
-    await setDoc(doc(db, 'proveedores', proveedor.id), proveedor);
+    await conAviso('el proveedor', () => setDoc(doc(db, 'proveedores', proveedor.id), sanitizarParaFirestore(proveedor)));
   };
 
   const updateProveedor = async (id: string, data: Partial<ProveedorVermur>): Promise<void> => {
-    await updateDoc(doc(db, 'proveedores', id), data as Record<string, unknown>);
+    await conAviso('el proveedor', () => updateDoc(doc(db, 'proveedores', id), sanitizarParaFirestore(data) as Record<string, unknown>));
   };
 
   return { proveedores, loading, error, createProveedor, updateProveedor };

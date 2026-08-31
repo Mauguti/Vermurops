@@ -30,6 +30,8 @@ import type {
 } from '../components/ordenesCompra/OrdenesCompraData';
 import { puedeTransicionarOC, type RolOC } from '../lib/stateMachineOC';
 import { generateFolioOC } from '../lib/folioServiceOC';
+import { conAviso } from '../lib/erroresEscritura';
+import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
 // ─── Colección ──────────────────────────────────────────────────────────────
 
@@ -93,7 +95,7 @@ export function useOrdenesCompra() {
       updatedAt: now,
     };
 
-    await setDoc(doc(db, COLLECTION, id), oc);
+    await conAviso('la orden de compra', () => setDoc(doc(db, COLLECTION, id), sanitizarParaFirestore(oc)));
     return oc;
   }, []);
 
@@ -103,10 +105,10 @@ export function useOrdenesCompra() {
     id: string,
     data: Partial<OrdenCompra>,
   ): Promise<void> => {
-    await updateDoc(doc(db, COLLECTION, id), {
+    await conAviso('la orden de compra', () => updateDoc(doc(db, COLLECTION, id), sanitizarParaFirestore({
       ...data,
       updatedAt: new Date().toISOString(),
-    } as Record<string, unknown>);
+    }) as Record<string, unknown>));
   }, []);
 
   // ── Transicionar estado (valida con la máquina de estados) ────────────────
@@ -140,23 +142,22 @@ export function useOrdenesCompra() {
     if (nuevoEstado === 'autorizada') actorField.autorizadaPor = actor;
     if (nuevoEstado === 'pagada') actorField.pagadaPor = actor;
 
-    await updateDoc(doc(db, COLLECTION, oc.id), {
+    await conAviso('la orden de compra', () => updateDoc(doc(db, COLLECTION, oc.id), sanitizarParaFirestore({
       estado: nuevoEstado,
       historialEstados: [...oc.historialEstados, registro],
       ...actorField,
       updatedAt: new Date().toISOString(),
-    } as Record<string, unknown>);
-
+    }) as Record<string, unknown>));
     return { ok: true };
   }, []);
 
   // ── Soft delete ───────────────────────────────────────────────────────────
 
   const deleteOrden = useCallback(async (id: string): Promise<void> => {
-    await updateDoc(doc(db, COLLECTION, id), {
+    await conAviso('la orden de compra', () => updateDoc(doc(db, COLLECTION, id), sanitizarParaFirestore({
       activo: false,
       updatedAt: new Date().toISOString(),
-    });
+    }) as Record<string, unknown>));
   }, []);
 
   // ── Agregados para KPIs ───────────────────────────────────────────────────

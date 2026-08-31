@@ -19,6 +19,7 @@ import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
+import { conAviso } from '../lib/erroresEscritura';
 
 const COL = 'importacionesTarifas';
 const ESTADOS_ABIERTOS: EstadoImportacion[] = ['extrayendo', 'en_revision'];
@@ -57,7 +58,7 @@ export function useImportacionesTarifas() {
    */
   const crearImportacion = async (imp: ImportacionTarifario): Promise<void> => {
     exigir(user?.rol as UserRole | undefined, 'tarifario.cargar');
-    await setDoc(doc(db, COL, imp.id), sanitizarParaFirestore(imp));
+    await conAviso('la importación de tarifario', () => setDoc(doc(db, COL, imp.id), sanitizarParaFirestore(imp)));
   };
 
   /** Guarda el avance de la revisión. Se llama seguido: uno por edición. */
@@ -66,10 +67,10 @@ export function useImportacionesTarifas() {
     cambios: Partial<ImportacionTarifario>,
   ): Promise<void> => {
     exigir(user?.rol as UserRole | undefined, 'tarifario.cargar');
-    await updateDoc(doc(db, COL, id), sanitizarParaFirestore({
+    await conAviso('la importación de tarifario', () => updateDoc(doc(db, COL, id), sanitizarParaFirestore({
       ...cambios,
       updatedAt: new Date().toISOString(),
-    }) as Record<string, unknown>);
+    }) as Record<string, unknown>));
   };
 
   /**
@@ -85,11 +86,11 @@ export function useImportacionesTarifas() {
     extra: Partial<ImportacionTarifario> = {},
   ): Promise<void> => {
     exigir(user?.rol as UserRole | undefined, 'tarifario.cargar');
-    await updateDoc(doc(db, COL, id), sanitizarParaFirestore({
+    await conAviso('la importación de tarifario', () => updateDoc(doc(db, COL, id), sanitizarParaFirestore({
       ...extra,
       estado,
       updatedAt: new Date().toISOString(),
-    }) as Record<string, unknown>);
+    }) as Record<string, unknown>));
   };
 
   return { abiertas, loading, error, crearImportacion, actualizarImportacion, cerrarImportacion };

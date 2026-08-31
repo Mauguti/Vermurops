@@ -26,6 +26,7 @@ import { useAuth } from '../auth/AuthContext';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 import { puedeCrearCotizacion, PermisoDenegadoError } from '../auth/permisos';
 import { UserRole } from '../auth/users';
+import { conAviso } from '../lib/erroresEscritura';
 
 export function useCotizaciones() {
   const { user } = useAuth();
@@ -57,11 +58,11 @@ export function useCotizaciones() {
           try {
             // setDoc preserva el folio como document ID (no usa addDoc).
             // Dos sesiones simultáneas producirían writes idénticos → sin daño.
-            await Promise.all(
+            await conAviso('las cotizaciones iniciales', () => Promise.all(
               initialKanbanQuotes.map(q =>
-                setDoc(doc(db, 'cotizaciones', q.id), q)
+                setDoc(doc(db, 'cotizaciones', q.id), sanitizarParaFirestore(q))
               )
-            );
+            ));
             // Inicializar el contador al máximo folio del seed (→ 8).
             // El siguiente generateFolio() devolverá COT-2026-0009.
             await initContadorDesdeFolios(initialKanbanQuotes.map(q => q.id));
@@ -113,7 +114,7 @@ export function useCotizaciones() {
         `El rol «${rol ?? 'sin sesión'}» no puede crear cotizaciones en la etapa «${quote.etapa}».`,
       );
     }
-    await setDoc(doc(db, 'cotizaciones', quote.id), sanitizarParaFirestore(quote));
+    await conAviso('la cotización', () => setDoc(doc(db, 'cotizaciones', quote.id), sanitizarParaFirestore(quote)));
   };
 
   /**
@@ -130,10 +131,10 @@ export function useCotizaciones() {
    * resolvimos en useEmbarques.
    */
   const updateCotizacion = async (id: string, data: Partial<KanbanQuote>): Promise<void> => {
-    await updateDoc(
+    await conAviso('la cotización', () => updateDoc(
       doc(db, 'cotizaciones', id),
       sanitizarParaFirestore(data) as Record<string, unknown>,
-    );
+    ));
   };
 
   return { quotes, loading, error, createCotizacion, updateCotizacion };

@@ -16,6 +16,8 @@ import { collection, onSnapshot, doc, setDoc, updateDoc, getDocsFromServer } fro
 import { evaluarSeed } from '../lib/seedGuard';
 import { TerminoPagoVermur, initialTerminosPago } from '../components/terminosPago/TerminosPagoData';
 import { useAuth } from '../auth/AuthContext';
+import { conAviso } from '../lib/erroresEscritura';
+import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
 export function useTerminosPago() {
   const { user } = useAuth();
@@ -53,11 +55,11 @@ export function useTerminosPago() {
               return;
             }
 
-            await Promise.all(
+            await conAviso('los términos de pago iniciales', () => Promise.all(
               initialTerminosPago.map(tp =>
-                setDoc(doc(db, 'terminosPago', tp.id), tp)
+                setDoc(doc(db, 'terminosPago', tp.id), sanitizarParaFirestore(tp))
               )
-            );
+            ));
           } catch (err) {
             const msg = err instanceof Error ? err.message : 'Error al sembrar términos de pago iniciales';
             setError(msg);
@@ -93,11 +95,11 @@ export function useTerminosPago() {
   // ── Writes ───────────────────────────────────────────────────────────────
 
   const createTerminoPago = async (tp: TerminoPagoVermur): Promise<void> => {
-    await setDoc(doc(db, 'terminosPago', tp.id), tp);
+    await conAviso('el término de pago', () => setDoc(doc(db, 'terminosPago', tp.id), sanitizarParaFirestore(tp)));
   };
 
   const updateTerminoPago = async (id: string, data: Partial<TerminoPagoVermur>): Promise<void> => {
-    await updateDoc(doc(db, 'terminosPago', id), data as Record<string, unknown>);
+    await conAviso('el término de pago', () => updateDoc(doc(db, 'terminosPago', id), sanitizarParaFirestore(data) as Record<string, unknown>));
   };
 
   return { terminosPago, loading, error, createTerminoPago, updateTerminoPago };
