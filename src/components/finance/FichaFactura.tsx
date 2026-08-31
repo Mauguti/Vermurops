@@ -65,12 +65,6 @@ export default function FichaFactura({ invoice, onClose }: FichaFacturaProps) {
         subtitulo={
           <p className="text-[12px] text-text-secondary font-mono">RFC: {invoice.rfc}</p>
         }
-        acciones={
-          <button className="text-[13px] font-medium text-text-secondary border border-card-border bg-white hover:bg-neutral-bg px-[16px] py-[8px] rounded-[8px] flex items-center gap-[6px] transition-colors shadow-sm">
-            <Download className="w-[16px] h-[16px]" />
-            Descargar todo (ZIP)
-          </button>
-        }
       />
 
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">

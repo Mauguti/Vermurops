@@ -67,3 +67,18 @@ Los demás enlaces de la tabla del plan sí se hicieron, porque su FK ya existí
   lo más cerca que se puede llegar hoy.
 - **Factura → su embarque:** el tipo de `invoice` es `any` y los datos son
   mock. No hay `embarqueId`. El modelo real se construye en la fase B.
+
+---
+
+## Resueltos en esta pasada
+
+Se atendieron en el paso 6 (nomenclatura), porque el plan pide ahí esconder o
+renombrar lo que promete algo que no hace:
+
+- **«Nueva Solicitud»** en la ficha de proveedor — botón sin `onClick`. Retirado.
+- **«Descargar todo (ZIP)»** en la ficha de factura — botón sin `onClick`. Retirado.
+- **Las cuatro pestañas de Clientes** (Cuentas · Contactos · Leads ·
+  Oportunidades) — solo cambiaban de color; el contenido de abajo no dependía
+  de cuál estuviera activa. Además, «Leads» y «Oportunidades» nombraban en
+  vocabulario de CRM lo que este sistema llama prospectos y cotizaciones, en
+  otro módulo. Retiradas.

@@ -6,9 +6,10 @@
  */
 
 import React, { useState, useMemo } from 'react';
-import { Search, Filter, Download, Clock, Settings, CheckCircle, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { Search, Filter, Download, Clock, Settings, CheckCircle, CheckCircle2, XCircle, AlertTriangle, FileText } from 'lucide-react';
 import type { OrdenCompra, EstadoOC } from './OrdenesCompraData';
 import { ESTADOS_OC_MAP } from './OrdenesCompraData';
+import EstadoVacio from '../ui/EstadoVacio';
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,9 @@ const FILTROS: { id: FiltroEstado; label: string }[] = [
 export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelectOC }: BandejaOCProps) {
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todos');
   const [searchTerm, setSearchTerm] = useState('');
+
+  /** Para que el estado vacío diga cuál de los dos vacíos es. */
+  const hayFiltro = filtroEstado !== 'todos' || searchTerm.trim() !== '';
 
   // Filtrado
   const ordenesFiltradas = useMemo(() => {
@@ -200,8 +204,19 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
           <tbody className="divide-y divide-divider bg-white">
             {ordenesFiltradas.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-[16px] py-[40px] text-center text-[13px] text-text-muted">
-                  No hay órdenes de compra que coincidan con los filtros.
+                <td colSpan={8}>
+                  {/* U-6 · El vacío explica cuál de los dos es: no hay ninguna,
+                      o el filtro las escondió. Antes decía siempre lo segundo. */}
+                  <EstadoVacio
+                    variante="plano"
+                    icono={<FileText className="w-5 h-5" />}
+                    titulo={hayFiltro
+                      ? 'Ninguna orden coincide con los filtros'
+                      : 'Todavía no hay órdenes de compra'}
+                    detalle={hayFiltro
+                      ? 'Quita los filtros para ver todas las órdenes.'
+                      : 'Nacen del embarque cuando hay que pagarle a un proveedor, o se capturan sueltas para los gastos de oficina.'}
+                  />
                 </td>
               </tr>
             ) : (

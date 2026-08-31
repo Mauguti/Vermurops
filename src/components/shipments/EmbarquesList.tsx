@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Filter, Plus, Ship, Plane, Truck, ArrowRight, Calendar, User, FileText, Globe, Layers, Settings, Download, Upload, X } from 'lucide-react';
 import { EmbarqueCompleto, ModalidadEmbarque } from './EmbarquesData';
+import EstadoVacio from '../ui/EstadoVacio';
 
 interface EmbarquesListProps {
   embarques: EmbarqueCompleto[];
@@ -291,8 +292,19 @@ export default function EmbarquesList({
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-10 text-center text-xs text-gray-400 italic">
-                    No se encontraron embarques.
+                  <td colSpan={7}>
+                    {/* U-6 · Distingue «no hay ninguno» de «el filtro no
+                        encontró». Antes decía siempre lo mismo. */}
+                    <EstadoVacio
+                      variante="plano"
+                      icono={<Ship className="w-5 h-5" />}
+                      titulo={embarques.length === 0
+                        ? 'Todavía no hay embarques'
+                        : 'Ningún embarque coincide con la búsqueda'}
+                      detalle={embarques.length === 0
+                        ? 'Nacen solos al marcar una cotización como ganada, o se capturan a mano desde «Nuevo embarque».'
+                        : 'Prueba con otro folio, otro cliente u otra modalidad.'}
+                    />
                   </td>
                 </tr>
               ) : (

@@ -182,7 +182,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
           piezas separadas —un breadcrumb con un badge suelto a la derecha y una
           tarjeta aparte con el nombre— que no se leían como una sola cabecera. */}
       <FichaHeader
-        modulo="Altas"
+        modulo="Clientes"
         onBack={onBack}
         folio={cliente.id}
         titulo={cliente.nombre}

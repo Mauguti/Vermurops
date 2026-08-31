@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { initialRFQs, RFQ, Modality } from './pricing/PricingData';
 import { Search, Filter, Plane, Ship, Truck, FileText, ChevronRight } from 'lucide-react';
 import FichaRFQ from './pricing/FichaRFQ';
+import EstadoVacio from './ui/EstadoVacio';
 
 export default function Pricing() {
   const [rfqs, setRfqs] = useState<RFQ[]>(initialRFQs);
@@ -71,7 +72,7 @@ export default function Pricing() {
     <div className="space-y-[24px]">
       <div className="flex justify-between items-center mb-[12px]">
         <h2 className="text-[22px] font-semibold text-text-primary tracking-tight">
-          Solicitudes de Pricing (RFQs)
+          Solicitudes de cotización
         </h2>
       </div>
 
@@ -80,7 +81,7 @@ export default function Pricing() {
           <Search className="w-[18px] h-[18px] absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input 
             type="text" 
-            placeholder="Buscar por Cotización o Cliente..." 
+            placeholder="Buscar por solicitud o cliente..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-[36px] pr-[12px] py-[10px] outline-none text-[14px] bg-card border border-card-border rounded-[8px] focus:border-brand focus:ring-1 focus:ring-brand shadow-sm text-text-primary"
@@ -153,8 +154,20 @@ export default function Pricing() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-[40px] text-center text-[13px] text-text-muted">
-                    No se encontraron solicitudes de pricing que coincidan con la búsqueda.
+                  <td colSpan={6}>
+                    {/* U-6 · Antes no había nada: la tabla se quedaba en
+                        blanco y no distinguía «no hay solicitudes» de «el
+                        filtro no encontró». */}
+                    <EstadoVacio
+                      variante="plano"
+                      icono={<FileText className="w-5 h-5" />}
+                      titulo={rfqs.length === 0
+                        ? 'No hay solicitudes de cotización'
+                        : 'Ninguna solicitud coincide con la búsqueda'}
+                      detalle={rfqs.length === 0
+                        ? 'Llegan cuando Ventas pide cotizar una operación.'
+                        : 'Prueba con otro folio, otro cliente u otro estado.'}
+                    />
                   </td>
                 </tr>
               )}

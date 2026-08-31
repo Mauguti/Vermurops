@@ -61,7 +61,6 @@ export default function Clients() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showInactivos, setShowInactivos] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('Cuentas');
   const [showModal, setShowModal] = useState(false);
 
   const [providerSearchTerm, setProviderSearchTerm] = useState('');
@@ -129,7 +128,6 @@ export default function Clients() {
       (cp?.nombre ?? '').toLowerCase().includes(q);
   });
 
-  const tabs = ['Cuentas', 'Contactos', 'Leads', 'Oportunidades'];
   const providerTabs = ['Todos', 'Navieras', 'Aerolíneas', 'Transportistas', 'Aduanales'];
 
   const getTransportIcon = (type: string) => {
@@ -182,24 +180,13 @@ export default function Clients() {
 
       {viewType === 'Clientes' && !selectedClientId && (
         <>
-          {/* Top Tabs */}
-          <div className="border-b border-divider mb-[24px]">
-            <nav className="-mb-px flex space-x-[32px]">
-              {tabs.map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`pb-[12px] px-[4px] text-[14px] font-medium transition-colors border-b-[2px] ${
-                    activeTab === tab
-                      ? 'border-brand text-text-primary'
-                      : 'border-transparent text-text-muted hover:text-text-secondary hover:border-text-muted'
-                  }`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </nav>
-          </div>
+          {/* U-6 · Aquí había cuatro pestañas —Cuentas, Contactos, Leads,
+              Oportunidades— que solo cambiaban de color: el contenido de abajo
+              no dependía de cuál estuviera activa. Y dos de ellas, Leads y
+              Oportunidades, nombraban en vocabulario de CRM lo que este
+              sistema llama prospectos y cotizaciones, en otro módulo.
+              Se retiran: una pestaña que no lleva a ningún lado enseña que las
+              pestañas de esta app no llevan a ningún lado. */}
 
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-[16px] mb-[24px]">
             <div className="flex items-center gap-3 flex-1">
