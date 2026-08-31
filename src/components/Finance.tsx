@@ -5,6 +5,9 @@ import FichaFactura from './finance/FichaFactura';
 import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import BandejaOC from './ordenesCompra/BandejaOC';
 import FichaOC from './ordenesCompra/FichaOC';
+import NuevaOCOficina from './ordenesCompra/NuevaOCOficina';
+import { useProveedores } from '../hooks/useProveedores';
+import { useConceptos } from '../hooks/useConceptos';
 import type { OrdenCompra, EstadoOC } from './ordenesCompra/OrdenesCompraData';
 import type { RolOC } from '../lib/stateMachineOC';
 import { useAuth } from '../auth/AuthContext';
@@ -19,7 +22,10 @@ export default function Finance() {
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
   const [ocAbiertaId, setOcAbiertaId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ mensaje: string; tipo: TipoToast } | null>(null);
-  const { user } = useAuth();
+  const { user, puede } = useAuth();
+  const [nuevaOCAbierta, setNuevaOCAbierta] = useState(false);
+  const { proveedores } = useProveedores();
+  const { conceptos } = useConceptos();
 
   /*
    * U-4 · Alguien enlazó a una orden de compra desde un embarque o desde un
@@ -37,8 +43,11 @@ export default function Finance() {
   // ── OC: datos reales de Firestore ─────────────────────────────────────────
   const {
     ordenes, loading: loadingOC, porPagar, conteosPorEstado,
-    transicionarEstado, updateOrden,
+    transicionarEstado, updateOrden, createOrden,
   } = useOrdenesCompra();
+
+  /** C-3 · El gasto de oficina lo carga Administración. */
+  const puedeSolicitarPago = puede('ordenCompra.solicitar');
 
   /*
    * C-2 · La orden abierta se DERIVA del listener, no se guarda en estado.
@@ -239,12 +248,27 @@ export default function Finance() {
                 )}
 
                 {activeTab === 'Cuentas por pagar' && (
-                   <BandejaOC
-                     ordenes={ordenes}
-                     loading={loadingOC}
-                     conteosPorEstado={conteosPorEstado}
-                     onSelectOC={oc => setOcAbiertaId(oc.id)}
-                   />
+                   <div className="space-y-4">
+                     {/* C-3 · El segundo origen. Las de embarque nacen del
+                         cargo, en la ficha del embarque; aquí solo se
+                         capturan las que no cuelgan de ninguno. */}
+                     {puedeSolicitarPago && (
+                       <div className="flex justify-end">
+                         <button
+                           onClick={() => setNuevaOCAbierta(true)}
+                           className="inline-flex items-center gap-1.5 bg-[#E11D48] hover:bg-[#BE123C] text-white text-[12px] font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors shadow-sm"
+                         >
+                           <Plus className="w-3.5 h-3.5" /> Gasto de oficina
+                         </button>
+                       </div>
+                     )}
+                     <BandejaOC
+                       ordenes={ordenes}
+                       loading={loadingOC}
+                       conteosPorEstado={conteosPorEstado}
+                       onSelectOC={oc => setOcAbiertaId(oc.id)}
+                     />
+                   </div>
                 )}
 
                 {activeTab === 'Estados de cuenta' && (
@@ -404,6 +428,29 @@ export default function Finance() {
            </div>
         </div>
       )}
+
+      {/* C-3 · Alta de la orden suelta. */}
+      {nuevaOCAbierta && (
+        <NuevaOCOficina
+          proveedores={proveedores}
+          conceptos={conceptos.filter(c => c.activo !== false)}
+          solicitante={{ uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' }}
+          onCancelar={() => setNuevaOCAbierta(false)}
+          onCrear={(datos) => {
+            createOrden(datos)
+              .then(oc => {
+                setNuevaOCAbierta(false);
+                setToast({ mensaje: `Orden ${oc.folio} solicitada para ${oc.proveedorNombre}.`, tipo: 'exito' });
+              })
+              .catch(err => setToast({
+                mensaje: `No se pudo solicitar el pago: ${err instanceof Error ? err.message : err}`,
+                tipo: 'error',
+              }));
+          }}
+        />
+      )}
+
+      <Toast mensaje={toast?.mensaje ?? null} tipo={toast?.tipo} onClose={() => setToast(null)} />
     </div>
   );
 }

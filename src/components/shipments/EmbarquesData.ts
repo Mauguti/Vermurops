@@ -93,6 +93,16 @@ export interface CargoDetalle {
    * en la factura general.
    */
   grupoFacturacion?: string;
+  /**
+   * Orden de compra que se generó de este gasto (C-3).
+   *
+   * `null`/ausente = todavía no se ha pedido su pago. La marca vive aquí y no
+   * como lista dentro de la orden, por el mismo motivo que `facturaId`: así un
+   * gasto no puede acabar en dos órdenes, que es como se paga dos veces lo
+   * mismo.
+   */
+  ordenCompraId?: string | null;
+
   // ── A-3: el costo que Operaciones corrigió ───────────────────────────────
   /**
    * Importe con el que la línea nació de la cotización.

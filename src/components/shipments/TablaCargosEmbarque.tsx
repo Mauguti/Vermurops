@@ -1,9 +1,11 @@
 import React from 'react';
-import { Trash2, Undo2, Lock, AlertTriangle } from 'lucide-react';
+import { Trash2, Undo2, Lock, AlertTriangle, Receipt } from 'lucide-react';
 import type { CargoDetalle, MonedaCargo } from './EmbarquesData';
 import {
   agruparCargos, desviacionDe, montoOriginal, GrupoCargos,
 } from '../../lib/cargosEditables';
+import { puedeConvertirse } from '../../lib/ocDesdeCargo';
+import { EnlaceEntidad } from '../ui/ficha/EnlaceEntidad';
 
 /**
  * A-3. Los cargos del embarque, agrupados por concepto y editables.
@@ -41,6 +43,11 @@ interface Props {
   onEditarMonto: (cargoId: string, monto: number) => void;
   onRestaurar: (cargoId: string) => void;
   onQuitar: (cargoId: string) => void;
+  /**
+   * C-3 · Convierte el gasto en orden de compra. Ausente si el rol no puede
+   * solicitar pagos: entonces la columna no aparece en vez de aparecer muerta.
+   */
+  onGenerarOC?: (cargoId: string) => void;
 }
 
 const money = (n: number) =>
@@ -49,7 +56,7 @@ const money = (n: number) =>
 const signo = (n: number) => `${n > 0 ? '+' : ''}${money(n)}`;
 
 export default function TablaCargosEmbarque({
-  detalles, editable, nombreProveedor, onEditarMonto, onRestaurar, onQuitar,
+  detalles, editable, nombreProveedor, onEditarMonto, onRestaurar, onQuitar, onGenerarOC,
 }: Props) {
   const grupos = agruparCargos(detalles);
 
@@ -75,6 +82,7 @@ export default function TablaCargosEmbarque({
           onEditarMonto={onEditarMonto}
           onRestaurar={onRestaurar}
           onQuitar={onQuitar}
+          onGenerarOC={onGenerarOC}
         />
       ))}
     </div>
@@ -84,7 +92,7 @@ export default function TablaCargosEmbarque({
 // ─── Una tarjeta por concepto ─────────────────────────────────────────────────
 
 function GrupoCard({
-  grupo, editable, nombreProveedor, onEditarMonto, onRestaurar, onQuitar,
+  grupo, editable, nombreProveedor, onEditarMonto, onRestaurar, onQuitar, onGenerarOC,
 }: { grupo: GrupoCargos } & Omit<Props, 'detalles'>) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -137,6 +145,7 @@ function GrupoCard({
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Importe</th>
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Moneda</th>
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Cotizado</th>
+              <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Pago</th>
               {editable && <th className="px-2 py-2 w-[60px]" />}
             </tr>
           </thead>
@@ -150,6 +159,7 @@ function GrupoCard({
                 onEditarMonto={onEditarMonto}
                 onRestaurar={onRestaurar}
                 onQuitar={onQuitar}
+                onGenerarOC={onGenerarOC}
               />
             ))}
           </tbody>
@@ -177,6 +187,7 @@ function GrupoCard({
                     <span className="text-gray-300">—</span>
                   )}
                 </td>
+                <td />
                 {editable && <td />}
               </tr>
             ))}
@@ -192,7 +203,7 @@ function GrupoCard({
 const inputNum = 'w-[110px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-[#E11D48] focus:bg-white bg-transparent rounded outline-none text-[12px] font-semibold';
 
 function Renglon({
-  cargo, editable, nombreProveedor, onEditarMonto, onRestaurar, onQuitar,
+  cargo, editable, nombreProveedor, onEditarMonto, onRestaurar, onQuitar, onGenerarOC,
 }: { cargo: CargoDetalle } & Omit<Props, 'detalles'>) {
   const desviacion = desviacionDe(cargo);
   const original = montoOriginal(cargo);
@@ -207,6 +218,8 @@ function Renglon({
    */
   const facturado = !!cargo.facturaId;
   const puedeEditar = editable && !facturado;
+
+  const conversion = puedeConvertirse(cargo);
 
   return (
     <tr className="hover:bg-gray-50/60 group">
@@ -267,6 +280,36 @@ function Renglon({
                 {signo(desviacion)}
               </span>
             )}
+          </span>
+        ) : (
+          <span className="text-gray-300">—</span>
+        )}
+      </td>
+
+      {/* C-3 · De aquí sale la orden de compra. El gasto ya sabe a quién se le
+          paga, por qué concepto y cuánto: recapturarlo a mano es pedir que
+          alguien copie datos que el sistema ya tiene. */}
+      <td className="px-3 py-1.5">
+        {cargo.ordenCompraId ? (
+          <EnlaceEntidad
+            tipo="ordenCompra"
+            id={cargo.ordenCompraId}
+            title="Ya generó una orden de compra"
+          >
+            Orden generada
+          </EnlaceEntidad>
+        ) : onGenerarOC && conversion.puede ? (
+          <button
+            onClick={() => onGenerarOC(cargo.id)}
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#E11D48] hover:underline"
+          >
+            <Receipt className="w-3 h-3" /> Solicitar pago
+          </button>
+        ) : onGenerarOC && cargo.tipo === 'gasto' ? (
+          <span className="text-[10px] text-amber-600" title={conversion.detalle}>
+            {conversion.motivo === 'sin_proveedor' ? 'Falta proveedor'
+              : conversion.motivo === 'monto_cero' ? 'Sin importe'
+              : '—'}
           </span>
         ) : (
           <span className="text-gray-300">—</span>

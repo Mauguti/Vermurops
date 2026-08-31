@@ -10,12 +10,14 @@ import { useProveedores } from '../../hooks/useProveedores';
 import { useAuth } from '../../auth/AuthContext';
 import TablaCargosEmbarque from './TablaCargosEmbarque';
 import { editarMontoCargo, restaurarMontoCargo, desviacionDelEmbarque } from '../../lib/cargosEditables';
+import { construirOCDesdeCargo, marcarCargoConOrden, puedeConvertirse } from '../../lib/ocDesdeCargo';
 import { generateFolioEmbarque, parseFolioNumero } from '../../lib/folioService';
 import { FichaHeader, FichaTabs, BadgeEstado } from '../ui/ficha/FichaLayout';
 import { EnlaceEntidad, BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import LineaTiempo from '../ui/ficha/LineaTiempo';
 import { ETAPAS_EMBARQUE, estadoDe } from '../../lib/estadoEmbarque';
 import { useOrdenesCompra } from '../../hooks/useOrdenesCompra';
+import Toast, { TipoToast } from '../ui/Toast';
 
 type PestanaEmbarque =
   | 'general' | 'entidades' | 'ruta' | 'cargos'
@@ -38,11 +40,17 @@ export default function FichaEmbarque({
 }: FichaEmbarqueProps) {
   const { clientes } = useClientes();
   const { proveedores } = useProveedores();
-  const { ordenes } = useOrdenesCompra();
+  const { ordenes, createOrden } = useOrdenesCompra();
 
   /** U-4 · Las órdenes de compra que se pagan por este embarque. */
   const ocDelEmbarque = ordenes.filter(o => o.embarqueId === embarque.id);
+
+  const [avisoOC, setAvisoOC] = useState<{ mensaje: string; tipo: TipoToast } | null>(null);
+
   const { user, puede } = useAuth();
+
+  /** Solo quien puede solicitar pagos ve la acción. */
+  const puedeSolicitarPago = puede('ordenCompra.solicitar');
 
   /**
    * A-3 · Quién corrige costos.
@@ -182,6 +190,46 @@ export default function FichaEmbarque({
 
   const handleRestaurarCargo = (id: string) => {
     guardarDetalles(restaurarMontoCargo(embarque.cargos.detalles || [], id));
+  };
+
+  /**
+   * C-3 · El gasto se convierte en orden de compra.
+   *
+   * El cargo se marca con la orden que generó DESPUÉS de crearla, y solo si
+   * se creó. Marcarlo antes dejaría un gasto que dice tener orden y no la
+   * tiene: nadie volvería a pedir su pago y el proveedor se quedaría sin
+   * cobrar sin que nada lo señalara.
+   */
+  const handleGenerarOC = async (cargoId: string) => {
+    const detalles = embarque.cargos.detalles || [];
+    const cargo = detalles.find(c => c.id === cargoId);
+    if (!cargo) return;
+
+    const revision = puedeConvertirse(cargo);
+    if (!revision.puede) {
+      setAvisoOC({ mensaje: revision.detalle ?? 'Este cargo no se puede pagar.', tipo: 'error' });
+      return;
+    }
+
+    try {
+      const oc = await createOrden(construirOCDesdeCargo(cargo, {
+        embarque,
+        proveedorNombre: nombreProveedor(cargo.proveedorId) || 'Proveedor sin nombre',
+        solicitante: { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' },
+        ahora: new Date().toISOString(),
+      }));
+
+      guardarDetalles(marcarCargoConOrden(detalles, cargoId, oc.id));
+      setAvisoOC({
+        mensaje: `Orden ${oc.folio} solicitada para ${oc.proveedorNombre}. Operaciones la gestiona y Administración la autoriza.`,
+        tipo: 'exito',
+      });
+    } catch (err) {
+      setAvisoOC({
+        mensaje: `No se pudo solicitar el pago: ${err instanceof Error ? err.message : err}`,
+        tipo: 'error',
+      });
+    }
   };
 
   const handleDeleteCargo = (id: string) => {
@@ -419,6 +467,8 @@ export default function FichaEmbarque({
         activa={activeTab}
         onCambiar={setActiveTab}
       />
+
+      <Toast mensaje={avisoOC?.mensaje ?? null} tipo={avisoOC?.tipo} onClose={() => setAvisoOC(null)} />
 
       {/* Contenedor del Tab activo */}
       <div className="space-y-6">
@@ -694,6 +744,7 @@ export default function FichaEmbarque({
               onEditarMonto={handleEditarMontoCargo}
               onRestaurar={handleRestaurarCargo}
               onQuitar={handleDeleteCargo}
+              onGenerarOC={puedeSolicitarPago ? handleGenerarOC : undefined}
             />
 
             {/* Lo que se movió respecto a la cotización. Es lo que dirección
