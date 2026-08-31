@@ -5,6 +5,7 @@ import { Modalidad } from '../proveedores/ProveedoresData';
 import AltaRapidaProveedorModal from '../proveedores/AltaRapidaProveedorModal';
 import { ChevronRight, ChevronDown, Check, X, Plane, Ship, Truck, FileText, Plus, DollarSign, Send, ArrowLeft, Paperclip, File as FileIcon, HelpCircle } from 'lucide-react';
 import { useServicios, renderIcon } from '../../config/serviciosStore';
+import { FichaHeader, BadgeEstado } from '../ui/ficha/FichaLayout';
 
 interface FichaRFQProps {
   rfq: RFQ;
@@ -123,35 +124,31 @@ export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
 
   return (
     <div className="space-y-[24px]">
-      {/* Header */}
-      <div className="flex items-center space-x-[8px] text-[13px] text-text-secondary mb-[16px]">
-        <button onClick={onClose} className="flex items-center hover:text-text-primary transition-colors">
-          <ArrowLeft className="w-4 h-4 mr-1" />
-          Volver a Lista
-        </button>
-        <ChevronRight className="w-4 h-4 text-text-muted" />
-        <span className="text-text-primary font-medium">RFQ {rfq.quoteRef}</span>
-      </div>
-
-      <div className="bg-card border border-card-border rounded-[12px] p-[24px] shadow-sm flex justify-between items-start">
-        <div>
-          <h2 className="text-[24px] font-semibold text-text-primary tracking-tight leading-none mb-[8px]">{rfq.client}</h2>
+      {/* U-3 · Mismo encabezado que las demás fichas. Antes eran dos piezas: la
+          miga de pan por un lado y una tarjeta con el nombre y el estado por
+          otro, con tipografías que no coincidían con ninguna otra ficha. */}
+      <FichaHeader
+        modulo="Solicitudes"
+        onBack={onClose}
+        folio={rfq.quoteRef}
+        titulo={rfq.client}
+        badges={
+          <BadgeEstado tono={
+            rfq.status === 'Completado' ? 'exito'
+            : rfq.status === 'En proceso' ? 'activo'
+            : 'espera'}
+          >
+            {rfq.status}
+          </BadgeEstado>
+        }
+        subtitulo={
           <div className="flex items-center text-[13px] text-text-secondary space-x-[12px]">
-            <span>Origen: <span className="font-semibold text-brand">{rfq.quoteRef}</span></span>
-            <span className="text-divider">•</span>
             <span>Responsable: {rfq.responsible}</span>
             <span className="text-divider">•</span>
             <span>Límite: <span className="text-danger-text">{rfq.deadline}</span></span>
           </div>
-        </div>
-        <span className={`px-[12px] py-[6px] rounded-md text-[13px] font-semibold tracking-wide ${
-          rfq.status === 'Completado' ? 'bg-success-bg text-success-text' : 
-          rfq.status === 'En proceso' ? 'bg-info-bg text-info-text' : 
-          'bg-neutral-bg text-text-secondary'
-        }`}>
-          {rfq.status.toUpperCase()}
-        </span>
-      </div>
+        }
+      />
 
       {/* Main Content Layout */}
       <div className="flex flex-col lg:flex-row gap-[24px]">

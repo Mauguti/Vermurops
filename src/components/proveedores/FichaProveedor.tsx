@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronRight, Phone, Mail, Check, BookOpen } from 'lucide-react';
+import { Phone, Mail, Check, BookOpen } from 'lucide-react';
 import { ProveedorVermur, contactoPrincipal } from './ProveedoresData';
 import { PIPELINE_STAGES } from '../quotes/QuotesData';
 import type { KanbanQuote } from '../quotes/QuotesData';
 import { extraerHistorialProveedor, calcularResumenProveedor, formatTotalesPorMoneda } from '../../lib/historialProveedor';
+import { FichaHeader, BadgeEstado } from '../ui/ficha/FichaLayout';
 
 interface Props {
   proveedor: ProveedorVermur;
@@ -45,25 +46,41 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit }: Pr
 
   return (
     <div className="space-y-[24px]">
-      {/* Header Ficha Proveedor */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-[8px] text-[13px] text-text-secondary">
-          <button onClick={onBack} className="hover:text-text-primary transition-colors">Proveedores</button>
-          <ChevronRight className="w-4 h-4 text-text-muted" />
-          <span className="text-text-primary font-medium">{proveedor.nombre}</span>
-        </div>
-        <div className="flex space-x-[12px]">
-           <button
-             onClick={onEdit}
-             className="bg-white border border-card-border text-text-primary px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium hover:bg-neutral-bg transition-colors shadow-sm"
-           >
-             Editar Datos
-           </button>
-           <button className="bg-brand text-white px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium hover:bg-brand-hover shadow-sm transition-colors">
-             Nueva Solicitud
-           </button>
-        </div>
-      </div>
+      {/* U-3 · Mismo encabezado que la ficha de cotización: breadcrumb, folio,
+          nombre y badges. Antes era un breadcrumb suelto sin título ni estado,
+          así que el nombre del proveedor solo se leía en la miga de pan. */}
+      <FichaHeader
+        modulo="Proveedores"
+        onBack={onBack}
+        folio={proveedor.id}
+        titulo={proveedor.nombre}
+        badges={
+          <>
+            <BadgeEstado tono={proveedor.activo === false ? 'peligro' : 'exito'}>
+              {proveedor.activo === false ? 'Inactivo' : 'Activo'}
+            </BadgeEstado>
+            {!proveedor.rfc?.trim() && (
+              <BadgeEstado
+                tono="espera"
+                title="Sin RFC: es un probable proveedor, pendiente de que Administración lo valide."
+              >
+                Sin validar
+              </BadgeEstado>
+            )}
+            {(proveedor.tipos ?? []).map(t => (
+              <BadgeEstado key={t} tono="neutro">{t}</BadgeEstado>
+            ))}
+          </>
+        }
+        acciones={
+          <button
+            onClick={onEdit}
+            className="bg-white border border-card-border text-text-primary px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium hover:bg-neutral-bg transition-colors shadow-sm"
+          >
+            Editar datos
+          </button>
+        }
+      />
 
       <div className="bg-card rounded-[12px] border border-card-border shadow-sm overflow-hidden flex flex-col md:flex-row">
         {/* Main Content (Left 2/3) */}

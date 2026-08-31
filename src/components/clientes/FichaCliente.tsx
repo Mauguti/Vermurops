@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ClienteVermur, DocsAlta, ContratoCliente, PagareCliente } from './ClientesData';
 import { validarRFC } from '../../lib/validadores';
 import { ChevronRight, Loader2, Check } from 'lucide-react';
+import { FichaHeader, BadgeEstado } from '../ui/ficha/FichaLayout';
 
 interface Props {
   cliente: ClienteVermur;
@@ -169,37 +170,36 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
 
   return (
     <div className="space-y-[24px]">
-      {/* Breadcrumb */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[13px] text-text-secondary">
-          <button onClick={onBack} className="hover:text-text-primary transition-colors">Cuentas</button>
-          <ChevronRight className="w-4 h-4 text-text-muted" />
-          <span className="text-text-primary font-medium">{cliente.nombre}</span>
-        </div>
-        <span className={`px-3 py-1 rounded-md text-[11px] font-semibold tracking-wide ${
-          cliente.statusOperativo === 'ACTIVO'
-            ? 'bg-success-bg text-success-text'
-            : 'bg-neutral-bg text-text-secondary'
-        }`}>
-          {cliente.statusOperativo}
-        </span>
-      </div>
-
-      {/* Header card */}
-      <div className="bg-white rounded-[12px] border border-card-border shadow-sm px-6 py-5">
-        <div className="flex items-center gap-4">
-          <div className="w-[52px] h-[52px] bg-canvas border border-card-border rounded-[10px] flex items-center justify-center text-[20px] font-semibold text-text-primary shrink-0">
-            {cliente.nombre.charAt(0)}
-          </div>
-          <div>
-            <h2 className="text-[18px] font-semibold text-text-primary leading-tight">{cliente.nombre}</h2>
-            {cliente.comercial && (
-              <p className="text-[12px] text-text-muted mt-0.5">{cliente.comercial}</p>
+      {/* U-3 · Mismo encabezado que la ficha de cotización. Antes eran tres
+          piezas separadas —un breadcrumb con un badge suelto a la derecha y una
+          tarjeta aparte con el nombre— que no se leían como una sola cabecera. */}
+      <FichaHeader
+        modulo="Altas"
+        onBack={onBack}
+        folio={cliente.id}
+        titulo={cliente.nombre}
+        badges={
+          <>
+            <BadgeEstado tono={cliente.statusOperativo === 'ACTIVO' ? 'exito' : 'neutro'}>
+              {cliente.statusOperativo}
+            </BadgeEstado>
+            {cliente.validadoFiscalmente !== true && (
+              <BadgeEstado
+                tono="espera"
+                title="Sin validación fiscal no se debe operar un embarque de este cliente."
+              >
+                Sin validar
+              </BadgeEstado>
             )}
-            <p className="text-[11px] text-text-muted font-mono mt-1">RFC: {cliente.rfc || '—'}</p>
+          </>
+        }
+        subtitulo={
+          <div className="text-[12px] text-text-muted">
+            {cliente.comercial && <span className="mr-3">{cliente.comercial}</span>}
+            <span className="font-mono text-[11px]">RFC: {cliente.rfc || '—'}</span>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Tab panel */}
       <div className="bg-card rounded-[12px] border border-card-border shadow-sm overflow-hidden">

@@ -11,6 +11,11 @@ import { useAuth } from '../../auth/AuthContext';
 import TablaCargosEmbarque from './TablaCargosEmbarque';
 import { editarMontoCargo, restaurarMontoCargo, desviacionDelEmbarque } from '../../lib/cargosEditables';
 import { generateFolioEmbarque, parseFolioNumero } from '../../lib/folioService';
+import { FichaHeader, FichaTabs, BadgeEstado } from '../ui/ficha/FichaLayout';
+
+type PestanaEmbarque =
+  | 'general' | 'entidades' | 'ruta' | 'cargos'
+  | 'documentos' | 'eventos' | 'productos' | 'master_hijo';
 
 interface FichaEmbarqueProps {
   embarque: EmbarqueCompleto;
@@ -42,7 +47,7 @@ export default function FichaEmbarque({
   const nombreProveedor = (id: string | undefined) =>
     (id ? proveedores.find(p => p.id === id)?.nombre : '') ?? '';
 
-  const [activeTab, setActiveTab] = useState<'general' | 'entidades' | 'ruta' | 'cargos' | 'documentos' | 'eventos' | 'productos' | 'master_hijo'>('general');
+  const [activeTab, setActiveTab] = useState<PestanaEmbarque>('general');
 
   // Estado temporal de edición general
   const [desc, setDesc] = useState(embarque.descripcionCarga);
@@ -317,57 +322,68 @@ export default function FichaEmbarque({
     alert(`Se ha creado el HBL Hijo ${nuevoHijo.folio}. Puedes buscarlo en la lista.`);
   };
 
+  const PESTANAS = [
+    { id: 'general' as const, label: 'General' },
+    { id: 'entidades' as const, label: 'Entidades' },
+    { id: 'ruta' as const, label: 'Ruta y aduanas' },
+    { id: 'cargos' as const, label: 'Cargos', contador: (embarque.cargos.detalles ?? []).length },
+    { id: 'documentos' as const, label: 'Documentos', contador: (embarque.documentos ?? []).length },
+    { id: 'eventos' as const, label: 'Seguimiento' },
+    { id: 'productos' as const, label: 'Productos', contador: (embarque.productos ?? []).length },
+    { id: 'master_hijo' as const, label: 'Master / hijo' },
+  ];
+
   return (
     <div className="space-y-6">
-      
-      {/* Breadcrumbs y Barra superior */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-150">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-500">
-          <span className="cursor-pointer hover:text-gray-700 transition-colors uppercase tracking-wide">Embarques</span>
-          <ChevronRight className="w-3.5 h-3.5 text-gray-400" />
-          <span className="text-gray-800 uppercase tracking-wide font-extrabold">{embarque.folio}</span>
-          <span className="text-[9px] bg-gray-100 text-gray-400 font-extrabold tracking-wider px-1.5 py-0.5 rounded uppercase ml-2">
-            {embarque.modalidad}
-          </span>
-        </div>
-
-        <button
-          onClick={onClose}
-          className="p-1.5 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors self-start sm:self-center"
-        >
-          <X className="w-4.5 h-4.5" />
-        </button>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="flex flex-wrap gap-x-6 gap-y-2 -mb-px">
-          {([
-            { id: 'general', label: 'General' },
-            { id: 'entidades', label: 'Entidades' },
-            { id: 'ruta', label: 'Ruta y Aduanas' },
-            { id: 'cargos', label: 'Cargos' },
-            { id: 'documentos', label: 'Documentos' },
-            { id: 'eventos', label: 'Seguimiento' },
-            { id: 'productos', label: 'Productos' },
-            { id: 'master_hijo', label: 'Master / Hijo' },
-          ] as const).map(tab => {
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`py-3 px-1 text-xs font-bold uppercase tracking-wider border-b-2 transition-all
-                  ${active
-                    ? 'border-[#E11D48] text-[#E11D48] font-extrabold'
-                    : 'border-transparent text-gray-400 hover:text-gray-600'}`}
+      {/* U-3 · Mismo encabezado que la ficha de cotización. Antes el folio
+          vivía en la miga de pan y el embarque no tenía título: el cliente al
+          que pertenece solo aparecía dentro de una pestaña. */}
+      <FichaHeader
+        modulo="Embarques"
+        onBack={onClose}
+        folio={embarque.folio}
+        titulo={embarque.entidades?.clienteCobrar || 'Sin cliente'}
+        badges={
+          <>
+            <BadgeEstado tono="neutro">{embarque.modalidad}</BadgeEstado>
+            {embarque.requiereCaptura && (
+              <BadgeEstado
+                tono="espera"
+                title="Nació de una cotización ganada y le falta la captura operativa."
               >
-                {tab.label}
-              </button>
-            );
-          })}
-        </nav>
-      </div>
+                Por capturar
+              </BadgeEstado>
+            )}
+            {embarque.cierres?.administrativo ? (
+              <BadgeEstado tono="exito">Cerrado</BadgeEstado>
+            ) : embarque.cierres?.operativo ? (
+              <BadgeEstado tono="activo">Cierre operativo</BadgeEstado>
+            ) : null}
+            {(embarque.advertenciasHeredadas?.length ?? 0) > 0 && (
+              <BadgeEstado
+                tono="peligro"
+                title="La cotización de origen dejó advertencias. Se revisan en Seguimiento."
+              >
+                {embarque.advertenciasHeredadas!.length} advertencia
+                {embarque.advertenciasHeredadas!.length !== 1 ? 's' : ''}
+              </BadgeEstado>
+            )}
+          </>
+        }
+        subtitulo={
+          embarque.ruta?.origen?.puertoCarga || embarque.ruta?.destino?.puertoDescarga ? (
+            <p className="text-[12px] text-gray-500">
+              {embarque.ruta.origen.puertoCarga || '—'} → {embarque.ruta.destino.puertoDescarga || '—'}
+            </p>
+          ) : undefined
+        }
+      />
+
+      <FichaTabs<PestanaEmbarque>
+        pestanas={PESTANAS}
+        activa={activeTab}
+        onCambiar={setActiveTab}
+      />
 
       {/* Contenedor del Tab activo */}
       <div className="space-y-6">

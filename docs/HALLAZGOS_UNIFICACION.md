@@ -23,3 +23,22 @@ tests.
 
 **Detectado con:** un scan de estado write-only sobre todos los `.tsx`.
 Vale la pena dejarlo como paso fijo antes de cerrar cualquier bloque de UI.
+
+### 2 · Botones que no hacen nada
+
+Encontrados al alinear los encabezados. Ninguno tiene `onClick`:
+
+| Dónde | Botón |
+|---|---|
+| `proveedores/FichaProveedor.tsx` | «Nueva Solicitud» |
+| `finance/FichaFactura.tsx` | «Descargar todo (ZIP)» |
+
+Se conservaron tal cual en el paso 3 para no mezclar. Se atienden en el paso
+de nomenclatura, que es donde el plan pide esconder o renombrar lo que promete
+algo que no hace.
+
+### 3 · La ficha de orden de compra no existe
+
+El plan la lista entre las fichas a alinear. `components/ordenesCompra/` solo
+tiene `BandejaOC.tsx` y `OrdenesCompraData.ts`. La ficha se construye en el
+bloque C del plan de operación; cuando exista, nace con `FichaLayout`.

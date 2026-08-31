@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, FileText, Code, CheckCircle, Download, ExternalLink, Printer } from 'lucide-react';
+import { FichaHeader, BadgeEstado } from '../ui/ficha/FichaLayout';
 
 interface FichaFacturaProps {
   invoice: any;
@@ -48,35 +49,29 @@ export default function FichaFactura({ invoice, onClose }: FichaFacturaProps) {
 
   return (
     <div className="bg-white rounded-[12px] border border-card-border shadow-sm flex flex-col h-[calc(100vh-120px)] min-h-[600px] overflow-hidden">
-      {/* Cabecera */}
-      <div className="px-[32px] py-[20px] border-b border-divider flex justify-between items-center bg-canvas shrink-0">
-        <div className="flex items-center gap-[16px]">
-          <button 
-            onClick={onClose}
-            className="p-[6px] border border-card-border rounded-[6px] text-text-muted hover:text-text-primary hover:bg-white transition-colors bg-neutral-bg"
-          >
-            <X className="w-[18px] h-[18px]" />
-          </button>
-          <div>
-            <div className="flex items-center gap-[12px]">
-              <h3 className="text-[18px] font-bold text-text-primary tracking-tight">Factura {invoice.id}</h3>
-              {invoice.cfdiStatus === 'Timbrada' && (
-                <span className="px-[8px] py-[2px] rounded-[4px] text-[11px] font-bold tracking-[0.02em] bg-info-bg text-info-text uppercase">Timbrada</span>
-              )}
-              {invoice.cfdiStatus === 'Borrador' && (
-                <span className="px-[8px] py-[2px] rounded-[4px] text-[11px] font-bold tracking-[0.02em] bg-neutral-bg text-text-secondary uppercase">Borrador</span>
-              )}
-            </div>
-            <p className="text-[12px] text-text-secondary mt-[2px] font-medium">{invoice.client} • {invoice.rfc}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-[12px]">
+      {/* U-3 · Mismo encabezado que las demás fichas. La «X» de cerrar se
+          convierte en la miga de pan, que es como se sale de la cotización, del
+          embarque y del prospecto. */}
+      <FichaHeader
+        modulo="Facturas"
+        onBack={onClose}
+        folio={invoice.id}
+        titulo={invoice.client}
+        badges={
+          <BadgeEstado tono={invoice.cfdiStatus === 'Timbrada' ? 'exito' : 'espera'}>
+            {invoice.cfdiStatus}
+          </BadgeEstado>
+        }
+        subtitulo={
+          <p className="text-[12px] text-text-secondary font-mono">RFC: {invoice.rfc}</p>
+        }
+        acciones={
           <button className="text-[13px] font-medium text-text-secondary border border-card-border bg-white hover:bg-neutral-bg px-[16px] py-[8px] rounded-[8px] flex items-center gap-[6px] transition-colors shadow-sm">
             <Download className="w-[16px] h-[16px]" />
             Descargar todo (ZIP)
           </button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* Columna Izquierda: Metadatos */}
