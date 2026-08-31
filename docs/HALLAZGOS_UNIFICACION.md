@@ -42,3 +42,28 @@ algo que no hace.
 El plan la lista entre las fichas a alinear. `components/ordenesCompra/` solo
 tiene `BandejaOC.tsx` y `OrdenesCompraData.ts`. La ficha se construye en el
 bloque C del plan de operación; cuando exista, nace con `FichaLayout`.
+
+### 4 · La cotización no recuerda de qué prospecto salió
+
+El plan de unificación pide enlazar «prospecto convertido → su cotización» y
+«cotización → su prospecto de origen». **No hay campo que lo relacione.**
+
+La conversión (`Quotes.tsx`, `KanbanProspeccion.onConvert`) crea la cotización
+con `generateFolio()` y muestra un aviso que dice «Cotización COT-… creada
+desde prospecto PRO-…», pero no guarda el vínculo en ningún lado. El texto se
+pierde en cuanto se cierra el diálogo.
+
+Enlazar por nombre de empresa sería adivinar: dos prospectos de la misma
+empresa apuntarían a la misma cotización. Hace falta `KanbanQuote.prospectoId`,
+que es un cambio de modelo y quedó fuera de esta pasada.
+
+Los demás enlaces de la tabla del plan sí se hicieron, porque su FK ya existía.
+
+### 5 · La orden de compra y la factura no tienen a dónde enlazar
+
+- **OC → su embarque:** `BandejaOC` recibe `onSelectOC` y `Finance.tsx` no se
+  lo pasa, así que hacer clic en una orden no hace nada. No hay ficha de OC.
+  El enlace desde el embarque y desde el proveedor lleva a la bandeja, que es
+  lo más cerca que se puede llegar hoy.
+- **Factura → su embarque:** el tipo de `invoice` es `any` y los datos son
+  mock. No hay `embarqueId`. El modelo real se construye en la fase B.

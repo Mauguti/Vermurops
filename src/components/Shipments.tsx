@@ -9,6 +9,7 @@ import CotizacionesGanadas from './shipments/CotizacionesGanadas';
 import { agruparPorEstado, estadoDe, ETAPAS_EMBARQUE } from '../lib/estadoEmbarque';
 import { crearEmbarquesDeCotizacionGanada } from '../lib/crearEmbarquesGanada';
 import { useServicios } from '../config/serviciosStore';
+import { useDestinoPendiente } from '../navegacion/NavegacionContext';
 import { useAuth } from '../auth/AuthContext';
 import { generateFolioEmbarque } from '../lib/folioService';
 import Toast, { TipoToast } from './ui/Toast';
@@ -26,6 +27,12 @@ export default function Shipments() {
   const [vista, setVista] = useState<'bandeja' | 'kanban' | 'lista'>('bandeja');
   const [toast, setToast] = useState<{ mensaje: string; tipo: TipoToast } | null>(null);
   const [creando, setCreando] = useState(false);
+
+  // U-4 · Alguien enlazó a un embarque desde otro módulo.
+  useDestinoPendiente(['embarque'], (d) => {
+    setSelectedEmbarqueId(d.id);
+    setVista('lista');
+  });
 
   // Seleccionar embarque activo
   const selectedEmbarque = embarques.find(e => e.id === selectedEmbarqueId) || null;

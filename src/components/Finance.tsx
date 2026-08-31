@@ -5,12 +5,25 @@ import FichaFactura from './finance/FichaFactura';
 import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import BandejaOC from './ordenesCompra/BandejaOC';
 import ModuloEnDesarrollo from './ui/ModuloEnDesarrollo';
+import { useDestinoPendiente } from '../navegacion/NavegacionContext';
 
 export default function Finance() {
   const [activeTab, setActiveTab] = useState('Facturas (CFDI)');
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+
+  /*
+   * U-4 · Alguien enlazó a una orden de compra desde un embarque o desde un
+   * proveedor. La OC todavía no tiene ficha propia —se construye en el bloque
+   * C del plan de operación— así que el salto deja al usuario en la bandeja
+   * donde vive, que es lo más cerca que se puede llevar hoy.
+   */
+  useDestinoPendiente(['ordenCompra'], () => {
+    setSelectedInvoice(null);
+    setShowForm(false);
+    setActiveTab('Cuentas por pagar');
+  });
 
   // ── OC: datos reales de Firestore ─────────────────────────────────────────
   const { ordenes, loading: loadingOC, totalPorPagar, conteosPorEstado } = useOrdenesCompra();

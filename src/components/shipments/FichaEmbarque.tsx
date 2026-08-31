@@ -12,6 +12,8 @@ import TablaCargosEmbarque from './TablaCargosEmbarque';
 import { editarMontoCargo, restaurarMontoCargo, desviacionDelEmbarque } from '../../lib/cargosEditables';
 import { generateFolioEmbarque, parseFolioNumero } from '../../lib/folioService';
 import { FichaHeader, FichaTabs, BadgeEstado } from '../ui/ficha/FichaLayout';
+import { EnlaceEntidad, BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
+import { useOrdenesCompra } from '../../hooks/useOrdenesCompra';
 
 type PestanaEmbarque =
   | 'general' | 'entidades' | 'ruta' | 'cargos'
@@ -34,6 +36,10 @@ export default function FichaEmbarque({
 }: FichaEmbarqueProps) {
   const { clientes } = useClientes();
   const { proveedores } = useProveedores();
+  const { ordenes } = useOrdenesCompra();
+
+  /** U-4 · Las órdenes de compra que se pagan por este embarque. */
+  const ocDelEmbarque = ordenes.filter(o => o.embarqueId === embarque.id);
   const { user, puede } = useAuth();
 
   /**
@@ -378,6 +384,23 @@ export default function FichaEmbarque({
           ) : undefined
         }
       />
+
+      {/* U-4 · De aquí a lo que este embarque toca, sin salir a las listas.
+          Operaciones llega a la cotización que lo originó de un clic. */}
+      <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2 -mt-2">
+        <BloqueEnlaces
+          titulo="Cotización"
+          tipo="cotizacion"
+          ids={embarque.cotizacionId ? [embarque.cotizacionId] : []}
+          vacio="Se capturó a mano, no nació de una cotización."
+        />
+        <BloqueEnlaces
+          titulo="Órdenes de compra"
+          tipo="ordenCompra"
+          ids={ocDelEmbarque.map(o => o.id)}
+          vacio="Todavía no se ha solicitado ninguna."
+        />
+      </div>
 
       <FichaTabs<PestanaEmbarque>
         pestanas={PESTANAS}

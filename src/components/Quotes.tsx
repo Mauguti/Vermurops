@@ -19,6 +19,7 @@ import { useProspectos } from '../hooks/useProspectos';
 import { useClientes } from '../hooks/useClientes';
 import { generateFolio, generateFolioProspecto } from '../lib/folioService';
 import { crearEmbarquesDeCotizacionGanada } from '../lib/crearEmbarquesGanada';
+import { useDestinoPendiente } from '../navegacion/NavegacionContext';
 import Toast, { TipoToast } from './ui/Toast';
 import SpreadsheetTable, { type VistaConfig } from './table/SpreadsheetTable';
 import { COTIZACION_COLUMNS, VISTA_DEFAULT_COTIZACIONES } from './quotes/cotizacionColumns';
@@ -184,6 +185,21 @@ export default function Quotes() {
 
   // Para que una empresa que ya es cliente no se recapture como texto libre.
   const { clientes } = useClientes();
+
+  /*
+   * U-4 · Alguien enlazó a una cotización o a un prospecto desde otro módulo.
+   * Si el documento todavía no llegó del listener, el destino se vuelve a
+   * evaluar cuando llegue: por eso depende de las listas y no solo del salto.
+   */
+  useDestinoPendiente(['cotizacion', 'prospecto'], (d) => {
+    if (d.tipo === 'cotizacion') {
+      const q = kanbanQuotes.find(x => x.id === d.id);
+      if (q) { setViewMode('kanban'); setSelectedQuote(q); }
+    } else {
+      const p = todosLosProspectos.find(x => x.id === d.id);
+      if (p) { setViewMode('prospeccion'); setProspectoAbierto(p); }
+    }
+  });
 
   // Ventas solo ve los suyos; los demás roles ven todos.
   const prospectos = todosLosProspectos.filter(p => {

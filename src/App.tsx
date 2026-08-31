@@ -10,6 +10,7 @@ import { tiempoRelativo } from './notifications/notificationsStore';
 import { NotifCard } from './pages/Notificaciones';
 import LoginPage from './components/Login';
 import Sidebar from './components/Sidebar';
+import { NavegacionProvider } from './navegacion/NavegacionContext';
 import Dashboard from './components/Dashboard';
 import Quotes from './components/Quotes';
 import Pricing from './components/Pricing';
@@ -306,6 +307,11 @@ function AppShell() {
   };
 
   return (
+    /* U-4 · Los saltos entre entidades (embarque → su cotización, cliente →
+       sus embarques) necesitan cambiar de módulo Y decirle al módulo qué
+       abrir. El proveedor envuelve todo porque el origen y el destino del
+       salto viven en módulos distintos. */
+    <NavegacionProvider onCambiarVista={safeNavigate}>
     <div className="flex min-h-screen bg-canvas font-sans">
       <Sidebar currentView={currentView} onChangeView={safeNavigate} />
 
@@ -355,6 +361,7 @@ function AppShell() {
         </main>
       </div>
     </div>
+    </NavegacionProvider>
   );
 }
 

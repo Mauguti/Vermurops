@@ -5,6 +5,9 @@ import { PIPELINE_STAGES } from '../quotes/QuotesData';
 import type { KanbanQuote } from '../quotes/QuotesData';
 import { extraerHistorialProveedor, calcularResumenProveedor, formatTotalesPorMoneda } from '../../lib/historialProveedor';
 import { FichaHeader, BadgeEstado } from '../ui/ficha/FichaLayout';
+import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
+import { useTarifas } from '../../hooks/useTarifas';
+import { useOrdenesCompra } from '../../hooks/useOrdenesCompra';
 
 interface Props {
   proveedor: ProveedorVermur;
@@ -30,6 +33,12 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit }: Pr
   const [fichaTab, setFichaTab] = useState<'historial' | 'notas'>('historial');
 
   const cp = contactoPrincipal(proveedor);
+
+  // U-4 · Lo que cuelga de este proveedor.
+  const { tarifas } = useTarifas();
+  const { ordenes } = useOrdenesCompra();
+  const susTarifas = tarifas.filter(t => t.proveedorId === proveedor.id);
+  const susOrdenes = ordenes.filter(o => o.proveedorId === proveedor.id);
 
   const provHistorial = useMemo(
     () => extraerHistorialProveedor(quotes, proveedor.id, proveedor.nombre),
@@ -81,6 +90,25 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit }: Pr
           </button>
         }
       />
+
+      {/* U-4 · A dónde lleva este proveedor. Las tarifas no tienen ficha
+          propia: se cuentan, y el catálogo se abre desde su módulo. */}
+      <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
+        <div className="flex items-baseline gap-2">
+          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Tarifas</span>
+          <span className="text-[11px] text-text-secondary">
+            {susTarifas.length > 0
+              ? `${susTarifas.length} vigente${susTarifas.length !== 1 ? 's' : ''} en el catálogo`
+              : 'Sin tarifas cargadas todavía.'}
+          </span>
+        </div>
+        <BloqueEnlaces
+          titulo="Órdenes de compra"
+          tipo="ordenCompra"
+          ids={susOrdenes.map(o => o.id)}
+          vacio="Nunca se le ha solicitado un pago."
+        />
+      </div>
 
       <div className="bg-card rounded-[12px] border border-card-border shadow-sm overflow-hidden flex flex-col md:flex-row">
         {/* Main Content (Left 2/3) */}

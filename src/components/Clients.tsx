@@ -9,6 +9,7 @@ import NuevoClienteModal from './clientes/NuevoClienteModal';
 import ProveedorFormModal from './proveedores/ProveedorFormModal';
 import FichaProveedor from './proveedores/FichaProveedor';
 import { useAuth } from '../auth/AuthContext';
+import { useDestinoPendiente } from '../navegacion/NavegacionContext';
 
 export default function Clients() {
   // Matriz §4.1: las altas definitivas de clientes y proveedores son solo de
@@ -65,6 +66,19 @@ export default function Clients() {
 
   const [providerSearchTerm, setProviderSearchTerm] = useState('');
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+
+  // U-4 · Alguien enlazó a un cliente o a un proveedor desde otro módulo.
+  useDestinoPendiente(['cliente', 'proveedor'], (d) => {
+    if (d.tipo === 'cliente') {
+      setViewType('Clientes');
+      setSelectedProviderId(null);
+      setSelectedClientId(d.id);
+    } else {
+      setViewType('Proveedores');
+      setSelectedClientId(null);
+      setSelectedProviderId(d.id);
+    }
+  });
   const selectedProvider = selectedProviderId
     ? (proveedores.find(p => p.id === selectedProviderId) ?? null)
     : null;

@@ -61,6 +61,7 @@ import TarjetaModalidad from './TarjetaModalidad';
 import {
   FichaLayout, FichaHeader, FichaTabs, FichaFooter, BadgeEstado,
 } from '../ui/ficha/FichaLayout';
+import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import ResumenFinancieroInline from './ResumenFinancieroInline';
 import { calcTotales } from '../../lib/cotizacionCalculator';
 
@@ -1116,6 +1117,20 @@ export default function FichaCotizacion({
           </p>
         ) : undefined}
       />
+
+      {/* U-4 · Los embarques que nacieron de esta cotización. Solo aparece
+          cuando ya ganó: antes no hay nada que enlazar y el bloque sería un
+          rótulo vacío. */}
+      {(quote.embarqueIds?.length ?? 0) > 0 && (
+        <div className="px-6 pt-3">
+          <BloqueEnlaces
+            titulo="Embarques"
+            tipo="embarque"
+            ids={quote.embarqueIds ?? []}
+            vacio=""
+          />
+        </div>
+      )}
 
       <FichaTabs
         pestanas={TABS.map(t => ({ id: t.id, label: t.label }))}

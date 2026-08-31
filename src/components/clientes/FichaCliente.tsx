@@ -3,6 +3,9 @@ import { ClienteVermur, DocsAlta, ContratoCliente, PagareCliente } from './Clien
 import { validarRFC } from '../../lib/validadores';
 import { ChevronRight, Loader2, Check } from 'lucide-react';
 import { FichaHeader, BadgeEstado } from '../ui/ficha/FichaLayout';
+import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
+import { useCotizaciones } from '../../hooks/useCotizaciones';
+import { useEmbarques } from '../../hooks/useEmbarques';
 
 interface Props {
   cliente: ClienteVermur;
@@ -93,6 +96,11 @@ function SaveBar({ onSave, saving }: { onSave: () => void; saving: boolean }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
+  // U-4 · Lo que este cliente tiene abierto, enlazado desde su propia ficha.
+  const { quotes } = useCotizaciones();
+  const { embarques } = useEmbarques();
+  const susCotizaciones = quotes.filter(q => q.clienteId === cliente.id);
+  const susEmbarques = embarques.filter(e => susCotizaciones.some(q => q.id === e.cotizacionId));
   const [tab, setTab] = useState<TabId>('informacion');
   const [draft, setDraft] = useState<ClienteVermur>(() => withDefaults(cliente));
   const [saving, setSaving] = useState(false);
@@ -200,6 +208,22 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
           </div>
         }
       />
+
+      {/* U-4 · A dónde lleva este cliente. */}
+      <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
+        <BloqueEnlaces
+          titulo="Cotizaciones"
+          tipo="cotizacion"
+          ids={susCotizaciones.map(q => q.id)}
+          vacio="Todavía no se le ha cotizado nada."
+        />
+        <BloqueEnlaces
+          titulo="Embarques"
+          tipo="embarque"
+          ids={susEmbarques.map(e => e.id)}
+          vacio="Ninguna cotización suya ha llegado a embarque."
+        />
+      </div>
 
       {/* Tab panel */}
       <div className="bg-card rounded-[12px] border border-card-border shadow-sm overflow-hidden">
