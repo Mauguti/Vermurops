@@ -235,3 +235,70 @@ export async function reservarFoliosSerie(
   tx.set(ref, { ultimo: ultimo + cuantos }, { merge: true });
   return { folios, sembrado };
 }
+
+/**
+ * Reserva folios de VARIAS series en una sola transacción.
+ *
+ * Firestore exige que TODAS las lecturas de una transacción ocurran antes de
+ * la primera escritura. `reservarFoliosSerie` hace get y set juntos, así que
+ * llamarla dos veces seguidas —una cotización marítima con un terrestre que se
+ * opera aparte— revienta la transacción entera con «Firestore transactions
+ * require all reads to be executed before all writes».
+ *
+ * Aquí se leen todos los contadores primero y se escriben después. El orden de
+ * los folios devueltos respeta el orden de los pedidos.
+ */
+export async function reservarFoliosMultiSerie(
+  tx: { get: (ref: ReturnType<typeof docContadorSerie>) => Promise<{ exists: () => boolean; data: () => Record<string, unknown> | undefined }>;
+        set: (ref: ReturnType<typeof docContadorSerie>, data: Record<string, unknown>, opts?: { merge: boolean }) => unknown },
+  pedidos: { prefijo: string; cuantos: number }[],
+  anio = new Date().getFullYear(),
+): Promise<Map<string, ResultadoReserva>> {
+  const resultado = new Map<string, ResultadoReserva>();
+
+  // Varios grupos pueden caer en la misma serie (dos terrestres de importación
+  // que se operan aparte). Se consolidan para leer el contador una sola vez.
+  const totalPorPrefijo = new Map<string, number>();
+  pedidos.forEach(p => {
+    if (p.cuantos <= 0) return;
+    totalPorPrefijo.set(p.prefijo, (totalPorPrefijo.get(p.prefijo) ?? 0) + p.cuantos);
+  });
+
+  // ── Fase 1: todas las lecturas ────────────────────────────────────────────
+  const estado = new Map<string, { ultimo: number; sembrado: boolean }>();
+  for (const prefijo of totalPorPrefijo.keys()) {
+    const snap = await tx.get(docContadorSerie(prefijo));
+    const data = snap.exists() ? snap.data() : undefined;
+    estado.set(prefijo, {
+      ultimo: (data?.ultimo as number) ?? 0,
+      sembrado: (data?.sembrado as boolean) ?? false,
+    });
+  }
+
+  // ── Fase 2: asignación en memoria ─────────────────────────────────────────
+  const cursor = new Map<string, number>();
+  pedidos.forEach(({ prefijo, cuantos }) => {
+    const est = estado.get(prefijo);
+    if (!est || cuantos <= 0) {
+      resultado.set(prefijo, { folios: [], sembrado: est?.sembrado ?? true });
+      return;
+    }
+    const desde = cursor.get(prefijo) ?? est.ultimo;
+    const folios: string[] = [];
+    for (let i = 1; i <= cuantos; i++) folios.push(formatFolioSerie(prefijo, desde + i, anio));
+    cursor.set(prefijo, desde + cuantos);
+
+    const previo = resultado.get(prefijo);
+    resultado.set(prefijo, {
+      folios: [...(previo?.folios ?? []), ...folios],
+      sembrado: est.sembrado,
+    });
+  });
+
+  // ── Fase 3: todas las escrituras ──────────────────────────────────────────
+  cursor.forEach((ultimo, prefijo) => {
+    tx.set(docContadorSerie(prefijo), { ultimo }, { merge: true });
+  });
+
+  return resultado;
+}

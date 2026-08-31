@@ -45,7 +45,7 @@ export default function CotizacionesGanadas({
       <div className="border-2 border-dashed border-gray-200 rounded-xl py-10 text-center">
         <CheckCircle2 className="w-6 h-6 text-gray-300 mx-auto mb-2" />
         <p className="text-[12px] text-gray-400">
-          No hay cotizaciones ganadas esperando embarque.
+          Todas las cotizaciones ganadas tienen su embarque.
         </p>
       </div>
     );
@@ -54,9 +54,19 @@ export default function CotizacionesGanadas({
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/60 flex items-center justify-between">
-        <h3 className="text-[11px] font-bold text-[#18181B] uppercase tracking-widest">
-          Cotizaciones ganadas por abrir
-        </h3>
+        {/* Con A-1 cableado esta lista debería estar vacía: el embarque nace
+            al marcar la cotización ganada. Lo que aparece aquí son las que se
+            ganaron antes de que eso existiera, o aquellas en las que la
+            generación falló. Por eso se explica en vez de solo listarse. */}
+        <div>
+          <h3 className="text-[11px] font-bold text-[#18181B] uppercase tracking-widest">
+            Cotizaciones ganadas sin embarque
+          </h3>
+          <p className="text-[10px] text-gray-400 mt-0.5">
+            El embarque nace solo al marcar la cotización ganada. Estas se
+            quedaron sin él: ábrelas para generarlo.
+          </p>
+        </div>
         <span className="text-[11px] font-bold text-[#E11D48] bg-[#E11D48]/10 px-2 py-0.5 rounded-full">
           {pendientes.length}
         </span>

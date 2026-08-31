@@ -75,6 +75,17 @@ export interface DatosGeneracion {
   generadoPor: string;
   /** Marca de tiempo, inyectada para poder probar. */
   ahora: string;
+  /**
+   * Modalidad del embarque, cuando ya la decidió la agrupación.
+   *
+   * Sin esto se usa `modalidadDominante(quote)`, que mira la cotización
+   * ENTERA: en una cotización con un terrestre que se opera aparte, los dos
+   * embarques nacerían marítimos y el folio VLIT no correspondería al
+   * documento.
+   */
+  modalidad?: ModalidadEmbarque;
+  /** Servicio del que se hereda la ruta. Por defecto, el primero. */
+  servicioRuta?: KanbanQuote['servicios'][number];
 }
 
 /**
@@ -86,8 +97,8 @@ export interface DatosGeneracion {
  */
 export function construirEmbarqueDesdeCotizacion(d: DatosGeneracion): EmbarqueCompleto {
   const { quote, folio, cargos, advertencias, origen, generadoPor, ahora } = d;
-  const { modalidad } = modalidadDominante(quote);
-  const primerServicio = quote.servicios?.[0];
+  const modalidad = d.modalidad ?? modalidadDominante(quote).modalidad;
+  const primerServicio = d.servicioRuta ?? quote.servicios?.[0];
 
   const empresa = quote.prospecto?.empresa ?? 'Por definir';
   const fecha = ahora.slice(0, 10);

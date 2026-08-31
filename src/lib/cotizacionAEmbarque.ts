@@ -239,7 +239,7 @@ function cargosDeLinea(linea: LineaPlana, cotizacionId: string): CargoDetalle[] 
  * El caso más común y más grave es que la cotización siga apuntando solo al
  * prospecto: Ventas cerró la venta con alguien que nunca pasó por el alta.
  */
-function revisarCliente(
+export function revisarCliente(
   quote: KanbanQuote,
   cliente: ClienteVermur | null | undefined,
 ): Advertencia | null {
@@ -287,19 +287,41 @@ export function mapearCotizacionAEmbarque(
   quote: KanbanQuote,
   contexto: ContextoMapeo = {},
 ): ResultadoMapeo {
+  const { cargos, advertencias } = mapearLineasAEmbarque(
+    aplanarCotizacion(quote), quote.id, contexto,
+  );
+
+  const avisoCliente = revisarCliente(quote, contexto.cliente);
+  if (avisoCliente) advertencias.push(avisoCliente);
+
+  return { cargos, advertencias };
+}
+
+/**
+ * El mismo mapeo, pero sobre un SUBCONJUNTO de líneas.
+ *
+ * Existe porque una cotización multimodal genera varios embarques (A-1) y cada
+ * uno hereda solo las líneas que le tocan. Si cada embarque heredara todos los
+ * cargos, se cobraría y se pagaría N veces lo mismo.
+ *
+ * No revisa el expediente del cliente: ese aviso es de la cotización entera y
+ * duplicarlo por embarque sería ruido. Lo agrega `mapearCotizacionAEmbarque`
+ * o, en la generación por grupos, el planificador.
+ */
+export function mapearLineasAEmbarque(
+  lineas: LineaPlana[],
+  cotizacionId: string,
+  contexto: ContextoMapeo = {},
+): ResultadoMapeo {
   const fechaRef = contexto.fechaReferencia ?? new Date().toISOString().slice(0, 10);
-  const lineas = aplanarCotizacion(quote);
 
   const cargos: CargoDetalle[] = [];
   const advertencias: Advertencia[] = [];
 
   lineas.forEach(linea => {
-    cargos.push(...cargosDeLinea(linea, quote.id));
+    cargos.push(...cargosDeLinea(linea, cotizacionId));
     advertencias.push(...revisarLinea(linea, fechaRef));
   });
-
-  const avisoCliente = revisarCliente(quote, contexto.cliente);
-  if (avisoCliente) advertencias.push(avisoCliente);
 
   if (lineas.length === 0) {
     advertencias.push({

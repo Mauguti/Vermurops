@@ -161,6 +161,7 @@ export default function KanbanCotizaciones({
       const updated: KanbanQuote = {
         ...q,
         etapa: newEtapa,
+        estadoFinal: newEtapa === 'ganada' ? 'ganada' : newEtapa === 'perdida' ? 'perdida' : null,
         updatedAt: fechaActual,
         historialEtapas: [...q.historialEtapas, { etapa: newEtapa, fecha: fechaActual }],
         actividades: [...q.actividades, newSysAct],
@@ -170,7 +171,21 @@ export default function KanbanCotizaciones({
       return updated;
     });
 
-    onUpdateQuotes(updatedQuotes);
+    /*
+     * A-1 · Arrastrar a «Ganada» tiene que generar el embarque igual que el
+     * botón de la ficha.
+     *
+     * Era la segunda puerta a la misma etapa, y no pasaba por la ficha: la
+     * cotización quedaba ganada sin embarque, sin `estadoFinal` y sin
+     * congelarse. El cliente pidió que fuera «de a huevo, sin paso
+     * intermedio», y eso no puede depender de por dónde entró el usuario.
+     */
+    const ganada = updatedQuotes.find(q => q.id === quoteId);
+    if (newEtapa === 'ganada' && ganada) {
+      onConvertToShipment(ganada);
+    } else {
+      onUpdateQuotes(updatedQuotes);
+    }
 
     // Disparar notificación si aplica
     if (notifPayload) agregarNotificacion(notifPayload);

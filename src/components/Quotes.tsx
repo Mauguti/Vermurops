@@ -18,6 +18,7 @@ import { useCotizaciones } from '../hooks/useCotizaciones';
 import { useProspectos } from '../hooks/useProspectos';
 import { useClientes } from '../hooks/useClientes';
 import { generateFolio, generateFolioProspecto } from '../lib/folioService';
+import { crearEmbarquesDeCotizacionGanada } from '../lib/crearEmbarquesGanada';
 import Toast, { TipoToast } from './ui/Toast';
 import SpreadsheetTable, { type VistaConfig } from './table/SpreadsheetTable';
 import { COTIZACION_COLUMNS, VISTA_DEFAULT_COTIZACIONES } from './quotes/cotizacionColumns';
@@ -107,6 +108,68 @@ export default function Quotes() {
           tipo: 'error',
         });
       }
+    }
+  };
+
+  /**
+   * A-1 · Se marcó la cotización como ganada: nacen sus embarques.
+   *
+   * Recibe la cotización YA con los campos de ganada aplicados, porque la
+   * transacción escribe las dos cosas juntas: o queda ganada y con embarques,
+   * o no queda nada. Decisión del cliente: «una cotización ganada se crea un
+   * embarque de a huevo, no hay paso intermedio».
+   *
+   * Es idempotente: si la cotización ya tiene embarques, no genera gemelos.
+   */
+  const handleCotizacionGanada = async (ganada: KanbanQuote) => {
+    try {
+      const cliente = clientes.find(c => c.id === ganada.clienteId) ?? null;
+      const r = await crearEmbarquesDeCotizacionGanada({
+        quote: ganada,
+        cliente,
+        catalogoServicios: serviciosActivos,
+        generadoPor: user?.nombre ?? user?.email ?? '',
+      });
+
+      if (selectedQuote?.id === ganada.id) {
+        setSelectedQuote({ ...ganada, embarqueIds: r.embarqueIds });
+      }
+
+      if (r.yaExistian) {
+        setToast({
+          mensaje: `${ganada.id} ya tenía embarque (${r.embarqueIds.join(', ')}). No se generó otro.`,
+          tipo: 'exito',
+        });
+        return;
+      }
+
+      const folios = r.embarques.map(e => e.folio).join(', ');
+      // Las advertencias no bloquean —el cliente lo pidió sin paso
+      // intermedio— pero sí se dicen: quien cierra la venta no va a abrir el
+      // embarque, y ahí es donde quedan.
+      const cuantas = r.advertencias.length;
+      setToast({
+        mensaje: cuantas > 0
+          ? `Embarque ${folios} generado con ${cuantas} advertencia(s). Operaciones las verá en «Por capturar».`
+          : `Embarque ${folios} generado desde ${ganada.id}.`,
+        // Mismo criterio que usa Shipments: una advertencia se muestra en rojo
+        // aunque el embarque sí se haya creado, porque nadie más la va a leer.
+        tipo: cuantas > 0 ? 'error' : 'exito',
+      });
+
+      if (r.seriesSinSembrar.length > 0) {
+        // Más grave que una advertencia de línea: el folio puede duplicar uno
+        // que ya existe en papel.
+        setTimeout(() => setToast({
+          mensaje: `La serie ${r.seriesSinSembrar.join(', ')} no tiene sembrado el consecutivo de Magaya: el folio puede duplicar uno histórico. Se siembra en Configuración.`,
+          tipo: 'error',
+        }), 4000);
+      }
+    } catch (err) {
+      setToast({
+        mensaje: `No se pudo cerrar la venta: ${err instanceof Error ? err.message : err}. La cotización NO quedó marcada como ganada.`,
+        tipo: 'error',
+      });
     }
   };
 
@@ -1090,9 +1153,7 @@ export default function Quotes() {
         <BandejaPricing
           quotes={permittedQuotes}
           onUpdateQuotes={handleUpdateQuotes}
-          onConvertToShipment={q => {
-            alert(`"${q.prospecto.empresa}" convertida a embarque.`);
-          }}
+          onConvertToShipment={handleCotizacionGanada}
           onFichaVisible={setFichaAbierta}
         />
 
@@ -1112,7 +1173,7 @@ export default function Quotes() {
               }));
               setSelectedQuote(updated);
             }}
-            onConvertToShipment={q => { alert(`¡Felicidades! "${q.prospecto.empresa}" marcada como GANADA.`); }}
+            onConvertToShipment={handleCotizacionGanada}
             rolActivo={rolActivo}
           />
         ) : (
@@ -1146,7 +1207,7 @@ export default function Quotes() {
                 quotes={permittedQuotes}
                 onUpdateQuotes={handleUpdateQuotes}
                 rolActivo={rolActivo}
-                onConvertToShipment={q => { alert(`¡Felicidades! "${q.prospecto.empresa}" marcada como GANADA.`); }}
+                onConvertToShipment={handleCotizacionGanada}
                 onFichaVisible={setFichaAbierta}
               />
             )

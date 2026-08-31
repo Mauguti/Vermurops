@@ -261,7 +261,7 @@ export default function FichaCotizacion({
       createdAt: fechaActual,
     };
 
-    onUpdateQuote({
+    const actualizada: KanbanQuote = {
       ...quote,
       etapa: newEtapa,
       motivoPerdida: newEtapa === 'perdida' ? lossReasonText : null,
@@ -269,7 +269,24 @@ export default function FichaCotizacion({
       updatedAt: fechaActual,
       historialEtapas: [...quote.historialEtapas, newHistoryEntry],
       actividades: [...quote.actividades, newActivityEntry],
-    });
+    };
+
+    /*
+     * A-1 · Ganada es la única etapa que NO se guarda por su cuenta.
+     *
+     * De esta transición nace el embarque, y las dos escrituras tienen que
+     * caer juntas: una cotización ganada sin embarque deja la venta cerrada
+     * sin nada que operar, y un embarque sin la cotización marcada haría que
+     * el siguiente clic generara un gemelo con otro folio.
+     *
+     * `onConvertToShipment` recibe la cotización YA actualizada y la escribe
+     * dentro de la misma transacción que crea los embarques.
+     */
+    if (newEtapa === 'ganada') {
+      onConvertToShipment(actualizada);
+    } else {
+      onUpdateQuote(actualizada);
+    }
 
     // Disparar notificación si aplica
     const notif = crearNotificacionEtapa(
@@ -1395,7 +1412,6 @@ export default function FichaCotizacion({
                 onChange={e => {
                   const val = e.target.value as PipelineStageId;
                   if (val === 'perdida') setShowLossReasonForm(true);
-                  else if (val === 'ganada') { onConvertToShipment(quote); handleStageChange(val); }
                   else handleStageChange(val);
                 }}
                 className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 outline-none focus:border-[#E11D48] shadow-xs"
@@ -1918,9 +1934,8 @@ export default function FichaCotizacion({
           <button
             onClick={() => {
               if (advanceTarget === 'ganada') {
-                if (confirm(`¿Marcar ${quote.id} como GANADA?`)) {
+                if (confirm(`¿Marcar ${quote.id} como GANADA?\n\nSe generará el embarque en automático con los conceptos a cobrar y a pagar, y la cotización quedará congelada.`)) {
                   handleStageChange('ganada');
-                  onConvertToShipment(quote);
                 }
               } else {
                 handleStageChange(advanceTarget);
@@ -1952,9 +1967,8 @@ export default function FichaCotizacion({
         {puedeMarcarGanada && advanceTarget !== 'ganada' && (
           <button
             onClick={() => {
-              if (confirm(`¿Marcar ${quote.id} como GANADA?`)) {
+              if (confirm(`¿Marcar ${quote.id} como GANADA?\n\nSe generará el embarque en automático con los conceptos a cobrar y a pagar, y la cotización quedará congelada.`)) {
                 handleStageChange('ganada');
-                onConvertToShipment(quote);
               }
             }}
             className="w-full max-w-3xl mx-auto px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2 shadow-xs"

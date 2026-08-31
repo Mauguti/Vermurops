@@ -7,9 +7,8 @@ import { useCotizaciones } from '../hooks/useCotizaciones';
 import { useClientes } from '../hooks/useClientes';
 import CotizacionesGanadas from './shipments/CotizacionesGanadas';
 import { agruparPorEstado, estadoDe, ETAPAS_EMBARQUE } from '../lib/estadoEmbarque';
-import { mapearCotizacionAEmbarque } from '../lib/cotizacionAEmbarque';
-import { construirEmbarqueDesdeCotizacion, agruparParaEmbarques, prefijoFolio, modalidadDominante } from '../lib/generacionEmbarque';
-import { aplanarCotizacion } from '../lib/lineasCotizacion';
+import { crearEmbarquesDeCotizacionGanada } from '../lib/crearEmbarquesGanada';
+import { useServicios } from '../config/serviciosStore';
 import { useAuth } from '../auth/AuthContext';
 import { generateFolioEmbarque } from '../lib/folioService';
 import Toast, { TipoToast } from './ui/Toast';
@@ -21,6 +20,7 @@ export default function Shipments() {
   const { quotes } = useCotizaciones();
   const { clientes } = useClientes();
   const { user, puede } = useAuth();
+  const { serviciosActivos } = useServicios();
   const [selectedEmbarqueId, setSelectedEmbarqueId] = useState<string | null>(null);
   /** 5.3 · Vista del módulo: lista, kanban por estado, o cotizaciones por abrir. */
   const [vista, setVista] = useState<'bandeja' | 'kanban' | 'lista'>('bandeja');
@@ -179,23 +179,29 @@ export default function Shipments() {
     setCreando(true);
     try {
       const cliente = clientes.find(c => c.id === quote.clienteId) ?? null;
-      const { cargos, advertencias } = mapearCotizacionAEmbarque(quote, { cliente });
-      const folio = await generateFolioEmbarque();
-
-      const nuevo = construirEmbarqueDesdeCotizacion({
-        quote, folio, cargos, advertencias,
-        origen: 'automatico',
+      const r = await crearEmbarquesDeCotizacionGanada({
+        quote,
+        cliente,
+        catalogoServicios: serviciosActivos,
         generadoPor: user?.nombre ?? user?.email ?? '',
-        ahora: new Date().toISOString(),
       });
 
-      await guardarEmbarque(nuevo);
-      setSelectedEmbarqueId(nuevo.id);
+      setSelectedEmbarqueId(r.embarqueIds[0] ?? null);
+
+      if (r.yaExistian) {
+        setToast({
+          mensaje: `${quote.id} ya tenía embarque (${r.embarqueIds.join(', ')}).`,
+          tipo: 'exito',
+        });
+        return;
+      }
+
+      const folios = r.embarques.map(e => e.folio).join(', ');
       setToast({
-        mensaje: advertencias.length > 0
-          ? `Embarque ${folio} abierto con ${advertencias.length} advertencia(s). Revísalas en la ficha.`
-          : `Embarque ${folio} abierto desde ${quote.id}.`,
-        tipo: advertencias.length > 0 ? 'error' : 'exito',
+        mensaje: r.advertencias.length > 0
+          ? `Embarque ${folios} abierto con ${r.advertencias.length} advertencia(s). Revísalas en la ficha.`
+          : `Embarque ${folios} abierto desde ${quote.id}.`,
+        tipo: r.advertencias.length > 0 ? 'error' : 'exito',
       });
     } catch (err) {
       setToast({
