@@ -71,6 +71,19 @@ const FORWARD_TARGETS: Partial<Record<PipelineStageId, PipelineStageId[]>> = {
   negociacion:            ['ganada'],
 };
 
+/**
+ * ¿Existe ya el generador de PDF?
+ *
+ * Hoy el botón solo dispara un alert. Se apaga entero en vez de deshabilitarlo:
+ * un botón gris con «(próximamente)» sigue prometiendo algo, y es justo el
+ * patrón que le molesta al cliente — «botones que no corresponden al momento o
+ * que se llaman distinto a lo que hacen».
+ *
+ * El PDF es trabajo propio: sin margen, sin proveedores y sin desglose de
+ * costos, solo montos individuales y totales. Al construirlo, poner en true.
+ */
+const PDF_DISPONIBLE = false;
+
 const ADVANCE_CONFIG: Partial<Record<PipelineStageId, { label: string; cls: string }>> = {
   solicitado_pricing:     { label: 'Enviar a Pricing',        cls: 'bg-[#4B2A8C] hover:bg-[#3d2277]' },
   pricing_solicitando:    { label: 'Iniciar cotización',      cls: 'bg-indigo-600 hover:bg-indigo-700' },
@@ -659,8 +672,15 @@ export default function FichaCotizacion({
   /**
    * El PDF es solo de Pricing y Admin —lleva los costos implícitos en los
    * montos y Ventas no ve costos— y solo con la cotización completa.
+   *
+   * Pero además está apagado por PDF_DISPONIBLE: hoy el generador no existe,
+   * es un alert. Un botón deshabilitado seguiría prometiendo algo, así que no
+   * se muestra hasta que funcione de verdad. Cuando el generador exista, se
+   * cambia esa constante a true y las condiciones de rol y prontitud ya están
+   * puestas.
    */
   const puedeGenerarPDF =
+    PDF_DISPONIBLE &&
     rolActivo !== 'ventas' &&
     prontitud.lista &&
     ['consolidada', 'enviada_cliente', 'negociacion', 'ganada'].includes(quote.etapa);
