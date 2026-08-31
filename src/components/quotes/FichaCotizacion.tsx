@@ -139,8 +139,6 @@ export default function FichaCotizacion({
   const [modalAgente, setModalAgente] = useState<string | null>(null);
   /** Extracción recién llegada, esperando la pantalla de revisión (TA-4). */
   const [toastLocal, setToastLocal] = useState<string | null>(null);
-  /** Proveedor al que se atribuyen las tarifas extraídas. */
-  const [proveedorDelDocumento] = useState<string | null>(null);
   const [extraccionPendiente, setExtraccionPendiente] =
     useState<{ documento: import('../../lib/documentoTarifario').DocumentoTarifario; respuesta: unknown } | null>(null);
   /**
@@ -808,6 +806,7 @@ export default function FichaCotizacion({
   const guardarTarifasExtraidas = async (
     lineasListas: import('../../lib/importacionTarifas').LineaEnRevision[],
     documento: import('../../lib/documentoTarifario').DocumentoTarifario,
+    proveedorId: string,
   ) => {
     let creadas = 0;
     for (const l of lineasListas) {
@@ -816,7 +815,7 @@ export default function FichaCotizacion({
           id: `TAR-${Date.now()}-${creadas}`,
           tipo: 'estandar',
           conceptoId: l.conceptoId!,
-          proveedorId: proveedorDelDocumento ?? '',
+          proveedorId,
           puertoOrigenId: l.puertoOrigenId,
           puertoDestinoId: l.puertoDestinoId,
           terminalId: null,

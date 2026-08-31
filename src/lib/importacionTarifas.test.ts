@@ -11,6 +11,7 @@ import {
   validarRespuestaN8N, textoDeAviso, normalizarUnidad, construirLineasEnRevision,
   resolverConcepto, resolverPuerto, resolverProveedor,
   motivosNoGuardable, esGuardable, resumenRevision, ordenarParaRevision,
+  estadoGuardable,
   vigenciasSeTraslapan, detectarColisiones,
   LineaEnRevision,
 } from './importacionTarifas';
@@ -457,5 +458,44 @@ describe('construcción de las líneas de revisión', () => {
     const [a] = construirLineasEnRevision(datos, catalogos);
     const confirmada = { ...a, monedaConfirmada: true, unidadConfirmada: true };
     expect(esGuardable(confirmada)).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// El proveedor bloquea igual que el concepto.
+//
+// Una tarifa sin proveedorId resuelto entra al catálogo y no hace match
+// completo en la comparativa: existe y no se puede usar bien. Es el mismo
+// agujero del conceptoId y se trata igual.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('el proveedor del tarifario es bloqueante', () => {
+  const lista = [linea()];
+
+  it('sin proveedor NO se guarda, aunque las líneas estén listas', () => {
+    const e = estadoGuardable(null, false, lista);
+    expect(e.puedeGuardar).toBe(false);
+    expect(e.faltantes[0]).toContain('elegir el proveedor');
+  });
+
+  it('un proveedor SUGERIDO tampoco basta: hay que confirmarlo', () => {
+    const e = estadoGuardable('PRV-001', false, lista);
+    expect(e.puedeGuardar).toBe(false);
+    expect(e.faltantes[0]).toContain('sugerencia');
+  });
+
+  it('con proveedor confirmado y líneas listas, sí', () => {
+    expect(estadoGuardable('PRV-001', true, lista).puedeGuardar).toBe(true);
+  });
+
+  it('con proveedor pero sin líneas guardables, no', () => {
+    const e = estadoGuardable('PRV-001', true, [linea({ conceptoId: null })]);
+    expect(e.puedeGuardar).toBe(false);
+    expect(e.faltantes.some(f => f.includes('Ninguna línea'))).toBe(true);
+  });
+
+  it('acumula lo que falta, en orden de resolución', () => {
+    const e = estadoGuardable(null, false, [linea({ conceptoId: null })]);
+    expect(e.faltantes).toHaveLength(2);
+    expect(e.faltantes[0]).toContain('proveedor');
   });
 });

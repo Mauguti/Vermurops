@@ -350,6 +350,43 @@ export interface LineaEnRevision {
   descartada: boolean;
 }
 
+/**
+ * ¿Se puede guardar esta importación?
+ *
+ * El proveedor se resuelve UNA VEZ para todo el tarifario, no por línea: un
+ * documento es la lista de precios de un proveedor. Pero es tan bloqueante
+ * como el concepto — una tarifa sin `proveedorId` resuelto entra al catálogo y
+ * no hace match completo en la comparativa: existe y no se puede usar bien.
+ *
+ * Es el mismo agujero del conceptoId, y se trata igual.
+ */
+export interface EstadoImportacionGuardable {
+  puedeGuardar: boolean;
+  /** Qué falta, en orden de lo que hay que resolver primero. */
+  faltantes: string[];
+}
+
+export function estadoGuardable(
+  proveedorId: string | null,
+  proveedorConfirmado: boolean,
+  lineas: LineaEnRevision[],
+): EstadoImportacionGuardable {
+  const faltantes: string[] = [];
+
+  if (!proveedorId) {
+    faltantes.push('Falta elegir el proveedor del tarifario');
+  } else if (!proveedorConfirmado) {
+    faltantes.push('El proveedor es una sugerencia: hay que confirmarlo');
+  }
+
+  const guardables = lineas.filter(esGuardable).length;
+  if (guardables === 0) {
+    faltantes.push('Ninguna línea está lista para guardar');
+  }
+
+  return { puedeGuardar: faltantes.length === 0, faltantes };
+}
+
 export type MotivoNoGuardable =
   | 'sin_concepto'
   | 'concepto_sin_confirmar'

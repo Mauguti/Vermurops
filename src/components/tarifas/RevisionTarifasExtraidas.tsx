@@ -5,13 +5,16 @@ import {
 import {
   validarRespuestaN8N, construirLineasEnRevision, motivosNoGuardable,
   esGuardable, resumenRevision, ordenarParaRevision, textoDeAviso, TEXTO_MOTIVO,
-  type LineaEnRevision, type NivelConfianza,
+  resolverProveedor, estadoGuardable,
+  type LineaEnRevision, type NivelConfianza, type NivelMatch,
 } from '../../lib/importacionTarifas';
 import type { ConceptoMatch } from './tarifaMatching';
 import type { PuertoMatch } from '../../lib/importacionTarifas';
 import type { UnidadTarifa } from './TarifasData';
 import ConceptoSelector from '../conceptos/ConceptoSelector';
 import type { ConceptoVermur } from '../conceptos/ConceptosData';
+import SelectorProveedor from '../proveedores/SelectorProveedor';
+import type { ProveedorVermur } from '../proveedores/ProveedoresData';
 
 /**
  * Revisión de las tarifas que extrajo la IA (TA-4).
@@ -40,14 +43,37 @@ interface Props {
   nombreArchivo: string;
   conceptos: ConceptoVermur[];
   puertos: PuertoMatch[];
+  proveedores: ProveedorVermur[];
   onCancelar: () => void;
-  onGuardar: (lineas: LineaEnRevision[]) => void | Promise<void>;
+  /** El proveedor va como parámetro: es de todo el tarifario, no de cada línea. */
+  onGuardar: (lineas: LineaEnRevision[], proveedorId: string) => void | Promise<void>;
 }
 
 export default function RevisionTarifasExtraidas({
-  respuestaCruda, nombreArchivo, conceptos, puertos, onCancelar, onGuardar,
+  respuestaCruda, nombreArchivo, conceptos, puertos, proveedores, onCancelar, onGuardar,
 }: Props) {
   const validacion = useMemo(() => validarRespuestaN8N(respuestaCruda), [respuestaCruda]);
+
+  /**
+   * Proveedor del tarifario. Se resuelve UNA VEZ para todo el documento: un
+   * tarifario es la lista de precios de un proveedor.
+   *
+   * Es tan bloqueante como el concepto — sin `proveedorId` la tarifa entra al
+   * catálogo y no hace match completo en la comparativa: existe y no se puede
+   * usar bien. Mismo agujero, mismo tratamiento.
+   */
+  const sugerenciaProveedor = useMemo(
+    () => resolverProveedor(
+      validacion.datos?.proveedor,
+      proveedores.map(p => ({ id: p.id, nombre: p.nombre })),
+    ),
+    [validacion.datos?.proveedor, proveedores],
+  );
+
+  const [proveedorId, setProveedorId] = useState<string | null>(
+    sugerenciaProveedor.match?.id ?? null,
+  );
+  const [nivelProveedor, setNivelProveedor] = useState<NivelMatch>(sugerenciaProveedor.nivel);
 
   const [lineas, setLineas] = useState<LineaEnRevision[]>(() =>
     validacion.datos
@@ -60,6 +86,7 @@ export default function RevisionTarifasExtraidas({
 
   const resumen = resumenRevision(lineas);
   const ordenadas = useMemo(() => ordenarParaRevision(lineas), [lineas]);
+  const estado = estadoGuardable(proveedorId, nivelProveedor === 'exacto', lineas);
 
   const actualizar = (id: string, cambios: Partial<LineaEnRevision>) =>
     setLineas(prev => prev.map(l => (l.lineaId === id ? { ...l, ...cambios } : l)));
@@ -96,9 +123,6 @@ export default function RevisionTarifasExtraidas({
       <div className="px-5 py-3 border-b border-gray-100 bg-gray-50/60 space-y-2 shrink-0">
         <div className="flex items-center gap-3 flex-wrap">
           <span className="text-[12px] text-gray-500">{nombreArchivo}</span>
-          {d.proveedor && (
-            <span className="text-[12px] font-bold text-[#18181B]">{d.proveedor}</span>
-          )}
           {d.vigenciaTexto && (
             <span className="text-[11px] text-gray-500">Vigencia: {d.vigenciaTexto}</span>
           )}
@@ -107,6 +131,37 @@ export default function RevisionTarifasExtraidas({
             <Sparkles className="w-2.5 h-2.5 inline mr-0.5" />
             Confianza {d.confianza}
           </span>
+        </div>
+
+        {/* El proveedor del tarifario: bloquea el guardado hasta resolverse. */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[9px] font-bold text-gray-400 uppercase w-[70px] shrink-0">Proveedor</span>
+          <div className="min-w-[220px]">
+            <SelectorProveedor
+              compacto
+              proveedores={proveedores}
+              valorId={proveedorId}
+              onSelect={(p) => { setProveedorId(p.id); setNivelProveedor('exacto'); }}
+              onNombreLibre={() => { /* alta rápida se resuelve en el catálogo */ }}
+              placeholder="Buscar proveedor…"
+            />
+          </div>
+          {proveedorId && nivelProveedor === 'sugerido' && (
+            <button
+              onClick={() => setNivelProveedor('exacto')}
+              className="text-[10px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-1.5 py-0.5 rounded"
+            >
+              Confirmar «{proveedores.find(p => p.id === proveedorId)?.nombre}»
+            </button>
+          )}
+          {!proveedorId && validacion.datos?.proveedor && (
+            <span className="text-[10px] text-amber-700">
+              El documento dice «{validacion.datos.proveedor}» y no está en el catálogo
+            </span>
+          )}
+          {proveedorId && nivelProveedor === 'exacto' && (
+            <Check className="w-3.5 h-3.5 text-emerald-600" />
+          )}
         </div>
 
         <p className="text-[12px] font-semibold text-gray-700">
@@ -253,7 +308,9 @@ export default function RevisionTarifasExtraidas({
 
       <div className="px-5 py-3 border-t border-gray-150 bg-gray-50/50 flex items-center justify-between shrink-0">
         <p className="text-[11px] text-gray-500">
-          {resumen.guardables} de {resumen.total} listas para guardar
+          {estado.puedeGuardar
+            ? `${resumen.guardables} de ${resumen.total} listas para guardar`
+            : estado.faltantes[0]}
         </p>
         <div className="flex items-center gap-2">
           <button
@@ -264,11 +321,12 @@ export default function RevisionTarifasExtraidas({
           </button>
           <button
             onClick={async () => {
+              if (!estado.puedeGuardar || !proveedorId) return;
               setGuardando(true);
-              try { await onGuardar(lineas.filter(esGuardable)); }
+              try { await onGuardar(lineas.filter(esGuardable), proveedorId); }
               finally { setGuardando(false); }
             }}
-            disabled={resumen.guardables === 0 || guardando}
+            disabled={!estado.puedeGuardar || guardando}
             className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-[11px] font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {guardando ? 'Guardando…' : `Guardar ${resumen.guardables} tarifa${resumen.guardables !== 1 ? 's' : ''}`}
