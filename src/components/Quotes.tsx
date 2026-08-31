@@ -613,6 +613,35 @@ export default function Quotes() {
     );
   }
 
+  /*
+   * U-2 · La ficha del prospecto ocupa la pantalla, no un cajón encima de la
+   * tabla. Se devuelve antes que el módulo, igual que hace el Kanban de
+   * prospección con la suya.
+   */
+  if (prospectoAbierto) {
+    return (
+      <div className="animate-fade-in pb-12">
+        <FichaProspecto
+          prospecto={prospectoAbierto}
+          onClose={() => setProspectoAbierto(null)}
+          onUpdate={(actualizado) => {
+            updateProspecto(actualizado.id, actualizado).catch(err =>
+              setToast({ mensaje: `No se pudo guardar: ${err.message}`, tipo: 'error' }));
+            setProspectoAbierto(actualizado);
+          }}
+          onConvert={() => { /* la conversión vive en el Kanban */ }}
+        />
+        {/* El aviso viaja con la ficha: si el guardado falla mientras está
+            abierta, nadie vería el toast del módulo. */}
+        <Toast
+          mensaje={toast?.mensaje ?? null}
+          tipo={toast?.tipo}
+          onClose={() => setToast(null)}
+        />
+      </div>
+    );
+  }
+
   return (
     // El div raíz llamaba a setActiveMenu(null), una función que no existe en
     // este componente: cada clic dentro del módulo lanzaba un ReferenceError.
@@ -1303,19 +1332,6 @@ export default function Quotes() {
         isOpen={chatOpen}
         onClose={() => setChatOpen(false)}
       />
-      {prospectoAbierto && (
-        <FichaProspecto
-          prospecto={prospectoAbierto}
-          isOpen={true}
-          onClose={() => setProspectoAbierto(null)}
-          onUpdate={(actualizado) => {
-            updateProspecto(actualizado.id, actualizado).catch(err =>
-              setToast({ mensaje: `No se pudo guardar: ${err.message}`, tipo: 'error' }));
-            setProspectoAbierto(actualizado);
-          }}
-          onConvert={() => { /* la conversión vive en el Kanban */ }}
-        />
-      )}
 
       {/* Confirmación visible de las acciones (bug 1.1) */}
       <Toast

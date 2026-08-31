@@ -1,16 +1,42 @@
 import React, { useState } from 'react';
-import { X, Calendar, DollarSign, Mail, Phone, User, MessageSquare, Clock } from 'lucide-react';
+import { DollarSign, Mail, Phone, User, ArrowRight, CheckCircle2, MessageSquare } from 'lucide-react';
 import { Prospecto, ProspectoActivity } from '../../data';
-import { ORIGENES_PROSPECTO, VENDEDORES } from './QuotesData';
+import { VENDEDORES } from './QuotesData';
 import ModalMotivoPerdida from './ModalMotivoPerdida';
+import {
+  FichaLayout, FichaHeader, FichaTabs, FichaContenido, FichaFooter, BadgeEstado,
+} from '../ui/ficha/FichaLayout';
+import EstadoVacio from '../ui/EstadoVacio';
+
+/**
+ * ── De drawer a pantalla completa (U-2) ────────────────────────────────────
+ * El cliente pidió explícitamente que el prospecto dejara de ser un cajón
+ * lateral. Era la única ficha que se abría encima de la lista, en 520px, con
+ * su propio encabezado y su propio footer: la misma información se leía
+ * distinta según si venías del Kanban o de la tabla.
+ *
+ * Ahora usa la anatomía de `ui/ficha/FichaLayout`, igual que la cotización.
+ * Los handlers, los campos y las acciones son los mismos: cambió dónde se
+ * dibujan, no qué hacen.
+ */
 
 interface FichaProspectoProps {
   prospecto: Prospecto | null;
-  isOpen: boolean;
+  /**
+   * Se conserva para no tocar a quien la llama. En pantalla completa el
+   * montaje ya es la condición, así que quien la renderice puede omitirla.
+   */
+  isOpen?: boolean;
   onClose: () => void;
   onUpdate: (updated: Prospecto) => void;
   onConvert: (p: Prospecto) => void;
 }
+
+const PESTANAS = [
+  { id: 'info', label: 'Información' },
+  { id: 'actividad', label: 'Actividad' },
+] as const;
+type PestanaProspecto = typeof PESTANAS[number]['id'];
 
 const STAGES = [
   { id: 'nuevo_lead', label: 'Nuevo Lead' },
@@ -19,7 +45,8 @@ const STAGES = [
   { id: 'convertido', label: 'Convertido' }
 ] as const;
 
-export default function FichaProspecto({ prospecto, isOpen, onClose, onUpdate, onConvert }: FichaProspectoProps) {
+export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUpdate, onConvert }: FichaProspectoProps) {
+  const [pestana, setPestana] = useState<PestanaProspecto>('info');
   // Antes «Eliminar prospecto» solo pedía confirmación y tenía un TODO: no
   // hacía nada. Ahora se marca como perdido con su motivo, igual que una
   // cotización perdida — no se borra, se registra por qué se perdió.
@@ -69,59 +96,53 @@ export default function FichaProspecto({ prospecto, isOpen, onClose, onUpdate, o
   const currentStageIndex = STAGES.findIndex(s => s.id === prospecto.etapa);
 
   return (
-    <div className="fixed inset-0 z-[150] flex justify-end">
-      {/* Backdrop */}
-      <div 
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-
-      {/* Slide-over panel */}
-      <div className="relative w-full max-w-[520px] bg-[#FAFAF9] h-full shadow-[-4px_0_24px_rgba(0,0,0,0.10)] flex flex-col animate-in slide-in-from-right duration-200">
-        
-        {/* Header */}
-        <div className="px-6 py-5 bg-white border-b border-gray-200 flex flex-col gap-3 shrink-0 relative">
-          <button 
-            onClick={onClose}
-            className="absolute top-5 right-5 p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-
-          <div className="flex items-center justify-between pr-8">
-            <span className="text-xs font-bold text-[#E11D48] tracking-wider uppercase font-mono">
-              {prospecto.folio}
-            </span>
-            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-gray-100 text-gray-600 border-gray-200">
-              {prospecto.origenLead}
-            </span>
-          </div>
-
-          <input 
+    <FichaLayout>
+      <FichaHeader
+        modulo="Prospectos"
+        onBack={onClose}
+        folio={prospecto.folio}
+        titulo={
+          <input
             value={prospecto.empresa}
             onChange={e => onUpdate({ ...prospecto, empresa: e.target.value })}
-            className="text-[20px] font-bold text-[#18181B] bg-transparent outline-none focus:bg-gray-50 rounded px-1 -ml-1 border border-transparent focus:border-gray-200"
+            className="text-xl font-bold text-[#18181B] tracking-tight bg-transparent outline-none focus:bg-white rounded px-1 -ml-1 border border-transparent focus:border-gray-200"
           />
+        }
+        badges={
+          <>
+            <BadgeEstado tono={
+              prospecto.etapa === 'convertido' ? 'exito'
+              : prospecto.etapa === 'perdido' ? 'peligro'
+              : 'activo'}
+            >
+              {prospecto.etapa === 'perdido'
+                ? 'Perdido'
+                : STAGES.find(s => s.id === prospecto.etapa)?.label}
+            </BadgeEstado>
+            <BadgeEstado tono="neutro">{prospecto.origenLead}</BadgeEstado>
+          </>
+        }
+        subtitulo={prospecto.valorEstimado ? (
+          <p className="font-black text-[#E11D48] tabular-nums">
+            Valor estimado: ${prospecto.valorEstimado.toLocaleString()} USD
+          </p>
+        ) : undefined}
+      />
 
-          <div className="flex items-center gap-3">
-            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border bg-white border-gray-200 text-gray-600">
-              {STAGES.find(s => s.id === prospecto.etapa)?.label}
-            </span>
-            
-            {prospecto.etapa === 'convertido' && (
-              <button 
-                onClick={() => onConvert(prospecto)}
-                className="ml-auto bg-[#22C55E] text-white hover:bg-[#16A34A] px-3 py-1.5 rounded-lg text-xs font-bold transition-colors"
-              >
-                Convertir a cotización →
-              </button>
-            )}
-          </div>
-        </div>
+      <FichaTabs<PestanaProspecto>
+        pestanas={PESTANAS.map(t => ({
+          id: t.id,
+          label: t.label,
+          contador: t.id === 'actividad' ? (prospecto.actividades?.length ?? 0) : undefined,
+        }))}
+        activa={pestana}
+        onCambiar={setPestana}
+      />
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          
+      <FichaContenido>
+        {pestana === 'info' && (
+        <div className="space-y-8 max-w-4xl">
+
           {/* Pipeline visual */}
           <div>
             <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Pipeline</h4>
@@ -259,7 +280,11 @@ export default function FichaProspecto({ prospecto, isOpen, onClose, onUpdate, o
             />
           </div>
 
-          {/* Actividades */}
+        </div>
+        )}
+
+        {pestana === 'actividad' && (
+        <div className="space-y-8 max-w-4xl">
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-5">
             <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-2">
               Actividades
@@ -321,17 +346,36 @@ export default function FichaProspecto({ prospecto, isOpen, onClose, onUpdate, o
                 </div>
               ))}
               {(!prospecto.actividades || prospecto.actividades.length === 0) && (
-                <div className="text-xs text-gray-400 italic pl-4">No hay actividades registradas.</div>
+                <EstadoVacio
+                  variante="plano"
+                  icono={<MessageSquare className="w-5 h-5" />}
+                  titulo="Sin actividades registradas"
+                  detalle="Cada llamada, correo o reunión que registres queda aquí con su fecha y su responsable. Es lo que explica por qué el prospecto avanzó o se quedó parado."
+                />
               )}
             </div>
           </div>
         </div>
+        )}
+      </FichaContenido>
 
-        {/* Footer */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between shrink-0">
-          <div className="text-[9px] text-gray-400 uppercase font-bold tracking-wider space-y-1">
-            <p>Creado: {prospecto.fechaCreacion}</p>
-          </div>
+      {/* Footer: la acción de la etapa arriba, la salida abajo — misma
+          jerarquía que la ficha de cotización. Antes «Convertir a cotización»
+          vivía escondido en el encabezado del cajón. */}
+      <FichaFooter>
+        {prospecto.etapa === 'convertido' && (
+          <button
+            onClick={() => onConvert(prospecto)}
+            className="w-full max-w-3xl mx-auto px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2 shadow-xs"
+          >
+            Convertir a cotización <ArrowRight className="w-4 h-4" />
+          </button>
+        )}
+
+        <div className="flex items-center justify-between max-w-3xl mx-auto w-full gap-4">
+          <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">
+            Creado: {prospecto.fechaCreacion}
+          </p>
           {prospecto.etapa === 'perdido' ? (
             <div className="text-right">
               <p className="text-[10px] font-bold text-red-500 uppercase tracking-wider">Perdido</p>
@@ -347,7 +391,11 @@ export default function FichaProspecto({ prospecto, isOpen, onClose, onUpdate, o
           )}
         </div>
 
-      </div>
+        <div className="flex items-center justify-center gap-1.5 pt-1">
+          <CheckCircle2 className="w-3 h-3 text-green-500" />
+          <span className="text-[10px] text-gray-400">Guardado automáticamente</span>
+        </div>
+      </FichaFooter>
 
       {pidiendoMotivo && prospecto && (
         <ModalMotivoPerdida
@@ -366,6 +414,6 @@ export default function FichaProspecto({ prospecto, isOpen, onClose, onUpdate, o
           }}
         />
       )}
-    </div>
+    </FichaLayout>
   );
 }

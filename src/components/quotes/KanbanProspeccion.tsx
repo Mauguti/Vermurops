@@ -61,6 +61,28 @@ export default function KanbanProspeccion({
     onConvert(p);
   };
 
+  /*
+   * U-2 · La ficha del prospecto es pantalla completa, no un cajón encima del
+   * tablero. Reemplaza el tablero mientras está abierta, igual que la ficha de
+   * cotización reemplaza al Kanban de cotizaciones.
+   */
+  if (selectedProspecto) {
+    return (
+      <FichaProspecto
+        prospecto={selectedProspecto}
+        onClose={() => setSelectedProspecto(null)}
+        onUpdate={(updated) => {
+          setProspectos(prev => prev.map(p => p.id === updated.id ? updated : p));
+          setSelectedProspecto(updated);
+        }}
+        onConvert={p => {
+          handleConvert(p);
+          setSelectedProspecto(null);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="overflow-x-auto pb-4">
@@ -155,19 +177,6 @@ export default function KanbanProspeccion({
         </div>
       </div>
 
-      <FichaProspecto
-        prospecto={selectedProspecto}
-        isOpen={selectedProspecto !== null}
-        onClose={() => setSelectedProspecto(null)}
-        onUpdate={(updated) => {
-          setProspectos(prev => prev.map(p => p.id === updated.id ? updated : p));
-          setSelectedProspecto(updated);
-        }}
-        onConvert={p => {
-          handleConvert(p);
-          setSelectedProspecto(null);
-        }}
-      />
     </div>
   );
 }

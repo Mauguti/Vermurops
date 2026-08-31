@@ -36,8 +36,13 @@ export interface FichaHeaderProps {
   onBack: () => void;
   /** Folio o identificador. Segundo tramo del breadcrumb. */
   folio: string;
-  /** Nombre grande: la empresa, el cliente, el proveedor. */
-  titulo: string;
+  /**
+   * Nombre grande: la empresa, el cliente, el proveedor.
+   *
+   * Acepta un nodo para las fichas cuyo nombre se edita en el encabezado (el
+   * prospecto). Un string se envuelve en el h2 con el estilo de siempre.
+   */
+  titulo: React.ReactNode;
   /** Badges de estado. Usa `<BadgeEstado>` para que el color sea el mismo. */
   badges?: React.ReactNode;
   /** Una línea bajo el título: el total, la ruta, lo que identifique la ficha. */
@@ -60,9 +65,11 @@ export function FichaHeader({
           <span className="text-[#18181B] font-medium">{folio}</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <h2 className="text-xl font-bold text-[#18181B] tracking-tight truncate">
-            {titulo}
-          </h2>
+          {typeof titulo === 'string' ? (
+            <h2 className="text-xl font-bold text-[#18181B] tracking-tight truncate">
+              {titulo}
+            </h2>
+          ) : titulo}
           {badges}
         </div>
         {subtitulo && (
