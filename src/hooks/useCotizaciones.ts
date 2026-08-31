@@ -23,6 +23,7 @@ import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firesto
 import { KanbanQuote, initialKanbanQuotes } from '../components/quotes/QuotesData';
 import { initContadorDesdeFolios } from '../lib/folioService';
 import { useAuth } from '../auth/AuthContext';
+import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 import { puedeCrearCotizacion, PermisoDenegadoError } from '../auth/permisos';
 import { UserRole } from '../auth/users';
 
@@ -112,11 +113,27 @@ export function useCotizaciones() {
         `El rol «${rol ?? 'sin sesión'}» no puede crear cotizaciones en la etapa «${quote.etapa}».`,
       );
     }
-    await setDoc(doc(db, 'cotizaciones', quote.id), quote);
+    await setDoc(doc(db, 'cotizaciones', quote.id), sanitizarParaFirestore(quote));
   };
 
+  /**
+   * Actualiza la cotización.
+   *
+   * Sanitiza antes de escribir: Firestore RECHAZA `undefined` con «Unsupported
+   * field value» y tumba la escritura entera. KanbanQuote tiene decenas de
+   * campos opcionales anidados —conceptoId, vigencia, condiciones— y basta uno
+   * en undefined para que no se guarde nada.
+   *
+   * Sin esto el fallo era invisible: la promesa se rechazaba, nadie la
+   * atrapaba, el estado de React ya se había actualizado —así que en pantalla
+   * parecía guardado— y al recargar el trabajo no estaba. Lo mismo que ya
+   * resolvimos en useEmbarques.
+   */
   const updateCotizacion = async (id: string, data: Partial<KanbanQuote>): Promise<void> => {
-    await updateDoc(doc(db, 'cotizaciones', id), data as Record<string, unknown>);
+    await updateDoc(
+      doc(db, 'cotizaciones', id),
+      sanitizarParaFirestore(data) as Record<string, unknown>,
+    );
   };
 
   return { quotes, loading, error, createCotizacion, updateCotizacion };

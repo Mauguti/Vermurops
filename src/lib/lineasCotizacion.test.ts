@@ -488,3 +488,39 @@ describe('desglose de costos por proveedor', () => {
     expect(aplanarCotizacion(quote([srv]))[0].costos).toEqual([]);
   });
 });
+
+describe('lo escrito tiene que ser guardable en Firestore', () => {
+  const sinUndefined = (v: unknown, ruta = 'quote'): string[] => {
+    if (v === undefined) return [ruta];
+    if (Array.isArray(v)) return v.flatMap((x, i) => sinUndefined(x, `${ruta}[${i}]`));
+    if (v && typeof v === 'object') {
+      return Object.entries(v as Record<string, unknown>)
+        .flatMap(([k, x]) => sinUndefined(x, `${ruta}.${k}`));
+    }
+    return [];
+  };
+
+  it('elegir un concepto del catálogo no deja undefined', () => {
+    // Era el camino del bug: `conceptoId: ... ?? undefined` tumbaba la
+    // escritura entera y el concepto se perdía al recargar.
+    const q = aplicarEdicionLinea(quote([SRV_FICHA]), 'srv-1::c1',
+      { conceptoId: 'CON-99', concepto: 'Flete' });
+    expect(sinUndefined(q)).toEqual([]);
+  });
+
+  it('quitar el concepto lo deja en null, no en undefined', () => {
+    const q = aplicarEdicionLinea(quote([SRV_FICHA]), 'srv-1::c1', { conceptoId: null });
+    expect(sinUndefined(q)).toEqual([]);
+    expect(q.servicios[0].conceptos[0].conceptoId).toBeNull();
+  });
+
+  it('agregar una línea no deja undefined', () => {
+    const q = agregarLinea(quote([SRV_FICHA]), { servicioId: 'srv-1', concepto: 'Nuevo' });
+    expect(sinUndefined(q)).toEqual([]);
+  });
+
+  it('editar costo y profit no deja undefined', () => {
+    const q = aplicarEdicionLinea(quote([SRV_FICHA]), 'srv-1::c1', { profit: 800 });
+    expect(sinUndefined(q)).toEqual([]);
+  });
+});

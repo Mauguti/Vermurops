@@ -392,15 +392,21 @@ export function aplicarEdicionLinea(
         // El costo solo se acepta en líneas capturadas a mano.
         const costo = linea.costoDerivado ? costoDeConcepto(c) : (edicion.costo ?? c.costo);
         // Teclear un cero es una decisión y queda registrada como tal.
+        // Si nunca se capturó, la clave se OMITE: en undefined, Firestore
+        // rechaza la escritura completa de la cotización.
         const costoCapturado = edicion.costo !== undefined ? true : c.costoCapturado;
         const { venta, margen } = calcLinea(costo, profit);
 
         return {
           ...c,
+          ...(costoCapturado !== undefined ? { costoCapturado } : {}),
           nombre: edicion.concepto ?? c.nombre,
-          conceptoId: edicion.conceptoId !== undefined ? (edicion.conceptoId ?? undefined) : c.conceptoId,
+          // Se omite la clave en vez de ponerla en undefined (Firestore la
+          // rechaza). `null` sí es válido y significa «sin concepto».
+          ...(edicion.conceptoId !== undefined
+            ? { conceptoId: edicion.conceptoId ?? null }
+            : {}),
           costo,
-          costoCapturado,
           profit,
           venta,
           margen,
@@ -499,7 +505,7 @@ export function agregarLinea(quote: KanbanQuote, nueva: NuevaLinea): KanbanQuote
   const concepto: ConceptoCotizacion = {
     id: `con-${nueva.servicioId}-${Date.now()}`,
     nombre: nueva.concepto,
-    conceptoId: nueva.conceptoId ?? undefined,
+    ...(nueva.conceptoId ? { conceptoId: nueva.conceptoId } : {}),
     costo,
     profit,
     venta,

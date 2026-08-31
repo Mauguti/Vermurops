@@ -377,7 +377,9 @@ export function escribirCelda(
             moneda: 'USD',
             seleccionada: false,
             proveedorId: agente.proveedorId ?? null,
-            vigencia: agente.vigencia ?? undefined,
+            // Clave AUSENTE, no clave en undefined: Firestore rechaza undefined
+            // y tumbaría la escritura completa de la cotización.
+            ...(agente.vigencia ? { vigencia: agente.vigencia } : {}),
           };
           return { ...c, tarifas: [...tarifas, nueva] };
         }),

@@ -98,7 +98,16 @@ export default function Quotes() {
       const existing = kanbanQuotes.find(q => q.id === newQ.id);
       return existing !== undefined && existing !== newQ;
     });
-    if (changed) await updateCotizacion(changed.id, changed);
+    if (changed) {
+      try {
+        await updateCotizacion(changed.id, changed);
+      } catch (err) {
+        setToast({
+          mensaje: `No se pudo guardar la cotización: ${err instanceof Error ? err.message : err}`,
+          tipo: 'error',
+        });
+      }
+    }
   };
 
   // ── Prospectos ───────────────────────────────────────────────────────────
@@ -1094,7 +1103,13 @@ export default function Quotes() {
             quote={selectedQuote}
             onBack={() => setSelectedQuote(null)}
             onUpdateQuote={(updated) => {
-              updateCotizacion(updated.id, updated);
+              // El error se AVISA. Antes la promesa se rechazaba en silencio,
+              // el estado local ya se había actualizado —así que en pantalla
+              // parecía guardado— y el trabajo se perdía al recargar.
+              updateCotizacion(updated.id, updated).catch(err => setToast({
+                mensaje: `No se pudo guardar: ${err instanceof Error ? err.message : err}`,
+                tipo: 'error',
+              }));
               setSelectedQuote(updated);
             }}
             onConvertToShipment={q => { alert(`¡Felicidades! "${q.prospecto.empresa}" marcada como GANADA.`); }}

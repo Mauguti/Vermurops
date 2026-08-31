@@ -501,3 +501,51 @@ describe('matriz por servicio', () => {
     expect(m.agenteMenorId).toBeNull();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Nada de lo que se escribe puede llevar `undefined`.
+//
+// Firestore lo rechaza con «Unsupported field value» y tumba la escritura
+// ENTERA de la cotización. El fallo era invisible: la promesa se rechazaba,
+// nadie la atrapaba, el estado de React ya se había actualizado —así que en
+// pantalla parecía guardado— y al recargar el trabajo no estaba.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('lo escrito tiene que ser guardable en Firestore', () => {
+  const sinUndefined = (v: unknown, ruta = 'quote'): string[] => {
+    if (v === undefined) return [ruta];
+    if (Array.isArray(v)) return v.flatMap((x, i) => sinUndefined(x, `${ruta}[${i}]`));
+    if (v && typeof v === 'object') {
+      return Object.entries(v as Record<string, unknown>)
+        .flatMap(([k, x]) => sinUndefined(x, `${ruta}.${k}`));
+    }
+    return [];
+  };
+
+  const agente: AgenteColumna = {
+    id: 'PRV-N', proveedorId: 'PRV-N', nombre: 'Nuevo', vigencia: null, orden: 5,
+  };
+
+  it('crear una tarifa desde una celda no deja undefined', () => {
+    const q = escribirCelda(COMPARATIVA, 'srv-1::c1', agente, 1000);
+    expect(sinUndefined(q)).toEqual([]);
+  });
+
+  it('tampoco con vigencia puesta', () => {
+    const q = escribirCelda(COMPARATIVA, 'srv-1::c1', { ...agente, vigencia: '2026-09-15' }, 1000);
+    expect(sinUndefined(q)).toEqual([]);
+  });
+
+  it('borrar una celda no deja undefined', () => {
+    const q = escribirCelda(COMPARATIVA, 'srv-1::c1',
+      { id: 'PRV-S', proveedorId: 'PRV-S', nombre: 'Sunway', vigencia: null, orden: 0 }, null);
+    expect(sinUndefined(q)).toEqual([]);
+  });
+
+  it('elegir agente no deja undefined', () => {
+    expect(sinUndefined(elegirAgente(COMPARATIVA, 'PRV-C'))).toEqual([]);
+  });
+
+  it('quitar una columna no deja undefined', () => {
+    expect(sinUndefined(quitarAgenteDeCotizacion(COMPARATIVA, 'PRV-B'))).toEqual([]);
+  });
+});
