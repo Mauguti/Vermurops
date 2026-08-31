@@ -4,6 +4,11 @@ import { DollarSign, FileText, CheckCircle, Clock, AlertCircle, Plus, Search, Fi
 import FichaFactura from './finance/FichaFactura';
 import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import BandejaOC from './ordenesCompra/BandejaOC';
+import FichaOC from './ordenesCompra/FichaOC';
+import type { OrdenCompra, EstadoOC } from './ordenesCompra/OrdenesCompraData';
+import type { RolOC } from '../lib/stateMachineOC';
+import { useAuth } from '../auth/AuthContext';
+import Toast, { TipoToast } from './ui/Toast';
 import ModuloEnDesarrollo from './ui/ModuloEnDesarrollo';
 import { useDestinoPendiente } from '../navegacion/NavegacionContext';
 
@@ -12,6 +17,9 @@ export default function Finance() {
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);
+  const [ocAbiertaId, setOcAbiertaId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ mensaje: string; tipo: TipoToast } | null>(null);
+  const { user } = useAuth();
 
   /*
    * U-4 · Alguien enlazó a una orden de compra desde un embarque o desde un
@@ -19,14 +27,65 @@ export default function Finance() {
    * C del plan de operación— así que el salto deja al usuario en la bandeja
    * donde vive, que es lo más cerca que se puede llevar hoy.
    */
-  useDestinoPendiente(['ordenCompra'], () => {
+  useDestinoPendiente(['ordenCompra'], (d) => {
     setSelectedInvoice(null);
     setShowForm(false);
     setActiveTab('Cuentas por pagar');
+    setOcAbiertaId(d.id);
   });
 
   // ── OC: datos reales de Firestore ─────────────────────────────────────────
-  const { ordenes, loading: loadingOC, porPagar, conteosPorEstado } = useOrdenesCompra();
+  const {
+    ordenes, loading: loadingOC, porPagar, conteosPorEstado,
+    transicionarEstado, updateOrden,
+  } = useOrdenesCompra();
+
+  /*
+   * C-2 · La orden abierta se DERIVA del listener, no se guarda en estado.
+   *
+   * Si se guardara el objeto, al transicionarlo la pantalla seguiría
+   * mostrando el estado viejo hasta recargar: el botón parecería no haber
+   * hecho nada. Guardando solo el id, el snapshot de Firestore la refresca.
+   */
+  const ocAbierta = ocAbiertaId ? ordenes.find(o => o.id === ocAbiertaId) ?? null : null;
+
+  const rolOC = (user?.rol ?? 'ventas') as RolOC;
+
+  const handleTransicionar = async (nuevoEstado: EstadoOC, cambios?: Partial<OrdenCompra>) => {
+    if (!ocAbierta) return;
+
+    /*
+     * Lo que el usuario acaba de escribir se guarda ANTES de transicionar y
+     * viaja en el objeto que se valida. Si solo se guardara, la máquina
+     * evaluaría la copia vieja del listener y rechazaría el pago diciendo que
+     * falta el comprobante que el usuario está viendo en pantalla.
+     */
+    const conCambios: OrdenCompra = { ...ocAbierta, ...(cambios ?? {}) };
+    if (cambios && Object.keys(cambios).length > 0) {
+      try {
+        await updateOrden(ocAbierta.id, cambios);
+      } catch (err) {
+        setToast({ mensaje: `No se pudo guardar: ${err instanceof Error ? err.message : err}`, tipo: 'error' });
+        return;
+      }
+    }
+
+    const r = await transicionarEstado(conCambios, nuevoEstado, rolOC, {
+      uid: user?.uid ?? '',
+      nombre: user?.nombre ?? user?.email ?? '',
+    });
+    if (!r.ok) {
+      setToast({ mensaje: r.razon ?? 'No se pudo cambiar el estado.', tipo: 'error' });
+      return;
+    }
+    setToast({ mensaje: `${ocAbierta.folio}: ${nuevoEstado.replace('_', ' ')}.`, tipo: 'exito' });
+  };
+
+  const handleActualizarOC = (cambios: Partial<OrdenCompra>) => {
+    if (!ocAbierta) return;
+    updateOrden(ocAbierta.id, cambios).catch(err =>
+      setToast({ mensaje: `No se pudo guardar: ${err instanceof Error ? err.message : err}`, tipo: 'error' }));
+  };
 
   const tabs = ['Facturas (CFDI)', 'Cuentas por cobrar', 'Cuentas por pagar', 'Estados de cuenta'];
 
@@ -80,6 +139,21 @@ export default function Finance() {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (ocAbierta) {
+    return (
+      <>
+        <FichaOC
+          oc={ocAbierta}
+          rol={rolOC}
+          onBack={() => setOcAbiertaId(null)}
+          onTransicionar={handleTransicionar}
+          onActualizar={handleActualizarOC}
+        />
+        <Toast mensaje={toast?.mensaje ?? null} tipo={toast?.tipo} onClose={() => setToast(null)} />
+      </>
+    );
+  }
 
   if (selectedInvoice) {
     return <FichaFactura invoice={selectedInvoice} onClose={() => setSelectedInvoice(null)} />;
@@ -169,6 +243,7 @@ export default function Finance() {
                      ordenes={ordenes}
                      loading={loadingOC}
                      conteosPorEstado={conteosPorEstado}
+                     onSelectOC={oc => setOcAbiertaId(oc.id)}
                    />
                 )}
 
