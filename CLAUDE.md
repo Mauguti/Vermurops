@@ -75,6 +75,17 @@ términos de pago) vienen de archivos reales exportados de Magaya y depurados, e
 `src/data/seeds/`. Si no encuentras el archivo, **pregunta** — no lo generes. Un catálogo
 ficticio en producción es peor que no tener catálogo.
 
+**Antes de diagnosticar una regresión en local, mira DESDE DÓNDE corre el dev
+server.** `lsof -ti:3000` y revisa la ruta del proceso. Si el trabajo está en un
+worktree y el server corre desde el checkout principal, se ve otra rama y
+parece que el código desapareció. Ya costó tiempo cuatro veces. La causa más
+barata siempre es «desde dónde se está sirviendo», no «qué se rompió».
+
+**Un guardado que falla en silencio es peor que uno que no guarda.**
+Firestore rechaza `undefined` y tumba la escritura entera; si nadie atrapa la
+promesa, el estado de React ya se actualizó y en pantalla parece guardado. «No
+guardó nada» se reporta en cinco minutos; «guardó a medias» vive semanas.
+
 **Cuando cambies el modelo de datos, maneja el fallback.** Hay datos legacy en producción. El
 patrón que usamos: helper que intenta el campo nuevo y cae al viejo (ver `getOficialIds`,
 `matchConcept`).
@@ -162,6 +173,24 @@ La función `calcularIVA` existe con 21 tests. **Está desconectada del flujo** 
 
 Flete internacional en USD, gastos nacionales en MXN con IVA. **Los totales nunca se mezclan** —
 se calculan por moneda y se muestran separados. Un total revuelto se ve creíble y es basura.
+
+**Matiz (31-ago-2026): comparar sí exige convertir.** Si un agente cotiza el
+flete en USD y las maniobras en MXN, su total no se puede sumar — y sin total
+comparable, la comparativa entre agentes pierde sentido.
+
+La salida es convertir **para comparar**, no para cotizar:
+  - el desglose original queda siempre visible: «USD 1,500 + MXN 8,000 @ 18.5»
+  - los montos guardados conservan su moneda; el PDF sale separado
+  - sin tipo de cambio NO se inventa uno: totales separados y sin ✓Menor
+
+El pecado que prohíbe esta regla es el total del que no sabes qué mezcla. Uno
+declarado no está revuelto. Ver `lib/monedaComparativa.ts`.
+
+**Tipo de cambio.** Se guarda CON la cotización y no se relee: tomar el vigente
+en cada apertura podría reordenar a los agentes y contradecir una decisión ya
+tomada. Fuentes: SAT, Banxico, Banamex compra/venta, manual, y el **pricing
+rate** — que no es un número suelto sino una REGLA sobre otra tasa, con el
+colchón de Pricing: «el de Banamex más cuatro pesos o más un porcentaje».
 
 ### 4.4 Un concepto, no cuatro
 
@@ -288,6 +317,113 @@ después hay que rehacerlo. Se construye en el Bloque 5.
 
 ---
 
+## 4.9 La ficha de cotización — cómo quedó (31-ago-2026)
+
+El cliente dijo que la ficha anterior «no se entiende». Se rehízo siguiendo la
+vista que Luis ya tenía en su sistema.
+
+### La comparativa es de PAQUETES, no de tarifas sueltas
+
+Nuestra comparativa comparaba tarifas individuales por concepto. La del cliente
+compara paquetes completos por agente, y por eso no le encontraban sentido.
+
+Textual de Gabi: *«son cuatro agentes diferentes... el más barato es el de
+Sunway con Hapag-Lloyd por 2200, en total. Que eso incluye cuatro conceptos.»*
+
+    Concepto              │ Sunway │ BrandNew │ BoardCargo │
+    Flete internacional   │  1,500 │   1,600  │    1,450   │
+    Maniobras origen      │    200 │     180  │      220   │
+    VALIDEZ               │ 15/sep │  20/sep  │   10/sep   │
+    TOTAL                 │  1,700 │   1,780  │  1,670 ✓Menor
+
+**La matriz se DERIVA, no se guarda.** `concepto.tarifas[]` ya es la matriz,
+girada: filas = conceptos, columnas = proveedores, celda = monto. Guardarla
+aparte sería una tercera fuente de verdad para los costos, después de la
+dualidad de §6. Derivada, la matriz y la tabla de líneas no pueden
+desincronizarse.
+
+**Una matriz por SERVICIO**, no por cotización: se pide la misma ruta a varios
+proveedores, y un agente marítimo no compite contra un transportista terrestre.
+En pantalla es UNA sola tabla que cambia de contenido según el servicio activo.
+
+**Reglas que la sostienen** (`lib/matrizComparativa.ts`):
+  - Las filas tienen TIPO: solo las de `importe` suman. Una fecha o unos días
+    de tránsito no son dinero.
+  - La vigencia es propiedad de la COLUMNA, pintada como fila. Meterla como
+    concepto falso es lo que inflaba el total en el sistema de referencia.
+  - Las columnas se indexan por id de agente, nunca por posición.
+  - Un agente en cero NO gana: no cotizar no es ser barato.
+  - Se avisa de los **paquetes incompletos**: comparar uno de 3 conceptos
+    contra uno de 1 premia al que contesta a medias.
+  - NO se carga el más barato solo: se preselecciona y se puede cambiar.
+    *«Aunque sea la más barata no siempre la tomamos, por los detalles: tiempo
+    de tránsito, free time, o el cliente que no quiere cierto proveedor.»*
+
+### El resto de la ficha
+
+  - **Tarjetas por modalidad** (marítimo, aéreo, terrestre, despacho aduanal y
+    cargos locales), con tabla editable: concepto, proveedor, costo, profit,
+    venta, margen. La capa de «servicios» con categorías inventadas se retiró.
+  - **El concepto se ELIGE del catálogo, nunca se teclea.** Sin `conceptoId` la
+    tarifa no hace match y dos renglones escritos distinto son conceptos
+    distintos.
+  - **Resumen financiero dentro de la ficha**: «mientras cotizan no lo pueden
+    ver, se tendrían que salir de lo que están haciendo».
+  - **Costo cero declarado ≠ campo vacío.** `costoCapturado` distingue una
+    decisión —cortesía, cargo absorbido, pérdida deliberada— de un olvido.
+  - **Botones que cumplen su promesa**: cada acción declara qué necesita, y
+    donde no aparece se explica qué falta (`lib/prontitudCotizacion.ts`).
+
+## 4.10 Carga de tarifarios con IA (31-ago-2026)
+
+*«Un almacén me cobra el IN, el OUT, el PICK... si son 10 conceptos, tendría
+que subir 10 veces la tarifa.»* Y: *«voy a cargar unos tarifarios que tengo de
+agosto, pero no los pude cargar porque no encontré dónde.»*
+
+### El flujo
+
+    Documento (Excel, PDF, imagen o correo pegado)
+       ├─ Storage           → es la EVIDENCIA
+       └─ Cloud Function    → n8n → IA → tarifas propuestas
+                                          ↓
+                            pantalla de REVISIÓN editable
+                                          ↓
+                            catálogo general de tarifas
+
+**Una subida, dos usos.** El documento del que se extrajo una tarifa ES la
+evidencia: no hay dos sistemas de adjuntos. Responde a *«tiene que haber una
+trazabilidad de ¿de dónde saqué este costo? Ah, ok, Juan Pérez me lo mandó
+ayer.»*
+
+**n8n EXTRAE Y PROPONE; la app DECIDE Y ESCRIBE.** El agente no toca Firestore.
+La IA se equivoca, y una tarifa mal cargada se propaga a cotizaciones reales y
+de ahí a facturas.
+
+### Lo que bloquea el guardado
+
+  - **Sin `conceptoId` resuelto**, no se guarda: la tarifa existiría y sería
+    invisible para el panel.
+  - **Sin `proveedorId` resuelto**, tampoco: no haría match en la comparativa.
+  - **Moneda y unidad exigen confirmación explícita**, no basta con que sean
+    editables. Un 1,200 que era MXN cargado como USD se ve perfectamente bien
+    en la pantalla de revisión y nadie lo atrapa hasta que llega la factura.
+
+### La infraestructura
+
+  - `functions/` en **us-central1** (equivalente a nam5, donde vive Firestore),
+    con estructura para varias funciones: `comun/auth.ts` lo compartirá la de
+    Gestión de Usuarios.
+  - `extraerTarifas` valida el token de Firebase Auth, comprueba
+    `tarifario.cargar`, y reenvía a n8n con el secreto del lado del servidor.
+    `invoker: 'public'` — público en la RED, cerrado en el CÓDIGO.
+  - Secreto en Secret Manager: `firebase functions:secrets:set VERMUR_N8N_TOKEN`.
+    n8n lo valida como header `X-Vermur-Token`.
+  - `N8N_WEBHOOK_URL` en `functions/.env`. **El default es producción a
+    propósito**: `/webhook-test/` solo responde mientras alguien tiene n8n
+    abierto, así que como default funcionaría en pruebas y fallaría en uso real.
+  - Evidencias en Storage bajo `tarifarios/{año}/{mes}/`, máximo 10 MB, sin
+    sobrescribir ni borrar: la evidencia de un costo no se edita.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
@@ -299,13 +435,16 @@ después hay que rehacerlo. Se construye en el Bloque 5.
 | Conceptos | 105 conceptos con `calcularIVA` + 21 tests |
 | Términos de pago | 25 términos, incluye descuento por pronto pago |
 | Tarifas | Catálogo, carga masiva, lookup por concepto y ruta |
-| Cotizaciones | Ficha a pantalla completa, máquina de estados con 9 etapas |
-| Comparativa de Pricing | A nivel concepto y a nivel servicio, con selección múltiple |
+| Cotizaciones | Ficha por modalidad con tabla editable, máquina de estados con 9 etapas |
+| Comparativa por agente | Matriz de paquetes: conceptos en filas, proveedores en columnas (§4.9) |
+| Monedas | Conversión declarada para comparar, tipo de cambio con pricing rate |
+| Carga de tarifarios con IA | Cloud Function + n8n + pantalla de revisión (§4.10) |
+| Evidencias | Documentos en Storage, ligados a las tarifas que produjeron |
 | Panel de tarifas | Filtrado por concepto activo, drag and drop con @dnd-kit |
 | Simulador de costo | Marcar tarifas y ver el escenario antes de aplicar |
 | Bandeja Pricing | Tres bloques por acción, barra de progreso, badges de tarifas |
 | Tabla configurable | `SpreadsheetTable<T>` genérico con vistas guardables |
-| Embarques | Estructura base, productos (contenedor → pallets → mercancía) |
+| Embarques | Persistidos en Firestore, cargos por moneda, Kanban por estado |
 
 ### En construcción o pausado
 
@@ -371,58 +510,13 @@ la autenticación. **Toca producción: hay que avisar y publicar con
 `firebase deploy --only firestore:rules`.** Mientras no se cierre, asumir que
 todo dato en Firestore es escribible por cualquier miembro del equipo.
 
-**~~Falta `trafico` y `ubicacion` en `ServicioSolicitado`~~ → CERRADA (30-ago-2026).**
-`ServicioSolicitado` ya tiene `trafico: 'importacion' | 'exportacion'` y
-`ubicacion: 'origen' | 'destino'`. Se cerró porque el campo hacía falta dos
-veces: para el IVA (§4.2) y para el folio del embarque, que codifica el tráfico
-(VLIM impo marítimo vs VLEM expo marítimo).
-
-`lib/ivaCotizacion.ts` conecta `calcularIVA` con las líneas. Devuelve null con
-motivo cuando falta el dato, en vez de asumir 0% o 16%: un IVA inventado se ve
-igual de creíble que uno correcto y sale en una factura.
-
-Las cotizaciones anteriores no traen el campo. `lib/traficoServicio.ts` intenta
-derivarlo de la ruta —destino en México es importación— y si no puede, lo marca
-como desconocido con su motivo. El cotejo es por token y no por subcadena:
-«Laredo, USA» es Texas, «Nuevo Laredo» es México.
-
-Pendiente de este trabajo: mostrar el desglose de IVA en la ficha y en el PDF.
-
-**~~Escrituras que fallan en silencio~~ → CERRADA (31-ago-2026).**
-Firestore rechaza `undefined` con «Unsupported field value» y tumba la
-escritura ENTERA. Si además nadie atrapa la promesa rechazada, el estado de
-React ya se actualizó y en pantalla parece guardado: el trabajo se pierde al
-recargar sin que nada avise.
-
-El patrón mordió tres veces —prospectos, embarques y los conceptos de la
-matriz—. Los dos primeros no guardaban nada; el tercero guardaba a medias, que
-es peor porque se ve bien.
-
-Resuelto en dos capas, en ese orden:
-
-  1. **Atrapar** — `lib/erroresEscritura.ts` con `conAviso()`, que envuelve
-     cada escritura de los 13 hooks: reporta y relanza. Los avisos se pintan
-     con `<AvisosEscritura />`, montado una vez en la raíz, y NO se cierran
-     solos: un toast que dice «tu cambio no se guardó» espera a que lo lean.
-     Hay además una red de seguridad sobre `unhandledrejection` para lo que se
-     escape.
-  2. **Sanitizar** — los 13 hooks pasan por `sanitizarParaFirestore` antes de
-     escribir.
-
-Atrapar rinde más que sanitizar y por eso fue primero: sanitizar arregla ESE
-modo de fallo, atrapar hace visibles todos —permisos, red, reglas, cuota—.
-
-## ESTÁNDAR PARA HOOKS NUEVOS
-
-Todo hook que escriba a Firestore **sanitiza y atrapa**:
-
-```ts
-await conAviso('el cliente', () =>
-  setDoc(doc(db, 'clientes', c.id), sanitizarParaFirestore(c)));
-```
-
-Sin las dos cosas, un fallo de escritura vuelve a ser invisible y el usuario
-pierde trabajo sin enterarse.
+**Resueltas** (se conservan como referencia de dónde buscar):
+  - `trafico` y `ubicacion` en `ServicioSolicitado` — 30-ago. Desbloqueó el
+    IVA (`lib/ivaCotizacion.ts`) y el folio del embarque.
+  - Escrituras que fallaban en silencio — 31-ago. Ver el estándar más abajo.
+  - «Nuevo Concepto» sin `conceptoId` — cerrada en CC-1..CC-4 y **reintroducida
+    y vuelta a cerrar el 31-ago** al rehacer la ficha en tabla. Si algún día se
+    cambia la celda de concepto, el `ConceptoSelector` no es negociable.
 
 **`getCostoOficial` suma tarifas sin mirar la moneda.**
 Con multi-selección de tarifas, `getCostoOficial` hace `reduce((a, t) => a + t.monto)`
@@ -443,6 +537,18 @@ BandejaPricing guarda en `servicio.cotizacionesProveedor` (sin `proveedorId`); F
 guarda en `concepto.tarifas` (con `proveedorId`). Los helpers recorren ambos niveles con
 fallback, pero hay que unificar. Estimado: 2-3 días, con riesgo alto en
 `calcularTotalConsolidado` y el guard de la máquina de estados.
+
+Sube de severidad desde E-4: el mapeo cotización → embarque corre en automático
+al marcar ganada, así que un costo que se pierda por leer un solo nivel produce
+un embarque mal nacido sin que nadie lo note. `lib/cotizacionAEmbarque.ts` tiene
+tests explícitos para los tres casos (FichaCotizacion, BandejaPricing y mixta).
+
+**Los agentes sin precio no se persisten.**
+En la comparativa, un agente agregado como columna vacía vive en estado de
+React: si Pricing agrega tres y recarga antes de capturar precios, se pierden.
+Los que ya tienen precio se recuperan solos porque se derivan de las tarifas.
+Falta `KanbanQuote.agentesComparativa?: Record<servicioId, AgenteColumna[]>`.
+Media hora de trabajo.
 
 **Ajuste «Probable Proveedor».**
 El alta rápida de proveedor debe quitar el RFC (la ausencia de RFC es la señal de que no está
@@ -479,7 +585,17 @@ embarques        contenedores → pallets (por cliente) → mercancía
 vistasUsuario    configuración de columnas por usuario y módulo
 contadores       folios consecutivos
 notificaciones   avisos entre áreas
+embarques        heredan los cargos de la cotización ganada · cierres · Kanban
+documentosTarifario  evidencias en Storage · hash · cuántas tarifas produjeron
+importacionesTarifas borradores de la carga con IA · respuesta cruda de n8n
 ```
+
+**Storage:** `tarifarios/{año}/{mes}/` — los documentos de los que salen las
+tarifas. Máximo 10 MB, sin sobrescribir ni borrar.
+
+**Cloud Functions** (`functions/`, us-central1): `extraerTarifas` es el proxy
+hacia n8n. Estructurada para varias — Gestión de Usuarios reutilizará
+`comun/auth.ts`.
 
 **Convenciones:**
 - camelCase en español
