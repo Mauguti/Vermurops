@@ -32,6 +32,9 @@ import { puedeTransicionarOC, type RolOC } from '../lib/stateMachineOC';
 import { generateFolioOC } from '../lib/folioServiceOC';
 import { conAviso } from '../lib/erroresEscritura';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
+import { exigir } from '../auth/permisos';
+import { UserRole } from '../auth/users';
+import { totalesPorPagar, TotalesPorPagar } from '../lib/cuentasPorPagar';
 
 // ─── Colección ──────────────────────────────────────────────────────────────
 
@@ -83,6 +86,9 @@ export function useOrdenesCompra() {
   const createOrden = useCallback(async (
     datos: Omit<OrdenCompra, 'id' | 'folio' | 'createdAt' | 'updatedAt'>,
   ): Promise<OrdenCompra> => {
+    // Una OC es una instrucción de pago: quién puede emitirla no es cosmético.
+    exigir(user?.rol as UserRole | undefined, 'ordenCompra.solicitar');
+
     const id = doc(collection(db, COLLECTION)).id;
     const folio = await generateFolioOC();
     const now = new Date().toISOString();
@@ -97,7 +103,7 @@ export function useOrdenesCompra() {
 
     await conAviso('la orden de compra', () => setDoc(doc(db, COLLECTION, id), sanitizarParaFirestore(oc)));
     return oc;
-  }, []);
+  }, [user]);
 
   // ── Actualizar OC (parcial) ───────────────────────────────────────────────
 
@@ -162,10 +168,14 @@ export function useOrdenesCompra() {
 
   // ── Agregados para KPIs ───────────────────────────────────────────────────
 
-  /** Total de OCs autorizadas (pendientes de pago) — alimenta KPI "Por pagar". */
-  const totalPorPagar = ordenes
-    .filter(oc => oc.estado === 'autorizada')
-    .reduce((acc, oc) => acc + oc.monto, 0);
+  /**
+   * Lo que Vermur debe, por moneda.
+   *
+   * Antes esto era un `reduce` que sumaba `oc.monto` sin mirar `oc.moneda` y
+   * la tarjeta lo rotulaba «USD». Una OC de 2,000 USD y otra de 40,000 MXN
+   * daban «$42,000 USD»: §4.3 exacto, un total revuelto que se ve creíble.
+   */
+  const porPagar: TotalesPorPagar = totalesPorPagar(ordenes);
 
   /** Conteo por estado para badges/filtros. */
   const conteosPorEstado: Record<EstadoOC, number> = {
@@ -188,7 +198,7 @@ export function useOrdenesCompra() {
     transicionarEstado,
     deleteOrden,
     // KPIs
-    totalPorPagar,
+    porPagar,
     conteosPorEstado,
   };
 }

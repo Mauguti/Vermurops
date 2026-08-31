@@ -17,7 +17,16 @@ import type { EstadoOC, OrdenCompra, FondeoContext } from '../components/ordenes
 
 // ─── Tipos internos ────────────────────────────────────────────────────────────
 
-export type RolOC = 'ventas' | 'pricing' | 'operaciones' | 'admin';
+/**
+ * Roles que participan en el flujo de una OC.
+ *
+ * ⚠️ 'administracion' es el ÁREA —la que autoriza y paga, Julio en el
+ * levantamiento— y 'admin' es el superusuario TÉCNICO. La máquina nació solo
+ * con 'admin', así que el área que de verdad autoriza los pagos no podía
+ * hacerlo: el flujo entero se quedaba trabado en «en gestión». Misma
+ * distinción que en §4.1 del CLAUDE.md.
+ */
+export type RolOC = 'ventas' | 'pricing' | 'operaciones' | 'administracion' | 'admin';
 
 interface TransitionDefOC {
   hacia: EstadoOC;
@@ -61,7 +70,7 @@ const TRANSITIONS_OC: Record<EstadoOC, TransitionDefOC[]> = {
   en_gestion: [
     {
       hacia: 'autorizada',
-      roles: ['admin'],
+      roles: ['administracion', 'admin'],
       validar: (oc, fondeoCtx) => {
         // Fondeo solo aplica para OCs de embarque
         if (oc.origen === 'embarque' && fondeoCtx) {
@@ -74,7 +83,7 @@ const TRANSITIONS_OC: Record<EstadoOC, TransitionDefOC[]> = {
     },
     {
       hacia: 'rechazada',
-      roles: ['operaciones', 'admin'],
+      roles: ['operaciones', 'administracion', 'admin'],
       validar: (oc) =>
         !oc.motivoRechazo
           ? 'Debes indicar un motivo de rechazo.'
@@ -86,7 +95,7 @@ const TRANSITIONS_OC: Record<EstadoOC, TransitionDefOC[]> = {
   autorizada: [
     {
       hacia: 'pagada',
-      roles: ['admin'],
+      roles: ['administracion', 'admin'],
       validar: (oc) =>
         !oc.comprobantePago
           ? 'Debes adjuntar el comprobante de pago antes de marcar como pagada.'
@@ -94,7 +103,7 @@ const TRANSITIONS_OC: Record<EstadoOC, TransitionDefOC[]> = {
     },
     {
       hacia: 'rechazada',
-      roles: ['admin'],
+      roles: ['administracion', 'admin'],
       validar: (oc) =>
         !oc.motivoRechazo
           ? 'Debes indicar un motivo de rechazo.'

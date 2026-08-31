@@ -37,7 +37,11 @@ export type Capacidad =
   // Operaciones
   | 'embarque.generar'        // Generar el embarque desde la cotización
   | 'factura.generar'         // Generar factura dentro del embarque
-  | 'notaCredito.generar';    // Generar nota de crédito
+  | 'notaCredito.generar'     // Generar nota de crédito
+  // Órdenes de compra (C-2): tres áreas, tres capacidades
+  | 'ordenCompra.solicitar'   // Pedir que se le pague a un proveedor
+  | 'ordenCompra.gestionar'   // Revisar la solicitud y prepararla para autorizar
+  | 'ordenCompra.autorizar';  // Autorizar el pago y registrarlo
 
 export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
   'lead.crear',
@@ -54,6 +58,9 @@ export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
   'embarque.generar',
   'factura.generar',
   'notaCredito.generar',
+  'ordenCompra.solicitar',
+  'ordenCompra.gestionar',
+  'ordenCompra.autorizar',
 ];
 
 // ─── Matriz rol → capacidades ────────────────────────────────────────────────
@@ -79,6 +86,19 @@ export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
  *  - `factura.generar` la comparten Administración y Operaciones: es la única
  *    celda de la matriz con dos áreas marcadas.
  *
+ *  - Las tres capacidades de orden de compra siguen el flujo que el cliente
+ *    describió: «PRICING solicita → OPERACIONES gestiona → ADMIN autoriza y
+ *    paga». Con dos matices que salen del mismo levantamiento:
+ *
+ *      · `ordenCompra.solicitar` la tienen también Operaciones y
+ *        Administración. Operaciones porque el gasto que se convierte en OC
+ *        nace de un cargo de SU embarque (C-3), y Administración porque el
+ *        cliente dijo que los gastos de oficina «también lo cargaría el área
+ *        de administración».
+ *      · `ordenCompra.autorizar` es de 'administracion', el ÁREA, no solo del
+ *        superusuario técnico. En el levantamiento «Admin» es Julio, que lleva
+ *        los pagos.
+ *
  *  - `catalogo.importarMasivo` NO está en la matriz del cliente: es una
  *    herramienta de mantenimiento, no una función del negocio. Sobrescribe
  *    catálogos completos (~817 clientes) contra la base que el equipo está
@@ -97,11 +117,14 @@ export const CAPACIDADES_POR_ROL: Record<UserRole, Capacidad[]> = {
     'tarifa.gestionar',
     'tarifario.cargar',
     'proveedor.altaRapida',
+    'ordenCompra.solicitar',
   ],
   operaciones: [
     'embarque.generar',
     'factura.generar',
     'notaCredito.generar',
+    'ordenCompra.solicitar',
+    'ordenCompra.gestionar',
   ],
   // El área: concentra las tres altas definitivas y la facturación.
   // OJO: sin 'catalogo.importarMasivo' — ver la nota de arriba.
@@ -111,6 +134,8 @@ export const CAPACIDADES_POR_ROL: Record<UserRole, Capacidad[]> = {
     'puerto.alta',
     'factura.generar',
     'notaCredito.generar',
+    'ordenCompra.solicitar',
+    'ordenCompra.autorizar',
   ],
   // Superusuario técnico: todo, para poder dar soporte.
   admin: TODAS_LAS_CAPACIDADES,

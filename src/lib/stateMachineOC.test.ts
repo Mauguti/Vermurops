@@ -413,3 +413,59 @@ describe('G. Anticipos parciales', () => {
     expect(r).toMatch(/mayor a cero/i);
   });
 });
+
+// ─── H · El ÁREA de Administración, no solo el superusuario ──────────────────
+//
+// La máquina nació con roles: ['admin'] en autorizar y pagar. En esta app
+// 'admin' es el superusuario TÉCNICO y 'administracion' es el área que lleva
+// los pagos (§4.1). Con la definición original, Julio no podía autorizar nada
+// y toda OC se quedaba trabada en «en gestión».
+
+describe('H · administracion autoriza y paga', () => {
+  it('autoriza desde en gestión', () => {
+    const oc = makeOC({ estado: 'en_gestion' });
+    expect(puedeTransicionarOC('en_gestion', 'autorizada', 'administracion', oc).ok).toBe(true);
+  });
+
+  it('paga desde autorizada, con comprobante', () => {
+    const oc = makeOC({ estado: 'autorizada', comprobantePago: 'https://.../pago.pdf' });
+    expect(puedeTransicionarOC('autorizada', 'pagada', 'administracion', oc).ok).toBe(true);
+  });
+
+  it('sin comprobante NO puede pagar: la validación sigue mandando', () => {
+    const oc = makeOC({ estado: 'autorizada', comprobantePago: null });
+    const r = puedeTransicionarOC('autorizada', 'pagada', 'administracion', oc);
+    expect(r.ok).toBe(false);
+    expect(r.razon).toMatch(/comprobante/i);
+  });
+
+  it('rechaza desde autorizada con motivo', () => {
+    const oc = makeOC({ estado: 'autorizada', motivoRechazo: 'Duplicada' });
+    expect(puedeTransicionarOC('autorizada', 'rechazada', 'administracion', oc).ok).toBe(true);
+  });
+
+  it('el fondeo insuficiente la sigue frenando', () => {
+    const oc = makeOC({ estado: 'en_gestion', origen: 'embarque' });
+    const r = puedeTransicionarOC('en_gestion', 'autorizada', 'administracion', oc, {
+      totalFondeo: 1000, totalOCsPendientes: 10000,
+    });
+    expect(r.ok).toBe(false);
+    expect(r.razon).toMatch(/fondeo/i);
+  });
+
+  it('NO gestiona: gestionar es de Operaciones', () => {
+    const oc = makeOC({ estado: 'solicitada' });
+    expect(puedeTransicionarOC('solicitada', 'en_gestion', 'administracion', oc).ok).toBe(false);
+  });
+
+  it('Operaciones NO autoriza: autorizar el pago es de Administración', () => {
+    const oc = makeOC({ estado: 'en_gestion' });
+    expect(puedeTransicionarOC('en_gestion', 'autorizada', 'operaciones', oc).ok).toBe(false);
+  });
+
+  it('Pricing solo solicita: no gestiona ni autoriza', () => {
+    expect(puedeTransicionarOC('solicitada', 'en_gestion', 'pricing', makeOC()).ok).toBe(false);
+    expect(puedeTransicionarOC('en_gestion', 'autorizada', 'pricing', makeOC({ estado: 'en_gestion' })).ok).toBe(false);
+  });
+});
+

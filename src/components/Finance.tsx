@@ -26,7 +26,7 @@ export default function Finance() {
   });
 
   // ── OC: datos reales de Firestore ─────────────────────────────────────────
-  const { ordenes, loading: loadingOC, totalPorPagar, conteosPorEstado } = useOrdenesCompra();
+  const { ordenes, loading: loadingOC, porPagar, conteosPorEstado } = useOrdenesCompra();
 
   const tabs = ['Facturas (CFDI)', 'Cuentas por cobrar', 'Cuentas por pagar', 'Estados de cuenta'];
 
@@ -99,28 +99,34 @@ export default function Finance() {
                 del embarque (Bloque 5). */}
           </div>
 
-          {/* KPIs
-              Aquí había cuatro tarjetas: tres con cifras inventadas
-              ($145,250 facturado, $62,400 por cobrar, $18,250 vencido) que
-              nunca se conectaron a nada. Cifras financieras falsas que se ven
-              creíbles son peor que no tener el dato. Se conserva solo la que
-              sale de datos reales: por pagar a proveedores, desde las OC. */}
+          {/* KPIs (C-1)
+              Aquí había cuatro tarjetas con cifras inventadas ($145,250
+              facturado, $62,400 por cobrar, $18,250 vencido, $42,100 por
+              pagar) que nunca se conectaron a nada. Ahora las de pago salen de
+              las OC reales, y las de cobro siguen sin existir porque la
+              facturación se construye en la fase B: se dice, en vez de
+              rellenarse con un número creíble. */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-[16px]">
-            <div className="bg-white p-[20px] rounded-[12px] border border-card-border shadow-sm">
-               <p className="text-[11px] font-medium text-text-muted uppercase tracking-[0.05em] mb-[4px]">Por pagar (Prov.)</p>
-               <p className="text-[24px] font-semibold text-text-primary tabular-nums">
-                 {loadingOC ? (
-                   <span className="text-text-muted">...</span>
-                 ) : (
-                   <>${totalPorPagar.toLocaleString()} <span className="text-[14px] text-text-muted font-normal">USD</span></>
-                 )}
-               </p>
-            </div>
-            <div className="col-span-1 md:col-span-3 bg-white p-[20px] rounded-[12px] border border-dashed border-card-border shadow-sm flex items-center">
+            <TarjetaKPI
+              titulo="Por pagar en firme"
+              detalle="Órdenes autorizadas, pendientes de pago"
+              montos={porPagar.enFirme}
+              monedas={porPagar.monedasActivas}
+              cargando={loadingOC}
+              acento
+            />
+            <TarjetaKPI
+              titulo="Solicitudes en curso"
+              detalle="Solicitadas y en gestión: todavía se pueden rechazar"
+              montos={porPagar.enCurso}
+              monedas={porPagar.monedasActivas}
+              cargando={loadingOC}
+            />
+            <div className="col-span-2 bg-white p-[20px] rounded-[12px] border border-dashed border-card-border shadow-sm flex items-center">
                <p className="text-[12px] text-text-secondary leading-snug">
-                 Los indicadores de facturado, por cobrar y vencido todavía no
-                 están conectados. Se muestran en cuanto la facturación viva
-                 dentro del embarque.
+                 Facturado, por cobrar y vencido todavía no existen: se
+                 calculan de las facturas emitidas, y la facturación se
+                 construye dentro del embarque.
                </p>
             </div>
           </div>
@@ -323,6 +329,58 @@ export default function Finance() {
            </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Tarjeta de KPI ───────────────────────────────────────────────────────────
+
+/**
+ * Un KPI de dinero, con un renglón POR MONEDA.
+ *
+ * §4.3: los totales nunca se mezclan. Una tarjeta con un solo número y la
+ * etiqueta «USD» encima de una suma de pesos y dólares se ve perfectamente
+ * bien y es basura. Si no hay movimiento, dice cero en vez de quedarse vacía.
+ */
+function TarjetaKPI({
+  titulo, detalle, montos, monedas, cargando, acento = false,
+}: {
+  titulo: string;
+  detalle: string;
+  montos: Record<'USD' | 'MXN', number>;
+  monedas: ('USD' | 'MXN')[];
+  cargando: boolean;
+  acento?: boolean;
+}) {
+  const money = (n: number) =>
+    n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  return (
+    <div className="bg-white p-[20px] rounded-[12px] border border-card-border shadow-sm">
+      <p className="text-[11px] font-medium text-text-muted uppercase tracking-[0.05em] mb-[4px]">
+        {titulo}
+      </p>
+      {cargando ? (
+        <p className="text-[24px] font-semibold text-text-muted tabular-nums">…</p>
+      ) : monedas.length === 0 ? (
+        <p className={`text-[24px] font-semibold tabular-nums ${acento ? 'text-[#E11D48]' : 'text-text-primary'}`}>
+          $0.00
+        </p>
+      ) : (
+        <div className="space-y-0.5">
+          {monedas.map(m => (
+            <p
+              key={m}
+              className={`text-[20px] font-semibold tabular-nums leading-tight ${
+                acento ? 'text-[#E11D48]' : 'text-text-primary'}`}
+            >
+              ${money(montos[m])}{' '}
+              <span className="text-[12px] text-text-muted font-normal">{m}</span>
+            </p>
+          ))}
+        </div>
+      )}
+      <p className="text-[10px] text-text-muted mt-[6px] leading-snug">{detalle}</p>
     </div>
   );
 }
