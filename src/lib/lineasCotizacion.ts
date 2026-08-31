@@ -117,6 +117,15 @@ export interface LineaPlana {
    * Es lo que el embarque necesita para generar sus líneas de gasto (E-3).
    */
   costos: CostoLinea[];
+
+  /**
+   * ¿El costo fue capturado, aunque valga cero?
+   *
+   * Distingue «nadie lo ha puesto» de «alguien decidió que es cero». Un
+   * concepto absorbido o con pérdida deliberada es válido; uno sin capturar,
+   * no. Ver ConceptoCotizacion.costoCapturado.
+   */
+  costoCapturado: boolean;
 }
 
 // ─── Aplanado ─────────────────────────────────────────────────────────────────
@@ -196,6 +205,13 @@ function lineaDesdeConcepto(
     });
   }
 
+  // Capturado si viene de tarifas/subconceptos (son datos reales), si alguien
+  // lo marcó explícitamente, o —fallback para lo anterior a la marca— si es
+  // mayor que cero.
+  const costoCapturado = costos.length > 0
+    || concepto.costoCapturado === true
+    || (concepto.costo ?? 0) > 0;
+
   return {
     id: `${srv.id}::${concepto.id}`,
     servicioId: srv.id,
@@ -217,6 +233,7 @@ function lineaDesdeConcepto(
     tarifasCount: oficiales.length,
     tarifaOrigenId,
     costos,
+    costoCapturado,
   };
 }
 
@@ -256,6 +273,7 @@ function lineaDesdeServicio(srv: ServicioSolicitado, indice: number): LineaPlana
       tarifaOrigenId: seleccionada.tarifaOrigenId ?? null,
       vigencia: seleccionada.vigencia ?? null,
     }],
+    costoCapturado: true,
   };
 }
 
@@ -373,6 +391,8 @@ export function aplicarEdicionLinea(
         const profit = edicion.profit ?? c.profit;
         // El costo solo se acepta en líneas capturadas a mano.
         const costo = linea.costoDerivado ? costoDeConcepto(c) : (edicion.costo ?? c.costo);
+        // Teclear un cero es una decisión y queda registrada como tal.
+        const costoCapturado = edicion.costo !== undefined ? true : c.costoCapturado;
         const { venta, margen } = calcLinea(costo, profit);
 
         return {
@@ -380,6 +400,7 @@ export function aplicarEdicionLinea(
           nombre: edicion.concepto ?? c.nombre,
           conceptoId: edicion.conceptoId !== undefined ? (edicion.conceptoId ?? undefined) : c.conceptoId,
           costo,
+          costoCapturado,
           profit,
           venta,
           margen,

@@ -43,7 +43,7 @@ export interface Prontitud {
 const TEXTO_FALTANTE: Record<TipoFaltante, string> = {
   sin_concepto:  'sin concepto del catálogo',
   sin_proveedor: 'sin proveedor',
-  sin_monto:     'sin monto',
+  sin_monto:     'sin costo capturado',
 };
 
 /** Qué le falta a una línea. Puede faltarle más de una cosa. */
@@ -55,7 +55,12 @@ export function faltantesDeLinea(l: LineaPlana): TipoFaltante[] {
   if (!l.conceptoId) faltan.push('sin_concepto');
 
   if (!l.proveedorNombre?.trim()) faltan.push('sin_proveedor');
-  if (!Number.isFinite(l.costo) || l.costo <= 0) faltan.push('sin_monto');
+
+  // Lo que bloquea es que NADIE haya capturado el costo, no que valga cero.
+  // Un concepto absorbido o puesto con pérdida a propósito es válido: «a veces
+  // hay que poner el segundo concepto con pérdida, y el profit ponérselo al
+  // flete internacional». Un campo vacío no es lo mismo que un cero declarado.
+  if (!l.costoCapturado || !Number.isFinite(l.costo)) faltan.push('sin_monto');
 
   return faltan;
 }

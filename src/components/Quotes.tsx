@@ -25,6 +25,7 @@ import { PROSPECTO_COLUMNS, VISTA_DEFAULT_PROSPECTOS } from './quotes/prospectoC
 import FichaProspecto from './quotes/FichaProspecto';
 import { useVistasUsuario } from '../hooks/useVistasUsuario';
 import VistaSelector from './table/VistaSelector';
+import SelectorServicios from './quotes/SelectorServicios';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Componente principal del módulo de Cotizaciones
@@ -954,29 +955,11 @@ export default function Quotes() {
               <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-1.5">
                 Servicios a Cotizar (Consolidación Multimodal) *
               </h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                {serviciosActivos.map((srv) => {
-                  const selected = formServicios.includes(srv.id);
-                  return (
-                    <button
-                      key={srv.id}
-                      type="button"
-                      onClick={() => toggleServicioForm(srv.id)}
-                      className={`flex flex-col items-center justify-center gap-2.5 p-3 rounded-xl border text-xs font-bold transition-all shadow-2xs
-                        ${selected
-                          ? `ring-2 ring-offset-2 font-black border-brand bg-brand/5`
-                          : 'border-gray-200 text-gray-400 bg-gray-50 hover:border-gray-300'}`}
-                    >
-                      <div className={`mb-2 ${selected ? 'text-brand' : 'text-text-muted'}`}>
-                        {renderIcon(srv.icono, "w-6 h-6")}
-                      </div>
-                      <span className={`text-[11px] font-bold uppercase tracking-wide text-center leading-tight ${selected ? 'text-brand' : 'text-text-secondary'}`}>
-                        {srv.nombre}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
+              <SelectorServicios
+                servicios={serviciosActivos}
+                seleccionados={formServicios}
+                onToggle={toggleServicioForm}
+              />
             </div>
 
             {/* Sección 3: Detalles de la Carga */}

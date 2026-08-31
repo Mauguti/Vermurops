@@ -234,12 +234,26 @@ function Renglon({
 
       <td className="px-3 py-1.5 text-right">
         {editable && !linea.costoDerivado ? (
-          <input
-            type="number"
-            value={linea.costo || ''}
-            onChange={e => onEditar(linea.id, 'costo', Number(e.target.value))}
-            className={inputNum}
-          />
+          <div className="inline-flex items-center gap-1 justify-end">
+            <input
+              type="number"
+              value={linea.costoCapturado ? linea.costo : ''}
+              placeholder="—"
+              onChange={e => onEditar(linea.id, 'costo', Number(e.target.value))}
+              className={inputNum}
+            />
+            {/* Un cero declarado es una decisión —cortesía, cargo absorbido,
+                concepto con pérdida a propósito—, no un olvido. Se marca para
+                que se lea como tal. */}
+            {linea.costoCapturado && linea.costo === 0 && (
+              <span
+                className="text-[8px] font-bold uppercase tracking-wider text-gray-400 bg-gray-100 px-1 py-0.5 rounded shrink-0"
+                title="Costo capturado en cero: cortesía, cargo absorbido o concepto con pérdida deliberada."
+              >
+                sin costo
+              </span>
+            )}
+          </div>
         ) : (
           <span
             className="px-2 tabular-nums text-gray-700 inline-flex items-center gap-1"

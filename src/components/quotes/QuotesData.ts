@@ -83,6 +83,20 @@ export interface Subconcepto {
 }
 
 export interface ConceptoCotizacion {
+  /**
+   * ¿Alguien capturó el costo, aunque haya sido cero?
+   *
+   * Un campo vacío no es lo mismo que un cero declarado. Gabi lo describió en
+   * la sesión: «a veces hay que poner el segundo concepto con pérdida, y el
+   * profit ponérselo al flete internacional». También hay cortesías y cargos
+   * absorbidos: un concepto en cero puede ser una decisión, no un olvido.
+   *
+   * Ausente en los conceptos anteriores a esto. El fallback es `costo > 0`:
+   * un concepto recién creado nace en cero sin la marca y sigue bloqueando,
+   * que es lo correcto.
+   */
+  costoCapturado?: boolean;
+
   id: string;
   nombre: string;
   /** FK al catálogo conceptos/. null/undefined = concepto legacy (texto libre). */

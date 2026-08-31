@@ -89,7 +89,7 @@ describe('qué bloquea que esté lista', () => {
     expect(p.faltantes.map(f => f.tipo)).toContain('sin_proveedor');
   });
 
-  it('un concepto sin monto', () => {
+  it('un concepto sin costo capturado', () => {
     const sinMonto = concepto({ id: 'c3', nombre: 'Seguro', conceptoId: 'CON-003', profit: 100 });
     const p = evaluarProntitud(quote([sinMonto]));
     expect(p.lista).toBe(false);
@@ -171,29 +171,88 @@ describe('textos para el bloque que sustituye al botón', () => {
 
   it('varios faltantes se leen como frase, no como lista de códigos', () => {
     expect(textoFaltantesLinea(['sin_proveedor', 'sin_monto']))
-      .toBe('sin proveedor y sin monto');
+      .toBe('sin proveedor y sin costo capturado');
     expect(textoFaltantesLinea(['sin_concepto', 'sin_proveedor', 'sin_monto']))
-      .toBe('sin concepto del catálogo, sin proveedor y sin monto');
-    expect(textoFaltantesLinea(['sin_monto'])).toBe('sin monto');
+      .toBe('sin concepto del catálogo, sin proveedor y sin costo capturado');
+    expect(textoFaltantesLinea(['sin_monto'])).toBe('sin costo capturado');
   });
 });
 
 describe('faltantesDeLinea sobre la línea plana', () => {
-  const base = { id: 'l', conceptoId: 'CON-1', proveedorNombre: 'Maersk', costo: 100 } as LineaPlana;
+  const base = {
+    id: 'l', conceptoId: 'CON-1', proveedorNombre: 'Maersk',
+    costo: 100, costoCapturado: true,
+  } as LineaPlana;
 
   it('completa no tiene faltantes', () => {
     expect(faltantesDeLinea(base)).toEqual([]);
   });
 
-  it('un costo en cero cuenta como sin monto', () => {
-    expect(faltantesDeLinea({ ...base, costo: 0 })).toContain('sin_monto');
+  it('un cero DECLARADO no cuenta como faltante', () => {
+    expect(faltantesDeLinea({ ...base, costo: 0, costoCapturado: true })).not.toContain('sin_monto');
+  });
+
+  it('un costo sin capturar sí', () => {
+    expect(faltantesDeLinea({ ...base, costo: 0, costoCapturado: false })).toContain('sin_monto');
   });
 
   it('un proveedor con solo espacios no cuenta', () => {
     expect(faltantesDeLinea({ ...base, proveedorNombre: '   ' })).toContain('sin_proveedor');
   });
 
-  it('un costo no numérico cuenta como sin monto', () => {
+  it('un costo no numérico cuenta como faltante aunque diga capturado', () => {
     expect(faltantesDeLinea({ ...base, costo: NaN })).toContain('sin_monto');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Cero capturado vs. campo vacío.
+//
+// «A veces hay que poner el segundo concepto con pérdida, y el profit
+// ponérselo al flete internacional». Un concepto absorbido, una cortesía o uno
+// puesto con pérdida a propósito valen cero y son válidos. Lo que bloquea es
+// que NADIE haya capturado el costo.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('costo cero: decisión, no olvido', () => {
+  const enCero = concepto({
+    id: 'z1', nombre: 'Cortesía', conceptoId: 'CON-Z', profit: 0,
+    costo: 0, costoCapturado: true,
+    tarifas: [], proveedoresOficialIds: [],
+  });
+
+  it('un cero DECLARADO no bloquea, si tiene proveedor', () => {
+    // Se le pone proveedor aparte: el cero es sobre el costo, no sobre quién presta.
+    const conProv = { ...enCero, tarifas: [tarifa({ id: 'tz', monto: 0, proveedorId: 'PRV-Z' })], proveedoresOficialIds: ['tz'] };
+    const p = evaluarProntitud(quote([conProv as typeof enCero]));
+    expect(p.faltantes.map(f => f.tipo)).not.toContain('sin_monto');
+  });
+
+  it('un cero SIN capturar sí bloquea', () => {
+    const sinCapturar = concepto({ id: 'z2', nombre: 'Olvidado', conceptoId: 'CON-Y', costo: 0 });
+    expect(evaluarProntitud(quote([sinCapturar])).faltantes.map(f => f.tipo))
+      .toContain('sin_monto');
+  });
+
+  it('un concepto recién creado bloquea: nace en cero sin la marca', () => {
+    const nuevo = concepto({ id: 'z3', nombre: '', conceptoId: undefined });
+    expect(evaluarProntitud(quote([nuevo])).faltantes.map(f => f.tipo)).toContain('sin_monto');
+  });
+
+  it('fallback para lo anterior a la marca: un costo > 0 cuenta como capturado', () => {
+    // Los conceptos guardados antes de que existiera costoCapturado no la
+    // traen, y no deben empezar a bloquear de un día para otro.
+    const legacy = concepto({
+      id: 'z4', nombre: 'Viejo', conceptoId: 'CON-X', costo: 500,
+      tarifas: [tarifa({ id: 'tv', monto: 500, proveedorId: 'PRV-V' })],
+      proveedoresOficialIds: ['tv'],
+    });
+    expect(evaluarProntitud(quote([legacy])).lista).toBe(true);
+  });
+
+  it('el texto dice «sin costo capturado», no «sin monto»', () => {
+    // «Sin monto» suena a que el número está mal; lo que falta es capturarlo.
+    const sinCapturar = concepto({ id: 'z5', nombre: 'Algo', conceptoId: 'CON-W' });
+    const f = evaluarProntitud(quote([sinCapturar])).faltantes.find(x => x.tipo === 'sin_monto')!;
+    expect(textoFaltante(f)).toContain('sin costo capturado');
   });
 });

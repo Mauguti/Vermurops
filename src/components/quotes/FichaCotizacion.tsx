@@ -38,6 +38,9 @@ import {
   reordenarLinea, aplicarOrden, estaCongelada,
 } from '../../lib/lineasCotizacion';
 import { agruparPorModalidad } from '../../lib/agrupacionModalidad';
+import {
+  evaluarProntitud, faltantesPorLinea, resumenFaltantes, textoFaltantesLinea,
+} from '../../lib/prontitudCotizacion';
 import TarjetaModalidad from './TarjetaModalidad';
 import ResumenFinancieroInline from './ResumenFinancieroInline';
 import { calcTotales } from '../../lib/cotizacionCalculator';
@@ -550,6 +553,14 @@ export default function FichaCotizacion({
 
   // ── Vista plana para las tarjetas por modalidad ─────────────────────────
   const lineasPlanas = useMemo(() => aplanarCotizacion(quote), [quote]);
+
+  /**
+   * Qué le falta a la cotización para poder avanzar (BC-1).
+   *
+   * Gobierna qué botones se muestran. Un botón visible que no aplica es peor
+   * que uno ausente: obliga a preguntarse si uno lo está usando mal.
+   */
+  const prontitud = useMemo(() => evaluarProntitud(quote), [quote]);
   const tarjetasModalidad = useMemo(
     () => agruparPorModalidad(lineasPlanas, servicios ?? []),
     [lineasPlanas, servicios],
@@ -619,6 +630,40 @@ export default function FichaCotizacion({
   /** Pre-TA: botón primario de avance (primera transición forward disponible). */
   const advanceTarget = (FORWARD_TARGETS[quote.etapa] ?? []).find(t => disponibles.includes(t)) ?? null;
   const advanceCfg = advanceTarget ? ADVANCE_CONFIG[advanceTarget] ?? null : null;
+
+  /**
+   * Matriz de botones (BC-2).
+   *
+   * Cada transición declara qué necesita la cotización para poder cumplir su
+   * promesa. Si no la cumple, el botón NO se muestra y en su lugar se explica
+   * qué falta — esconderlo sin más solo cambia «no aplica» por «no sé por qué
+   * no puedo avanzar».
+   */
+  const CONDICION_AVANCE: Partial<Record<PipelineStageId, { ok: boolean; porque: string }>> = {
+    // Una solicitud vacía no tiene nada que cotizar.
+    solicitado_pricing:     { ok: prontitud.conConceptos, porque: 'Agrega al menos un concepto antes de enviarla a Pricing.' },
+    // Registrar respuestas exige que haya alguna respuesta.
+    cotizaciones_recibidas: { ok: prontitud.algunProveedor, porque: 'Ningún concepto tiene proveedor todavía.' },
+    // Consolidar, enviar y ganar exigen la cotización completa.
+    consolidada:            { ok: prontitud.lista, porque: '' },
+    enviada_cliente:        { ok: prontitud.lista, porque: '' },
+    ganada:                 { ok: prontitud.lista, porque: '' },
+  };
+
+  const condicionAvance = advanceTarget ? CONDICION_AVANCE[advanceTarget] : undefined;
+  const puedeAvanzar = condicionAvance ? condicionAvance.ok : true;
+
+  /** «Marcar ganada» como botón secundario obedece la misma condición. */
+  const puedeMarcarGanada = disponibles.includes('ganada') && prontitud.lista;
+
+  /**
+   * El PDF es solo de Pricing y Admin —lleva los costos implícitos en los
+   * montos y Ventas no ve costos— y solo con la cotización completa.
+   */
+  const puedeGenerarPDF =
+    rolActivo !== 'ventas' &&
+    prontitud.lista &&
+    ['consolidada', 'enviada_cliente', 'negociacion', 'ganada'].includes(quote.etapa);
 
   const inputCls ='w-full text-sm text-gray-700 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200 rounded-lg px-2.5 py-1.5 focus:bg-white focus:border-[#E11D48] outline-none transition-all';
   // Estilo atenuado/solo-lectura para campos del prospecto cuando hay cliente vinculado.
@@ -1557,7 +1602,7 @@ export default function FichaCotizacion({
       <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex flex-col gap-3 shrink-0">
 
         {/* ── Primario: avanzar etapa (dinámico según etapa + rol) ── */}
-        {advanceCfg && advanceTarget && (
+        {advanceCfg && advanceTarget && puedeAvanzar && (
           <button
             onClick={() => {
               if (advanceTarget === 'ganada') {
@@ -1578,8 +1623,21 @@ export default function FichaCotizacion({
           </button>
         )}
 
-        {/* ── Ganada (cuando disponible pero NO es el botón primario) ── */}
-        {disponibles.includes('ganada') && advanceTarget !== 'ganada' && (
+        {/* En lugar del botón, qué falta. La diferencia entre «no puedo
+            avanzar» y «no sé por qué no puedo avanzar». */}
+        {advanceCfg && !puedeAvanzar && (
+          <BloqueFaltantes
+            prontitud={prontitud}
+            porque={condicionAvance?.porque ?? ''}
+            accion={advanceCfg.label}
+          />
+        )}
+
+        {/* ── Ganada (cuando disponible pero NO es el botón primario) ──
+            Exige la cotización completa: de esta transición nace el embarque
+            heredando los cargos. Si falta un costo, el embarque nace mal y
+            nadie se entera hasta pagarle al proveedor. */}
+        {puedeMarcarGanada && advanceTarget !== 'ganada' && (
           <button
             onClick={() => {
               if (confirm(`¿Marcar ${quote.id} como GANADA?`)) {
@@ -1595,12 +1653,20 @@ export default function FichaCotizacion({
 
         {/* ── Secundarios: PDF + Perdida ── */}
         <div className="flex gap-3 max-w-3xl mx-auto w-full">
-          <button
-            onClick={() => alert('Generando PDF de la cotización consolidada...')}
-            className="flex-1 px-4 py-2.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2"
-          >
-            <FileText className="w-3.5 h-3.5 text-gray-400" /> Generar PDF
-          </button>
+          {/* Solo Pricing y Admin: un PDF lleva los costos implícitos en los
+              montos, y Ventas no ve costos (§ bloque 2). Y solo cuando la
+              cotización está completa: un PDF a medias es un documento que
+              sale al cliente con huecos.
+              ⚠️ PENDIENTE REAL: hoy este botón es un stub. Condicionarlo lo
+              esconde, pero el PDF sigue sin construirse. */}
+          {puedeGenerarPDF && (
+            <button
+              onClick={() => alert('Generando PDF de la cotización consolidada...')}
+              className="flex-1 px-4 py-2.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              <FileText className="w-3.5 h-3.5 text-gray-400" /> Generar PDF
+            </button>
+          )}
 
           {disponibles.includes('perdida') && !showLossReasonForm && (
             <button
@@ -1618,6 +1684,57 @@ export default function FichaCotizacion({
           <span className="text-[10px] text-gray-400">Guardado automáticamente</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bloque que ocupa el lugar del botón ausente.
+//
+// Esconder un botón que no aplica resuelve la mitad del problema; la otra
+// mitad es que el usuario sepa por qué. Sin esto, «no aplica» se convierte en
+// «no sé por qué no puedo avanzar», que genera el mismo estrés.
+// ─────────────────────────────────────────────────────────────────────────────
+function BloqueFaltantes({
+  prontitud, porque, accion,
+}: {
+  prontitud: ReturnType<typeof evaluarProntitud>;
+  porque: string;
+  accion: string;
+}) {
+  const grupos = faltantesPorLinea(prontitud);
+  const resumen = resumenFaltantes(prontitud);
+
+  return (
+    <div className="w-full max-w-3xl mx-auto rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
+      <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
+        {resumen || porque || `Falta información para «${accion}»`}
+      </p>
+
+      {porque && grupos.length === 0 && (
+        <p className="text-[12px] text-amber-700 mt-1">{porque}</p>
+      )}
+
+      {grupos.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {grupos.slice(0, 6).map(g => (
+            <li key={g.lineaId} className="text-[12px] text-amber-800 flex items-baseline gap-1.5">
+              <span className="text-amber-400">·</span>
+              <span className="font-medium">{g.concepto}</span>
+              <span className="text-amber-600">— {textoFaltantesLinea(g.tipos)}</span>
+            </li>
+          ))}
+          {grupos.length > 6 && (
+            <li className="text-[11px] text-amber-600 pl-3">
+              y {grupos.length - 6} concepto{grupos.length - 6 !== 1 ? 's' : ''} más
+            </li>
+          )}
+        </ul>
+      )}
+
+      <p className="text-[10px] text-amber-600 mt-2">
+        «{accion}» aparecerá cuando esté completo.
+      </p>
     </div>
   );
 }
