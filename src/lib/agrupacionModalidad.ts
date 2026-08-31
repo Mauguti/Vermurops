@@ -63,13 +63,18 @@ const redondear = (n: number) => Math.round(n * 100) / 100;
  * propia: es como el cliente lee su cotización.
  */
 export function modalidadDeLinea(linea: LineaPlana, catalogo: Servicio[]): ModalidadFicha {
-  const transporte = modalidadDeServicio(linea.servicioTipo, catalogo);
+  return modalidadDeServicioTipo(linea.servicioTipo, catalogo);
+}
+
+/** Modalidad de ficha a partir del `tipo` de un servicio. */
+export function modalidadDeServicioTipo(tipo: string, catalogo: Servicio[]): ModalidadFicha {
+  const transporte = modalidadDeServicio(tipo, catalogo);
   if (transporte) return transporte;
 
-  const t = linea.servicioTipo.trim().toLowerCase();
+  const t = tipo.trim().toLowerCase();
   if (t.includes('aduan')) return 'aduanal';
 
-  const delCatalogo = catalogo.find(s => s.id === linea.servicioTipo)
+  const delCatalogo = catalogo.find(s => s.id === tipo)
     ?? catalogo.find(s => s.nombre.trim().toLowerCase() === t);
   if (delCatalogo?.categoria === 'aduana') return 'aduanal';
 
@@ -81,14 +86,29 @@ export function modalidadDeLinea(linea: LineaPlana, catalogo: Servicio[]): Modal
 /**
  * Arma una tarjeta por modalidad presente.
  *
- * Las modalidades sin líneas NO se muestran: una cotización marítima no tiene
- * por qué enseñar una tarjeta aérea vacía.
+ * «Presente» son dos cosas, y omitir la segunda era un bug: las modalidades que
+ * ya tienen líneas, Y las de los servicios que se eligieron al crear la
+ * cotización aunque todavía no tengan ningún concepto.
+ *
+ * Sin eso, una cotización recién creada —que nace con servicios y
+ * `conceptos: []`— no mostraba ninguna tarjeta, y la única forma de agregar
+ * conceptos era abrir el detalle plegado con la interfaz anterior.
+ *
+ * Lo que sigue sin mostrarse son las modalidades que nadie eligió: una
+ * cotización marítima no enseña una tarjeta aérea vacía.
  */
 export function agruparPorModalidad(
   lineas: LineaPlana[],
   catalogo: Servicio[],
+  serviciosDeLaCotizacion: { id: string; tipo: string }[] = [],
 ): TarjetaModalidad[] {
   const porModalidad = new Map<ModalidadFicha, LineaPlana[]>();
+
+  // Primero las modalidades de los servicios elegidos, aunque vayan vacías.
+  serviciosDeLaCotizacion.forEach(srv => {
+    const m = modalidadDeServicioTipo(srv.tipo, catalogo);
+    if (!porModalidad.has(m)) porModalidad.set(m, []);
+  });
 
   lineas.forEach(l => {
     const m = modalidadDeLinea(l, catalogo);

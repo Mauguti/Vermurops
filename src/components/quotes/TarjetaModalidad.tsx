@@ -53,6 +53,8 @@ export interface TarjetaModalidadProps {
   onMoverLinea: (lineaId: string, direccion: 'arriba' | 'abajo') => void;
   onAgregarLinea: () => void;
   onCompararProveedor: (lineaId: string) => void;
+  /** Abre los datos que el embarque necesita: tráfico, ruta, FCL/LCL. */
+  onDatosEmbarque?: () => void;
 }
 
 const money = (n: number) =>
@@ -61,7 +63,7 @@ const money = (n: number) =>
 export default function TarjetaModalidad({
   tarjeta, moneda, editable,
   onEditarLinea, onElegirConcepto, onQuitarLinea, onMoverLinea, onAgregarLinea,
-  onCompararProveedor, conceptosActivos, onCrearConcepto, soloLectura,
+  onCompararProveedor, onDatosEmbarque, conceptosActivos, onCrearConcepto, soloLectura,
 }: TarjetaModalidadProps) {
   const [expandida, setExpandida] = useState(true);
 
@@ -83,7 +85,17 @@ export default function TarjetaModalidad({
           {expandida ? <ChevronUp className="w-3.5 h-3.5 text-gray-400" /> : <ChevronDown className="w-3.5 h-3.5 text-gray-400" />}
         </button>
 
-        <div className="flex items-center gap-5 text-right shrink-0">
+        <div className="flex items-center gap-4 text-right shrink-0">
+          {/* Discreto a propósito: es la excepción, no el trabajo diario. */}
+          {editable && onDatosEmbarque && (
+            <button
+              onClick={onDatosEmbarque}
+              className="text-[10px] font-semibold text-gray-400 hover:text-[#E11D48] px-2 py-1 rounded transition-colors"
+              title="Ruta, tráfico e información que el embarque necesita"
+            >
+              Datos del embarque
+            </button>
+          )}
           <div>
             <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Venta</p>
             <p className="text-[13px] font-bold text-[#18181B] tabular-nums">
@@ -134,8 +146,18 @@ export default function TarjetaModalidad({
 
                 {tarjeta.lineas.length === 0 && (
                   <tr>
-                    <td colSpan={editable ? 7 : 6} className="px-3 py-6 text-center text-gray-400 text-[12px]">
-                      Sin conceptos en esta modalidad.
+                    <td colSpan={editable ? 7 : 6} className="px-3 py-8 text-center">
+                      <p className="text-[12px] text-gray-400">
+                        Sin conceptos todavía.
+                      </p>
+                      {editable && (
+                        <button
+                          onClick={onAgregarLinea}
+                          className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-[#E11D48] hover:bg-[#E11D48]/5 px-2.5 py-1.5 rounded-lg transition-colors"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Agregar el primero
+                        </button>
+                      )}
                     </td>
                   </tr>
                 )}

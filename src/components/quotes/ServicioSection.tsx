@@ -13,6 +13,15 @@ import { type Rol } from '../../lib/stateMachine';
 import { resolverTrafico } from '../../lib/traficoServicio';
 
 export interface ServicioSectionProps {
+  /**
+   * true = solo los datos de la operación (ruta, tráfico, incoterm, FCL/LCL).
+   *
+   * Los conceptos se agregan ÚNICAMENTE en la tabla de su modalidad. Tener dos
+   * caminos para lo mismo confunde, y el cliente ya nos lo dijo con los
+   * botones. Lo que se conserva aquí es la captura que el embarque necesita
+   * para el folio y que la tabla no cubre.
+   */
+  soloDatosOperacion?: boolean;
   key?: React.Key;
   servicio: ServicioSolicitado;
   rolActivo: Rol;
@@ -48,7 +57,7 @@ function getModality(tipo: string, icono: string): 'maritimo' | 'terrestre' | 'o
   return 'otro';
 }
 
-export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servicios, renderIcon, moneda, clientePreferidos, clienteVetados, diasCredito, catalogoTarifas, onCrearTarifaSpot, activeConceptoId, onConceptoActivate, panelVisible, onComparativaToggle, conceptosActivos, onCrearConcepto }: ServicioSectionProps) {
+export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servicios, renderIcon, moneda, clientePreferidos, clienteVetados, diasCredito, catalogoTarifas, onCrearTarifaSpot, activeConceptoId, onConceptoActivate, panelVisible, onComparativaToggle, conceptosActivos, onCrearConcepto, soloDatosOperacion }: ServicioSectionProps) {
   // Si la ruta permite deducir el tráfico, se propone y Pricing solo confirma.
   // No se guarda solo: lo sugerido y lo declarado no son lo mismo, y el folio
   // del embarque depende de este dato.
@@ -372,7 +381,11 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
             </div>
           )}
 
-          {/* Conceptos */}
+          {/* Los conceptos se agregan ÚNICAMENTE en la tabla de su
+              modalidad. Aquí solo viven los datos que el embarque necesita
+              para el folio —tráfico, ubicación, FCL/LCL— y que la tabla no
+              cubre. Dos caminos para lo mismo confunden. */}
+          {!soloDatosOperacion && (
           <div className="border-t border-gray-150 pt-4 mt-4 space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest">
@@ -493,6 +506,7 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
               </div>
             )}
           </div>
+          )}
         </div>
       )}
     </div>

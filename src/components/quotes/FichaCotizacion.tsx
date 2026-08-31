@@ -37,7 +37,7 @@ import {
   aplanarCotizacion, aplicarEdicionLinea, quitarLinea, agregarLinea,
   reordenarLinea, aplicarOrden, estaCongelada,
 } from '../../lib/lineasCotizacion';
-import { agruparPorModalidad } from '../../lib/agrupacionModalidad';
+import { agruparPorModalidad, modalidadDeServicioTipo } from '../../lib/agrupacionModalidad';
 import {
   matricesPorServicio, escribirCelda, quitarAgenteDeCotizacion, elegirAgente,
   conceptosSinCotizar, claveAgente, construirMatriz, CONCEPTOS_POR_PLANTILLA,
@@ -49,6 +49,7 @@ import CapturaTipoCambio from './CapturaTipoCambio';
 import EvidenciasTarifas from './EvidenciasTarifas';
 import RevisionTarifasExtraidas from '../tarifas/RevisionTarifasExtraidas';
 import CargarTarifario from '../tarifas/CargarTarifario';
+import Toast from '../ui/Toast';
 import { usePuertos } from '../../hooks/usePuertos';
 import { useDocumentosTarifario } from '../../hooks/useDocumentosTarifario';
 import { totalesComparables } from '../../lib/matrizComparativa';
@@ -141,6 +142,8 @@ export default function FichaCotizacion({
   /** Extracción recién llegada, esperando la pantalla de revisión (TA-4). */
   const [toastLocal, setToastLocal] = useState<string | null>(null);
   const [cargandoTarifario, setCargandoTarifario] = useState(false);
+  /** Servicio cuyos datos de embarque se están editando. */
+  const [datosEmbarqueDe, setDatosEmbarqueDe] = useState<string | null>(null);
   const [extraccionPendiente, setExtraccionPendiente] =
     useState<{ documento: import('../../lib/documentoTarifario').DocumentoTarifario; respuesta: unknown } | null>(null);
   /**
@@ -622,8 +625,11 @@ export default function FichaCotizacion({
    */
   const prontitud = useMemo(() => evaluarProntitud(quote), [quote]);
   const tarjetasModalidad = useMemo(
-    () => agruparPorModalidad(lineasPlanas, servicios ?? []),
-    [lineasPlanas, servicios],
+    () => agruparPorModalidad(
+      lineasPlanas, servicios ?? [],
+      (quote.servicios ?? []).map(sv => ({ id: sv.id, tipo: sv.tipo })),
+    ),
+    [lineasPlanas, servicios, quote.servicios],
   );
 
   /** Aplica una edición de la tabla plana sobre el árbol anidado. */
@@ -1167,6 +1173,11 @@ export default function FichaCotizacion({
                   onMoverLinea={handleMoverLineaPlana}
                   onAgregarLinea={() => handleAgregarLineaPlana(t.modalidad)}
                   onCompararProveedor={handleCompararProveedor}
+                  onDatosEmbarque={() => {
+                    const srv = quote.servicios.find(
+                      sv => modalidadDeServicioTipo(sv.tipo, servicios ?? []) === t.modalidad);
+                    if (srv) setDatosEmbarqueDe(srv.id);
+                  }}
                 />
               ))}
 
@@ -1211,37 +1222,6 @@ export default function FichaCotizacion({
                 }}
               />
             )}
-
-            {/* Detalle avanzado por servicio — se conserva plegado para no
-                perder la captura de datos de embarque (FCL/LCL, tráfico). */}
-            <details className="pt-2">
-              <summary className="text-[10px] font-bold text-gray-400 uppercase tracking-widest cursor-pointer hover:text-gray-600">
-                Datos de la operación por servicio
-              </summary>
-              <div className="space-y-4 pt-3">
-            {quote.servicios.map(srv => (
-              <ServicioSection
-                key={srv.id}
-                servicio={srv}
-                rolActivo={rolActivo}
-                onUpdateServicio={updated => handleUpdateServicio(srv.id, updated)}
-                servicios={servicios}
-                renderIcon={renderIcon}
-                moneda={quote.moneda}
-                clientePreferidos={clienteVinculado?.proveedoresPreferidos}
-                clienteVetados={clienteVinculado?.proveedoresVetados}
-                diasCredito={clienteVinculado?.dias ?? 30}
-                catalogoTarifas={catalogoTarifas}
-                onCrearTarifaSpot={createTarifa}
-                activeConceptoId={activeConcepto?.servicioId === srv.id ? activeConcepto.id : undefined}
-                onConceptoActivate={(conceptoId) => handleConceptoActivate(conceptoId, srv.id)}
-                panelVisible={rolActivo !== 'ventas'}
-                onComparativaToggle={handleComparativaToggle}
-                conceptosActivos={conceptosActivos}
-              />
-            ))}
-              </div>
-            </details>
 
             {/* Botón para agregar nuevo servicio (Solo Pricing/Admin) */}
             {rolActivo !== 'ventas' && (
@@ -2000,6 +1980,95 @@ export default function FichaCotizacion({
           <span className="text-[10px] text-gray-400">Guardado automáticamente</span>
         </div>
       </div>
+
+      {/* ═══ Modales ═══════════════════════════════════════════════════════
+          Estaban declarados como estado pero nunca se renderizaban: los
+          botones que los abren no hacían nada. */}
+
+      {/* Elegir el proveedor que entra como columna de la comparativa. */}
+      {modalAgente && (
+        <ModalAgregarAgente
+          proveedores={proveedores}
+          modalidadRelevante={quote.servicios.find(sv => sv.id === modalAgente)?.tipo}
+          yaEnMatriz={(matrizActiva?.matriz.agentes ?? [])
+            .map(a => a.proveedorId).filter(Boolean) as string[]}
+          onCerrar={() => setModalAgente(null)}
+          onAgregar={(agente) => handleAgregarAgente(modalAgente, agente)}
+        />
+      )}
+
+      {/* Carga de tarifario: el MISMO componente que en el módulo de Tarifas. */}
+      {cargandoTarifario && (
+        <CargarTarifario
+          cotizacionId={quote.id}
+          onCerrar={() => setCargandoTarifario(false)}
+          onGuardadas={(n) => setToastLocal(
+            `${n} tarifa${n !== 1 ? 's' : ''} agregada${n !== 1 ? 's' : ''} al catálogo.`)}
+        />
+      )}
+
+      {/* Revisión de lo que extrajo la IA. Nada se guarda sin pasar por aquí. */}
+      {extraccionPendiente && (
+        <RevisionTarifasExtraidas
+          respuestaCruda={extraccionPendiente.respuesta}
+          nombreArchivo={extraccionPendiente.documento.nombreArchivo}
+          conceptos={conceptosActivos}
+          puertos={puertos.map(p => ({ id: p.id, nombre: p.nombre, codigo: p.codigo }))}
+          proveedores={proveedores}
+          onCancelar={() => setExtraccionPendiente(null)}
+          onGuardar={async (lineasListas, proveedorId) => {
+            await guardarTarifasExtraidas(lineasListas, extraccionPendiente.documento, proveedorId);
+            setExtraccionPendiente(null);
+          }}
+        />
+      )}
+
+      {/* Datos que el embarque necesita —tráfico, ruta, FCL/LCL— y que la
+          tabla no cubre. Los conceptos se agregan SOLO en la tabla. */}
+      {datosEmbarqueDe && (() => {
+        const srv = quote.servicios.find(sv => sv.id === datosEmbarqueDe);
+        if (!srv) return null;
+        return (
+          <div
+            className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4"
+            onClick={() => setDatosEmbarqueDe(null)}
+          >
+            <div
+              className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="px-5 py-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50 sticky top-0 z-10">
+                <div>
+                  <h3 className="text-[14px] font-bold text-[#18181B]">Datos del embarque</h3>
+                  <p className="text-[11px] text-gray-400 capitalize">{srv.tipo}</p>
+                </div>
+                <button onClick={() => setDatosEmbarqueDe(null)} className="text-gray-400 hover:text-gray-600">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-4">
+                <ServicioSection
+                  soloDatosOperacion
+                  servicio={srv}
+                  rolActivo={rolActivo}
+                  onUpdateServicio={updated => handleUpdateServicio(srv.id, updated)}
+                  servicios={servicios}
+                  renderIcon={renderIcon}
+                  moneda={quote.moneda}
+                  diasCredito={clienteVinculado?.dias ?? 30}
+                  catalogoTarifas={catalogoTarifas}
+                  onCrearTarifaSpot={createTarifa}
+                  panelVisible={false}
+                  onComparativaToggle={handleComparativaToggle}
+                  conceptosActivos={conceptosActivos}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      <Toast mensaje={toastLocal} tipo="exito" onClose={() => setToastLocal(null)} />
     </div>
   );
 }

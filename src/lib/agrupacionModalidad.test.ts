@@ -89,3 +89,47 @@ describe('tarjetas por modalidad', () => {
       .toEqual(['maritimo', 'aereo', 'terrestre', 'aduanal', 'locales']);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// El bug: una cotización recién creada no mostraba ninguna tarjeta.
+//
+// Nace con servicios y `conceptos: []`, así que no hay líneas — y las tarjetas
+// salían solo de las líneas. La única forma de agregar conceptos era abrir el
+// detalle plegado con la interfaz anterior.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('tarjetas de una cotización recién creada', () => {
+  const servicios = [
+    { id: 'srv-1', tipo: 'srv-def-1' },   // marítimo
+    { id: 'srv-2', tipo: 'srv-def-9' },   // aduanal
+  ];
+
+  it('muestra una tarjeta por servicio elegido aunque no haya conceptos', () => {
+    const t = agruparPorModalidad([], CATALOGO, servicios);
+    expect(t.map(x => x.modalidad)).toEqual(['maritimo', 'aduanal']);
+  });
+
+  it('las tarjetas vacías totalizan en cero, no revientan', () => {
+    const [mar] = agruparPorModalidad([], CATALOGO, servicios);
+    expect(mar.lineas).toEqual([]);
+    expect(mar.ventaTotal).toBe(0);
+    expect(mar.margen).toBe(0);
+  });
+
+  it('sigue sin mostrar modalidades que nadie eligió', () => {
+    // Una cotización marítima no enseña una tarjeta aérea vacía.
+    const t = agruparPorModalidad([], CATALOGO, [{ id: 'srv-1', tipo: 'srv-def-1' }]);
+    expect(t.map(x => x.modalidad)).toEqual(['maritimo']);
+  });
+
+  it('al agregar conceptos, caen en la tarjeta que ya estaba', () => {
+    const conLinea = [linea({ id: '1', servicioTipo: 'srv-def-1', costo: 100, profit: 20, venta: 120 })];
+    const t = agruparPorModalidad(conLinea, CATALOGO, servicios);
+    expect(t).toHaveLength(2);
+    expect(t.find(x => x.modalidad === 'maritimo')!.lineas).toHaveLength(1);
+    expect(t.find(x => x.modalidad === 'aduanal')!.lineas).toEqual([]);
+  });
+
+  it('sin servicios ni líneas no hay tarjetas', () => {
+    expect(agruparPorModalidad([], CATALOGO, [])).toEqual([]);
+  });
+});
