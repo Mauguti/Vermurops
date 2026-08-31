@@ -14,7 +14,7 @@ import {
   agenteConMenorTotal, conceptosCotizados, agentesIncompletos, filaVigencia,
   escribirCelda, quitarAgenteDeCotizacion,
   lineasDesdeAgente, elegirAgente, conceptosSinCotizar,
-  CONCEPTOS_POR_PLANTILLA,
+  CONCEPTOS_POR_PLANTILLA, matricesPorServicio,
   AgenteColumna, FilaMatriz,
 } from './matrizComparativa';
 import { aplanarCotizacion } from './lineasCotizacion';
@@ -426,5 +426,78 @@ describe('claveAgente', () => {
   it('sin id cae al nombre normalizado', () => {
     expect(claveAgente({ proveedorId: null, proveedor: 'Sunway Logistics' }))
       .toBe(claveAgente({ proveedorId: null, proveedor: '  SUNWAY LOGISTICS  ' }));
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Una matriz POR SERVICIO.
+//
+// Pricing pide la misma ruta a varios proveedores. Un agente marítimo no
+// compite contra un transportista terrestre: mezclarlos produce una matriz
+// llena de huecos y un total que compara peras con manzanas.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('matriz por servicio', () => {
+  const multimodal: KanbanQuote = {
+    ...quote([]),
+    servicios: [
+      {
+        id: 'srv-mar', tipo: 'maritimo', ruta: { origen: 'Shanghai', destino: 'Manzanillo' },
+        incoterm: 'FOB', mercancia: 'G', peso: 0, volumen: 0, estado: 'cotizado',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
+        conceptos: [concepto({
+          id: 'cm', nombre: 'Flete marítimo', tarifas: [
+            cp({ id: 'm1', monto: 1500, proveedor: 'Maersk', proveedorId: 'PRV-M' }),
+            cp({ id: 'm2', monto: 1400, proveedor: 'Hapag', proveedorId: 'PRV-H' }),
+          ],
+        })],
+      } as ServicioSolicitado,
+      {
+        id: 'srv-ter', tipo: 'terrestre', ruta: { origen: 'Manzanillo', destino: 'Querétaro' },
+        incoterm: 'DAP', mercancia: 'G', peso: 0, volumen: 0, estado: 'cotizado',
+        cotizacionesProveedor: [], profit: 0, recargosPct: 0,
+        conceptos: [concepto({
+          id: 'ct', nombre: 'Acarreo', tarifas: [
+            cp({ id: 't1', monto: 400, proveedor: 'Transportes Y', proveedorId: 'PRV-T' }),
+          ],
+        })],
+      } as ServicioSolicitado,
+    ],
+  };
+
+  it('cada servicio tiene su propia matriz con sus propios agentes', () => {
+    const ms = matricesPorServicio(multimodal);
+    expect(ms).toHaveLength(2);
+    expect(ms[0].matriz.agentes.map(a => a.nombre)).toEqual(['Maersk', 'Hapag']);
+    expect(ms[1].matriz.agentes.map(a => a.nombre)).toEqual(['Transportes Y']);
+  });
+
+  it('los agentes de un servicio NO aparecen en el otro', () => {
+    const ms = matricesPorServicio(multimodal);
+    expect(ms[0].matriz.agentes.map(a => a.id)).not.toContain('PRV-T');
+    expect(ms[1].matriz.agentes.map(a => a.id)).not.toContain('PRV-M');
+  });
+
+  it('cada matriz totaliza y elige su propio menor', () => {
+    const ms = matricesPorServicio(multimodal);
+    expect(ms[0].matriz.agenteMenorId).toBe('PRV-H');  // 1400 < 1500
+    expect(ms[1].matriz.agenteMenorId).toBe('PRV-T');
+  });
+
+  it('sin servicioId toma todo: solo tiene sentido con un único servicio', () => {
+    const todo = construirMatriz(multimodal);
+    expect(todo.agentes).toHaveLength(3);
+    expect(todo.filas).toHaveLength(2);
+  });
+
+  it('filtrar por servicio deja solo sus filas', () => {
+    const m = construirMatriz(multimodal, [], 'srv-ter');
+    expect(m.filas.map(f => f.etiqueta)).toEqual(['Acarreo']);
+  });
+
+  it('un servicio sin conceptos da una matriz vacía, no revienta', () => {
+    const vacio = { ...multimodal, servicios: [{ ...multimodal.servicios[0], conceptos: [] }] };
+    const m = construirMatriz(vacio as KanbanQuote, [], 'srv-mar');
+    expect(m.filas).toEqual([]);
+    expect(m.agenteMenorId).toBeNull();
   });
 });

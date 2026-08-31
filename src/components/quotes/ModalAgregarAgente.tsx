@@ -1,0 +1,118 @@
+import React, { useMemo, useState } from 'react';
+import { X, Search, Plus, Building2 } from 'lucide-react';
+import type { ProveedorVermur } from '../proveedores/ProveedoresData';
+
+/**
+ * Elegir el agente que entra como columna de la comparativa.
+ *
+ * Con buscador porque son muchos —544 proveedores en el catálogo— y porque
+ * Pricing pide la misma ruta «a entre 7 y 10» de ellos. Una lista sin filtro
+ * ahí no sirve.
+ *
+ * Si el agente no existe todavía, se puede capturar por nombre: es el
+ * «probable proveedor» sin RFC que Administración valida después (§6).
+ */
+
+interface Props {
+  proveedores: ProveedorVermur[];
+  /** Ya son columnas: no se ofrecen otra vez. */
+  yaEnMatriz: string[];
+  onCerrar: () => void;
+  onAgregar: (agente: { proveedorId: string | null; nombre: string }) => void;
+  /** Alta rápida de proveedor. Si no se provee, no se ofrece. */
+  onAltaRapida?: () => void;
+}
+
+const norm = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+
+export default function ModalAgregarAgente({
+  proveedores, yaEnMatriz, onCerrar, onAgregar, onAltaRapida,
+}: Props) {
+  const [busqueda, setBusqueda] = useState('');
+
+  const yaEsta = useMemo(() => new Set(yaEnMatriz), [yaEnMatriz]);
+
+  const filtrados = useMemo(() => {
+    const q = norm(busqueda);
+    return proveedores
+      .filter(p => p.activo && !yaEsta.has(p.id))
+      .filter(p => !q || norm(p.nombre).includes(q) || norm(p.rfc ?? '').includes(q))
+      .slice(0, 40);
+  }, [proveedores, busqueda, yaEsta]);
+
+  const nombreLibre = busqueda.trim();
+  const hayExacto = proveedores.some(p => norm(p.nombre) === norm(nombreLibre));
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[80vh]">
+        <div className="px-5 py-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50 shrink-0">
+          <h3 className="text-[14px] font-bold text-[#18181B]">Agregar agente a la comparativa</h3>
+          <button onClick={onCerrar} className="text-gray-400 hover:text-gray-600">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="relative border-b border-gray-100 shrink-0">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            autoFocus
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre o RFC…"
+            className="w-full pl-9 pr-3 py-2.5 text-xs text-gray-700 outline-none"
+          />
+        </div>
+
+        <div className="overflow-y-auto flex-1">
+          {filtrados.length === 0 && !nombreLibre && (
+            <p className="px-3 py-8 text-center text-[12px] text-gray-400">
+              Escribe para buscar entre los proveedores del catálogo.
+            </p>
+          )}
+
+          {filtrados.map(p => (
+            <button
+              key={p.id}
+              onClick={() => onAgregar({ proveedorId: p.id, nombre: p.nombre })}
+              className="w-full flex items-start gap-2.5 px-3 py-2 text-left hover:bg-gray-50 transition-colors"
+            >
+              <Building2 className="w-3.5 h-3.5 text-gray-300 mt-[2px] shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-[12px] text-gray-800 leading-tight">{p.nombre}</span>
+                {p.rfc && <span className="block text-[10px] text-gray-400">{p.rfc}</span>}
+              </span>
+            </button>
+          ))}
+
+          {/* Capturar por nombre: el «probable proveedor» que Administración
+              valida después. Solo si no coincide con uno del catálogo. */}
+          {nombreLibre && !hayExacto && (
+            <button
+              onClick={() => onAgregar({ proveedorId: null, nombre: nombreLibre })}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-left border-t border-gray-100 hover:bg-[#E11D48]/5 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5 text-[#E11D48] shrink-0" />
+              <span className="text-[12px] text-[#E11D48] font-semibold">
+                Usar «{nombreLibre}» como agente
+              </span>
+              <span className="text-[10px] text-gray-400 ml-auto shrink-0">sin dar de alta</span>
+            </button>
+          )}
+        </div>
+
+        {onAltaRapida && (
+          <div className="px-3 py-2.5 border-t border-gray-100 bg-gray-50/50 shrink-0">
+            <button
+              onClick={onAltaRapida}
+              className="text-[11px] font-semibold text-gray-500 hover:text-[#E11D48] transition-colors"
+            >
+              ¿No está? Dar de alta un proveedor nuevo
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

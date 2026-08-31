@@ -39,6 +39,13 @@ import {
 } from '../../lib/lineasCotizacion';
 import { agruparPorModalidad } from '../../lib/agrupacionModalidad';
 import {
+  matricesPorServicio, escribirCelda, quitarAgenteDeCotizacion, elegirAgente,
+  conceptosSinCotizar, claveAgente, construirMatriz, CONCEPTOS_POR_PLANTILLA,
+  type AgenteColumna,
+} from '../../lib/matrizComparativa';
+import MatrizAgentes from './MatrizAgentes';
+import ModalAgregarAgente from './ModalAgregarAgente';
+import {
   evaluarProntitud, faltantesPorLinea, resumenFaltantes, textoFaltantesLinea,
 } from '../../lib/prontitudCotizacion';
 import TarjetaModalidad from './TarjetaModalidad';
@@ -111,6 +118,17 @@ export default function FichaCotizacion({
   const conceptosActivos = useMemo(() => conceptosCatalogo.filter(c => c.activo), [conceptosCatalogo]);
 
   const [activeTab, setActiveTab] = useState<'info' | 'servicios' | 'actividades' | 'historial' | 'chat'>('info');
+
+  /**
+   * Agentes agregados a la comparativa que todavía no tienen precio.
+   *
+   * Es lo único de la matriz que NO se deriva: un agente sin tarifas no deja
+   * rastro en el árbol. Los que sí cotizaron salen solos de concepto.tarifas.
+   */
+  const [agentesGuardados, setAgentesGuardados] = useState<Record<string, AgenteColumna[]>>({});
+  /** Agente elegido por servicio. Sin elección explícita manda el menor. */
+  const [agenteElegido, setAgenteElegido] = useState<Record<string, string>>({});
+  const [modalAgente, setModalAgente] = useState<string | null>(null);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [newChatMessage, setNewChatMessage] = useState('');
@@ -624,6 +642,103 @@ export default function FichaCotizacion({
     onUpdateQuote(agregarLinea(quote, { servicioId, concepto: '' }));
   };
 
+  // ── Comparativa por servicio (MC-2/3/4) ────────────────────────────────
+  const matrices = useMemo(
+    () => matricesPorServicio(quote, agentesGuardados),
+    [quote, agentesGuardados],
+  );
+
+  /** Escribe el precio de un concepto para un agente. */
+  const handleEditarCelda = (filaId: string, agente: AgenteColumna, valor: number | null) => {
+    onUpdateQuote(escribirCelda(quote, filaId, agente, valor));
+  };
+
+  /** La vigencia es de la COLUMNA: se propaga a las tarifas de ese agente. */
+  const handleEditarVigencia = (agenteId: string, vigencia: string | null) => {
+    setAgentesGuardados(prev => {
+      const copia = { ...prev };
+      Object.keys(copia).forEach(srvId => {
+        copia[srvId] = copia[srvId].map(a => a.id === agenteId ? { ...a, vigencia } : a);
+      });
+      return copia;
+    });
+    onUpdateQuote({
+      ...quote,
+      servicios: quote.servicios.map(srv => ({
+        ...srv,
+        conceptos: (srv.conceptos ?? []).map(c => ({
+          ...c,
+          tarifas: (c.tarifas ?? []).map(t =>
+            claveAgente(t) === agenteId ? { ...t, vigencia: vigencia ?? undefined } : t),
+        })),
+      })),
+    });
+  };
+
+  const handleAgregarAgente = (servicioId: string, agente: { proveedorId: string | null; nombre: string }) => {
+    const id = agente.proveedorId ?? `nom:${agente.nombre.toLowerCase().trim()}`;
+    setAgentesGuardados(prev => ({
+      ...prev,
+      [servicioId]: [
+        ...(prev[servicioId] ?? []),
+        { id, proveedorId: agente.proveedorId, nombre: agente.nombre, vigencia: null,
+          orden: (prev[servicioId] ?? []).length + 100 },
+      ],
+    }));
+
+    // Primer agente del servicio: precargar los conceptos de la plantilla.
+    const servicio = quote.servicios.find(s => s.id === servicioId);
+    const sinConceptos = (servicio?.conceptos ?? []).length === 0;
+    if (sinConceptos) {
+      const plantilla = servicio?.tipo === 'terrestre' ? 'terrestre'
+        : servicio?.fcl_contenedor ? 'FCL' : 'default';
+      let actualizada = quote;
+      CONCEPTOS_POR_PLANTILLA[plantilla].forEach(cp => {
+        actualizada = agregarLinea(actualizada, { servicioId, concepto: cp.etiqueta });
+      });
+      onUpdateQuote(actualizada);
+    }
+    setModalAgente(null);
+  };
+
+  const handleQuitarAgente = (agenteId: string) => {
+    setAgentesGuardados(prev => {
+      const copia = { ...prev };
+      Object.keys(copia).forEach(k => { copia[k] = copia[k].filter(a => a.id !== agenteId); });
+      return copia;
+    });
+    onUpdateQuote(quitarAgenteDeCotizacion(quote, agenteId));
+  };
+
+  /**
+   * Carga las tarifas del agente elegido como costos de las líneas.
+   *
+   * Pregunta antes de reemplazar si ya hay costos capturados: es el puente
+   * entre comparar y cotizar, y borrar trabajo previo sin avisar sería caro.
+   */
+  const handleCargarEnLineas = (servicioId: string, matriz: ReturnType<typeof construirMatriz>) => {
+    const agenteId = agenteElegido[servicioId] ?? matriz.agenteMenorId;
+    if (!agenteId) return;
+
+    const sinCotizar = conceptosSinCotizar(matriz, agenteId);
+    const yaHayCostos = matriz.filas.some(f =>
+      aplanarCotizacion(quote).find(l => l.id === f.id && l.costo > 0));
+
+    const nombre = matriz.agentes.find(a => a.id === agenteId)?.nombre ?? '';
+    const avisos = [
+      yaHayCostos ? 'Los costos actuales de estos conceptos se van a reemplazar.' : '',
+      sinCotizar.length > 0
+        ? `${nombre} no cotizó: ${sinCotizar.join(', ')}. Esos conceptos quedan sin costo.`
+        : '',
+    ].filter(Boolean);
+
+    if (avisos.length > 0 && !window.confirm(
+      `Cargar las tarifas de ${nombre} en las líneas.\n\n${avisos.join('\n\n')}\n\n¿Continuar?`
+    )) return;
+
+    onUpdateQuote(elegirAgente(quote, agenteId));
+  };
+
   /** Abre la comparativa para elegir proveedor de esa línea. */
   const handleCompararProveedor = (lineaId: string) => {
     const linea = lineasPlanas.find(l => l.id === lineaId);
@@ -874,6 +989,30 @@ export default function FichaCotizacion({
         <div className="flex-1 flex min-h-0">
           {/* Columna izquierda: servicios */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {/* ── Comparativa de agentes, una por servicio ─────────────────
+                Arriba de la tabla: se compara, se elige, y se cotiza. Pricing
+                pide la misma ruta «a entre 7 y 10» proveedores, y un agente
+                marítimo no compite contra un transportista terrestre. */}
+            {matrices.map(({ servicioId, servicioTipo, matriz }) => (
+              <MatrizAgentes
+                key={servicioId}
+                matriz={matriz}
+                titulo={servicioTipo}
+                editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
+                agenteElegidoId={agenteElegido[servicioId] ?? matriz.agenteMenorId}
+                onElegirAgente={(id) => setAgenteElegido(p => ({ ...p, [servicioId]: id }))}
+                onEditarCelda={handleEditarCelda}
+                onEditarVigencia={handleEditarVigencia}
+                onEditarEtiqueta={(filaId, etiqueta) =>
+                  onUpdateQuote(aplicarEdicionLinea(quote, filaId, { concepto: etiqueta }))}
+                onQuitarAgente={handleQuitarAgente}
+                onQuitarFila={(filaId) => onUpdateQuote(quitarLinea(quote, filaId))}
+                onAgregarAgente={() => setModalAgente(servicioId)}
+                onAgregarFila={() => onUpdateQuote(agregarLinea(quote, { servicioId, concepto: '' }))}
+                onCargarEnLineas={() => handleCargarEnLineas(servicioId, matriz)}
+              />
+            ))}
+
             {/* ── Tarjetas por modalidad (sesión 30-ago-2026) ──────────────
                 Reemplaza el árbol de servicios → conceptos → cotizaciones de
                 proveedor. Luis: «no me queda claro por qué estamos segmentando

@@ -161,15 +161,25 @@ export function tipoDeFila(c: ConceptoCotizacion): TipoFila {
 }
 
 /**
- * Construye la matriz a partir de la cotización.
+ * Construye la matriz de UN servicio.
+ *
+ * Una matriz por servicio, no por cotización: Pricing pide la misma ruta a
+ * varios proveedores —«entre 7 y 10» según el levantamiento— y un agente
+ * marítimo no compite contra un transportista terrestre. Mezclarlos produce
+ * una matriz donde la mayoría de las celdas están vacías y el total compara
+ * peras con manzanas.
+ *
+ * Sin `servicioId` toma todos los conceptos de la cotización, que solo tiene
+ * sentido cuando hay un único servicio.
  *
  * Las columnas salen de los proveedores presentes en las tarifas, más los
- * agentes que se agregaron sin haber capturado precio todavía (que llegan en
- * `agentesGuardados` porque no se pueden derivar de nada).
+ * agentes agregados sin precio todavía (que llegan en `agentesGuardados`
+ * porque no se pueden derivar de nada).
  */
 export function construirMatriz(
   quote: KanbanQuote,
   agentesGuardados: AgenteColumna[] = [],
+  servicioId?: string,
 ): MatrizComparativa {
   const porClave = new Map<string, AgenteColumna>();
 
@@ -181,7 +191,9 @@ export function construirMatriz(
 
   const filas: FilaMatriz[] = [];
 
-  (quote.servicios ?? []).forEach(srv => {
+  (quote.servicios ?? [])
+    .filter(srv => servicioId === undefined || srv.id === servicioId)
+    .forEach(srv => {
     (srv.conceptos ?? []).forEach(c => {
       const celdas: Record<string, number | null> = {};
 
@@ -473,4 +485,21 @@ export function conceptosSinCotizar(
   return matriz.filas
     .filter(f => f.tipo === 'importe' && !((f.celdas[agenteId] ?? 0) > 0))
     .map(f => f.etiqueta);
+}
+
+/**
+ * Una matriz por cada servicio de la cotización.
+ *
+ * En una multimodal salen dos: la marítima con sus navieras y la terrestre con
+ * sus transportistas, cada una con sus propios agentes y su propio total.
+ */
+export function matricesPorServicio(
+  quote: KanbanQuote,
+  agentesPorServicio: Record<string, AgenteColumna[]> = {},
+): { servicioId: string; servicioTipo: string; matriz: MatrizComparativa }[] {
+  return (quote.servicios ?? []).map(srv => ({
+    servicioId: srv.id,
+    servicioTipo: srv.tipo,
+    matriz: construirMatriz(quote, agentesPorServicio[srv.id] ?? [], srv.id),
+  }));
 }
