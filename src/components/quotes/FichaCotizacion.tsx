@@ -62,6 +62,7 @@ import {
   FichaLayout, FichaHeader, FichaTabs, FichaFooter, BadgeEstado,
 } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
+import LineaTiempo from '../ui/ficha/LineaTiempo';
 import ResumenFinancieroInline from './ResumenFinancieroInline';
 import { calcTotales } from '../../lib/cotizacionCalculator';
 
@@ -1351,33 +1352,12 @@ export default function FichaCotizacion({
             {/* Línea del tiempo de Ventas: cinco pasos. Las tres etapas
                 internas de Pricing se colapsan en «En pricing» — a Ventas le
                 importa que está con Pricing, no en cuál paso interno va. */}
-            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-              <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
-                Avance de la cotización
-              </h4>
-              <div className="flex items-center gap-1">
-                {LINEA_TIEMPO_VENTAS.map((paso, i) => {
-                  const actual = indicePasoVentas(quote.etapa);
-                  const hecho = i < actual;
-                  const esActual = i === actual;
-                  const perdida = quote.etapa === 'perdida' && i === LINEA_TIEMPO_VENTAS.length - 1;
-                  return (
-                    <React.Fragment key={paso.id}>
-                      <div className="flex flex-col items-center flex-1 min-w-0">
-                        <div className={`w-full h-1.5 rounded-full ${
-                          perdida ? 'bg-red-400'
-                          : hecho || esActual ? 'bg-[#E11D48]'
-                          : 'bg-gray-200'}`} />
-                        <span className={`mt-1.5 text-[10px] text-center leading-tight truncate w-full ${
-                          esActual ? 'font-bold text-[#18181B]' : 'text-gray-400'}`}>
-                          {paso.label}
-                        </span>
-                      </div>
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            </div>
+            <LineaTiempo
+              titulo="Avance de la cotización"
+              pasos={LINEA_TIEMPO_VENTAS.map(p => ({ id: p.id, label: p.label }))}
+              indiceActual={indicePasoVentas(quote.etapa)}
+              fallido={quote.etapa === 'perdida'}
+            />
 
             {/* Margen de la OPERACIÓN, sin desglose. Es lo único de rentabilidad
                 que Ventas necesita: «que vean la coti y el margen. Eso es todo». */}

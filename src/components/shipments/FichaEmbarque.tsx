@@ -13,6 +13,8 @@ import { editarMontoCargo, restaurarMontoCargo, desviacionDelEmbarque } from '..
 import { generateFolioEmbarque, parseFolioNumero } from '../../lib/folioService';
 import { FichaHeader, FichaTabs, BadgeEstado } from '../ui/ficha/FichaLayout';
 import { EnlaceEntidad, BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
+import LineaTiempo from '../ui/ficha/LineaTiempo';
+import { ETAPAS_EMBARQUE, estadoDe } from '../../lib/estadoEmbarque';
 import { useOrdenesCompra } from '../../hooks/useOrdenesCompra';
 
 type PestanaEmbarque =
@@ -401,6 +403,16 @@ export default function FichaEmbarque({
           vacio="Todavía no se ha solicitado ninguna."
         />
       </div>
+
+      {/* U-5 · La misma línea del tiempo que la cotización y el prospecto.
+          Los pasos son los del Kanban de embarques, así que la ficha y el
+          tablero dicen lo mismo. NO es interactiva: el estado se DERIVA de la
+          captura y de los cierres (estadoDe), no se elige. */}
+      <LineaTiempo
+        titulo="Avance del embarque"
+        pasos={ETAPAS_EMBARQUE.map(e => ({ id: e.id, label: e.label }))}
+        indiceActual={ETAPAS_EMBARQUE.findIndex(e => e.id === estadoDe(embarque))}
+      />
 
       <FichaTabs<PestanaEmbarque>
         pestanas={PESTANAS}

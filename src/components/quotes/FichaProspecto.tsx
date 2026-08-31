@@ -7,6 +7,7 @@ import {
   FichaLayout, FichaHeader, FichaTabs, FichaContenido, FichaFooter, BadgeEstado,
 } from '../ui/ficha/FichaLayout';
 import EstadoVacio from '../ui/EstadoVacio';
+import LineaTiempo from '../ui/ficha/LineaTiempo';
 
 /**
  * ── De drawer a pantalla completa (U-2) ────────────────────────────────────
@@ -143,39 +144,16 @@ export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUp
         {pestana === 'info' && (
         <div className="space-y-8 max-w-4xl">
 
-          {/* Pipeline visual */}
-          <div>
-            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Pipeline</h4>
-            <div className="relative flex items-center justify-between">
-              <div className="absolute left-0 right-0 top-1/2 h-[2px] bg-gray-200 -z-10 -translate-y-1/2 mx-4" />
-              <div 
-                className="absolute left-0 top-1/2 h-[2px] bg-[#E11D48] -z-10 -translate-y-1/2 mx-4 transition-all duration-300" 
-                style={{ width: `calc(${(currentStageIndex / (STAGES.length - 1)) * 100}% - 32px)` }} 
-              />
-              
-              {STAGES.map((stage, idx) => {
-                const isActive = idx <= currentStageIndex;
-                return (
-                  <button
-                    key={stage.id}
-                    onClick={() => handleStageClick(stage.id)}
-                    className="flex flex-col items-center gap-2 group outline-none"
-                  >
-                    <div className={`w-4 h-4 rounded-full border-2 bg-white transition-colors duration-300
-                      ${isActive ? 'border-[#E11D48]' : 'border-gray-300 group-hover:border-gray-400'}
-                    `}>
-                      {isActive && <div className="w-full h-full rounded-full bg-[#E11D48] scale-[0.4] transition-transform" />}
-                    </div>
-                    <span className={`text-[10px] font-bold uppercase tracking-wider
-                      ${isActive ? 'text-[#E11D48]' : 'text-gray-400 group-hover:text-gray-600'}
-                    `}>
-                      {stage.label}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
+          {/* U-5 · La misma línea del tiempo que la cotización, no una barra
+              propia con círculos. Sigue siendo interactiva: hacer clic en un
+              paso mueve el prospecto, igual que antes. */}
+          <LineaTiempo
+            titulo="Avance del prospecto"
+            pasos={STAGES.map(x => ({ id: x.id, label: x.label }))}
+            indiceActual={currentStageIndex}
+            fallido={prospecto.etapa === 'perdido'}
+            onIrAPaso={handleStageClick}
+          />
 
           {/* Datos del Prospecto */}
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
