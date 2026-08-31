@@ -93,6 +93,22 @@ export interface CargoDetalle {
    * en la factura general.
    */
   grupoFacturacion?: string;
+  // ── A-3: el costo que Operaciones corrigió ───────────────────────────────
+  /**
+   * Importe con el que la línea nació de la cotización.
+   *
+   * Se fija la PRIMERA vez que alguien edita el monto, y ya no se vuelve a
+   * tocar. Sin él, corregir un costo borraría el dato que hace interesante al
+   * embarque: la diferencia entre lo que se pactó y lo que costó de verdad.
+   *
+   * Ausente = nadie lo ha editado y `monto` sigue siendo el original.
+   */
+  montoHeredado?: number;
+  /** Quién corrigió el importe por última vez. */
+  editadoPor?: string;
+  /** Cuándo. ISO. */
+  editadoEn?: string;
+
   /**
    * En qué factura quedó cubierta esta línea. `null`/ausente = sin facturar.
    *

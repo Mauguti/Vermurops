@@ -6,6 +6,10 @@ import RutaEmbarque from './RutaEmbarque';
 import DocumentosEmbarque from './DocumentosEmbarque';
 import ProductosEmbarque from './ProductosEmbarque';
 import { useClientes } from '../../hooks/useClientes';
+import { useProveedores } from '../../hooks/useProveedores';
+import { useAuth } from '../../auth/AuthContext';
+import TablaCargosEmbarque from './TablaCargosEmbarque';
+import { editarMontoCargo, restaurarMontoCargo, desviacionDelEmbarque } from '../../lib/cargosEditables';
 import { generateFolioEmbarque, parseFolioNumero } from '../../lib/folioService';
 
 interface FichaEmbarqueProps {
@@ -24,6 +28,20 @@ export default function FichaEmbarque({
   onSelectEmbarqueById
 }: FichaEmbarqueProps) {
   const { clientes } = useClientes();
+  const { proveedores } = useProveedores();
+  const { user, puede } = useAuth();
+
+  /**
+   * A-3 · Quién corrige costos.
+   *
+   * Textual: «el costo lo puede modificar operaciones». Administración entra a
+   * este embarque a registrar cierres y pagos, no a reescribir lo que costó.
+   */
+  const puedeEditarCargos = puede('embarque.generar');
+
+  const nombreProveedor = (id: string | undefined) =>
+    (id ? proveedores.find(p => p.id === id)?.nombre : '') ?? '';
+
   const [activeTab, setActiveTab] = useState<'general' | 'entidades' | 'ruta' | 'cargos' | 'documentos' | 'eventos' | 'productos' | 'master_hijo'>('general');
 
   // Estado temporal de edición general
@@ -52,6 +70,9 @@ export default function FichaEmbarque({
   const [newCargoTipo, setNewCargoTipo] = useState<'ingreso' | 'gasto'>('gasto');
   const [newCargoMonto, setNewCargoMonto] = useState(0);
   const [newCargoMoneda, setNewCargoMoneda] = useState<'USD' | 'MXN'>('USD');
+  /* A-3 · Un gasto sin proveedor no se le puede pagar a nadie: es lo primero
+     que la orden de compra necesita saber (C-3). */
+  const [newCargoProveedor, setNewCargoProveedor] = useState('');
 
   const [newEventTitulo, setNewEventTitulo] = useState('');
   const [newEventDesc, setNewEventDesc] = useState('');
@@ -107,6 +128,7 @@ export default function FichaEmbarque({
       monto: Number(newCargoMonto),
       moneda: newCargoMoneda,
       origen: 'manual',
+      ...(newCargoTipo === 'gasto' && newCargoProveedor ? { proveedorId: newCargoProveedor } : {}),
       facturaId: null,
     };
 
@@ -121,6 +143,32 @@ export default function FichaEmbarque({
 
     setNewCargoConcept('');
     setNewCargoMonto(0);
+    setNewCargoProveedor('');
+  };
+
+  /**
+   * A-3 · Corrige el importe de un cargo.
+   *
+   * Escribe SOLO en el embarque. La cotización no se toca: es lo que se pactó
+   * y así se queda. La diferencia entre las dos es el dato del profit real.
+   */
+  const guardarDetalles = (detalles: CargoDetalle[]) => {
+    onUpdateEmbarque({
+      ...embarque,
+      cargos: recalcularCargos(detalles),
+      updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+    });
+  };
+
+  const handleEditarMontoCargo = (id: string, monto: number) => {
+    guardarDetalles(editarMontoCargo(
+      embarque.cargos.detalles || [], id, monto,
+      { nombre: user?.nombre ?? user?.email ?? '', cuando: new Date().toISOString() },
+    ));
+  };
+
+  const handleRestaurarCargo = (id: string) => {
+    guardarDetalles(restaurarMontoCargo(embarque.cargos.detalles || [], id));
   };
 
   const handleDeleteCargo = (id: string) => {
@@ -587,69 +635,58 @@ export default function FichaEmbarque({
         {activeTab === 'cargos' && (
           <div className="space-y-6">
             
-            {/* Tabla de Cargos */}
-            <div className="bg-white rounded-xl border border-gray-150 shadow-2xs overflow-hidden">
-              <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="text-xs font-bold text-[#18181B] uppercase tracking-wider">
-                  Listado de Cargos y Recargos (Fletes y Gastos)
-                </h3>
-              </div>
+            {/* A-3 · Cargos por concepto, editables por Operaciones. */}
+            <TablaCargosEmbarque
+              detalles={embarque.cargos.detalles || []}
+              editable={puedeEditarCargos}
+              nombreProveedor={nombreProveedor}
+              onEditarMonto={handleEditarMontoCargo}
+              onRestaurar={handleRestaurarCargo}
+              onQuitar={handleDeleteCargo}
+            />
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-gray-50/70 text-[9px] font-bold text-gray-400 uppercase border-b border-gray-100">
-                      <th className="px-5 py-3">Concepto</th>
-                      <th className="px-5 py-3">Tipo</th>
-                      <th className="px-5 py-3 text-right">Importe</th>
-                      <th className="px-5 py-3">Moneda</th>
-                      <th className="px-5 py-3 text-center w-[60px]">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 text-xs font-semibold text-gray-700">
-                    {(embarque.cargos.detalles || []).length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-5 py-8 text-center text-gray-400 italic">
-                          No se han ingresado cargos para este embarque.
-                        </td>
-                      </tr>
-                    ) : (
-                      embarque.cargos.detalles.map(c => (
-                        <tr key={c.id} className="hover:bg-gray-50/50">
-                          <td className="px-5 py-3.5">{c.concepto}</td>
-                          <td className="px-5 py-3.5">
-                            {c.tipo === 'ingreso' ? (
-                              <span className="text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded text-[10px] font-bold border border-emerald-100 uppercase">Ingreso</span>
-                            ) : (
-                              <span className="text-rose-600 bg-rose-50 px-2 py-0.5 rounded text-[10px] font-bold border border-rose-100 uppercase">Gasto</span>
-                            )}
-                          </td>
-                          <td className="px-5 py-3.5 text-right font-mono font-bold tabular-nums">
-                            ${c.monto.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="px-5 py-3.5 font-mono text-gray-500">{c.moneda}</td>
-                          <td className="px-5 py-3.5 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCargo(c.id)}
-                              className="text-gray-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            {/* Lo que se movió respecto a la cotización. Es lo que dirección
+                revisa: no basta con que el embarque cuadre consigo mismo. */}
+            {(() => {
+              const d = desviacionDelEmbarque(embarque.cargos.detalles || []);
+              const conMovimiento = (['USD', 'MXN'] as const)
+                .filter(m => d[m].ingresos !== 0 || d[m].gastos !== 0);
+              if (conMovimiento.length === 0) return null;
+              return (
+                <div className="bg-amber-50/60 border border-amber-100 rounded-xl px-4 py-3">
+                  <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-2">
+                    Diferencia contra lo cotizado
+                  </p>
+                  <div className="flex flex-wrap gap-x-8 gap-y-1">
+                    {conMovimiento.map(m => (
+                      <div key={m} className="text-[12px] text-amber-900">
+                        <span className="font-bold font-mono mr-2">{m}</span>
+                        <span className="mr-4">
+                          Se cobra{' '}
+                          <span className="font-bold tabular-nums">
+                            {d[m].ingresos >= 0 ? '+' : ''}
+                            {d[m].ingresos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </span>
+                        </span>
+                        <span>
+                          Cuesta{' '}
+                          <span className="font-bold tabular-nums">
+                            {d[m].gastos >= 0 ? '+' : ''}
+                            {d[m].gastos.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                          </span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Totales y Agregar Cargo */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
-              {/* Formulario Agregar Cargo */}
-              <div className="md:col-span-2 bg-white p-5 rounded-xl border border-gray-150 shadow-2xs space-y-4">
+              {/* Formulario Agregar Cargo — solo Operaciones. */}
+              <div className={`md:col-span-2 bg-white p-5 rounded-xl border border-gray-150 shadow-2xs space-y-4 ${puedeEditarCargos ? '' : 'hidden'}`}>
                 <h4 className="text-xs font-bold text-[#18181B] uppercase tracking-wider border-b border-gray-100 pb-2.5">
                   Agregar nuevo cargo
                 </h4>
@@ -677,6 +714,29 @@ export default function FichaEmbarque({
                       <option value="ingreso">Ingreso (Monto facturado a cobrar)</option>
                     </select>
                   </div>
+
+                  {newCargoTipo === 'gasto' && (
+                    <div className="sm:col-span-2">
+                      <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">
+                        Proveedor a pagar
+                      </label>
+                      <select
+                        value={newCargoProveedor}
+                        onChange={e => setNewCargoProveedor(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white outline-none focus:border-[#E11D48]"
+                      >
+                        <option value="">Sin definir todavía</option>
+                        {proveedores.map(p => (
+                          <option key={p.id} value={p.id}>{p.nombre}</option>
+                        ))}
+                      </select>
+                      {!newCargoProveedor && (
+                        <p className="text-[9px] text-amber-600 font-semibold mt-1">
+                          Sin proveedor no se puede generar la orden de compra de este gasto.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
