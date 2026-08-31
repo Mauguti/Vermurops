@@ -58,6 +58,9 @@ import {
   evaluarProntitud, faltantesPorLinea, resumenFaltantes, textoFaltantesLinea,
 } from '../../lib/prontitudCotizacion';
 import TarjetaModalidad from './TarjetaModalidad';
+import {
+  FichaLayout, FichaHeader, FichaTabs, FichaFooter, BadgeEstado,
+} from '../ui/ficha/FichaLayout';
 import ResumenFinancieroInline from './ResumenFinancieroInline';
 import { calcTotales } from '../../lib/cotizacionCalculator';
 
@@ -1076,32 +1079,26 @@ export default function FichaCotizacion({
   };
 
   return (
-    <div className="flex flex-col h-full">
-      {/* ── Breadcrumb header ────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50 shrink-0">
-        <div className="min-w-0">
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-[13px] text-gray-500 mb-1">
-            <button onClick={onBack} className="hover:text-[#18181B] transition-colors">
-              Cotizaciones
-            </button>
-            <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
-            <span className="text-[#18181B] font-medium">{quote.id}</span>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-xl font-bold text-[#18181B] tracking-tight truncate">
-              {quote.prospecto.empresa}
-            </h2>
-            <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide
-              ${quote.etapa === 'ganada' ? 'bg-green-100 text-green-800' :
-                quote.etapa === 'perdida' ? 'bg-red-100 text-red-800' :
-                'bg-[#E11D48]/10 text-[#E11D48]'}`}
+    <FichaLayout>
+      {/* Anatomía compartida (ui/ficha/FichaLayout): esta ficha es la que la
+          define, así que usarla aquí es lo que garantiza que las demás se vean
+          igual y no al revés. */}
+      <FichaHeader
+        modulo="Cotizaciones"
+        onBack={onBack}
+        folio={quote.id}
+        titulo={quote.prospecto.empresa}
+        badges={
+          <>
+            <BadgeEstado tono={
+              quote.etapa === 'ganada' ? 'exito'
+              : quote.etapa === 'perdida' ? 'peligro'
+              : 'activo'}
             >
               {lineaTiempoColapsada(rolActivo)
                 ? (LINEA_TIEMPO_VENTAS[indicePasoVentas(quote.etapa)]?.label ?? quote.etapa)
                 : PIPELINE_STAGES.find(s => s.id === quote.etapa)?.label}
-            </span>
-            {/* Rol activo */}
+            </BadgeEstado>
             <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide border
               ${rolActivo === 'pricing' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-[#E11D48]/5 text-[#E11D48] border-[#E11D48]/20'}`}
             >
@@ -1111,31 +1108,20 @@ export default function FichaCotizacion({
                 : rolActivo === 'administracion' ? 'Administración'
                 : 'Ventas'}
             </span>
-          </div>
-          {/* Total consolidado si existe */}
-          {totalConsolidado > 0 && (
-            <p className="text-sm font-black text-[#E11D48] mt-0.5 tabular-nums">
-              Total: ${totalConsolidado.toLocaleString()} {quote.moneda}
-            </p>
-          )}
-        </div>
-      </div>
+          </>
+        }
+        subtitulo={totalConsolidado > 0 ? (
+          <p className="font-black text-[#E11D48] tabular-nums">
+            Total: ${totalConsolidado.toLocaleString()} {quote.moneda}
+          </p>
+        ) : undefined}
+      />
 
-      {/* ── Tabs ─────────────────────────────────────────────────────────────── */}
-      <div className="flex border-b border-gray-100 bg-white shrink-0 overflow-x-auto">
-        {TABS.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => { setActiveTab(tab.id); setShowLossReasonForm(false); }}
-            className={`px-6 py-3.5 text-center text-[10px] font-bold uppercase tracking-wider border-b-2 transition-all duration-200 whitespace-nowrap
-              ${activeTab === tab.id
-                ? 'border-[#E11D48] text-[#E11D48] bg-[#E11D48]/[0.02]'
-                : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50'}`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <FichaTabs
+        pestanas={TABS.map(t => ({ id: t.id, label: t.label }))}
+        activa={activeTab}
+        onCambiar={(id) => { setActiveTab(id); setShowLossReasonForm(false); }}
+      />
 
       {/* ── Contenido: Servicios (dos columnas FC-2 + drag&drop FC-3) ───────── */}
       {activeTab === 'servicios' && visible.desglosePorConcepto && (
@@ -1927,7 +1913,7 @@ export default function FichaCotizacion({
       )}
 
       {/* ── Footer de acciones (Pre-TA: jerarquía corregida) ─────────────────── */}
-      <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex flex-col gap-3 shrink-0">
+      <FichaFooter>
 
         {/* ── Primario: avanzar etapa (dinámico según etapa + rol) ── */}
         {advanceCfg && advanceTarget && puedeAvanzar && (
@@ -2009,7 +1995,7 @@ export default function FichaCotizacion({
           <CheckCircle2 className="w-3 h-3 text-green-500" />
           <span className="text-[10px] text-gray-400">Guardado automáticamente</span>
         </div>
-      </div>
+      </FichaFooter>
 
       {/* ═══ Modales ═══════════════════════════════════════════════════════
           Estaban declarados como estado pero nunca se renderizaban: los
@@ -2099,7 +2085,7 @@ export default function FichaCotizacion({
       })()}
 
       <Toast mensaje={toastLocal} tipo="exito" onClose={() => setToastLocal(null)} />
-    </div>
+    </FichaLayout>
   );
 }
 
