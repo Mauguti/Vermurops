@@ -47,6 +47,12 @@ interface ConceptoSelectorProps {
   onCrearNuevo?: () => void;
   /** true = solo muestra el nombre, no permite cambiar (rol ventas). */
   readOnly?: boolean;
+  /**
+   * Variante para celda de tabla: sin borde propio, ocupa el ancho de la
+   * columna y se comporta como el resto de las celdas editables. El dropdown
+   * y el buscador son los mismos — lo que cambia es el disparador.
+   */
+  compacto?: boolean;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -57,6 +63,7 @@ export default function ConceptoSelector({
   onSelect,
   onCrearNuevo,
   readOnly,
+  compacto,
 }: ConceptoSelectorProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -117,7 +124,9 @@ export default function ConceptoSelector({
   // ── Solo lectura ────────────────────────────────────────────────────────────
   if (readOnly) {
     return (
-      <span className="text-xs font-bold text-[#18181B] px-1 py-0.5">
+      <span className={compacto
+        ? 'text-[12px] font-medium text-gray-800 px-2'
+        : 'text-xs font-bold text-[#18181B] px-1 py-0.5'}>
         {selectedNombre || 'Sin concepto'}
       </span>
     );
@@ -129,7 +138,13 @@ export default function ConceptoSelector({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className={`flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-md border transition-colors max-w-[260px] ${
+        className={compacto
+          ? `flex items-center gap-1 text-[12px] w-full text-left px-2 py-1 rounded border transition-colors ${
+              selectedNombre
+                ? 'font-medium text-gray-800 bg-transparent border-transparent hover:border-gray-200 hover:bg-white'
+                : 'text-gray-400 bg-transparent border-dashed border-gray-300 hover:border-[#E11D48] hover:text-[#E11D48]'
+            }`
+          : `flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-md border transition-colors max-w-[260px] ${
           selectedNombre
             ? 'text-[#18181B] bg-white border-gray-200 hover:border-indigo-400 hover:bg-indigo-50/30'
             : 'text-gray-400 bg-gray-50 border-dashed border-gray-300 hover:border-indigo-400 hover:text-indigo-600'

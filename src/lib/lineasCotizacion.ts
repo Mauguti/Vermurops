@@ -321,6 +321,13 @@ export function compararConTarget(linea: LineaPlana): ComparacionTarget | null {
  */
 export interface EdicionLinea {
   concepto?: string;
+  /**
+   * FK al catálogo de conceptos. Va SIEMPRE junto al nombre: el nombre es
+   * para leer y el id es lo que hace match con las tarifas. Sin él, el panel
+   * de tarifas no encuentra nada y dos renglones escritos distinto —
+   * «almacenaje» y «Almajenaje»— son conceptos diferentes para el sistema.
+   */
+  conceptoId?: string | null;
   proveedorId?: string | null;
   proveedorNombre?: string;
   costo?: number;
@@ -371,6 +378,7 @@ export function aplicarEdicionLinea(
         return {
           ...c,
           nombre: edicion.concepto ?? c.nombre,
+          conceptoId: edicion.conceptoId !== undefined ? (edicion.conceptoId ?? undefined) : c.conceptoId,
           costo,
           profit,
           venta,

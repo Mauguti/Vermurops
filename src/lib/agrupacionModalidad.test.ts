@@ -27,13 +27,14 @@ describe('modalidad de una línea', () => {
     expect(modalidadDeLinea(linea({ id: 'e', servicioTipo: 'srv-def-9' }), CATALOGO)).toBe('aduanal');
   });
 
-  it('lo que no es transporte ni aduana cuelga del despacho aduanal', () => {
-    // Maniobras, seguro, almacenaje: cargos locales de la operación.
-    expect(modalidadDeLinea(linea({ id: 'f', servicioTipo: 'srv-def-4' }), CATALOGO)).toBe('aduanal');
+  it('lo que no es transporte ni aduana va a «Cargos locales», no a aduanal', () => {
+    // Un seguro de mercancía no es despacho aduanal: meterlo ahí sería
+    // forzarlo donde no va.
+    expect(modalidadDeLinea(linea({ id: 'f', servicioTipo: 'srv-def-4' }), CATALOGO)).toBe('locales');
   });
 
-  it('un tipo desconocido no revienta', () => {
-    expect(modalidadDeLinea(linea({ id: 'g', servicioTipo: 'xxx' }), CATALOGO)).toBe('aduanal');
+  it('un tipo desconocido cae en cargos locales, no revienta', () => {
+    expect(modalidadDeLinea(linea({ id: 'g', servicioTipo: 'xxx' }), CATALOGO)).toBe('locales');
   });
 });
 
@@ -83,7 +84,8 @@ describe('tarjetas por modalidad', () => {
     expect(agruparPorModalidad([], CATALOGO)).toEqual([]);
   });
 
-  it('el catálogo de modalidades tiene las cuatro de la ficha', () => {
-    expect(MODALIDADES_FICHA.map(m => m.id)).toEqual(['maritimo', 'aereo', 'terrestre', 'aduanal']);
+  it('el catálogo tiene las cuatro de transporte más cargos locales', () => {
+    expect(MODALIDADES_FICHA.map(m => m.id))
+      .toEqual(['maritimo', 'aereo', 'terrestre', 'aduanal', 'locales']);
   });
 });

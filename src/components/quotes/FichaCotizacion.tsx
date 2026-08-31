@@ -558,13 +558,21 @@ export default function FichaCotizacion({
   /** Aplica una edición de la tabla plana sobre el árbol anidado. */
   const handleEditarLineaPlana = (
     lineaId: string,
-    campo: 'concepto' | 'costo' | 'profit' | 'target',
-    valor: string | number,
+    campo: 'costo' | 'profit' | 'target',
+    valor: number,
   ) => {
-    const edicion = campo === 'concepto'
-      ? { concepto: String(valor) }
-      : { [campo]: Number(valor) };
-    onUpdateQuote(aplicarEdicionLinea(quote, lineaId, edicion));
+    onUpdateQuote(aplicarEdicionLinea(quote, lineaId, { [campo]: Number(valor) }));
+  };
+
+  /**
+   * Concepto elegido del catálogo.
+   *
+   * Se guardan el id Y el nombre juntos: el nombre es para leer, el id es lo
+   * que hace match con las tarifas. Teclear el concepto a mano dejaba el id
+   * vacío y el panel de tarifas sin nada que ofrecer.
+   */
+  const handleElegirConcepto = (lineaId: string, conceptoId: string, nombre: string) => {
+    onUpdateQuote(aplicarEdicionLinea(quote, lineaId, { conceptoId, concepto: nombre }));
   };
 
   const handleQuitarLineaPlana = (lineaId: string) => {
@@ -587,7 +595,9 @@ export default function FichaCotizacion({
     const lineaDeEsaModalidad = tarjetasModalidad.find(t => t.modalidad === modalidad)?.lineas[0];
     const servicioId = lineaDeEsaModalidad?.servicioId ?? quote.servicios[0]?.id;
     if (!servicioId) return;
-    onUpdateQuote(agregarLinea(quote, { servicioId, concepto: 'Nuevo concepto' }));
+    // Nace sin nombre: el usuario elige del catálogo. Poner «Nuevo concepto»
+    // como texto invitaba a dejarlo así, que es como aparecen los duplicados.
+    onUpdateQuote(agregarLinea(quote, { servicioId, concepto: '' }));
   };
 
   /** Abre la comparativa para elegir proveedor de esa línea. */
@@ -812,6 +822,9 @@ export default function FichaCotizacion({
                   moneda={quote.moneda}
                   editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
                   onEditarLinea={handleEditarLineaPlana}
+                  onElegirConcepto={handleElegirConcepto}
+                  conceptosActivos={conceptosActivos}
+                  soloLectura={rolActivo === 'ventas'}
                   onQuitarLinea={handleQuitarLineaPlana}
                   onMoverLinea={handleMoverLineaPlana}
                   onAgregarLinea={() => handleAgregarLineaPlana(t.modalidad)}

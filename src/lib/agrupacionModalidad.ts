@@ -25,14 +25,21 @@ import { LineaPlana } from './lineasCotizacion';
 import { Servicio } from '../config/serviciosStore';
 import { modalidadDeServicio } from './traficoServicio';
 
-/** Las cuatro modalidades de la ficha. «Aduanal» no es transporte pero sí agrupa. */
-export type ModalidadFicha = 'maritimo' | 'aereo' | 'terrestre' | 'aduanal';
+/**
+ * Agrupadores de la ficha.
+ *
+ * Las cuatro que nombró el cliente son de TRANSPORTE más el despacho aduanal.
+ * «Cargos locales» es la quinta y existe porque un seguro de mercancía o unas
+ * maniobras no son despacho aduanal: meterlos ahí sería forzarlos donde no van.
+ */
+export type ModalidadFicha = 'maritimo' | 'aereo' | 'terrestre' | 'aduanal' | 'locales';
 
 export const MODALIDADES_FICHA: { id: ModalidadFicha; label: string }[] = [
   { id: 'maritimo',  label: 'Marítimo' },
   { id: 'aereo',     label: 'Aéreo' },
   { id: 'terrestre', label: 'Terrestre' },
   { id: 'aduanal',   label: 'Despacho aduanal' },
+  { id: 'locales',   label: 'Cargos locales' },
 ];
 
 export interface TarjetaModalidad {
@@ -62,13 +69,13 @@ export function modalidadDeLinea(linea: LineaPlana, catalogo: Servicio[]): Modal
   const t = linea.servicioTipo.trim().toLowerCase();
   if (t.includes('aduan')) return 'aduanal';
 
-  const porNombre = catalogo.find(s => s.id === linea.servicioTipo);
-  if (porNombre?.categoria === 'aduana') return 'aduanal';
+  const delCatalogo = catalogo.find(s => s.id === linea.servicioTipo)
+    ?? catalogo.find(s => s.nombre.trim().toLowerCase() === t);
+  if (delCatalogo?.categoria === 'aduana') return 'aduanal';
 
-  // Todo lo que no es transporte ni aduana —maniobras, seguro, almacenaje—
-  // cuelga del despacho aduanal, que es donde el cliente espera ver los
-  // cargos locales de la operación.
-  return 'aduanal';
+  // Maniobras, seguro, almacenaje y demás cargos de la operación tienen su
+  // propia tarjeta. Un seguro de mercancía no es despacho aduanal.
+  return 'locales';
 }
 
 /**

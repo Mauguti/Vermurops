@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Ship, Plane, Truck, FileCheck, Plus, Trash2, ChevronUp, ChevronDown, Lock } from 'lucide-react';
+import { Ship, Plane, Truck, FileCheck, Package, Plus, Trash2, ChevronUp, ChevronDown, Lock } from 'lucide-react';
 import type { TarjetaModalidad as TarjetaData } from '../../lib/agrupacionModalidad';
 import type { LineaPlana } from '../../lib/lineasCotizacion';
 import { compararConTarget } from '../../lib/lineasCotizacion';
+import ConceptoSelector from '../conceptos/ConceptoSelector';
+import type { ConceptoVermur } from '../conceptos/ConceptosData';
 
 /**
  * Una tarjeta por modalidad, con la tabla de conceptos dentro.
@@ -22,6 +24,7 @@ const ICONO: Record<string, React.ReactNode> = {
   aereo:     <Plane className="w-4 h-4" />,
   terrestre: <Truck className="w-4 h-4" />,
   aduanal:   <FileCheck className="w-4 h-4" />,
+  locales:   <Package className="w-4 h-4" />,
 };
 
 const COLOR: Record<string, string> = {
@@ -29,6 +32,7 @@ const COLOR: Record<string, string> = {
   aereo:     'text-sky-600 bg-sky-50 border-sky-100',
   terrestre: 'text-amber-700 bg-amber-50 border-amber-100',
   aduanal:   'text-violet-600 bg-violet-50 border-violet-100',
+  locales:   'text-gray-600 bg-gray-50 border-gray-200',
 };
 
 export interface TarjetaModalidadProps {
@@ -36,7 +40,15 @@ export interface TarjetaModalidadProps {
   moneda: string;
   /** Solo lectura: Ventas no edita, y una cotización congelada tampoco. */
   editable: boolean;
-  onEditarLinea: (lineaId: string, campo: 'concepto' | 'costo' | 'profit' | 'target', valor: string | number) => void;
+  onEditarLinea: (lineaId: string, campo: 'costo' | 'profit' | 'target', valor: number) => void;
+  /**
+   * Concepto elegido del catálogo. Llega el id Y el nombre: el nombre se lee,
+   * el id es lo que hace match con las tarifas.
+   */
+  onElegirConcepto: (lineaId: string, conceptoId: string, nombre: string) => void;
+  conceptosActivos: ConceptoVermur[];
+  onCrearConcepto?: () => void;
+  soloLectura: boolean;
   onQuitarLinea: (lineaId: string) => void;
   onMoverLinea: (lineaId: string, direccion: 'arriba' | 'abajo') => void;
   onAgregarLinea: () => void;
@@ -48,7 +60,8 @@ const money = (n: number) =>
 
 export default function TarjetaModalidad({
   tarjeta, moneda, editable,
-  onEditarLinea, onQuitarLinea, onMoverLinea, onAgregarLinea, onCompararProveedor,
+  onEditarLinea, onElegirConcepto, onQuitarLinea, onMoverLinea, onAgregarLinea,
+  onCompararProveedor, conceptosActivos, onCrearConcepto, soloLectura,
 }: TarjetaModalidadProps) {
   const [expandida, setExpandida] = useState(true);
 
@@ -109,9 +122,13 @@ export default function TarjetaModalidad({
                     linea={l}
                     editable={editable}
                     onEditar={onEditarLinea}
+                    onElegirConcepto={onElegirConcepto}
                     onQuitar={onQuitarLinea}
                     onMover={onMoverLinea}
                     onComparar={onCompararProveedor}
+                    conceptosActivos={conceptosActivos}
+                    onCrearConcepto={onCrearConcepto}
+                    soloLectura={soloLectura}
                   />
                 ))}
 
@@ -164,27 +181,39 @@ interface RenglonProps {
   linea: LineaPlana;
   editable: boolean;
   onEditar: TarjetaModalidadProps['onEditarLinea'];
+  onElegirConcepto: TarjetaModalidadProps['onElegirConcepto'];
   onQuitar: (id: string) => void;
   onMover: (id: string, d: 'arriba' | 'abajo') => void;
   onComparar: (id: string) => void;
+  conceptosActivos: ConceptoVermur[];
+  onCrearConcepto?: () => void;
+  soloLectura: boolean;
 }
 
 function Renglon({
-  linea, editable, onEditar, onQuitar, onMover, onComparar,
+  linea, editable, onEditar, onElegirConcepto, onQuitar, onMover, onComparar,
+  conceptosActivos, onCrearConcepto, soloLectura,
 }: RenglonProps) {
   const target = compararConTarget(linea);
 
   return (
     <tr className="hover:bg-gray-50/60 group">
+      {/* El concepto se ELIGE del catálogo, nunca se teclea. Sin conceptoId el
+          panel de tarifas no puede hacer match, y dos renglones escritos
+          distinto («almacenaje» y «Almajenaje») serían conceptos diferentes. */}
       <td className="px-3 py-1.5">
-        {editable ? (
-          <input
-            value={linea.concepto}
-            onChange={e => onEditar(linea.id, 'concepto', e.target.value)}
-            className="w-full px-2 py-1 border border-transparent hover:border-gray-200 focus:border-[#E11D48] focus:bg-white bg-transparent rounded outline-none text-[12px] font-medium text-gray-800"
-          />
-        ) : (
-          <span className="px-2 font-medium text-gray-800">{linea.concepto}</span>
+        <ConceptoSelector
+          compacto
+          selectedNombre={linea.concepto || null}
+          conceptos={conceptosActivos}
+          onSelect={(conceptoId, nombre) => onElegirConcepto(linea.id, conceptoId, nombre)}
+          onCrearNuevo={onCrearConcepto}
+          readOnly={soloLectura || !editable}
+        />
+        {!linea.conceptoId && !soloLectura && (
+          <span className="block px-2 text-[9px] text-amber-600 font-semibold">
+            Sin concepto del catálogo: no habrá tarifas
+          </span>
         )}
       </td>
 
