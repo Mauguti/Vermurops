@@ -254,7 +254,7 @@ function Renglon({
       onClick={() => { if (aceptaTarifas) onComparar(linea.id); }}
       title={aceptaTarifas && !activa ? 'Clic para ver sus tarifas en el panel' : undefined}
       className={`group transition-colors ${
-        isOver ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300'
+        isOver ? 'bg-[#E11D48]/5 ring-1 ring-inset ring-[#E11D48]/30'
         : activa ? 'bg-[#E11D48]/[0.04] ring-1 ring-inset ring-[#E11D48]/25'
         : 'hover:bg-gray-50/60'} ${aceptaTarifas ? 'cursor-pointer' : ''}`}>
       {/* El concepto se ELIGE del catálogo, nunca se teclea. Sin conceptoId el

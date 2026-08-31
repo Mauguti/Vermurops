@@ -71,7 +71,7 @@ export default function DocumentosEmbarque({
   const getDocIconColor = (tipo: EmbarqueDocumento['tipo']) => {
     switch (tipo) {
       case 'cotizacion': return 'text-blue-500 bg-blue-50';
-      case 'pedimento': return 'text-purple-500 bg-purple-50';
+      case 'pedimento': return 'text-[#E11D48] bg-[#E11D48]/5';
       case 'bl':
       case 'mbl':
       case 'hbl': return 'text-emerald-500 bg-emerald-50';

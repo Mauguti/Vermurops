@@ -107,7 +107,7 @@ const PDF_DISPONIBLE = false;
 
 const ADVANCE_CONFIG: Partial<Record<PipelineStageId, { label: string; cls: string }>> = {
   solicitado_pricing:     { label: 'Enviar a Pricing',        cls: 'bg-[#4B2A8C] hover:bg-[#3d2277]' },
-  pricing_solicitando:    { label: 'Iniciar cotización',      cls: 'bg-indigo-600 hover:bg-indigo-700' },
+  pricing_solicitando:    { label: 'Iniciar cotización',      cls: 'bg-[#E11D48] hover:bg-[#BE123C]' },
   cotizaciones_recibidas: { label: 'Cotizaciones recibidas',  cls: 'bg-violet-600 hover:bg-violet-700' },
   consolidada:            { label: 'Consolidar cotización',   cls: 'bg-cyan-600 hover:bg-cyan-700' },
   enviada_cliente:        { label: 'Enviar al cliente',       cls: 'bg-blue-600 hover:bg-blue-700' },
@@ -1024,8 +1024,8 @@ export default function FichaCotizacion({
                       </>
                     )}
                     <div className="w-24">
-                      <p className="text-[9px] text-indigo-400 font-bold uppercase">Venta</p>
-                      <p className="font-black text-indigo-900 tabular-nums">${linea.venta.toLocaleString()} {prov.moneda}</p>
+                      <p className="text-[9px] text-[#E11D48]/60 font-bold uppercase">Venta</p>
+                      <p className="font-black text-[#9F1239] tabular-nums">${linea.venta.toLocaleString()} {prov.moneda}</p>
                     </div>
                   </div>
                 </div>
@@ -1055,8 +1055,8 @@ export default function FichaCotizacion({
                       </>
                     )}
                     <div className="w-24">
-                      <p className="text-[9px] text-indigo-400 font-bold uppercase">Venta</p>
-                      <p className="font-black text-indigo-900 tabular-nums">${(tram.costo * (1 + tram.margenPct / 100)).toLocaleString()} {tram.moneda}</p>
+                      <p className="text-[9px] text-[#E11D48]/60 font-bold uppercase">Venta</p>
+                      <p className="font-black text-[#9F1239] tabular-nums">${(tram.costo * (1 + tram.margenPct / 100)).toLocaleString()} {tram.moneda}</p>
                     </div>
                   </div>
                 </div>
@@ -1102,7 +1102,9 @@ export default function FichaCotizacion({
                 : PIPELINE_STAGES.find(s => s.id === quote.etapa)?.label}
             </BadgeEstado>
             <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide border
-              ${rolActivo === 'pricing' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-[#E11D48]/5 text-[#E11D48] border-[#E11D48]/20'}`}
+              ${rolActivo === 'pricing'
+                ? 'bg-[#1F2937]/5 text-[#1F2937] border-[#1F2937]/20'
+                : 'bg-[#E11D48]/5 text-[#E11D48] border-[#E11D48]/20'}`}
             >
               Vista: {rolActivo === 'pricing' ? 'Pricing'
                 : rolActivo === 'admin' ? 'Admin'
@@ -1330,9 +1332,9 @@ export default function FichaCotizacion({
         {/* FC-3: DragOverlay — tarjeta flotante siguiendo el cursor */}
         <DragOverlay dropAnimation={null}>
           {activeDrag && (
-            <div className="rounded-lg border border-indigo-300 bg-white p-2.5 text-[10px] shadow-xl w-[320px] pointer-events-none">
+            <div className="rounded-lg border border-[#E11D48]/30 bg-white p-2.5 text-[10px] shadow-xl w-[320px] pointer-events-none">
               <div className="font-bold text-gray-800 truncate">{activeDrag.provNombre}</div>
-              <div className="font-black text-indigo-800 tabular-nums mt-1">
+              <div className="font-black text-[#9F1239] tabular-nums mt-1">
                 {fmtPrecio(activeDrag.tarifa)}
               </div>
               <p className="text-[9px] text-gray-400 mt-0.5">Suelta sobre un concepto para aplicar</p>

@@ -344,7 +344,7 @@ export const EVENT_TYPES = {
   info: { label: 'Información', color: 'bg-blue-50 text-blue-700 border-blue-100' },
   alerta: { label: 'Alerta Operativa', color: 'bg-amber-50 text-amber-700 border-amber-100' },
   exito: { label: 'Éxito / Hito', color: 'bg-green-50 text-green-700 border-green-100' },
-  aduana: { label: 'Aduanas', color: 'bg-purple-50 text-purple-700 border-purple-100' },
+  aduana: { label: 'Aduanas', color: 'bg-[#E11D48]/5 text-[#BE123C] border-[#E11D48]/10' },
 } as const;
 
 // ────────────────────────────────────────────────────────────

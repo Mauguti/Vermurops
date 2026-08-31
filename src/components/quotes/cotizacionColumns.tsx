@@ -33,7 +33,7 @@ function ModalidadIcon({ tipo }: { tipo: string }) {
 const ETAPA_COLORS: Record<string, string> = {
   solicitud_cliente:     'bg-gray-100 text-gray-700',
   solicitado_pricing:    'bg-amber-50 text-amber-700',
-  pricing_solicitando:   'bg-indigo-50 text-indigo-700',
+  pricing_solicitando:   'bg-[#E11D48]/5 text-[#BE123C]',
   cotizaciones_recibidas:'bg-violet-50 text-violet-700',
   consolidada:           'bg-cyan-50 text-cyan-700',
   enviada_cliente:       'bg-blue-50 text-blue-700',

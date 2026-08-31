@@ -125,25 +125,25 @@ export default function TarifaSuggestions({
 
   // ── With tariffs: collapsible panel ─────────────────────────────────────
   return (
-    <div className="rounded-md border border-indigo-200/60 bg-indigo-50/30 overflow-hidden">
+    <div className="rounded-md border border-[#E11D48]/30 bg-[#E11D48]/5 overflow-hidden">
       {/* Header (clickable) */}
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-2.5 py-1.5 text-left hover:bg-indigo-50/50 transition-colors"
+        className="w-full flex items-center justify-between px-2.5 py-1.5 text-left hover:bg-[#E11D48]/5 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <BookOpen className="w-3 h-3 text-indigo-500" />
-          <span className="text-[10px] font-bold text-indigo-700">
+          <BookOpen className="w-3 h-3 text-[#E11D48]" />
+          <span className="text-[10px] font-bold text-[#BE123C]">
             {count} tarifa{count !== 1 ? 's' : ''} vigente{count !== 1 ? 's' : ''}
           </span>
-          <span className="text-[9px] font-medium text-indigo-400 uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-100/60 border border-indigo-200/40">
+          <span className="text-[9px] font-medium text-[#E11D48]/60 uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#E11D48]/10 border border-[#E11D48]/30">
             Catálogo
           </span>
         </div>
         {expanded
-          ? <ChevronDown className="w-3 h-3 text-indigo-400" />
-          : <ChevronRight className="w-3 h-3 text-indigo-400" />
+          ? <ChevronDown className="w-3 h-3 text-[#E11D48]/60" />
+          : <ChevronRight className="w-3 h-3 text-[#E11D48]/60" />
         }
       </button>
 
@@ -204,7 +204,7 @@ export default function TarifaSuggestions({
 
                 {/* Right: price + action */}
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="font-black text-indigo-800 tabular-nums whitespace-nowrap">
+                  <span className="font-black text-[#9F1239] tabular-nums whitespace-nowrap">
                     {fmtPrecio(t)}
                   </span>
                   {onUsarTarifa && (
@@ -217,7 +217,7 @@ export default function TarifaSuggestions({
                       <button
                         type="button"
                         onClick={e => { e.stopPropagation(); handleUsar(t); }}
-                        className="text-[9px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2 py-0.5 rounded transition-colors whitespace-nowrap"
+                        className="text-[9px] font-bold text-white bg-[#E11D48] hover:bg-[#BE123C] px-2 py-0.5 rounded transition-colors whitespace-nowrap"
                       >
                         Usar
                       </button>
@@ -230,7 +230,7 @@ export default function TarifaSuggestions({
 
           {/* Container resolution note */}
           {contenedorTipo && vigentes.some(v => v.precios.unidad === 'CONTENEDOR') && (
-            <p className="text-[8px] text-indigo-400 ml-1">
+            <p className="text-[8px] text-[#E11D48]/60 ml-1">
               Contenedor del servicio: <strong>{contenedorTipo}</strong> — al usar, se aplica el precio de {etiquetaContenedor(contenedorTipo)}.
             </p>
           )}
@@ -240,7 +240,7 @@ export default function TarifaSuggestions({
             <button
               type="button"
               onClick={() => setShowAll(!showAll)}
-              className="text-[9px] font-semibold text-indigo-500 hover:text-indigo-700 transition-colors ml-1"
+              className="text-[9px] font-semibold text-[#E11D48] hover:text-[#BE123C] transition-colors ml-1"
             >
               {showAll ? 'Mostrar solo las 3 más baratas' : `Ver todas (${count})`}
             </button>

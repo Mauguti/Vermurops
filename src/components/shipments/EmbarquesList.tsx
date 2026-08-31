@@ -322,7 +322,7 @@ export default function EmbarquesList({
                           </span>
                           <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1 mt-0.5">
                             {e.tipo === 'master' ? (
-                              <span className="text-purple-600 bg-purple-50 px-1 py-0.2 rounded font-extrabold text-[8px]">MASTER</span>
+                              <span className="text-[#E11D48] bg-[#E11D48]/5 px-1 py-0.2 rounded font-extrabold text-[8px]">MASTER</span>
                             ) : (
                               <span className="text-gray-500 bg-gray-100 px-1 py-0.2 rounded text-[8px]">HIJO</span>
                             )}
@@ -355,7 +355,7 @@ export default function EmbarquesList({
                           </span>
                         </div>
                         {e.ruta.aduana.pedimento && (
-                          <span className="text-[9px] text-purple-600 font-mono font-bold mt-0.5 block" title={`Pedimento: ${e.ruta.aduana.pedimento}`}>
+                          <span className="text-[9px] text-[#E11D48] font-mono font-bold mt-0.5 block" title={`Pedimento: ${e.ruta.aduana.pedimento}`}>
                             PED: {e.ruta.aduana.pedimento.slice(-7)}
                           </span>
                         )}

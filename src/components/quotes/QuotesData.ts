@@ -310,7 +310,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
   {
     id: 'pricing_solicitando',
     label: 'Pricing — Solicitando proveedores',
-    color: 'border-t-indigo-500 bg-indigo-50/50 text-indigo-800',
+    color: 'border-t-[#E11D48] bg-[#E11D48]/5 text-[#9F1239]',
     rol: 'pricing',
   },
   {
@@ -371,7 +371,7 @@ export const TIPOS_SERVICIO: Record<string, { label: string; color: string; icon
   'Transporte Terrestre': { label: 'Transporte Terrestre', color: 'bg-emerald-100 text-emerald-700', icon: 'truck' },
   'Transporte Aéreo': { label: 'Transporte Aéreo', color: 'bg-sky-100 text-sky-700', icon: 'plane' },
   'Maniobras': { label: 'Maniobras', color: 'bg-orange-100 text-orange-700', icon: 'package' },
-  'Almacenaje Nacional': { label: 'Almacenaje Nacional', color: 'bg-purple-100 text-purple-700', icon: 'warehouse' },
+  'Almacenaje Nacional': { label: 'Almacenaje Nacional', color: 'bg-[#E11D48]/10 text-[#BE123C]', icon: 'warehouse' },
   'Almacenaje Internacional': { label: 'Almacenaje Internacional', color: 'bg-fuchsia-100 text-fuchsia-700', icon: 'warehouse' },
   'Seguro de Mercancía': { label: 'Seguro de Mercancía', color: 'bg-pink-100 text-pink-700', icon: 'shield' },
   'Recolección': { label: 'Recolección', color: 'bg-rose-100 text-rose-700', icon: 'map-pin' },

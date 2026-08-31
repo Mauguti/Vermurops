@@ -108,7 +108,7 @@ export default function CapturaManualConcepto({ conceptoNombre, onGuardar, onCre
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1 text-[9px] font-bold text-gray-400 hover:text-indigo-600 uppercase tracking-wide transition-colors"
+        className="flex items-center gap-1 text-[9px] font-bold text-gray-400 hover:text-[#E11D48] uppercase tracking-wide transition-colors"
       >
         <Plus className="w-3 h-3" />
         Agregar cotización manual
@@ -159,7 +159,7 @@ export default function CapturaManualConcepto({ conceptoNombre, onGuardar, onCre
         <button
           onClick={handleSave}
           disabled={saving || !proveedorId || !monto}
-          className="flex items-center gap-1 text-[10px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 px-3 py-1 rounded transition-colors"
+          className="flex items-center gap-1 text-[10px] font-bold text-white bg-[#E11D48] hover:bg-[#BE123C] disabled:opacity-40 px-3 py-1 rounded transition-colors"
         >
           {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
           Agregar
@@ -179,7 +179,7 @@ export default function CapturaManualConcepto({ conceptoNombre, onGuardar, onCre
             type="checkbox"
             checked={guardarSpot}
             onChange={e => setGuardarSpot(e.target.checked)}
-            className="accent-indigo-600"
+            className="bg-[#E11D48]"
           />
           Guardar como tarifa spot para futuras cotizaciones
         </label>

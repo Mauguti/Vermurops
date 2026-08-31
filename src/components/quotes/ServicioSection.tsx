@@ -392,7 +392,7 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
                 Conceptos de Servicio
               </h4>
               {rolActivo !== 'ventas' && (
-                <button onClick={handleAddConcepto} className="text-[9px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-wide flex items-center gap-1 hover:bg-indigo-50 px-2 py-1 rounded-lg transition-colors">
+                <button onClick={handleAddConcepto} className="text-[9px] font-bold text-[#E11D48] hover:text-[#9F1239] uppercase tracking-wide flex items-center gap-1 hover:bg-[#E11D48]/5 px-2 py-1 rounded-lg transition-colors">
                   <Plus className="w-3 h-3" /> Agregar Concepto
                 </button>
               )}

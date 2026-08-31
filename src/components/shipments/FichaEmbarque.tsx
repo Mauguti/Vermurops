@@ -1012,20 +1012,20 @@ export default function FichaEmbarque({
 
             {embarque.tipo === 'master' ? (
               <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-purple-50/50 border border-purple-100 rounded-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#E11D48]/5 border border-[#E11D48]/10 rounded-xl">
                   <div>
-                    <span className="text-xs font-bold text-purple-700 flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-[#BE123C] flex items-center gap-1.5">
                       <Layers className="w-4 h-4" />
                       Embarque Master Consolidado (MBL)
                     </span>
-                    <span className="block text-[10px] text-purple-600 font-semibold leading-tight mt-1">
+                    <span className="block text-[10px] text-[#E11D48] font-semibold leading-tight mt-1">
                       Este embarque agrupa múltiples guías/cargas hijas (House BL) bajo un solo Bill of Lading maestro.
                     </span>
                   </div>
 
                   <button
                     onClick={handleCrearHijo}
-                    className="bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-bold uppercase tracking-wider px-3.5 py-2 rounded-lg shadow-sm transition-colors flex items-center gap-1 shrink-0"
+                    className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-[10px] font-bold uppercase tracking-wider px-3.5 py-2 rounded-lg shadow-sm transition-colors flex items-center gap-1 shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" /> Crear HBL Hijo
                   </button>
@@ -1044,11 +1044,11 @@ export default function FichaEmbarque({
                         <div
                           key={h.id}
                           onClick={() => onSelectEmbarqueById(h.id)}
-                          className="p-4 border border-gray-200 hover:border-purple-300 rounded-xl cursor-pointer hover:bg-purple-50/10 transition-all flex flex-col justify-between"
+                          className="p-4 border border-gray-200 hover:border-[#E11D48]/30 rounded-xl cursor-pointer hover:bg-[#E11D48]/5 transition-all flex flex-col justify-between"
                         >
                           <div className="flex justify-between items-start">
                             <div>
-                              <span className="text-xs font-bold text-gray-800 hover:text-purple-600">
+                              <span className="text-xs font-bold text-gray-800 hover:text-[#E11D48]">
                                 {h.folio}
                               </span>
                               <span className="block text-[9px] text-gray-400 font-bold uppercase mt-0.5">
@@ -1090,14 +1090,14 @@ export default function FichaEmbarque({
                   <div className="p-4 border border-gray-150 rounded-xl flex items-center justify-between bg-white shadow-2xs">
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase">Embarque Master Asociado</span>
-                      <span className="block text-xs font-bold text-purple-700 hover:underline cursor-pointer mt-1" onClick={() => onSelectEmbarqueById(master.id)}>
+                      <span className="block text-xs font-bold text-[#BE123C] hover:underline cursor-pointer mt-1" onClick={() => onSelectEmbarqueById(master.id)}>
                         {master.folio} — MBL: {master.numeroGuia}
                       </span>
                     </div>
 
                     <button
                       onClick={() => onSelectEmbarqueById(master.id)}
-                      className="text-purple-600 hover:text-purple-800 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
+                      className="text-[#E11D48] hover:text-[#9F1239] text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
                     >
                       Ver Master <ArrowRight className="w-3.5 h-3.5" />
                     </button>

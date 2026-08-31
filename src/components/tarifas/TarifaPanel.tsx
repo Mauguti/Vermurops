@@ -65,10 +65,10 @@ function DraggableTarifaCard({
         yaUsada
           ? 'bg-green-50/40 border-green-200/50'
           : simulada
-          ? 'bg-indigo-50/50 border-indigo-400 border-dashed ring-1 ring-indigo-200/50 cursor-pointer'
+          ? 'bg-[#E11D48]/5 border-[#E11D48]/60 border-dashed ring-1 ring-[#E11D48]/30 cursor-pointer'
           : isMaxTerminal
           ? 'bg-amber-50/60 border-amber-300/50 cursor-pointer'
-          : 'bg-white border-gray-150 hover:border-indigo-200 cursor-pointer'
+          : 'bg-white border-gray-150 hover:border-[#E11D48]/30 cursor-pointer'
       }`}
     >
       <div className="flex items-start gap-1.5">
@@ -114,7 +114,7 @@ function DraggableTarifaCard({
               {tarifa.tiempoTransitoDias != null && <span className="shrink-0">TT: {tarifa.tiempoTransitoDias}d</span>}
               {tarifa.freeTimeDias != null && <span className="shrink-0">FT: {tarifa.freeTimeDias}d</span>}
             </div>
-            <span className="font-black text-indigo-800 tabular-nums whitespace-nowrap ml-2">
+            <span className="font-black text-[#9F1239] tabular-nums whitespace-nowrap ml-2">
               {fmtPrecio(tarifa)}
             </span>
           </div>
@@ -122,7 +122,7 @@ function DraggableTarifaCard({
           {/* Botón Usar + badge simulación */}
           <div className="flex items-center justify-end gap-1.5 mt-1.5">
             {simulada && !yaUsada && (
-              <span className="text-[8px] font-bold text-indigo-600 px-1.5 py-0.5 rounded border border-dashed border-indigo-300 bg-indigo-50 whitespace-nowrap">
+              <span className="text-[8px] font-bold text-[#E11D48] px-1.5 py-0.5 rounded border border-dashed border-[#E11D48]/30 bg-[#E11D48]/5 whitespace-nowrap">
                 Simulando
               </span>
             )}
@@ -135,7 +135,7 @@ function DraggableTarifaCard({
               <button
                 type="button"
                 onClick={e => { e.stopPropagation(); onUsar(); }}
-                className="text-[9px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded transition-colors whitespace-nowrap"
+                className="text-[9px] font-bold text-white bg-[#E11D48] hover:bg-[#BE123C] px-3 py-1 rounded transition-colors whitespace-nowrap"
               >
                 Usar
               </button>
@@ -198,7 +198,7 @@ function SimuladorFooter({
               {fmtMonto(actual)}
             </span>
             <span className="text-[9px] text-gray-300">&rarr;</span>
-            <span className="text-[10px] font-bold text-indigo-700 tabular-nums">
+            <span className="text-[10px] font-bold text-[#BE123C] tabular-nums">
               {fmtMonto(simulado)} {m}
             </span>
             {delta !== 0 && (
@@ -218,7 +218,7 @@ function SimuladorFooter({
           <button
             type="button"
             onClick={onAplicar}
-            className="text-[9px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1 rounded transition-colors"
+            className="text-[9px] font-bold text-white bg-[#E11D48] hover:bg-[#BE123C] px-3 py-1 rounded transition-colors"
           >
             Aplicar {simuladasCount > 1 ? `${simuladasCount} tarifas` : 'tarifa'}
           </button>
@@ -393,14 +393,14 @@ export default function TarifaPanel({
           <BookOpen className="w-3.5 h-3.5" /> Catálogo de Tarifas
         </h3>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[9px] font-bold text-indigo-700 uppercase tracking-wider px-1.5 py-0.5 rounded bg-indigo-100/60 border border-indigo-200/40">
+          <span className="text-[9px] font-bold text-[#BE123C] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[#E11D48]/10 border border-[#E11D48]/30">
             {matchedConcept?.nombre ?? conceptoNombre}
           </span>
           <span className="text-[9px] text-gray-400">
             {vigentes.length} tarifa{vigentes.length !== 1 ? 's' : ''}
           </span>
           {simulatedIds.size > 0 && (
-            <span className="text-[9px] font-bold text-indigo-600 px-1.5 py-0.5 rounded border border-dashed border-indigo-300 bg-indigo-50/80">
+            <span className="text-[9px] font-bold text-[#E11D48] px-1.5 py-0.5 rounded border border-dashed border-[#E11D48]/30 bg-[#E11D48]/5">
               {simulatedIds.size} simulando
             </span>
           )}
@@ -414,7 +414,7 @@ export default function TarifaPanel({
             value={provSearch}
             onChange={e => setProvSearch(e.target.value)}
             placeholder="Buscar proveedor..."
-            className="w-full pl-7 pr-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] outline-none focus:border-indigo-400 bg-white"
+            className="w-full pl-7 pr-2.5 py-1.5 border border-gray-200 rounded-lg text-[11px] outline-none focus:border-[#E11D48]/60 bg-white"
           />
         </div>
       </div>
@@ -485,7 +485,7 @@ export default function TarifaPanel({
 
         {/* Nota de resolución por contenedor */}
         {contenedorTipo && vigentes.some(v => v.precios.unidad === 'CONTENEDOR') && (
-          <p className="text-[8px] text-indigo-400 mt-1">
+          <p className="text-[8px] text-[#E11D48]/60 mt-1">
             Contenedor: <strong>{contenedorTipo}</strong> — al usar, se aplica el precio de {etiquetaContenedor(contenedorTipo)}.
           </p>
         )}

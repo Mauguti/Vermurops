@@ -191,14 +191,14 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Folio</th>
-              <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Estado</th>
-              <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Proveedor</th>
-              <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Concepto</th>
+              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Folio</th>
+              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Estado</th>
+              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Proveedor</th>
+              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Concepto</th>
               <th className="bg-canvas text-right px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Monto</th>
-              <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Urgencia</th>
-              <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Fecha requerida</th>
-              <th className="bg-canvas text-left px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Origen</th>
+              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Urgencia</th>
+              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Fecha requerida</th>
+              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Origen</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-divider bg-white">

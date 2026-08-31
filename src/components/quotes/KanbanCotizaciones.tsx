@@ -397,7 +397,7 @@ export default function KanbanCotizaciones({
                   ${isDraggedOver
                     ? 'bg-[#E11D48]/[0.03] border-dashed border-[#E11D48]/30 ring-2 ring-[#E11D48]/10'
                     : 'border-gray-150'}
-                  ${isPricingColumn ? 'ring-1 ring-indigo-100' : ''}`}
+                  ${isPricingColumn ? 'ring-1 ring-[#E11D48]/30' : ''}`}
               >
                 {/* Cabecera columna */}
                 <div className={`p-3.5 border-t-4 ${stage.color} rounded-t-xl border-b border-gray-150 flex flex-col justify-between shrink-0`}>
@@ -415,7 +415,7 @@ export default function KanbanCotizaciones({
                     </div>
                   )}
                   {isPricingColumn && (
-                    <span className="mt-1.5 inline-block text-[8px] font-bold uppercase tracking-wider text-indigo-500 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded w-fit">
+                    <span className="mt-1.5 inline-block text-[8px] font-bold uppercase tracking-wider text-[#E11D48] bg-[#E11D48]/5 border border-[#E11D48]/10 px-1.5 py-0.5 rounded w-fit">
                       Pricing
                     </span>
                   )}
@@ -485,10 +485,10 @@ export default function KanbanCotizaciones({
 
                           {/* Badge En Proceso con Pricing (Ventas) */}
                           {rolActivo === 'ventas' && ['pricing_solicitando', 'cotizaciones_recibidas', 'consolidada'].includes(quote.etapa) && (
-                            <div className="flex items-center gap-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider w-fit">
+                            <div className="flex items-center gap-1.5 bg-[#E11D48]/5 border border-[#E11D48]/10 text-[#BE123C] px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider w-fit">
                               <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E11D48]/60 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#E11D48]"></span>
                               </span>
                               En proceso con Pricing
                             </div>
@@ -517,7 +517,7 @@ export default function KanbanCotizaciones({
                               {/* Avatar pricing */}
                               {quote.pricingId && (
                                 <div
-                                  className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-bold text-[8px] flex items-center justify-center ring-1 ring-white"
+                                  className="w-5 h-5 rounded-full bg-[#E11D48]/10 text-[#BE123C] font-bold text-[8px] flex items-center justify-center ring-1 ring-white"
                                   title={`Pricing: ${quote.pricingId}`}
                                 >
                                   {quote.pricingId.split(' ').map(n => n[0]).join('')}

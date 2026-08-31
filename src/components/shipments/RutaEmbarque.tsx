@@ -266,7 +266,7 @@ export default function RutaEmbarque({
       {/* Aduana Integrada */}
       <div className="bg-white p-6 rounded-xl border border-gray-150 shadow-2xs space-y-4">
         <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-          <Landmark className="w-4 h-4 text-purple-500" />
+          <Landmark className="w-4 h-4 text-[#E11D48]" />
           <h3 className="text-xs font-bold text-[#18181B] uppercase tracking-wider">
             Control de Aduana y Despacho
           </h3>
@@ -296,7 +296,7 @@ export default function RutaEmbarque({
           <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-xl">
             <div className="space-y-0.5">
               <span className="text-xs font-bold text-gray-700 flex items-center gap-1">
-                <ShieldCheck className="w-4 h-4 text-purple-500" />
+                <ShieldCheck className="w-4 h-4 text-[#E11D48]" />
                 Transacción Dirigida (AES)
               </span>
               <span className="block text-[10px] text-gray-400 font-semibold leading-tight">

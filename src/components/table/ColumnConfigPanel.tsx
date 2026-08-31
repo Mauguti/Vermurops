@@ -77,7 +77,7 @@ function SortableColumnItem({
       style={style}
       className={`
         flex items-center gap-2 px-2 py-1.5 rounded text-xs
-        ${isDragging ? 'bg-indigo-50' : 'hover:bg-gray-50'}
+        ${isDragging ? 'bg-[#E11D48]/5' : 'hover:bg-gray-50'}
       `}
     >
       {/* Drag handle */}
@@ -97,7 +97,7 @@ function SortableColumnItem({
       {/* Visibility toggle */}
       <button
         onClick={col.pinned ? undefined : onToggle}
-        className={`shrink-0 ${col.pinned ? 'text-gray-300 cursor-not-allowed' : isVisible ? 'text-indigo-500 hover:text-indigo-700' : 'text-gray-300 hover:text-gray-500'}`}
+        className={`shrink-0 ${col.pinned ? 'text-gray-300 cursor-not-allowed' : isVisible ? 'text-[#E11D48] hover:text-[#BE123C]' : 'text-gray-300 hover:text-gray-500'}`}
         title={col.pinned ? 'Columna fija' : isVisible ? 'Ocultar' : 'Mostrar'}
       >
         {isVisible || col.pinned ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
@@ -176,7 +176,7 @@ export default function ColumnConfigPanel({
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className={`p-1.5 rounded transition-colors border ${open ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+        className={`p-1.5 rounded transition-colors border ${open ? 'bg-[#E11D48]/5 border-[#E11D48]/30 text-[#E11D48]' : 'bg-white border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
         title="Configurar columnas"
       >
         <Settings className="w-3.5 h-3.5" />

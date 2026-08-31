@@ -146,8 +146,8 @@ export default function ConceptoSelector({
             }`
           : `flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-md border transition-colors max-w-[260px] ${
           selectedNombre
-            ? 'text-[#18181B] bg-white border-gray-200 hover:border-indigo-400 hover:bg-indigo-50/30'
-            : 'text-gray-400 bg-gray-50 border-dashed border-gray-300 hover:border-indigo-400 hover:text-indigo-600'
+            ? 'text-[#18181B] bg-white border-gray-200 hover:border-[#E11D48]/60 hover:bg-[#E11D48]/5'
+            : 'text-gray-400 bg-gray-50 border-dashed border-gray-300 hover:border-[#E11D48]/60 hover:text-[#E11D48]'
         }`}
       >
         <span className="truncate">
@@ -172,7 +172,7 @@ export default function ConceptoSelector({
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Buscar concepto..."
-                className="w-full pl-7 pr-7 py-1.5 border border-gray-200 rounded-md text-[11px] outline-none focus:border-indigo-400 bg-white"
+                className="w-full pl-7 pr-7 py-1.5 border border-gray-200 rounded-md text-[11px] outline-none focus:border-[#E11D48]/60 bg-white"
               />
               {search && (
                 <button
@@ -212,8 +212,8 @@ export default function ConceptoSelector({
                       onSelect(c.id, c.nombre);
                       setOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-indigo-50 transition-colors border-b border-gray-50 ${
-                      selectedNombre === c.nombre ? 'bg-indigo-50/60' : ''
+                    className={`w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#E11D48]/5 transition-colors border-b border-gray-50 ${
+                      selectedNombre === c.nombre ? 'bg-[#E11D48]/5' : ''
                     }`}
                   >
                     <div className="flex-1 min-w-0">
@@ -249,7 +249,7 @@ export default function ConceptoSelector({
               <button
                 type="button"
                 onClick={() => { onCrearNuevo(); setOpen(false); }}
-                className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+                className="flex items-center gap-1.5 text-[10px] font-bold text-[#E11D48] hover:text-[#9F1239] transition-colors"
               >
                 <Plus className="w-3 h-3" />
                 Crear nuevo concepto...
