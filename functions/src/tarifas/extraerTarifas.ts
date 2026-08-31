@@ -21,17 +21,55 @@
  */
 
 import { onRequest } from 'firebase-functions/v2/https';
-import { defineSecret } from 'firebase-functions/params';
+import { defineSecret, defineString } from 'firebase-functions/params';
 import * as logger from 'firebase-functions/logger';
 import { verificarUsuario, exigirCapacidad, ErrorAuth } from '../comun/auth.js';
 
 /** Secreto compartido con n8n. Se manda en X-Vermur-Token. */
 const VERMUR_N8N_TOKEN = defineSecret('VERMUR_N8N_TOKEN');
 
-const ENDPOINT_N8N = 'https://n8n.vermur.mx/webhook/extraer-tarifas';
+/**
+ * Endpoint del agente. Configurable para poder apuntar a la de test mientras
+ * se depura el agente, sin tocar código ni redesplegar.
+ *
+ * ⚠️ El default es la de PRODUCCIÓN a propósito. La ruta /webhook-test/ solo
+ * responde mientras alguien tiene n8n abierto escuchando: si quedara como
+ * default, funcionaría en pruebas y fallaría en uso real — el peor modo de
+ * fallo posible, porque se descubre con un cliente esperando.
+ */
+const N8N_WEBHOOK_URL = defineString('N8N_WEBHOOK_URL', {
+  default: 'https://n8n.vermur.mx/webhook/extraer-tarifas',
+  description: 'URL del webhook de n8n que extrae tarifas.',
+});
 
 /** La IA sobre un PDF escaneado puede tardar. Más allá, algo se atoró. */
 const TIMEOUT_MS = 120_000;
+
+/**
+ * Traduce el estado HTTP del agente a algo accionable.
+ *
+ * Un «error 404» no le dice nada a quien está cotizando: lo que necesita saber
+ * es si el problema se arregla solo, si tiene que avisarle a alguien, o si el
+ * documento es el que está mal. Mismo criterio que el timeout.
+ */
+function mensajeDeError(status: number): string {
+  if (status === 404) {
+    return 'El extractor de tarifas no está disponible. Avisa a sistemas.';
+  }
+  if (status === 401 || status === 403) {
+    return 'El extractor rechazó la conexión. Avisa a sistemas: la credencial no está bien configurada.';
+  }
+  if (status === 413) {
+    return 'El documento es demasiado grande para el extractor.';
+  }
+  if (status === 429) {
+    return 'El extractor está saturado. Espera un momento y vuelve a intentarlo.';
+  }
+  if (status >= 500) {
+    return 'El extractor falló al procesar el documento. Si se repite, avisa a sistemas.';
+  }
+  return `El extractor respondió con error ${status}.`;
+}
 
 export const extraerTarifas = onRequest(
   {
@@ -88,7 +126,7 @@ export const extraerTarifas = onRequest(
     try {
       logger.info('Extrayendo tarifas', { uid: usuario.uid, rol: usuario.rol });
 
-      const respuesta = await fetch(ENDPOINT_N8N, {
+      const respuesta = await fetch(N8N_WEBHOOK_URL.value(), {
         method: 'POST',
         headers: {
           'Content-Type': req.get('content-type') ?? 'application/json',
@@ -105,11 +143,10 @@ export const extraerTarifas = onRequest(
       const texto = await respuesta.text();
 
       if (!respuesta.ok) {
-        logger.error('n8n respondió con error', { status: respuesta.status, texto: texto.slice(0, 500) });
-        res.status(502).json({
-          ok: false,
-          error: `El extractor respondió con error ${respuesta.status}.`,
+        logger.error('n8n respondió con error', {
+          status: respuesta.status, texto: texto.slice(0, 500),
         });
+        res.status(502).json({ ok: false, error: mensajeDeError(respuesta.status) });
         return;
       }
 

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Plus, Search, Pencil, DollarSign, AlertTriangle, Clock, CheckCircle2, Upload } from 'lucide-react';
+import { Plus, Search, Pencil, DollarSign, AlertTriangle, Clock, CheckCircle2, Upload, Sparkles } from 'lucide-react';
 import { useTarifas } from '../hooks/useTarifas';
 import { useProveedores } from '../hooks/useProveedores';
 import { useConceptos } from '../hooks/useConceptos';
@@ -8,7 +8,8 @@ import {
   TarifaVermur, TipoTarifa, EstadoVigencia, estadoVigencia, UnidadTarifa,
 } from './tarifas/TarifasData';
 import TarifaFormModal from './tarifas/TarifaFormModal';
-import CargaMasivaTarifas from './tarifas/CargaMasivaTarifas';
+import CargarTarifario from './tarifas/CargarTarifario';
+import Toast, { TipoToast } from './ui/Toast';
 
 // ─── Helpers de display ──────────────────────────────────────────────────────
 
@@ -61,7 +62,9 @@ export default function RatesManagement() {
   const [filterTipo, setFilterTipo] = useState<'' | TipoTarifa>('');
   const [filterVigencia, setFilterVigencia] = useState<FiltroVigencia>('todas');
   const [modal, setModal] = useState<{ mode: 'crear' | 'editar'; tarifa?: TarifaVermur } | null>(null);
-  const [view, setView] = useState<'catalogo' | 'masiva'>('catalogo');
+  /** Modal de carga de tarifario con IA. */
+  const [cargando, setCargando] = useState(false);
+  const [toast, setToast] = useState<{ mensaje: string; tipo: TipoToast } | null>(null);
 
   // ── Lookup maps (id → nombre) ──────────────────────────────────────────
   const provMap = useMemo(() => {
@@ -157,15 +160,9 @@ export default function RatesManagement() {
     );
   }
 
-  // ── Vista de carga masiva ───────────────────────────────────────────────
-  if (view === 'masiva') {
-    return (
-      <CargaMasivaTarifas
-        onClose={() => setView('catalogo')}
-        onCreate={createTarifa}
-      />
-    );
-  }
+  // La carga masiva anterior se retiró: el cliente dijo que no le servía —«ahí
+  // intenté picar, pero no me apareció nada»— y dejar las dos confundiría.
+  // Ahora se sube el tarifario tal como llega y la IA propone las tarifas.
 
   return (
     <div className="space-y-6">
@@ -181,11 +178,11 @@ export default function RatesManagement() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setView('masiva')}
+            onClick={() => setCargando(true)}
             className="flex items-center gap-2 border border-card-border text-text-secondary px-4 py-2 rounded-[8px] text-[13px] font-medium hover:border-brand hover:text-brand transition-colors"
           >
-            <Upload className="w-4 h-4" />
-            Carga masiva
+            <Sparkles className="w-4 h-4" />
+            Cargar tarifario
           </button>
           <button
             onClick={() => setModal({ mode: 'crear' })}
@@ -196,6 +193,19 @@ export default function RatesManagement() {
           </button>
         </div>
       </div>
+
+      <Toast mensaje={toast?.mensaje ?? null} tipo={toast?.tipo} onClose={() => setToast(null)} />
+
+      {cargando && (
+        <CargarTarifario
+          pedirProveedorAntes
+          onCerrar={() => setCargando(false)}
+          onGuardadas={(n) => setToast({
+            mensaje: `${n} tarifa${n !== 1 ? 's' : ''} agregada${n !== 1 ? 's' : ''} al catálogo.`,
+            tipo: 'exito',
+          })}
+        />
+      )}
 
       {/* ── Contadores ─────────────────────────────────────────────────────── */}
       {conteos.total > 0 && (
@@ -279,7 +289,7 @@ export default function RatesManagement() {
                 <tr>
                   <td colSpan={8} className="px-4 py-12 text-center">
                     {conteos.total === 0 ? (
-                      <EmptyState onCreateClick={() => setModal({ mode: 'crear' })} onBulkClick={() => setView('masiva')} />
+                      <EmptyState onCreateClick={() => setModal({ mode: 'crear' })} onBulkClick={() => setCargando(true)} />
                     ) : (
                       <>
                         <DollarSign className="w-8 h-8 text-text-muted mx-auto mb-3" />
@@ -393,12 +403,13 @@ function EmptyState({ onCreateClick, onBulkClick }: { onCreateClick: () => void;
             onClick={onBulkClick}
             className="flex items-center gap-2 border border-card-border text-text-secondary px-5 py-2.5 rounded-[8px] text-[13px] font-medium hover:border-brand hover:text-brand transition-colors"
           >
-            <Upload className="w-4 h-4" />
-            Carga masiva
+            <Sparkles className="w-4 h-4" />
+            Cargar tarifario
           </button>
         </div>
         <p className="text-[11px] text-text-muted">
-          La carga masiva permite importar un tarifario completo de un jalón.
+          Sube el tarifario como te llegó —Excel, PDF, una captura o el correo— y el
+          sistema propone las tarifas para que las revises.
         </p>
       </div>
     </div>

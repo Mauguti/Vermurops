@@ -34,18 +34,21 @@ interface Props {
   documentos: DocumentoTarifario[];
   editable: boolean;
   subiendo: boolean;
-  /** procesarConIA en false = solo respaldo, sin pasar por el extractor. */
+  /** Sube el documento como respaldo, sin pasar por el extractor. */
   onSubir: (file: File, procesarConIA: boolean) => void;
+  /** Abre la carga de tarifario con IA — el mismo componente que en Tarifas. */
+  onCargarTarifario: () => void;
 }
 
-export default function EvidenciasTarifas({ documentos, editable, subiendo, onSubir }: Props) {
+export default function EvidenciasTarifas({
+  documentos, editable, subiendo, onSubir, onCargarTarifario,
+}: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
-  const [procesar, setProcesar] = useState(true);
   const [preview, setPreview] = useState<DocumentoTarifario | null>(null);
 
   const elegir = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
-    if (f) onSubir(f, procesar);
+    if (f) onSubir(f, false);
     e.target.value = '';
   };
 
@@ -64,23 +67,23 @@ export default function EvidenciasTarifas({ documentos, editable, subiendo, onSu
 
         {editable && (
           <div className="flex items-center gap-2 shrink-0">
-            {/* No todo documento es un tarifario: a veces es solo el respaldo. */}
-            <label className="flex items-center gap-1.5 text-[10px] text-gray-500 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={procesar}
-                onChange={e => setProcesar(e.target.checked)}
-                className="accent-[#E11D48] w-3 h-3"
-              />
-              Extraer tarifas
-            </label>
+            {/* Dos acciones distintas, no una con casilla: subir un respaldo y
+                cargar un tarifario son intenciones diferentes, y la casilla
+                obligaba a leerla antes de cada subida. */}
             <button
               onClick={() => inputRef.current?.click()}
               disabled={subiendo}
-              className="flex items-center gap-1.5 text-[11px] font-bold text-[#E11D48] hover:bg-[#E11D48]/5 px-2.5 py-1 rounded-lg transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 hover:text-gray-700 px-2 py-1 rounded-lg transition-colors disabled:opacity-50"
             >
               <Upload className="w-3.5 h-3.5" />
-              {subiendo ? 'Subiendo…' : 'Subir documento'}
+              {subiendo ? 'Subiendo…' : 'Solo respaldo'}
+            </button>
+            <button
+              onClick={onCargarTarifario}
+              className="flex items-center gap-1.5 text-[11px] font-bold text-[#E11D48] hover:bg-[#E11D48]/5 px-2.5 py-1 rounded-lg transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Cargar tarifario
             </button>
             <input
               ref={inputRef}

@@ -48,6 +48,7 @@ import ModalAgregarAgente from './ModalAgregarAgente';
 import CapturaTipoCambio from './CapturaTipoCambio';
 import EvidenciasTarifas from './EvidenciasTarifas';
 import RevisionTarifasExtraidas from '../tarifas/RevisionTarifasExtraidas';
+import CargarTarifario from '../tarifas/CargarTarifario';
 import { usePuertos } from '../../hooks/usePuertos';
 import { useDocumentosTarifario } from '../../hooks/useDocumentosTarifario';
 import { totalesComparables } from '../../lib/matrizComparativa';
@@ -139,6 +140,7 @@ export default function FichaCotizacion({
   const [modalAgente, setModalAgente] = useState<string | null>(null);
   /** Extracción recién llegada, esperando la pantalla de revisión (TA-4). */
   const [toastLocal, setToastLocal] = useState<string | null>(null);
+  const [cargandoTarifario, setCargandoTarifario] = useState(false);
   const [extraccionPendiente, setExtraccionPendiente] =
     useState<{ documento: import('../../lib/documentoTarifario').DocumentoTarifario; respuesta: unknown } | null>(null);
   /**
@@ -1194,20 +1196,18 @@ export default function FichaCotizacion({
                 documentos={documentos}
                 editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
                 subiendo={subiendoDoc}
-                onSubir={(file, procesarConIA) => {
-                  subirDocumento(file, { procesarConIA, cotizacionId: quote.id })
-                    .then(({ documento, extraccion, duplicadoDe }) => {
+                onCargarTarifario={() => setCargandoTarifario(true)}
+                onSubir={(file) => {
+                  subirDocumento(file, { procesarConIA: false, cotizacionId: quote.id })
+                    .then(({ duplicadoDe }) => {
                       if (duplicadoDe) {
-                        window.alert(
+                        setToastLocal(
                           `Este archivo ya se había subido el ${duplicadoDe.fechaSubida.slice(0, 10)}` +
                           ` por ${duplicadoDe.subidoPorNombre}. Se guardó de todos modos.`,
                         );
                       }
-                      if (procesarConIA && extraccion) {
-                        setExtraccionPendiente({ documento, respuesta: extraccion });
-                      }
                     })
-                    .catch(err => window.alert(err instanceof Error ? err.message : String(err)));
+                    .catch(err => setToastLocal(err instanceof Error ? err.message : String(err)));
                 }}
               />
             )}
