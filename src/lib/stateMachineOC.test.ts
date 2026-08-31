@@ -463,9 +463,13 @@ describe('H · administracion autoriza y paga', () => {
     expect(puedeTransicionarOC('en_gestion', 'autorizada', 'operaciones', oc).ok).toBe(false);
   });
 
-  it('Pricing solo solicita: no gestiona ni autoriza', () => {
+  it('Pricing no mueve órdenes de compra: no es su flujo', () => {
+    // El plan decía «PRICING solicita». Al aterrizarlo no encajó: Pricing
+    // cotiza y compara proveedores, y ni ve embarques ni gestiona pagos.
+    // Tampoco tiene ya `ordenCompra.solicitar` (ver permisos.ts).
     expect(puedeTransicionarOC('solicitada', 'en_gestion', 'pricing', makeOC()).ok).toBe(false);
     expect(puedeTransicionarOC('en_gestion', 'autorizada', 'pricing', makeOC({ estado: 'en_gestion' })).ok).toBe(false);
+    expect(puedeTransicionarOC('autorizada', 'pagada', 'pricing', makeOC({ estado: 'autorizada', comprobantePago: 'x' })).ok).toBe(false);
   });
 });
 

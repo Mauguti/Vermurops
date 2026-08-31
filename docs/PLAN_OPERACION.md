@@ -154,20 +154,35 @@ Retoma las órdenes de compra desde OC-1.
 
 OC-1 del plan original. Colección `ordenesCompra`, regla, contador `OC-2026-0001`.
 
-### C-2 · El flujo de tres áreas
+### C-2 · El flujo de dos áreas
+
+> **Corregido el 31-ago-2026.** Este plan decía «PRICING solicita → OPERACIONES
+> gestiona → ADMIN autoriza y paga». Al aterrizarlo se vio que el primer paso no
+> encaja: Pricing cotiza y compara proveedores, no gestiona pagos ni ve
+> embarques, así que la capacidad quedaba asignada sin pantalla donde ejercerla.
+> `ordenCompra.solicitar` se quitó de Pricing.
 
 ```
-PRICING solicita → OPERACIONES gestiona → ADMIN autoriza y paga
+OPERACIONES solicita y gestiona → ADMINISTRACIÓN autoriza y paga
 ```
 
 Estados: solicitada → en gestión → autorizada → pagada, con rechazada como salida.
-Ya está en `stateMachineOC.ts` con 54 tests.
+Está en `stateMachineOC.ts`.
+
+Dos cosas que faltaban para que el flujo pudiera correr, y que ya se
+corrigieron:
+  - `RolOC` tenía `admin` (el superusuario técnico) pero no `administracion`
+    (el área que lleva los pagos), así que nadie podía autorizar y toda OC se
+    quedaba trabada en «en gestión».
+  - Operaciones no tenía acceso al módulo de Finanzas, donde vive la bandeja.
 
 ### C-3 · Dos orígenes
 
 - **Desde un embarque:** hereda cliente, proveedor, folio y concepto. Casos: anticipos
-  de impuestos, anticipos a agentes aduanales, transportistas que cobran 50% adelantado
-- **Suelta:** gastos de oficina sin embarque — luz, nómina, servicios
+  de impuestos, anticipos a agentes aduanales, transportistas que cobran 50% adelantado.
+  Lo pide **Operaciones**, desde el cargo de gasto de su embarque.
+- **Suelta:** gastos de oficina sin embarque — luz, nómina, servicios.
+  Lo carga **Administración**.
 
 Del cliente: *«habíamos mencionado cargar todo lo que es gastos de oficina aquí en el
 sistema... eso también lo cargaría el área de administración»*.

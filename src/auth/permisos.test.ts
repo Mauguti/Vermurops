@@ -287,15 +287,23 @@ describe('Pricing crea cotizaciones directo (sesión 30-ago-2026)', () => {
   });
 });
 
-// ─── Órdenes de compra: el flujo de tres áreas (C-2) ────────────────────────
+// ─── Órdenes de compra: el flujo de DOS áreas (C-2) ─────────────────────────
 //
-// Cada paso del flujo necesita DOS cosas: la capacidad y la pantalla donde
-// ejercerla. Faltó la segunda y el paso del medio se quedó sin lugar:
-// Operaciones podía gestionar y no tenía cómo llegar a la bandeja.
+//     OPERACIONES solicita y gestiona → ADMINISTRACIÓN autoriza y paga
+//
+// El plan decía «PRICING solicita» y al aterrizarlo no encajó: Pricing no ve
+// embarques ni gestiona pagos, así que la capacidad quedaba asignada y sin
+// ninguna pantalla donde ejercerla.
+//
+// Cada paso necesita DOS cosas: la capacidad y el lugar donde ejercerla.
+// Faltó la segunda y el paso del medio se quedó sin lugar: Operaciones podía
+// gestionar y no tenía cómo llegar a la bandeja.
 
 describe('Órdenes de compra · capacidad y pantalla', () => {
-  it('Pricing solicita', () => {
-    expect(puede('pricing', 'ordenCompra.solicitar')).toBe(true);
+  it('Pricing NO solicita pagos: cotiza y compara, no gestiona dinero', () => {
+    expect(puede('pricing', 'ordenCompra.solicitar')).toBe(false);
+    expect(puede('pricing', 'ordenCompra.gestionar')).toBe(false);
+    expect(puede('pricing', 'ordenCompra.autorizar')).toBe(false);
   });
 
   it('Operaciones solicita y gestiona, pero no autoriza el pago', () => {

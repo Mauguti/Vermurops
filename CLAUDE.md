@@ -118,8 +118,10 @@ patrón que usamos: helper que intenta el campo nuevo y cae al viejo (ver `getOf
 - **Ventas** solo crea leads y solicita cotizaciones. NO da de alta clientes ni proveedores.
 - **Pricing** cotiza y gestiona tarifas. NO da de alta clientes, proveedores ni puertos.
   NO ve el Kanban. NO tiene seccion independiente de Documentos.
-- **Operaciones** genera embarques y factura. NO crea cotizaciones.
+- **Operaciones** genera embarques, factura, y solicita y gestiona las órdenes
+  de compra. NO crea cotizaciones.
 - **Administracion** es la unica que da altas definitivas de clientes, proveedores y puertos.
+  Autoriza y paga las órdenes de compra, y carga los gastos de oficina.
 
 **Citas del cliente:**
 
@@ -148,6 +150,32 @@ NO se agrego a `perdida` desde `solicitud_cliente`: esa es etapa pura de Ventas
 y la cotizacion todavia no le llega a Pricing.
 
 Fijado en `stateMachine.test.ts`, bloque G.
+
+**Corrección al plan de operación (31-ago-2026): las órdenes de compra son de
+DOS áreas, no de tres.**
+
+    OPERACIONES solicita y gestiona → ADMINISTRACIÓN autoriza y paga
+
+`docs/PLAN_OPERACION.md` decía «PRICING solicita → OPERACIONES gestiona → ADMIN
+autoriza y paga». Al aterrizarlo se vio que el primer paso no encaja: Pricing
+cotiza y compara proveedores, no gestiona pagos ni ve embarques, así que la
+capacidad quedaba asignada sin ninguna pantalla donde ejercerla.
+
+Quien pide pagos es **Operaciones** —anticipos de impuestos, anticipos a agentes
+aduanales, transportistas que cobran 50% adelantado, gastos que surgen en la
+operación— y **Administración** para los gastos de oficina, que el cliente puso
+explícitamente en su área: *«eso también lo cargaría el área de administración»*.
+
+`ordenCompra.solicitar` se quitó de Pricing. Una capacidad que ningún humano
+ejerce es ruido, por el mismo criterio con el que no se le dio
+`embarque.generar` a Ventas.
+
+Dos consecuencias en el código, ambas fijadas con tests:
+  - `RolOC` tenía `admin` pero no `administracion`, así que el ÁREA que lleva
+    los pagos no podía autorizarlos y toda OC se quedaba trabada en «en
+    gestión». Ver `stateMachineOC.test.ts`, bloque H.
+  - Operaciones no tenía acceso al módulo de Finanzas, donde vive la bandeja,
+    así que el paso del medio no tenía pantalla. Ver `permisos.test.ts`.
 
 ### 4.2 El IVA se deriva, no se captura
 
@@ -450,9 +478,9 @@ de ahí a facturas.
 
 | Módulo | Estado |
 |---|---|
-| Órdenes de compra | OC-0 hecho (modelo + máquina de estados + 54 tests). Pausado |
+| Órdenes de compra | C-1 a C-3 hechos: bandeja, ficha, flujo de dos áreas y los dos orígenes |
 | Gestión de usuarios | Plan aprobado, sin implementar. Roles hoy en `getRolByEmail` |
-| Finanzas | Placeholders. Cuentas por pagar se vuelve Órdenes de compra |
+| Finanzas | «Cuentas por pagar» ES la bandeja de OC. Cobranza y estados de cuenta pendientes |
 
 ### Sin empezar
 
