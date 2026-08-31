@@ -86,6 +86,29 @@ Firestore rechaza `undefined` y tumba la escritura entera; si nadie atrapa la
 promesa, el estado de React ya se actualizó y en pantalla parece guardado. «No
 guardó nada» se reporta en cinco minutos; «guardó a medias» vive semanas.
 
+**Nunca sumes dinero sin mirar la moneda.**
+El mismo bug apareció CUATRO veces en lugares distintos —el resumen del
+embarque, la comparativa de agentes, el KPI de cuentas por pagar y el pie de la
+bandeja de órdenes— siempre con la misma forma:
+
+```ts
+items.reduce((acc, x) => acc + x.monto, 0)   // ← compila, pasa tests, miente
+```
+
+2,000 USD y 40,000 MXN dan «42,000». Se ve perfectamente bien y nadie lo atrapa
+hasta que ese total llega a una factura o a un pago.
+
+Usa `sumarPorMoneda()` de `lib/sumarPorMoneda.ts`. Devuelve un importe POR
+moneda, nunca un escalar. Si de verdad necesitas un solo número, `totalDeUnaMoneda()`
+devuelve `null` cuando la lista mezcla, para que el caso tenga que resolverse
+en vez de colarse. Una moneda desconocida se descarta en vez de caer en USD:
+meter un importe en la moneda equivocada es peor que dejarlo fuera, porque el
+total seguiría viéndose correcto.
+
+`npx tsx scripts/auditarSumasDeDinero.ts` marca las sumas nuevas que no miran
+la moneda. Córrelo antes de cerrar cualquier bloque que toque dinero. Sale con
+código 1 si encuentra alguna sin clasificar.
+
 **Cuando cambies el modelo de datos, maneja el fallback.** Hay datos legacy en producción. El
 patrón que usamos: helper que intenta el campo nuevo y cae al viejo (ver `getOficialIds`,
 `matchConcept`).

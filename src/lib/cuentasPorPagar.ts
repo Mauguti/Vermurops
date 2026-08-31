@@ -22,21 +22,23 @@
  */
 
 import type { EstadoOC, OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
+import { sumarPorMoneda, monedasConMonto, Moneda } from './sumarPorMoneda';
 
-export type MonedaOC = 'USD' | 'MXN';
+/** @deprecated Usa `Moneda` de sumarPorMoneda. Se conserva por los imports. */
+export type MonedaOC = Moneda;
 
-const MONEDAS: MonedaOC[] = ['USD', 'MXN'];
+const MONEDAS: Moneda[] = ['USD', 'MXN'];
 const redondear = (n: number) => Math.round(n * 100) / 100;
 
 export interface TotalesPorPagar {
   /** Autorizadas: lo que se debe en firme, por moneda. */
-  enFirme: Record<MonedaOC, number>;
+  enFirme: Record<Moneda, number>;
   /** Solicitadas y en gestión: todavía no es deuda, pero viene. */
-  enCurso: Record<MonedaOC, number>;
+  enCurso: Record<Moneda, number>;
   /** Ya pagadas, por moneda. Histórico. */
-  pagado: Record<MonedaOC, number>;
+  pagado: Record<Moneda, number>;
   /** Monedas con algún movimiento en firme o en curso, en orden estable. */
-  monedasActivas: MonedaOC[];
+  monedasActivas: Moneda[];
 }
 
 /** ¿Este estado cuenta como deuda en firme? */
@@ -49,10 +51,6 @@ export function esSolicitudEnCurso(estado: EstadoOC): boolean {
   return estado === 'solicitada' || estado === 'en_gestion';
 }
 
-function vacio(): Record<MonedaOC, number> {
-  return { USD: 0, MXN: 0 };
-}
-
 /**
  * Totales por moneda. NUNCA se suman entre sí ni se convierten: §4.3.
  *
@@ -61,27 +59,22 @@ function vacio(): Record<MonedaOC, number> {
  * dejarlo fuera del total, porque el total seguiría viéndose correcto.
  */
 export function totalesPorPagar(ordenes: OrdenCompra[]): TotalesPorPagar {
-  const enFirme = vacio();
-  const enCurso = vacio();
-  const pagado = vacio();
+  const vivas = ordenes.filter(oc => oc.activo !== false);
+  const de = (predicado: (oc: OrdenCompra) => boolean) =>
+    sumarPorMoneda(vivas.filter(predicado), oc => oc.monto, oc => oc.moneda);
 
-  ordenes.forEach(oc => {
-    if (oc.activo === false) return;
-    const destino =
-      esCuentaPorPagar(oc.estado) ? enFirme
-      : esSolicitudEnCurso(oc.estado) ? enCurso
-      : oc.estado === 'pagada' ? pagado
-      : null;
-    if (!destino) return;                       // rechazada: no existió
-    if (!MONEDAS.includes(oc.moneda as MonedaOC)) return;
-    destino[oc.moneda as MonedaOC] = redondear(destino[oc.moneda as MonedaOC] + (oc.monto ?? 0));
-  });
+  const enFirme = de(oc => esCuentaPorPagar(oc.estado));
+  const enCurso = de(oc => esSolicitudEnCurso(oc.estado));
+  const pagado  = de(oc => oc.estado === 'pagada');
+  // La rechazada no cae en ningún grupo: no existió.
 
   return {
     enFirme,
     enCurso,
     pagado,
-    monedasActivas: MONEDAS.filter(m => enFirme[m] !== 0 || enCurso[m] !== 0),
+    monedasActivas: MONEDAS.filter(
+      m => monedasConMonto(enFirme).includes(m) || monedasConMonto(enCurso).includes(m),
+    ),
   };
 }
 
@@ -93,17 +86,17 @@ export function totalesPorPagar(ordenes: OrdenCompra[]): TotalesPorPagar {
  */
 export function porPagarPorProveedor(
   ordenes: OrdenCompra[],
-): { proveedorId: string; proveedorNombre: string; moneda: MonedaOC; monto: number; folios: string[] }[] {
-  const mapa = new Map<string, { proveedorId: string; proveedorNombre: string; moneda: MonedaOC; monto: number; folios: string[] }>();
+): { proveedorId: string; proveedorNombre: string; moneda: Moneda; monto: number; folios: string[] }[] {
+  const mapa = new Map<string, { proveedorId: string; proveedorNombre: string; moneda: Moneda; monto: number; folios: string[] }>();
 
   ordenes.forEach(oc => {
     if (oc.activo === false || !esCuentaPorPagar(oc.estado)) return;
-    if (!MONEDAS.includes(oc.moneda as MonedaOC)) return;
+    if (!MONEDAS.includes(oc.moneda as Moneda)) return;
     const clave = `${oc.proveedorId}::${oc.moneda}`;
     const actual = mapa.get(clave) ?? {
       proveedorId: oc.proveedorId,
       proveedorNombre: oc.proveedorNombre,
-      moneda: oc.moneda as MonedaOC,
+      moneda: oc.moneda as Moneda,
       monto: 0,
       folios: [],
     };

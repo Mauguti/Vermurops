@@ -10,6 +10,7 @@ import { Search, Filter, Download, Clock, Settings, CheckCircle, CheckCircle2, X
 import type { OrdenCompra, EstadoOC } from './OrdenesCompraData';
 import { ESTADOS_OC_MAP } from './OrdenesCompraData';
 import EstadoVacio from '../ui/EstadoVacio';
+import { sumarPorMoneda, formatearPorMoneda } from '../../lib/sumarPorMoneda';
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -277,9 +278,15 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
       {/* Footer con total */}
       <div className="flex justify-between items-center text-[12px] text-text-muted px-[4px]">
         <span>{totalFiltrado} orden{totalFiltrado !== 1 ? 'es' : ''} de compra</span>
+        {/* §4.3 · Por moneda. Este pie era la CUARTA aparición del mismo bug:
+            un reduce sobre `monto` sin mirar `moneda`, con el resultado
+            rotulado como si fuera una sola. */}
         {filtroEstado === 'autorizada' && (
           <span className="font-medium text-text-primary">
-            Total por pagar: ${ordenesFiltradas.reduce((acc, oc) => acc + oc.monto, 0).toLocaleString()}
+            Total por pagar: {formatearPorMoneda(
+              sumarPorMoneda(ordenesFiltradas, oc => oc.monto, oc => oc.moneda),
+              { vacio: 'sin órdenes autorizadas' },
+            )}
           </span>
         )}
       </div>
