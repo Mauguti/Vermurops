@@ -1121,17 +1121,28 @@ export default function FichaCotizacion({
         ) : undefined}
       />
 
-      {/* U-4 · Los embarques que nacieron de esta cotización. Solo aparece
-          cuando ya ganó: antes no hay nada que enlazar y el bloque sería un
-          rótulo vacío. */}
-      {(quote.embarqueIds?.length ?? 0) > 0 && (
-        <div className="px-6 pt-3">
-          <BloqueEnlaces
-            titulo="Embarques"
-            tipo="embarque"
-            ids={quote.embarqueIds ?? []}
-            vacio=""
-          />
+      {/* U-4/U-8 · De dónde vino y a dónde fue. Cada bloque aparece solo si
+          hay algo que enlazar: una cotización sin ganar no tiene embarques, y
+          una anterior a `prospectoId` no sabe de qué prospecto salió. Un
+          rótulo con un hueco al lado no informa de nada. */}
+      {(quote.prospectoId || (quote.embarqueIds?.length ?? 0) > 0) && (
+        <div className="px-6 pt-3 flex flex-wrap items-baseline gap-x-8 gap-y-2">
+          {quote.prospectoId && (
+            <BloqueEnlaces
+              titulo="Prospecto de origen"
+              tipo="prospecto"
+              ids={[quote.prospectoId]}
+              vacio=""
+            />
+          )}
+          {(quote.embarqueIds?.length ?? 0) > 0 && (
+            <BloqueEnlaces
+              titulo="Embarques"
+              tipo="embarque"
+              ids={quote.embarqueIds ?? []}
+              vacio=""
+            />
+          )}
         </div>
       )}
 

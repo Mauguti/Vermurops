@@ -192,12 +192,21 @@ export default function Quotes() {
    * evaluar cuando llegue: por eso depende de las listas y no solo del salto.
    */
   useDestinoPendiente(['cotizacion', 'prospecto'], (d) => {
+    /*
+     * Se limpia la OTRA ficha, no solo se abre la pedida.
+     *
+     * Cotización y prospecto viven en este mismo módulo y el prospecto se
+     * devuelve antes en el render. Sin limpiarlo, saltar de un prospecto a su
+     * cotización dejaba el prospecto en pantalla: el clic no hacía nada
+     * visible. Y la miga de pan promete volver a la lista de donde vienes, no
+     * a una ficha escondida debajo.
+     */
     if (d.tipo === 'cotizacion') {
       const q = kanbanQuotes.find(x => x.id === d.id);
-      if (q) { setViewMode('kanban'); setSelectedQuote(q); }
+      if (q) { setProspectoAbierto(null); setViewMode('kanban'); setSelectedQuote(q); }
     } else {
       const p = todosLosProspectos.find(x => x.id === d.id);
-      if (p) { setViewMode('prospeccion'); setProspectoAbierto(p); }
+      if (p) { setSelectedQuote(null); setViewMode('prospeccion'); setProspectoAbierto(p); }
     }
   });
 
@@ -1232,6 +1241,9 @@ export default function Quotes() {
                   const fechaActual = new Date().toISOString().slice(0, 16).replace('T', ' ');
                   const newQuote: KanbanQuote = {
                     id: folio, etapa: 'solicitud_cliente',
+                    // U-8 · De dónde salió. El aviso de abajo lo decía y no lo
+                    // guardaba en ningún lado: se perdía al cerrar el diálogo.
+                    prospectoId: p.id,
                     prospecto: { empresa: p.empresa, contacto: p.contactoNombre || 'Por definir', telefono: p.contactoTel || '—', email: p.contactoEmail || '—', origen: p.origenLead as any },
                     vendedorId: p.responsable || user?.nombre || '', pricingId: null,
                     servicios: p.servicioPotencial.map((tipo) => ({ id: `srv-${folio}-${tipo}`, tipo, ruta: { origen: 'Por definir', destino: 'Por definir' }, incoterm: 'FOB', mercancia: 'Por definir', peso: 0, volumen: 0, estado: 'pendiente' as const, cotizacionesProveedor: [], profit: 0, recargosPct: 0, conceptos: [] })),

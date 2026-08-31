@@ -8,6 +8,8 @@ import {
 } from '../ui/ficha/FichaLayout';
 import EstadoVacio from '../ui/EstadoVacio';
 import LineaTiempo from '../ui/ficha/LineaTiempo';
+import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
+import { useCotizaciones } from '../../hooks/useCotizaciones';
 
 /**
  * ── De drawer a pantalla completa (U-2) ────────────────────────────────────
@@ -48,6 +50,9 @@ const STAGES = [
 
 export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUpdate, onConvert }: FichaProspectoProps) {
   const [pestana, setPestana] = useState<PestanaProspecto>('info');
+  // U-8 · La cotización que salió de este prospecto. Se busca por
+  // `prospectoId`, que la conversión guarda desde hoy.
+  const { quotes } = useCotizaciones();
   // Antes «Eliminar prospecto» solo pedía confirmación y tenía un TODO: no
   // hacía nada. Ahora se marca como perdido con su motivo, igual que una
   // cotización perdida — no se borra, se registra por qué se perdió.
@@ -129,6 +134,20 @@ export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUp
           </p>
         ) : undefined}
       />
+
+      {/* U-8 · A qué cotización llevó. Los prospectos convertidos antes de que
+          existiera `prospectoId` no lo saben, y por eso el bloque explica que
+          no es lo mismo «no se convirtió» que «no se guardó de dónde salió». */}
+      {prospecto.etapa === 'convertido' && (
+        <div className="px-6 pt-3">
+          <BloqueEnlaces
+            titulo="Cotización"
+            tipo="cotizacion"
+            ids={quotes.filter(q => q.prospectoId === prospecto.id).map(q => q.id)}
+            vacio="Se convirtió antes de que se guardara el vínculo; búscala por el nombre de la empresa."
+          />
+        </div>
+      )}
 
       <FichaTabs<PestanaProspecto>
         pestanas={PESTANAS.map(t => ({

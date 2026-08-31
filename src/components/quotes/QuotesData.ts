@@ -264,6 +264,19 @@ export interface KanbanQuote {
    */
   embarqueIds?: string[];
 
+  /**
+   * Prospecto del que nació esta cotización (U-8).
+   *
+   * Se llena al convertir y no se toca después. Es la única forma de enlazar
+   * las dos fichas: adivinarlo por nombre de empresa haría que dos prospectos
+   * de la misma empresa apuntaran a la misma cotización.
+   *
+   * Opcional a propósito. Las cotizaciones anteriores a este campo se quedan
+   * sin él y el enlace simplemente no aparece para ellas — que es lo correcto:
+   * de esas no se sabe de dónde salieron, y fingir que sí sería peor.
+   */
+  prospectoId?: string;
+
   // Timestamps y auditoría
   createdAt: string;
   updatedAt: string;
