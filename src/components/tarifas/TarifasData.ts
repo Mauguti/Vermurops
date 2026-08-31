@@ -92,8 +92,28 @@ export interface TarifaVermur {
 
   // ── Estado ───────────────────────────────────────────────────────────────
   activo: boolean;
-  /** Cómo se creó el registro. */
-  origenDatos: 'manual' | 'cotizacion';
+  /**
+   * Cómo se creó el registro.
+   *  - 'manual':     capturada a mano en el catálogo
+   *  - 'cotizacion': tarifa spot nacida dentro de una cotización
+   *  - 'ocr':        extraída de un tarifario con IA y confirmada por Pricing
+   */
+  origenDatos: 'manual' | 'cotizacion' | 'ocr';
+
+  /**
+   * Documento del que salió esta tarifa (Storage).
+   *
+   * Responde a la trazabilidad que pidió el cliente: «tiene que haber una
+   * trazabilidad de ¿de dónde saqué este costo?». Convierte «esta tarifa dice
+   * 1,200 USD» en «aquí está el PDF del proveedor donde lo dice».
+   */
+  documentoOrigen?: {
+    /** Ruta en Firebase Storage. */
+    path: string;
+    nombreArchivo: string;
+    /** Id de la importación que la generó (importacionesTarifas/{id}). */
+    importacionId: string;
+  };
 
   // ── Auditoría ────────────────────────────────────────────────────────────
   /** UID del usuario que creó la tarifa. */
