@@ -376,7 +376,8 @@ export default function TarifaPanel({
         </div>
         <div className="flex-1 flex items-center justify-center px-6">
           <p className="text-xs text-gray-400 text-center leading-relaxed">
-            Selecciona un concepto en el panel izquierdo para ver las tarifas disponibles.
+            Haz clic en un renglón de la tabla para ver sus tarifas.
+            También puedes arrastrar una tarifa hasta el renglón.
           </p>
         </div>
       </div>

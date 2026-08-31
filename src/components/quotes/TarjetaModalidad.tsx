@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useDroppable } from '@dnd-kit/core';
 import { Ship, Plane, Truck, FileCheck, Package, Plus, Trash2, ChevronUp, ChevronDown, Lock } from 'lucide-react';
 import type { TarjetaModalidad as TarjetaData } from '../../lib/agrupacionModalidad';
 import type { LineaPlana } from '../../lib/lineasCotizacion';
@@ -53,6 +54,11 @@ export interface TarjetaModalidadProps {
   onMoverLinea: (lineaId: string, direccion: 'arriba' | 'abajo') => void;
   onAgregarLinea: () => void;
   onCompararProveedor: (lineaId: string) => void;
+  /**
+   * Línea a la que apunta el panel de tarifas. Sin esto el panel no sabe qué
+   * concepto filtrar y «Usar» no tiene destino.
+   */
+  lineaActivaId?: string | null;
   /** Abre los datos que el embarque necesita: tráfico, ruta, FCL/LCL. */
   onDatosEmbarque?: () => void;
 }
@@ -63,7 +69,8 @@ const money = (n: number) =>
 export default function TarjetaModalidad({
   tarjeta, moneda, editable,
   onEditarLinea, onElegirConcepto, onQuitarLinea, onMoverLinea, onAgregarLinea,
-  onCompararProveedor, onDatosEmbarque, conceptosActivos, onCrearConcepto, soloLectura,
+  onCompararProveedor, lineaActivaId, onDatosEmbarque, conceptosActivos, onCrearConcepto,
+  soloLectura,
 }: TarjetaModalidadProps) {
   const [expandida, setExpandida] = useState(true);
 
@@ -138,6 +145,7 @@ export default function TarjetaModalidad({
                     onQuitar={onQuitarLinea}
                     onMover={onMoverLinea}
                     onComparar={onCompararProveedor}
+                    activa={l.id === lineaActivaId}
                     conceptosActivos={conceptosActivos}
                     onCrearConcepto={onCrearConcepto}
                     soloLectura={soloLectura}
@@ -207,6 +215,7 @@ interface RenglonProps {
   onQuitar: (id: string) => void;
   onMover: (id: string, d: 'arriba' | 'abajo') => void;
   onComparar: (id: string) => void;
+  activa: boolean;
   conceptosActivos: ConceptoVermur[];
   onCrearConcepto?: () => void;
   soloLectura: boolean;
@@ -214,12 +223,40 @@ interface RenglonProps {
 
 function Renglon({
   linea, editable, onEditar, onElegirConcepto, onQuitar, onMover, onComparar,
-  conceptosActivos, onCrearConcepto, soloLectura,
+  activa, conceptosActivos, onCrearConcepto, soloLectura,
 }: RenglonProps) {
   const target = compararConTarget(linea);
 
+  /*
+   * El renglón es la zona de soltado del panel de tarifas.
+   *
+   * Antes vivía en ConceptoSection, dentro del árbol de conceptos. Al quitar
+   * ese árbol se fueron con él las dos formas de apuntar el panel a un
+   * concepto: el arrastre se quedó sin destino y «Usar» sin concepto activo.
+   * Aquí vuelven, sobre la tabla que sí está en pantalla.
+   *
+   * Solo las líneas que corresponden a un ConceptoCotizacion pueden recibir
+   * una tarifa: las de ruta B (`servicio.cotizacionesProveedor`) no tienen
+   * dónde guardarla.
+   */
+  const aceptaTarifas = editable && !!linea.conceptoLocalId;
+  const { setNodeRef, isOver } = useDroppable({
+    id: `fila-${linea.servicioId}-${linea.conceptoLocalId ?? linea.id}`,
+    disabled: !aceptaTarifas,
+    data: aceptaTarifas
+      ? { type: 'concepto', conceptoId: linea.conceptoLocalId, servicioId: linea.servicioId }
+      : undefined,
+  });
+
   return (
-    <tr className="hover:bg-gray-50/60 group">
+    <tr
+      ref={setNodeRef}
+      onClick={() => { if (aceptaTarifas) onComparar(linea.id); }}
+      title={aceptaTarifas && !activa ? 'Clic para ver sus tarifas en el panel' : undefined}
+      className={`group transition-colors ${
+        isOver ? 'bg-indigo-50 ring-1 ring-inset ring-indigo-300'
+        : activa ? 'bg-[#E11D48]/[0.04] ring-1 ring-inset ring-[#E11D48]/25'
+        : 'hover:bg-gray-50/60'} ${aceptaTarifas ? 'cursor-pointer' : ''}`}>
       {/* El concepto se ELIGE del catálogo, nunca se teclea. Sin conceptoId el
           panel de tarifas no puede hacer match, y dos renglones escritos
           distinto («almacenaje» y «Almajenaje») serían conceptos diferentes. */}
@@ -237,12 +274,30 @@ function Renglon({
             Sin concepto del catálogo: no habrá tarifas
           </span>
         )}
+        {activa && (
+          <span className="block px-2 text-[9px] font-bold text-[#E11D48] uppercase tracking-wider">
+            Tarifas del panel →
+          </span>
+        )}
       </td>
 
       <td className="px-3 py-1.5">
+        {/* Con proveedor también se puede cambiar: una tarifa elegida no es
+            una decisión definitiva, y antes la línea quedaba sin forma de
+            volver a apuntar el panel hacia ella. */}
         {linea.proveedorNombre ? (
-          <span className="text-gray-600">{linea.proveedorNombre}</span>
-        ) : editable ? (
+          aceptaTarifas ? (
+            <button
+              onClick={() => onComparar(linea.id)}
+              className="text-gray-600 hover:text-[#E11D48] hover:underline text-left"
+              title="Ver o cambiar sus tarifas en el panel"
+            >
+              {linea.proveedorNombre}
+            </button>
+          ) : (
+            <span className="text-gray-600">{linea.proveedorNombre}</span>
+          )
+        ) : aceptaTarifas ? (
           <button
             onClick={() => onComparar(linea.id)}
             className="text-[11px] font-semibold text-[#E11D48] hover:underline"

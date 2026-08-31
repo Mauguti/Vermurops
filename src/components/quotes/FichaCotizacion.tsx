@@ -861,12 +861,27 @@ export default function FichaCotizacion({
     setToastLocal(`${creadas} tarifa${creadas !== 1 ? 's' : ''} guardada${creadas !== 1 ? 's' : ''} en el catálogo.`);
   };
 
-  /** Abre la comparativa para elegir proveedor de esa línea. */
+  /**
+   * Apunta el panel de tarifas a esa línea.
+   *
+   * Es la única forma de fijar `activeConcepto`, y de eso dependen «Usar», la
+   * captura manual y el simulador del panel. Antes solo se llegaba aquí desde
+   * el enlace «Elegir proveedor», que aparece cuando la línea NO tiene
+   * proveedor: una línea ya resuelta quedaba fuera del alcance del panel.
+   */
   const handleCompararProveedor = (lineaId: string) => {
     const linea = lineasPlanas.find(l => l.id === lineaId);
     if (!linea?.conceptoLocalId) return;
     handleConceptoActivate(linea.conceptoLocalId, linea.servicioId);
   };
+
+  /** Línea que corresponde al concepto activo, para resaltarla en la tabla. */
+  const lineaActivaId = useMemo(() => {
+    if (!activeConcepto) return null;
+    return lineasPlanas.find(
+      l => l.conceptoLocalId === activeConcepto.id && l.servicioId === activeConcepto.servicioId,
+    )?.id ?? null;
+  }, [activeConcepto, lineasPlanas]);
 
   const serviciosConProveedor = quote.servicios.filter(
     s => (s.cotizacionesProveedor ?? []).some(cp => cp.seleccionada)
@@ -1173,6 +1188,7 @@ export default function FichaCotizacion({
                   onMoverLinea={handleMoverLineaPlana}
                   onAgregarLinea={() => handleAgregarLineaPlana(t.modalidad)}
                   onCompararProveedor={handleCompararProveedor}
+                  lineaActivaId={lineaActivaId}
                   onDatosEmbarque={() => {
                     const srv = quote.servicios.find(
                       sv => modalidadDeServicioTipo(sv.tipo, servicios ?? []) === t.modalidad);
