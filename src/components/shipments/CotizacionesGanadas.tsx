@@ -4,13 +4,18 @@ import type { KanbanQuote } from '../quotes/QuotesData';
 import { aplanarCotizacion, totalVenta } from '../../lib/lineasCotizacion';
 
 /**
- * Cotizaciones ganadas listas para abrir embarque.
+ * Embarques por capturar.
  *
- * Gabi: «no encontré cómo el ejecutivo de operaciones abre un embarque a
- * partir de una cotización. Que es como la sangre del día».
+ * NO es una bandeja de «por convertir»: el embarque se crea SOLO al marcar la
+ * cotización como ganada, sin paso intermedio. Lo que espera aquí es la
+ * CAPTURA operativa —guía, booking, buque, fechas—, no la conversión.
  *
- * Operaciones no entra al módulo de Cotizaciones —se lo quitamos a propósito—,
- * así que la lista vive aquí, dentro de Embarques, como en Magaya.
+ * El nombre importa: «Por abrir» sugería una acción pendiente que ya no
+ * existe. Gabi lo planteó como pregunta, no como requisito: «si ventas pone la
+ * cotización como ganada y en automático les aparece un embarque a
+ * operaciones... ¿cómo distingue operaciones que es uno que les acaba de
+ * enviar ventas, y no uno que ellos ya abrieron?». La respuesta es el estado,
+ * no un botón de conversión.
  */
 
 interface Props {

@@ -214,7 +214,7 @@ export default function Shipments() {
       {!selectedEmbarque && (
         <div className="flex items-center gap-1 border-b border-gray-200">
           {([
-            ['bandeja', `Por abrir (${ganadas.filter(q => !yaConEmbarque.has(q.id)).length})`],
+            ['bandeja', `Por capturar (${embarques.filter(e => e.requiereCaptura).length})`],
             ['kanban', 'Tablero'],
             ['lista', 'Todos los embarques'],
           ] as const).map(([id, label]) => (
