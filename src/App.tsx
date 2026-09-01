@@ -11,6 +11,7 @@ import { NotifCard } from './pages/Notificaciones';
 import LoginPage from './components/Login';
 import Sidebar from './components/Sidebar';
 import { NavegacionProvider } from './navegacion/NavegacionContext';
+import EmuladorBadge from './components/ui/EmuladorBadge';
 import Dashboard from './components/Dashboard';
 import Quotes from './components/Quotes';
 import Bookings from './components/Bookings';
@@ -390,6 +391,10 @@ function Root() {
 export default function App() {
   return (
     <AuthProvider>
+      {/* En la raíz y no en el shell: el aviso de «estás en emuladores»
+          importa también en el login, que es donde eliges con qué cuenta
+          entrar y contra qué base. */}
+      <EmuladorBadge />
       <NotificationsProviderWrapper />
     </AuthProvider>
   );

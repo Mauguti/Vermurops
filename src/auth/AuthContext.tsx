@@ -29,9 +29,14 @@ const AuthContext = createContext<AuthContextValue | null>(null);
  */
 const _ROL_POR_EMAIL_RAW: Record<string, UserRole> = {
   // ── Cuentas de prueba ──
+  // Las usan la validación manual y la operación nocturna (emuladores). Son
+  // CINCO, una por rol: el flujo de órdenes de compra no se puede probar sin
+  // operaciones y administracion.
   "admin@vermur.com":            "admin",
   "pricing@vermur.com":          "pricing",
   "ventas@vermur.com":           "ventas",
+  "operaciones@vermur.com":      "operaciones",
+  "administracion@vermur.com":   "administracion",
   // ── Equipo Vermur ──
   "itzel.laurean@vermur.com":    "ventas",
   "nohema.sosa@vermur.com":      "pricing",

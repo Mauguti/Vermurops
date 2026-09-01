@@ -14,9 +14,10 @@ import {
   mezclaMonedas, totalDeUnaMoneda, formatearPorMoneda, totalVacio,
 } from './sumarPorMoneda';
 
-const item = (monto: number, moneda: string) => ({ monto, moneda });
-const M = (x: { monto: number }) => x.monto;
-const C = (x: { moneda: string }) => x.moneda;
+interface Item { monto: number | null; moneda: string }
+const item = (monto: number, moneda: string): Item => ({ monto, moneda });
+const M = (x: Item) => x.monto;
+const C = (x: Item) => x.moneda;
 
 // ─── A · La suma ─────────────────────────────────────────────────────────────
 

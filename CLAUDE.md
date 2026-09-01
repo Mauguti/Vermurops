@@ -526,16 +526,24 @@ Consecuencias diarias: cualquier prueba de un alta crea un registro real;
 cualquier prueba de la máquina de estados mueve una cotización real; y una
 importación masiva lanzada «para ver qué hace» sobrescribe el catálogo vivo.
 
-Salidas, de menor a mayor esfuerzo:
-  1. Emuladores de Firebase en local (`firebase emulators:start`) con
-     `connectFirestoreEmulator` cuando `import.meta.env.DEV`. Aísla local sin
-     tocar la infraestructura, pero arranca con la base vacía.
+**Primera salida construida (1-sep-2026): emuladores por OPT-IN.**
+`VITE_USAR_EMULADORES=1` conecta Auth, Firestore y Storage a los emuladores
+locales (`src/firebase.ts`), con un badge fijo «Emuladores · producción
+intacta» para que nunca quede la duda de contra qué base miras datos. Es
+opt-in y NO `import.meta.env.DEV` a propósito: la validación diaria de Mau
+corre contra producción a sabiendas, y condicionar por DEV la cambiaría en
+silencio. La operación nocturna (`noche.sh`) lo usa; los emuladores arrancan
+vacíos y la app siembra los catálogos sola (seedGuard).
+`scripts/sembrarEmuladores.sh` crea las cinco cuentas de prueba en Auth.
+
+Pendiente la salida completa:
   2. Segundo proyecto Firebase de staging con una copia de los datos, elegido
      por variable de entorno. Es lo correcto a mediano plazo; cuesta plan Blaze
      aparte y mantener la copia.
 
-Mientras no exista: **avisar antes de cualquier prueba que escriba**, y tratar
-toda acción destructiva como si fuera en producción, porque lo es.
+Mientras tanto, `npm run dev` a secas SIGUE escribiendo en producción:
+**avisar antes de cualquier prueba que escriba**, y tratar toda acción
+destructiva como si fuera en producción, porque lo es.
 
 **🔴 CRÍTICO — Las reglas de Firestore no distinguen roles.**
 Hoy toda colección se protege con `allow read, write: if request.auth != null`.

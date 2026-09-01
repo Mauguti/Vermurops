@@ -12,3 +12,11 @@ dist/
 
 # Clave de cuenta de servicio de Firebase — NUNCA se commitea.
 serviceAccountKey.json
+
+# Operación nocturna: evidencia y logs son por-corrida, no del repo.
+# El contrato (NIGHT_RUN.md) y los archivos de estado SÍ se versionan.
+.noche/reportes/
+.noche/screenshots/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
