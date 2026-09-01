@@ -14,6 +14,7 @@
 
 import { KanbanQuote, PipelineStageId } from '../components/quotes/QuotesData';
 import type { UserRole } from '../auth/users';
+import { evaluarProntitud, resumenFaltantes, serviciosSinLineas } from './prontitudCotizacion';
 
 // ─── Tipos internos ────────────────────────────────────────────────────────────
 
@@ -109,13 +110,33 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
     {
       hacia: 'consolidada',
       roles: ['pricing', 'admin'],
+      /*
+       * El guard lee por el MISMO adaptador que los botones del footer.
+       *
+       * Antes leía solo `servicio.cotizacionesProveedor[].seleccionada` — la
+       * ruta B de la dualidad de §6, la única que existía cuando se escribió.
+       * La ficha rediseñada asigna proveedores en `concepto.tarifas` (ruta A),
+       * así que Pricing capturaba todo en las tarjetas, los botones decían
+       * «listo» y la máquina pedía «selecciona un proveedor por cada
+       * servicio» refiriéndose a una estructura que ya nadie llenaba.
+       *
+       * `evaluarProntitud` → `aplanarCotizacion` resuelve ambas rutas con la
+       * precedencia probada, y su condición es la que el cliente definió para
+       * consolidar: todos los conceptos con proveedor y monto. Un solo lector
+       * para una sola pregunta; si mañana aparece una ruta C, se arregla en el
+       * adaptador y no aquí.
+       */
       validar: q => {
-        const falta = q.servicios.some(
-          s => !(s.cotizacionesProveedor ?? []).some(cp => cp.seleccionada)
-        );
-        return falta
-          ? 'Selecciona un proveedor por cada servicio antes de consolidar.'
-          : null;
+        // Un servicio sin líneas es invisible para la vista plana: se pregunta
+        // aparte, o una multimodal a medio cotizar pasaría como completa.
+        const vacios = serviciosSinLineas(q);
+        if (vacios.length > 0) {
+          return `El servicio «${vacios[0].tipo}» no tiene ningún concepto con proveedor todavía.`;
+        }
+        const p = evaluarProntitud(q);
+        if (p.lista) return null;
+        if (!p.conConceptos) return 'Esta cotización no tiene conceptos que consolidar.';
+        return `${resumenFaltantes(p)}. Completa proveedor y costo antes de consolidar.`;
       },
     },
     {

@@ -149,3 +149,21 @@ export function textoFaltantesLinea(tipos: TipoFaltante[]): string {
   if (textos.length === 1) return textos[0];
   return `${textos.slice(0, -1).join(', ')} y ${textos[textos.length - 1]}`;
 }
+
+/**
+ * Servicios elegidos que no tienen NINGUNA línea.
+ *
+ * La vista plana solo enseña lo que existe: un servicio de la ruta B sin
+ * cotización seleccionada no aporta línea, y uno recién agregado tampoco. Para
+ * `evaluarProntitud` son invisibles — y consolidar una multimodal con el
+ * terrestre aún sin cotizar se vería «lista» sin estarlo. El guard viejo sí
+ * atrapaba ese caso; este helper lo conserva en el mundo de tarjetas.
+ */
+export function serviciosSinLineas(quote: KanbanQuote): { id: string; tipo: string }[] {
+  const lineas = aplanarCotizacion(quote);
+  const conLinea = new Set(lineas.map(l => l.servicioId));
+  return (quote.servicios ?? [])
+    .filter(s => !conLinea.has(s.id))
+    .map(s => ({ id: s.id, tipo: s.tipo }));
+}
+

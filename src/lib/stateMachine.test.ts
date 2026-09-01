@@ -14,7 +14,7 @@ import { KanbanQuote, ServicioSolicitado, CotizacionProveedor } from '../compone
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────────
 
-function makeProveedor(seleccionada: boolean): CotizacionProveedor {
+function makeProveedor(seleccionada: boolean, conceptoId?: string): CotizacionProveedor {
   return {
     id: 'prov-1',
     proveedor: 'Naviera Test',
@@ -22,10 +22,15 @@ function makeProveedor(seleccionada: boolean): CotizacionProveedor {
     monto: 1000,
     moneda: 'USD',
     seleccionada,
+    ...(conceptoId ? { conceptoId } : {}),
   };
 }
 
-function makeServicio(opts: { conProveedorSeleccionado?: boolean } = {}): ServicioSolicitado {
+function makeServicio(opts: {
+  conProveedorSeleccionado?: boolean;
+  /** conceptoId de la cotización de proveedor. Sin él, la línea B es legacy. */
+  conceptoId?: string;
+} = {}): ServicioSolicitado {
   return {
     id: 'srv-1',
     tipo: 'maritimo',
@@ -35,7 +40,7 @@ function makeServicio(opts: { conProveedorSeleccionado?: boolean } = {}): Servic
     peso: 1000,
     volumen: 5,
     estado: 'cotizado',
-    cotizacionesProveedor: opts.conProveedorSeleccionado ? [makeProveedor(true)] : [],
+    cotizacionesProveedor: opts.conProveedorSeleccionado ? [makeProveedor(true, opts.conceptoId)] : [],
     profit: 0,
     recargosPct: 0,
     conceptos: [],
@@ -89,10 +94,10 @@ describe('A. Transiciones permitidas', () => {
     expect(puedeTransicionarA('pricing_solicitando', 'cotizaciones_recibidas', 'pricing', q).ok).toBe(true);
   });
 
-  it('pricing puede consolidar si hay proveedor seleccionado en cada servicio', () => {
+  it('pricing puede consolidar si cada línea tiene proveedor y concepto del catálogo', () => {
     const q = makeQuote({
       etapa: 'cotizaciones_recibidas',
-      servicios: [makeServicio({ conProveedorSeleccionado: true })],
+      servicios: [makeServicio({ conProveedorSeleccionado: true, conceptoId: 'CON-001' })],
     });
     expect(puedeTransicionarA('cotizaciones_recibidas', 'consolidada', 'pricing', q).ok).toBe(true);
   });
@@ -251,12 +256,12 @@ describe('E. Bloqueos por validación de negocio', () => {
     expect(r.razon).toMatch(/proveedor/i);
   });
 
-  it('sí se puede consolidar si TODOS los servicios tienen proveedor seleccionado', () => {
+  it('sí se puede consolidar si TODAS las líneas están completas', () => {
     const q = makeQuote({
       etapa: 'cotizaciones_recibidas',
       servicios: [
-        makeServicio({ conProveedorSeleccionado: true }),
-        { ...makeServicio({ conProveedorSeleccionado: true }), id: 'srv-2' },
+        makeServicio({ conProveedorSeleccionado: true, conceptoId: 'CON-001' }),
+        { ...makeServicio({ conProveedorSeleccionado: true, conceptoId: 'CON-002' }), id: 'srv-2' },
       ],
     });
     expect(puedeTransicionarA('cotizaciones_recibidas', 'consolidada', 'pricing', q).ok).toBe(true);
@@ -362,3 +367,91 @@ describe('G. Cierre de cotizaciones por Pricing', () => {
     expect(disp).toContain('perdida');
   });
 });
+
+// ─── H · El guard lee la misma verdad que los botones ────────────────────────
+//
+// El bug que motivó esto (1-sep-2026): Pricing asignó proveedores en las
+// tarjetas por modalidad (ruta A, concepto.tarifas), los botones decían
+// «listo», y la máquina pedía «selecciona un proveedor por cada servicio»
+// porque su guard solo leía servicio.cotizacionesProveedor (ruta B) — la única
+// estructura que existía cuando se escribió. Dos lectores, dos verdades.
+//
+// Ahora el guard pasa por evaluarProntitud/aplanarCotizacion, que resuelven
+// ambas rutas. Estos tests fijan las tres formas de armar una cotización.
+
+function servicioRutaA(id: string, conceptoId = 'CON-001'): ServicioSolicitado {
+  return {
+    ...makeServicio(),
+    id,
+    cotizacionesProveedor: [],           // la ruta B vacía, como deja la ficha
+    conceptos: [{
+      id: `c-${id}`,
+      nombre: 'Flete marítimo',
+      conceptoId,
+      costo: 0, profit: 200, venta: 0, margen: 0,
+      subconceptos: [],
+      tarifas: [{
+        id: `t-${id}`, proveedor: 'Maersk', proveedorId: 'PRV-001',
+        contacto: 'C', monto: 1500, moneda: 'USD', seleccionada: true,
+      } as CotizacionProveedor],
+      proveedoresOficialIds: [`t-${id}`],
+    } as never],
+  };
+}
+
+describe('H. consolidar lee ambas rutas de la dualidad (§6)', () => {
+  it('ruta A pura: capturada en las tarjetas, consolida — el bug reportado', () => {
+    const q = makeQuote({
+      etapa: 'cotizaciones_recibidas',
+      servicios: [servicioRutaA('srv-1')],
+    });
+    expect(puedeTransicionarA('cotizaciones_recibidas', 'consolidada', 'pricing', q).ok).toBe(true);
+  });
+
+  it('mixta: un servicio por ruta A y otro por ruta B, consolida', () => {
+    const q = makeQuote({
+      etapa: 'cotizaciones_recibidas',
+      servicios: [
+        servicioRutaA('srv-1'),
+        { ...makeServicio({ conProveedorSeleccionado: true, conceptoId: 'CON-002' }), id: 'srv-2' },
+      ],
+    });
+    expect(puedeTransicionarA('cotizaciones_recibidas', 'consolidada', 'pricing', q).ok).toBe(true);
+  });
+
+  it('ruta A sin conceptoId del catálogo NO consolida: el embarque nacería sin claves SAT', () => {
+    const srv = servicioRutaA('srv-1');
+    (srv.conceptos![0] as { conceptoId?: string }).conceptoId = undefined;
+    const q = makeQuote({ etapa: 'cotizaciones_recibidas', servicios: [srv] });
+    const r = puedeTransicionarA('cotizaciones_recibidas', 'consolidada', 'pricing', q);
+    expect(r.ok).toBe(false);
+    expect(r.razon).toMatch(/completa/i);
+  });
+
+  it('ruta B legacy sin conceptoId queda bloqueada con mensaje, no en silencio', () => {
+    // Endurecimiento deliberado: el guard viejo la dejaba pasar, pero los
+    // botones ya no — y de una línea sin concepto del catálogo nace un cargo
+    // sin claves SAT. La condición es la que el cliente definió.
+    const q = makeQuote({
+      etapa: 'cotizaciones_recibidas',
+      servicios: [makeServicio({ conProveedorSeleccionado: true })],
+    });
+    const r = puedeTransicionarA('cotizaciones_recibidas', 'consolidada', 'pricing', q);
+    expect(r.ok).toBe(false);
+    expect(r.razon).toBeTruthy();
+  });
+
+  it('multimodal con un servicio aún sin cotizar NO consolida: el hueco que el guard viejo sí cubría', () => {
+    const q = makeQuote({
+      etapa: 'cotizaciones_recibidas',
+      servicios: [
+        servicioRutaA('srv-1'),
+        { ...makeServicio({ conProveedorSeleccionado: false }), id: 'srv-2', tipo: 'terrestre' },
+      ],
+    });
+    const r = puedeTransicionarA('cotizaciones_recibidas', 'consolidada', 'pricing', q);
+    expect(r.ok).toBe(false);
+    expect(r.razon).toMatch(/terrestre/);
+  });
+});
+
