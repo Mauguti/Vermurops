@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { AuthUser, isViewAllowed, UserRole } from './users';
 import { Capacidad, puede as puedeCapacidad } from './permisos';
-import { auth } from '../firebase';
+import { auth, USANDO_EMULADORES } from '../firebase';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AuthContext — contexto global de autenticación para VermurOps
@@ -28,15 +28,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
  * mal escrito no puede convertirse en un ascenso.
  */
 const _ROL_POR_EMAIL_RAW: Record<string, UserRole> = {
-  // ── Cuentas de prueba ──
-  // Las usan la validación manual y la operación nocturna (emuladores). Son
-  // CINCO, una por rol: el flujo de órdenes de compra no se puede probar sin
-  // operaciones y administracion.
-  "admin@vermur.com":            "admin",
-  "pricing@vermur.com":          "pricing",
-  "ventas@vermur.com":           "ventas",
-  "operaciones@vermur.com":      "operaciones",
-  "administracion@vermur.com":   "administracion",
   // ── Equipo Vermur ──
   "itzel.laurean@vermur.com":    "ventas",
   "nohema.sosa@vermur.com":      "pricing",
@@ -46,9 +37,32 @@ const _ROL_POR_EMAIL_RAW: Record<string, UserRole> = {
   "luis.renteria@vermur.com":    "admin",
 };
 
+/**
+ * Cuentas de prueba — SOLO con emuladores.
+ *
+ * Son cinco, una por rol: el flujo de órdenes de compra no se puede probar
+ * sin operaciones y administracion. Las usa la operación nocturna
+ * (scripts/sembrarEmuladores.sh las crea en el emulador de Auth).
+ *
+ * NO viven en el mapa de producción a propósito: ahí un correo de prueba con
+ * rol asignado es una cuenta privilegiada esperando a que alguien la cree.
+ * En producción, si estas cuentas existieran, caen al fallback de menor
+ * alcance como cualquier correo desconocido.
+ */
+const ROL_CUENTAS_PRUEBA: Record<string, UserRole> = {
+  "admin@vermur.com":            "admin",
+  "pricing@vermur.com":          "pricing",
+  "ventas@vermur.com":           "ventas",
+  "operaciones@vermur.com":      "operaciones",
+  "administracion@vermur.com":   "administracion",
+};
+
 // Normaliza las llaves a minúsculas+trim para que el lookup sea case-insensitive
 const ROL_POR_EMAIL: Record<string, UserRole> = Object.fromEntries(
-  Object.entries(_ROL_POR_EMAIL_RAW).map(([k, v]) => [k.toLowerCase().trim(), v]),
+  Object.entries({
+    ..._ROL_POR_EMAIL_RAW,
+    ...(USANDO_EMULADORES ? ROL_CUENTAS_PRUEBA : {}),
+  }).map(([k, v]) => [k.toLowerCase().trim(), v]),
 );
 
 const ROL_FALLBACK: UserRole = "ventas";

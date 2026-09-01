@@ -8,6 +8,9 @@ import { useClientes } from '../hooks/useClientes';
 import CotizacionesGanadas from './shipments/CotizacionesGanadas';
 import { agruparPorEstado, estadoDe, ETAPAS_EMBARQUE } from '../lib/estadoEmbarque';
 import { crearEmbarquesDeCotizacionGanada } from '../lib/crearEmbarquesGanada';
+import { mapearCotizacionAEmbarque } from '../lib/cotizacionAEmbarque';
+import { construirEmbarqueDesdeCotizacion } from '../lib/generacionEmbarque';
+import { EMBARQUE_AUTOMATICO_DISPONIBLE } from '../config/banderas';
 import { useServicios } from '../config/serviciosStore';
 import { useDestinoPendiente } from '../navegacion/NavegacionContext';
 import { useAuth } from '../auth/AuthContext';
@@ -184,6 +187,43 @@ export default function Shipments() {
   const abrirEmbarqueDesdeCotizacion = async (quote: typeof quotes[number]) => {
     if (creando) return;
     setCreando(true);
+
+    /*
+     * Bandera de A-1 apagada: el camino manual usa el folio SHP-, cuyo
+     * contador SÍ está sembrado. Los folios por serie (VLIM, VLIT…) esperan
+     * los consecutivos de Magaya: sin sembrar, el primero duplicaría uno
+     * histórico que va impreso en documentos. Ver config/banderas.ts.
+     */
+    if (!EMBARQUE_AUTOMATICO_DISPONIBLE) {
+      try {
+        const cliente = clientes.find(c => c.id === quote.clienteId) ?? null;
+        const { cargos, advertencias } = mapearCotizacionAEmbarque(quote, { cliente });
+        const folio = await generateFolioEmbarque();
+        const nuevo = construirEmbarqueDesdeCotizacion({
+          quote, folio, cargos, advertencias,
+          origen: 'automatico',
+          generadoPor: user?.nombre ?? user?.email ?? '',
+          ahora: new Date().toISOString(),
+        });
+        await guardarEmbarque(nuevo);
+        setSelectedEmbarqueId(nuevo.id);
+        setToast({
+          mensaje: advertencias.length > 0
+            ? `Embarque ${folio} abierto con ${advertencias.length} advertencia(s). Revísalas en la ficha.`
+            : `Embarque ${folio} abierto desde ${quote.id}.`,
+          tipo: advertencias.length > 0 ? 'error' : 'exito',
+        });
+      } catch (err) {
+        setToast({
+          mensaje: `No se pudo abrir el embarque: ${err instanceof Error ? err.message : err}`,
+          tipo: 'error',
+        });
+      } finally {
+        setCreando(false);
+      }
+      return;
+    }
+
     try {
       const cliente = clientes.find(c => c.id === quote.clienteId) ?? null;
       const r = await crearEmbarquesDeCotizacionGanada({

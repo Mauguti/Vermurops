@@ -19,6 +19,7 @@ import { useProspectos } from '../hooks/useProspectos';
 import { useClientes } from '../hooks/useClientes';
 import { generateFolio, generateFolioProspecto } from '../lib/folioService';
 import { crearEmbarquesDeCotizacionGanada } from '../lib/crearEmbarquesGanada';
+import { EMBARQUE_AUTOMATICO_DISPONIBLE } from '../config/banderas';
 import { useDestinoPendiente } from '../navegacion/NavegacionContext';
 import Toast, { TipoToast } from './ui/Toast';
 import SpreadsheetTable, { type VistaConfig } from './table/SpreadsheetTable';
@@ -123,6 +124,27 @@ export default function Quotes() {
    * Es idempotente: si la cotización ya tiene embarques, no genera gemelos.
    */
   const handleCotizacionGanada = async (ganada: KanbanQuote) => {
+    /*
+     * A-1 apagado: marcar ganada solo marca ganada, como producción hoy.
+     * La cotización SÍ se guarda —este handler recibe la versión ya
+     * actualizada y es el único que la persiste en esta ruta— y el embarque
+     * se abre a mano desde Embarques, con folio SHP- del contador sembrado.
+     * Ver config/banderas.ts.
+     */
+    if (!EMBARQUE_AUTOMATICO_DISPONIBLE) {
+      try {
+        await updateCotizacion(ganada.id, ganada);
+        setToast({ mensaje: `${ganada.id} marcada como ganada. Abre su embarque desde el módulo de Embarques.`, tipo: 'exito' });
+      } catch (err) {
+        setToast({
+          mensaje: `No se pudo guardar: ${err instanceof Error ? err.message : err}`,
+          tipo: 'error',
+        });
+      }
+      if (selectedQuote?.id === ganada.id) setSelectedQuote(ganada);
+      return;
+    }
+
     try {
       const cliente = clientes.find(c => c.id === ganada.clienteId) ?? null;
       const r = await crearEmbarquesDeCotizacionGanada({
