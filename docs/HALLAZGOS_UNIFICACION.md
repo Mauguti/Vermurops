@@ -71,3 +71,19 @@ renombrar lo que promete algo que no hace:
   dos fichas se enlazan. Las cotizaciones anteriores al campo se quedan sin él
   y su enlace no aparece: de esas no se sabe de dónde salieron, y fingir que sí
   sería peor.
+
+### 6 · Archivos huérfanos tras retirar la vista de Pricing
+
+Al quitar la sección del menú, estos tres quedaron sin nadie que los importe:
+
+```
+src/components/Pricing.tsx
+src/components/pricing/FichaRFQ.tsx
+src/components/pricing/PricingData.ts   (initialRFQs — datos de ejemplo)
+```
+
+No se borraron: es el mismo criterio que se siguió con `Documents.tsx` cuando
+se retiró esa sección. Quedan fuera del bundle porque nada los alcanza.
+
+Bórrense cuando se confirme que el flujo de solicitudes de cotización no va a
+reusar nada de ahí.

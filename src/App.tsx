@@ -13,7 +13,6 @@ import Sidebar from './components/Sidebar';
 import { NavegacionProvider } from './navegacion/NavegacionContext';
 import Dashboard from './components/Dashboard';
 import Quotes from './components/Quotes';
-import Pricing from './components/Pricing';
 import Bookings from './components/Bookings';
 import Pickups from './components/Pickups';
 import Shipments from './components/Shipments';
@@ -55,10 +54,14 @@ const ROLE_BADGE_STYLE: Record<string, { background: string; color: string }> = 
 // ─── View title map ───────────────────────────────────────────────────────────
 // Sin 'documents': la sección suelta se retiró para todos los roles. Los
 // documentos viven dentro de la cotización y del embarque (§4.8).
+//
+// Sin 'pricing': era una bandeja de RFQs con datos de ejemplo, anterior a que
+// el trabajo de Pricing viviera en la Bandeja del módulo de cotizaciones. Dos
+// pantallas para lo mismo, y solo una con datos reales. Ojo: el ROL 'pricing'
+// sigue existiendo — lo que se retira es la VISTA.
 const VIEW_LABELS: Record<string, string> = {
   dashboard: 'Vista general',
   quotes: 'CRM',
-  pricing: 'Pricing',
   bookings: 'Reservas',
   pickups: 'Recolecciones',
   shipments: 'Embarques',
@@ -291,7 +294,6 @@ function AppShell() {
     switch (currentView) {
       case 'dashboard':  return <Dashboard />;
       case 'quotes':     return <Quotes />;
-      case 'pricing':    return <Pricing />;
       case 'bookings':   return <Bookings />;
       case 'pickups':    return <Pickups />;
       case 'shipments':  return <Shipments />;

@@ -214,6 +214,20 @@ describe('vista vs. capacidad de alta', () => {
     });
   });
 
+  it('NINGÚN rol tiene la vista suelta de Pricing', () => {
+    // Era una bandeja de RFQs con datos de ejemplo, anterior a que el trabajo
+    // de Pricing viviera en la Bandeja del módulo de cotizaciones: dos
+    // pantallas para lo mismo y solo una con datos reales.
+    //
+    // Ojo con la distinción: el ROL 'pricing' sigue existiendo y es quien
+    // cotiza. Lo que se retiró es la VISTA del mismo nombre.
+    const ROLES: UserRole[] = ['ventas', 'pricing', 'operaciones', 'administracion', 'admin'];
+    ROLES.forEach(rol => {
+      expect(isViewAllowed(rol, 'pricing')).toBe(false);
+    });
+    expect(puede('pricing', 'cotizacion.crear')).toBe(true);
+  });
+
   it('Operaciones no entra al módulo de Cotizaciones', () => {
     // «Operaciones: quitar creación de cotizaciones». Decidido con Mau: se
     // retira el módulo completo, no solo el permiso de crear.

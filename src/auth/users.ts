@@ -48,7 +48,10 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
   //    consulta. Pricing necesita el catálogo para capturar la ruta (puerto
   //    origen/destino) de una tarifa marítima. El botón de alta se oculta con
   //    la capacidad 'puerto.alta' — misma distinción que en proveedores.
-  pricing: ['dashboard', 'quotes', 'pricing', 'rates', 'clients', 'puertos', 'exchange', 'settings'],
+  //  - sin 'pricing': esa vista era una bandeja de RFQs con datos de ejemplo,
+  //    anterior a que el trabajo de Pricing viviera en la Bandeja del módulo
+  //    de cotizaciones. El ROL sigue; la VISTA se retiró.
+  pricing: ['dashboard', 'quotes', 'rates', 'clients', 'puertos', 'exchange', 'settings'],
 
   // Operaciones: genera embarques y factura.
   //  - 'quotes' se QUITA (cliente, 27-ago-2026): «Operaciones no debe crear
@@ -66,7 +69,7 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
   administracion: ['dashboard', 'clients', 'finance', 'shipments', 'exchange', 'puertos', 'reports', 'settings'],
 
   admin: [
-    'dashboard', 'quotes', 'pricing', 'bookings', 'pickups',
+    'dashboard', 'quotes', 'bookings', 'pickups',
     'shipments', 'finance', 'exchange', 'clients',
     'puertos', 'rates', 'reports', 'settings',
   ],
