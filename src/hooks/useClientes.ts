@@ -109,6 +109,10 @@ export function useClientes() {
   };
 
   const updateCliente = async (id: string, data: Partial<ClienteVermur>): Promise<void> => {
+    // Editar el expediente ES parte del alta (§4.1): días de crédito, RFC y
+    // validación fiscal son decisiones de Administración. Sin esta guarda,
+    // cualquier rol con el módulo abierto podía reescribirlos.
+    exigir(user?.rol as UserRole | undefined, 'cliente.alta');
     await conAviso('el cliente', () => updateDoc(doc(db, 'clientes', id), sanitizarParaFirestore(data) as Record<string, unknown>));
   };
 

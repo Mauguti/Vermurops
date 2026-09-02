@@ -114,6 +114,10 @@ export function useProveedores() {
   };
 
   const updateProveedor = async (id: string, data: Partial<ProveedorVermur>): Promise<void> => {
+    // Mismo criterio que updateCliente: editar el expediente es del alta.
+    // El «probable proveedor» de Pricing entra por createProveedor con modo
+    // rapida; una vez creado, quien lo completa y valida es Administración.
+    exigir(user?.rol as UserRole | undefined, 'proveedor.alta');
     await conAviso('el proveedor', () => updateDoc(doc(db, 'proveedores', id), sanitizarParaFirestore(data) as Record<string, unknown>));
   };
 

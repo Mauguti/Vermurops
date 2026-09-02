@@ -6,6 +6,7 @@ import { FichaHeader, BadgeEstado } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import { useCotizaciones } from '../../hooks/useCotizaciones';
 import { useEmbarques } from '../../hooks/useEmbarques';
+import { useAuth } from '../../auth/AuthContext';
 
 interface Props {
   cliente: ClienteVermur;
@@ -78,7 +79,8 @@ function BoolCheck({
   );
 }
 
-function SaveBar({ onSave, saving }: { onSave: () => void; saving: boolean }) {
+function SaveBar({ onSave, saving, oculta }: { onSave: () => void; saving: boolean; oculta?: boolean }) {
+  if (oculta) return null;
   return (
     <div className="mt-8 pt-6 border-t border-divider flex justify-end">
       <button
@@ -96,6 +98,15 @@ function SaveBar({ onSave, saving }: { onSave: () => void; saving: boolean }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
+  /*
+   * B2 · Ver y editar son cosas distintas (§4.1). El expediente del cliente
+   * —días de crédito, RFC, validación fiscal— es del alta, y el alta es de
+   * Administración. Los demás roles consultan: el fieldset deshabilita todos
+   * los campos de una vez y las barras de guardar no se montan.
+   */
+  const { puede } = useAuth();
+  const soloConsulta = !puede('cliente.alta');
+
   // U-4 · Lo que este cliente tiene abierto, enlazado desde su propia ficha.
   const { quotes } = useCotizaciones();
   const { embarques } = useEmbarques();
@@ -246,7 +257,12 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
           </nav>
         </div>
 
-        <div className="p-8 bg-white">
+        <fieldset disabled={soloConsulta} className="p-8 bg-white disabled:opacity-90">
+          {soloConsulta && (
+            <p className="mb-5 text-[11px] text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              Solo consulta. Las altas y la edición del expediente son de Administración.
+            </p>
+          )}
 
           {/* ── Información ────────────────────────────────────────────────── */}
           {tab === 'informacion' && (
@@ -310,7 +326,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                   </Field>
                 </div>
               </div>
-              <SaveBar saving={saving} onSave={() => saveInformacion({
+              <SaveBar oculta={soloConsulta} saving={saving} onSave={() => saveInformacion({
                 nombre: draft.nombre, comercial: draft.comercial,
                 representante: draft.representante, rfc: draft.rfc,
                 domicilio: draft.domicilio, telefono: draft.telefono,
@@ -379,7 +395,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                     onChange={e => set('montoAprobado', e.target.value)} />
                 </Field>
               </div>
-              <SaveBar saving={saving} onSave={() => save({
+              <SaveBar oculta={soloConsulta} saving={saving} onSave={() => save({
                 tipoCredito: draft.tipoCredito, monto: draft.monto,
                 divisa: draft.divisa, dias: draft.dias,
                 interesMoratorio: draft.interesMoratorio,
@@ -428,7 +444,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                   </div>
                 </div>
               </div>
-              <SaveBar saving={saving} onSave={() => save({
+              <SaveBar oculta={soloConsulta} saving={saving} onSave={() => save({
                 docsAlta: draft.docsAlta,
                 expedienteDrive: draft.expedienteDrive,
               })} />
@@ -549,14 +565,14 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                 )}
               </div>
 
-              <SaveBar saving={saving} onSave={() => save({
+              <SaveBar oculta={soloConsulta} saving={saving} onSave={() => save({
                 contrato: draft.contrato,
                 pagare: draft.pagare,
               })} />
             </div>
           )}
 
-        </div>
+        </fieldset>
       </div>
     </div>
   );

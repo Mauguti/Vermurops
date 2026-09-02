@@ -8,6 +8,7 @@ import { FichaHeader, BadgeEstado } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import { useTarifas } from '../../hooks/useTarifas';
 import { useOrdenesCompra } from '../../hooks/useOrdenesCompra';
+import { useAuth } from '../../auth/AuthContext';
 
 interface Props {
   proveedor: ProveedorVermur;
@@ -33,6 +34,8 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit }: Pr
   const [fichaTab, setFichaTab] = useState<'historial' | 'notas'>('historial');
 
   const cp = contactoPrincipal(proveedor);
+  const { puede } = useAuth();
+  const puedeEditar = puede('proveedor.alta');
 
   // U-4 · Lo que cuelga de este proveedor.
   const { tarifas } = useTarifas();
@@ -82,12 +85,17 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit }: Pr
           </>
         }
         acciones={
-          <button
-            onClick={onEdit}
-            className="bg-white border border-card-border text-text-primary px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium hover:bg-neutral-bg transition-colors shadow-sm"
-          >
-            Editar datos
-          </button>
+          /* B2 · Editar el expediente es del alta: solo Administración. Los
+             demás roles consultan — el botón no se muestra deshabilitado, no
+             se muestra. */
+          puedeEditar ? (
+            <button
+              onClick={onEdit}
+              className="bg-white border border-card-border text-text-primary px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium hover:bg-neutral-bg transition-colors shadow-sm"
+            >
+              Editar datos
+            </button>
+          ) : undefined
         }
       />
 

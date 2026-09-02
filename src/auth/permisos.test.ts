@@ -246,11 +246,24 @@ describe('vista vs. capacidad de alta', () => {
     expect(puede('pricing', 'tarifario.cargar')).toBe(true);
   });
 
-  it('Ventas NO entra al módulo de Altas: solo prospectos', () => {
-    // Corregido el 30-ago-2026. Antes se le dejaba la vista en modo consulta;
-    // el cliente pidió quitarla: «solo con el de prospectos».
-    expect(isViewAllowed('ventas', 'clients')).toBe(false);
+  it('Ventas CONSULTA el módulo de Altas pero no da de alta ni edita', () => {
+    // Segunda corrección (2-sep-2026). El 30-ago se quitó la vista completa
+    // por la queja de Luis; al reportar «sigue el módulo de altas disponible
+    // para todos» se aterrizó la distinción de puertos: VER y DAR DE ALTA son
+    // cosas distintas. Ventas necesita consultar clientes y proveedores para
+    // trabajar; lo que no puede es alterarlos.
+    expect(isViewAllowed('ventas', 'clients')).toBe(true);
     expect(puede('ventas', 'cliente.alta')).toBe(false);
+    expect(puede('ventas', 'proveedor.alta')).toBe(false);
+    expect(puede('ventas', 'proveedor.altaRapida')).toBe(false);
+  });
+
+  it('Pricing y Operaciones consultan Altas sin poder dar de alta', () => {
+    (['pricing', 'operaciones'] as UserRole[]).forEach(rol => {
+      expect(isViewAllowed(rol, 'clients')).toBe(true);
+      expect(puede(rol, 'cliente.alta')).toBe(false);
+      expect(puede(rol, 'proveedor.alta')).toBe(false);
+    });
   });
 });
 
