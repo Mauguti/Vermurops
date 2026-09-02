@@ -20,6 +20,7 @@ import { useClientes } from '../hooks/useClientes';
 import { generateFolio, generateFolioProspecto } from '../lib/folioService';
 import { crearEmbarquesDeCotizacionGanada } from '../lib/crearEmbarquesGanada';
 import { EMBARQUE_AUTOMATICO_DISPONIBLE } from '../config/banderas';
+import { visibleParaVentas } from '../lib/propiedadComercial';
 import { useDestinoPendiente } from '../navegacion/NavegacionContext';
 import Toast, { TipoToast } from './ui/Toast';
 import SpreadsheetTable, { type VistaConfig } from './table/SpreadsheetTable';
@@ -232,10 +233,17 @@ export default function Quotes() {
     }
   });
 
-  // Ventas solo ve los suyos; los demás roles ven todos.
+  /*
+   * Ventas solo ve los suyos; los demás roles ven todos.
+   *
+   * «Suyos» se decide con el matcher tolerante de propiedadComercial: la
+   * igualdad estricta contra user.nombre fue el bug de las «desapariciones»
+   * (2-sep-2026) — un responsable guardado como prefijo de correo o asignado
+   * al catálogo mock volvía el registro invisible para quien lo creó.
+   */
   const prospectos = todosLosProspectos.filter(p => {
     if (rolActivo === 'ventas') {
-      return p.responsable === user?.nombre || p.responsable === user?.uid;
+      return visibleParaVentas(p.responsable, user);
     }
     return true;
   });
@@ -265,10 +273,11 @@ export default function Quotes() {
   // Aviso visible de que algo ocurrió (bug 1.1: no había confirmación alguna).
   const [toast, setToast] = useState<{ mensaje: string; tipo: TipoToast } | null>(null);
 
-  // Filtro de visibilidad por rol (Ventas solo ve lo suyo)
+  // Filtro de visibilidad por rol (Ventas solo ve lo suyo, más los huérfanos
+  // del catálogo mock — mismo criterio que los prospectos, arriba).
   const permittedQuotes = kanbanQuotes.filter(q => {
     if (rolActivo === 'ventas') {
-      return q.vendedorId === user?.uid || q.vendedorId === user?.nombre;
+      return visibleParaVentas(q.vendedorId, user);
     }
     return true;
   });
@@ -417,7 +426,14 @@ export default function Quotes() {
   const [formTelefono, setFormTelefono] = useState('');
   const [formEmail, setFormEmail] = useState('');
   const [formOrigen, setFormOrigen] = useState<KanbanQuote['prospecto']['origen']>('web');
-  const [formVendedor, setFormVendedor] = useState(VENDEDORES[0].nombre);
+  /*
+   * El vendedor por default es QUIEN CREA, no el primero de un catálogo de
+   * nombres inventados. Con el default mock, una solicitud creada sin tocar el
+   * dropdown nacía asignada a 'ventas' y desaparecía de la vista de su
+   * creadora en el instante de crearla.
+   */
+  const [formVendedor, setFormVendedor] = useState('');
+  const vendedorEfectivo = formVendedor || user?.nombre || '';
   const [formServicios, setFormServicios] = useState<string[]>(['maritimo']);
 
   /**
@@ -569,7 +585,7 @@ export default function Quotes() {
         email: formEmail || '—',
         origen: formOrigen,
       },
-      vendedorId: formVendedor,
+      vendedorId: vendedorEfectivo,
       // Si la crea Pricing, es suya desde el inicio: no entra al carrusel, que
       // es solo para clientes nuevos que llegan por la página.
       pricingId: puedeCrear ? (user?.uid ?? user?.nombre ?? null) : null,
@@ -1085,14 +1101,15 @@ export default function Quotes() {
                 </div>
                 <div>
                   <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">Vendedor Asignado</label>
+                  {/* Sin el catálogo mock: asignar a «María López» —que no
+                      existe— es crear un registro que ningún vendedor real ve.
+                      Cuando exista Gestión de Usuarios, aquí va el directorio. */}
                   <select
-                    value={formVendedor}
+                    value={vendedorEfectivo}
                     onChange={e => setFormVendedor(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] bg-white cursor-pointer"
                   >
-                    {VENDEDORES.map(v => (
-                      <option key={v.id} value={v.nombre}>{v.nombre}</option>
-                    ))}
+                    <option value={user?.nombre ?? ''}>{user?.nombre ?? 'Yo'} (yo)</option>
                   </select>
                 </div>
               </div>

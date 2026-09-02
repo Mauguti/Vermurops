@@ -11,6 +11,7 @@ import { useNotifications } from '../../notifications/NotificationsContext';
 import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
 import { generateFolio } from '../../lib/folioService';
 import { puedeTransicionarA, type Rol } from '../../lib/stateMachine';
+import { useAuth } from '../../auth/AuthContext';
 
 interface KanbanCotizacionesProps {
   quotes: KanbanQuote[];
@@ -75,7 +76,10 @@ export default function KanbanCotizaciones({
   const [qaContacto, setQaContacto] = useState('');
   const [qaOrigen, setQaOrigen] = useState<KanbanQuote['prospecto']['origen']>('web');
   const [qaServicios, setQaServicios] = useState<TipoServicio[]>(['maritimo']);
-  const [qaVendedor, setQaVendedor] = useState(VENDEDORES[0].nombre);
+  /* El default mock ('ventas') hacía invisible la solicitud para su creadora
+     real en el instante de crearla. El vendedor es quien crea. */
+  const { user } = useAuth();
+  const qaVendedor = user?.nombre ?? '';
 
   // Drag & Drop
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
@@ -636,13 +640,9 @@ export default function KanbanCotizaciones({
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Vendedor</label>
-                  <select
-                    value={qaVendedor}
-                    onChange={e => setQaVendedor(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48] bg-white"
-                  >
-                    {VENDEDORES.map(v => <option key={v.id} value={v.nombre}>{v.nombre}</option>)}
-                  </select>
+                  <div className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs bg-gray-50 text-gray-600">
+                    {qaVendedor || 'Tu usuario'}
+                  </div>
                 </div>
               </div>
 

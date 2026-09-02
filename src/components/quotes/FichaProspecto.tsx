@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { DollarSign, Mail, Phone, User, ArrowRight, CheckCircle2, MessageSquare } from 'lucide-react';
 import { Prospecto, ProspectoActivity } from '../../data';
-import { VENDEDORES } from './QuotesData';
 import ModalMotivoPerdida from './ModalMotivoPerdida';
 import {
   FichaLayout, FichaHeader, FichaTabs, FichaContenido, FichaFooter, BadgeEstado,
@@ -10,6 +9,7 @@ import EstadoVacio from '../ui/EstadoVacio';
 import LineaTiempo from '../ui/ficha/LineaTiempo';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import { useCotizaciones } from '../../hooks/useCotizaciones';
+import { useAuth } from '../../auth/AuthContext';
 
 /**
  * ── De drawer a pantalla completa (U-2) ────────────────────────────────────
@@ -50,6 +50,8 @@ const STAGES = [
 
 export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUpdate, onConvert }: FichaProspectoProps) {
   const [pestana, setPestana] = useState<PestanaProspecto>('info');
+  const { user } = useAuth();
+  const usuarioActual = user?.nombre ?? '';
   // U-8 · La cotización que salió de este prospecto. Se busca por
   // `prospectoId`, que la conversión guarda desde hoy.
   const { quotes } = useCotizaciones();
@@ -256,8 +258,13 @@ export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUp
                   onChange={e => onUpdate({ ...prospecto, responsable: e.target.value })}
                   className="w-full bg-gray-50 border border-gray-200 rounded p-1.5 text-xs text-gray-700 font-medium outline-none cursor-pointer"
                 >
-                  {VENDEDORES.map(v => (
-                    <option key={v.id} value={v.nombre}>{v.nombre}</option>
+                  {/* Antes ofrecía el catálogo mock (María López, Carlos
+                      Gómez): reasignar a un nombre inventado hacía que el
+                      prospecto desapareciera de la vista de Ventas. Las
+                      opciones son el responsable ACTUAL —para que el valor
+                      real no se pinte en blanco— y quien lo está viendo. */}
+                  {[...new Set([prospecto.responsable, usuarioActual].filter(Boolean))].map(n => (
+                    <option key={n} value={n}>{n}{n === usuarioActual ? ' (yo)' : ''}</option>
                   ))}
                 </select>
               </div>
