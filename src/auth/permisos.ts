@@ -32,6 +32,7 @@ export type Capacidad =
   | 'catalogo.importarMasivo' // Sobrescribir un catálogo completo desde los seeds
   // Administración
   | 'cliente.alta'            // Alta definitiva de cliente
+  | 'concepto.editar'         // Editar el catálogo de conceptos (reglas de IVA, claves SAT)
   | 'proveedor.alta'          // Alta definitiva de proveedor
   | 'puerto.alta'             // Alta de puerto
   // Operaciones
@@ -53,6 +54,7 @@ export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
   'proveedor.altaRapida',
   'catalogo.importarMasivo',
   'cliente.alta',
+  'concepto.editar',
   'proveedor.alta',
   'puerto.alta',
   'embarque.generar',
@@ -134,6 +136,7 @@ export const CAPACIDADES_POR_ROL: Record<UserRole, Capacidad[]> = {
   // OJO: sin 'catalogo.importarMasivo' — ver la nota de arriba.
   administracion: [
     'cliente.alta',
+    'concepto.editar',
     'proveedor.alta',
     'puerto.alta',
     'factura.generar',

@@ -17,6 +17,8 @@ import { evaluarSeed } from '../lib/seedGuard';
 import { ConceptoVermur, initialConceptos } from '../components/conceptos/ConceptosData';
 import { useAuth } from '../auth/AuthContext';
 import { conAviso } from '../lib/erroresEscritura';
+import { exigir } from '../auth/permisos';
+import { UserRole } from '../auth/users';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
 export function useConceptos() {
@@ -99,6 +101,12 @@ export function useConceptos() {
   };
 
   const updateConcepto = async (id: string, data: Partial<ConceptoVermur>): Promise<void> => {
+    // La regla de IVA y las claves SAT de un concepto se propagan a cada
+    // factura que se emita con él: editarlas es de Administración (B3).
+    // createConcepto queda sin guarda a propósito — es el alta rápida desde la
+    // cotización, que nace en 'revisar' precisamente para que Administración
+    // la resuelva aquí.
+    exigir(user?.rol as UserRole | undefined, 'concepto.editar');
     await conAviso('el concepto', () => updateDoc(doc(db, 'conceptos', id), sanitizarParaFirestore(data) as Record<string, unknown>));
   };
 

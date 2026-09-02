@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../auth/AuthContext';
 import { useServicios, renderIcon, CategoriaServicio } from '../config/serviciosStore';
 import ContadoresFolio from './settings/ContadoresFolio';
+import CatalogoConceptos from './conceptos/CatalogoConceptos';
 
 export default function Settings() {
   const { user, logout } = useAuth();
@@ -123,6 +124,9 @@ export default function Settings() {
     { id: 'company', label: 'Mi empresa', icon: <Building2 className="w-[18px] h-[18px]" /> },
     { id: 'users', label: 'Usuarios y roles', icon: <Users className="w-[18px] h-[18px]" /> },
     { id: 'catalogs', label: 'Catálogos base', icon: <Database className="w-[18px] h-[18px]" /> },
+    // B3 · Visible para todos: consultar la regla de IVA de un concepto es
+    // trabajo diario de Pricing y Operaciones. Editar exige concepto.editar.
+    { id: 'conceptos', label: 'Catálogo de conceptos', icon: <Package className="w-[18px] h-[18px]" /> },
     ...(isAdmin ? [{ id: 'services_catalog', label: 'Catálogo de servicios', icon: <Package className="w-[18px] h-[18px]" /> }] : []),
     // Mantenimiento, no función del negocio: solo superusuario, igual que la
     // importación masiva de catálogos.
@@ -232,6 +236,18 @@ export default function Settings() {
                     <p className="text-[13px] text-text-secondary text-center max-w-[300px]">La gestión de usuarios y roles estará disponible próximamente. Por ahora, los usuarios se administran directamente en Firebase.</p>
                  </div>
               </div>
+           )}
+
+           {activeSection === 'conceptos' && (
+             <div>
+               <h3 className="text-[16px] font-semibold text-text-primary mb-1">Catálogo de conceptos</h3>
+               <p className="text-[12px] text-text-secondary mb-5">
+                 Los servicios y cargos que Vermur cobra o paga. El IVA de cada
+                 uno se deriva de su regla — lo que ves aquí es lo que la
+                 facturación aplica.
+               </p>
+               <CatalogoConceptos />
+             </div>
            )}
 
            {activeSection === 'catalogs' && (
