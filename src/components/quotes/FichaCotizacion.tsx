@@ -12,6 +12,7 @@ import {
 } from './QuotesData';
 import { useAuth } from '../../auth/AuthContext';
 import { useNotifications } from '../../notifications/NotificationsContext';
+import { idUnico } from '../../lib/idUnico';
 import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
 import { useServicios, renderIcon } from '../../config/serviciosStore';
 import { useClientes } from '../../hooks/useClientes';
@@ -36,6 +37,7 @@ import {
 import {
   aplanarCotizacion, aplicarEdicionLinea, quitarLinea, agregarLinea,
   reordenarLinea, aplicarOrden, estaCongelada, moverLineaDeServicio,
+  repararConceptosDuplicados,
 } from '../../lib/lineasCotizacion';
 import {
   matricesPorServicio, escribirCelda, quitarAgenteDeCotizacion, elegirAgente,
@@ -379,7 +381,7 @@ export default function FichaCotizacion({
     // Duplicate check
     if ((conc.tarifas || []).some(t => t.tarifaOrigenId === tarifa.id)) return;
     const esPrimera = !(conc.tarifas?.length);
-    const cpId = `cp-${Date.now()}`;
+    const cpId = idUnico('cp');
     const cp: CotizacionProveedor = {
       id: cpId,
       proveedor: provNombre,
@@ -434,7 +436,7 @@ export default function FichaCotizacion({
       if (newCps.some(t => t.tarifaOrigenId === tarifa.id)) continue;
       const prov = proveedores.find(p => p.id === tarifa.proveedorId);
       const contacto = prov ? contactoPrincipal(prov) : undefined;
-      const cpId = `cp-${Date.now()}-${newCps.length}`;
+      const cpId = idUnico('cp');
       newCps.push({
         id: cpId,
         proveedor: prov?.nombre ?? tarifa.proveedorId,
@@ -904,6 +906,29 @@ export default function FichaCotizacion({
     if (!linea?.conceptoLocalId) return;
     handleConceptoActivate(linea.conceptoLocalId, linea.servicioId);
   };
+
+  /*
+   * Reparación de conceptos gemelos (4-sep-2026).
+   *
+   * Las cotizaciones guardadas antes de idUnico pueden traer dos conceptos con
+   * el mismo id — editar uno editaba todos. Se separan al abrir la ficha, UNA
+   * vez y avisando: renombrar ids en silencio es cómo se pierde la confianza.
+   * Solo cuando la cotización es editable; una congelada se queda como está.
+   */
+  const reparacionHecha = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (rolActivo === 'ventas' || estaCongelada(quote)) return;
+    if (reparacionHecha.current === quote.id) return;
+    const { quote: reparada, reparados } = repararConceptosDuplicados(quote);
+    if (reparados === 0) { reparacionHecha.current = quote.id; return; }
+    reparacionHecha.current = quote.id;
+    onUpdateQuote(reparada);
+    setToastLocal(
+      `Se separaron ${reparados} concepto(s) que compartían identidad interna. ` +
+      'Antes, editar uno editaba los dos; ya son independientes.',
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quote.id, quote.servicios]);
 
   /** Línea que corresponde al concepto activo, para resaltarla en la tabla. */
   const lineaActivaId = useMemo(() => {

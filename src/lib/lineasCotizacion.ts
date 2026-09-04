@@ -38,6 +38,7 @@ import {
   costoDeConcepto,
 } from '../components/quotes/QuotesData';
 import { calcLinea } from './cotizacionCalculator';
+import { idUnico } from './idUnico';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -503,7 +504,9 @@ export function agregarLinea(quote: KanbanQuote, nueva: NuevaLinea): KanbanQuote
   const { venta, margen } = calcLinea(costo, profit);
 
   const concepto: ConceptoCotizacion = {
-    id: `con-${nueva.servicioId}-${Date.now()}`,
+    // idUnico y no Date.now() a secas: dos líneas del mismo ms nacían con el
+    // mismo id y toda edición —profit, costo, concepto— pegaba en las dos.
+    id: idUnico(`con-${nueva.servicioId}`),
     nombre: nueva.concepto,
     ...(nueva.conceptoId ? { conceptoId: nueva.conceptoId } : {}),
     costo,
@@ -525,6 +528,43 @@ export function agregarLinea(quote: KanbanQuote, nueva: NuevaLinea): KanbanQuote
         : srv,
     ),
   };
+}
+
+/**
+ * Separa los conceptos gemelos de una cotización ya dañada.
+ *
+ * Antes de idUnico, dos líneas creadas en el mismo milisegundo nacían con el
+ * mismo id. Esas cotizaciones ya están GUARDADAS así, y mientras las gemelas
+ * compartan id, editar una edita todas. Esta función re-acuña el id de las
+ * repetidas (la primera conserva el suyo: es la referencia más probable de
+ * proveedoresOficialIds y demás).
+ *
+ * Devuelve cuántas reparó para poder DECIRLO: renombrar ids en silencio y que
+ * el usuario vea «cambiar» su tabla sin explicación es cómo se pierde la
+ * confianza en el sistema.
+ */
+export function repararConceptosDuplicados(
+  quote: KanbanQuote,
+): { quote: KanbanQuote; reparados: number } {
+  let reparados = 0;
+
+  const servicios = (quote.servicios ?? []).map(srv => {
+    const vistos = new Set<string>();
+    let cambio = false;
+
+    const conceptos = (srv.conceptos ?? []).map(c => {
+      if (!vistos.has(c.id)) { vistos.add(c.id); return c; }
+      reparados += 1;
+      cambio = true;
+      return { ...c, id: idUnico(`con-${srv.id}`) };
+    });
+
+    return cambio ? { ...srv, conceptos } : srv;
+  });
+
+  return reparados === 0
+    ? { quote, reparados: 0 }
+    : { quote: { ...quote, servicios }, reparados };
 }
 
 /**

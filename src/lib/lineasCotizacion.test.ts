@@ -12,7 +12,7 @@
  * cotización armada desde FichaCotizacion, desde BandejaPricing, y mixta.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   aplanarCotizacion,
   totalVenta,
@@ -22,6 +22,7 @@ import {
   agregarLinea,
   quitarLinea,
   moverLineaDeServicio,
+  repararConceptosDuplicados,
   compararConTarget,
   tieneVariosServicios,
   LineaPlana,
@@ -579,6 +580,97 @@ describe('moverLineaDeServicio', () => {
   it('al mismo servicio es un no-op', () => {
     const q = conLineaFresca();
     expect(moverLineaDeServicio(q, idDeLaFresca(q), 'srv-1')).toBe(q);
+  });
+});
+
+// ─── El profit es de SU línea (4-sep-2026) ───────────────────────────────────
+//
+// Bug reportado por Ventas: editar el profit de un concepto lo aplicaba a
+// todos. La causa: agregarLinea acuñaba ids con Date.now() a secas — dos
+// líneas del mismo milisegundo nacían gemelas y toda edición pegaba en ambas.
+// Rompe la estrategia central del negocio (Gabi): «a veces hay que poner el
+// segundo concepto con pérdida, y el profit ponérselo al flete internacional».
+
+describe('el profit es de su línea, no de la cotización', () => {
+  const base = () => quote([servicio({ id: 'srv-1' })]);
+
+  it('dos líneas del MISMO milisegundo nacen con ids distintos', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(999);
+    let q = agregarLinea(base(), { servicioId: 'srv-1', concepto: 'Flete' });
+    q = agregarLinea(q, { servicioId: 'srv-1', concepto: 'Maniobras' });
+    vi.restoreAllMocks();
+    const ids = (q.servicios[0].conceptos ?? []).map(c => c.id);
+    expect(new Set(ids).size).toBe(2);
+  });
+
+  it('editar el profit de una NO toca la otra — el caso de Gabi', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(999);
+    let q = agregarLinea(base(), { servicioId: 'srv-1', concepto: 'Flete internacional' });
+    q = agregarLinea(q, { servicioId: 'srv-1', concepto: 'Concepto con pérdida' });
+    vi.restoreAllMocks();
+
+    const lineas = aplanarCotizacion(q);
+    // Todo el profit al flete; el otro queda con pérdida deliberada.
+    q = aplicarEdicionLinea(q, lineas[0].id, { profit: 800 });
+    q = aplicarEdicionLinea(q, lineas[1].id, { profit: -100 });
+
+    const despues = aplanarCotizacion(q);
+    expect(despues.find(l => l.concepto === 'Flete internacional')!.profit).toBe(800);
+    expect(despues.find(l => l.concepto === 'Concepto con pérdida')!.profit).toBe(-100);
+  });
+
+  it('costo y concepto tampoco se propagan entre líneas del mismo ms', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(999);
+    let q = agregarLinea(base(), { servicioId: 'srv-1', concepto: 'A' });
+    q = agregarLinea(q, { servicioId: 'srv-1', concepto: 'B' });
+    vi.restoreAllMocks();
+
+    const lineas = aplanarCotizacion(q);
+    q = aplicarEdicionLinea(q, lineas[0].id, { costo: 500, conceptoId: 'CON-001' });
+
+    const otra = aplanarCotizacion(q).find(l => l.concepto === 'B')!;
+    expect(otra.costo).toBe(0);
+    expect(otra.conceptoId).toBeNull();
+  });
+});
+
+// ─── Reparación de cotizaciones ya dañadas ───────────────────────────────────
+
+describe('repararConceptosDuplicados', () => {
+  const conGemelas = (): KanbanQuote => quote([
+    servicio({
+      id: 'srv-1',
+      conceptos: [
+        concepto({ id: 'con-999', nombre: 'Flete', profit: 500 }),
+        concepto({ id: 'con-999', nombre: 'Maniobras', profit: 100 }),
+        concepto({ id: 'con-otro', nombre: 'Seguro', profit: 50 }),
+      ],
+    }),
+  ]);
+
+  it('re-acuña la repetida; la primera conserva su id', () => {
+    const { quote: r, reparados } = repararConceptosDuplicados(conGemelas());
+    expect(reparados).toBe(1);
+    const ids = (r.servicios[0].conceptos ?? []).map(c => c.id);
+    expect(ids[0]).toBe('con-999');
+    expect(ids[1]).not.toBe('con-999');
+    expect(new Set(ids).size).toBe(3);
+  });
+
+  it('reparada, cada gemela edita solo lo suyo', () => {
+    const { quote: r } = repararConceptosDuplicados(conGemelas());
+    const lineas = aplanarCotizacion(r);
+    const editada = aplicarEdicionLinea(r, lineas[1].id, { profit: 999 });
+    const despues = aplanarCotizacion(editada);
+    expect(despues.find(l => l.concepto === 'Flete')!.profit).toBe(500);
+    expect(despues.find(l => l.concepto === 'Maniobras')!.profit).toBe(999);
+  });
+
+  it('sin duplicados devuelve el mismo objeto, cero reparados', () => {
+    const q = quote([servicio({ id: 'srv-1', conceptos: [concepto({ id: 'c1', nombre: 'A' })] })]);
+    const r = repararConceptosDuplicados(q);
+    expect(r.reparados).toBe(0);
+    expect(r.quote).toBe(q);
   });
 });
 
