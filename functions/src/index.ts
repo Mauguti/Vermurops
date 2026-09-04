@@ -18,5 +18,8 @@ setGlobalOptions({ region: 'us-central1' });
 // ── Tarifas ──────────────────────────────────────────────────────────────────
 export { extraerTarifas } from './tarifas/extraerTarifas.js';
 
+// ── Clasificación de documentos (tarifas + expediente KYC + embarque) ────────
+export { clasificarDocumento } from './documentos/clasificarDocumento.js';
+
 // ── Gestión de usuarios (pendiente) ─────────────────────────────────────────
 // export { crearUsuario } from './usuarios/crearUsuario.js';

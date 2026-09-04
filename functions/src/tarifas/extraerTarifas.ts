@@ -1,75 +1,33 @@
 /**
  * extraerTarifas.ts
  *
- * Proxy entre la app y el agente de n8n que interpreta tarifarios (TA-3).
+ * Proxy autenticado hacia el agente de n8n que extrae tarifas (§4.10).
  *
- * ── Por qué existe ─────────────────────────────────────────────────────────
- * El webhook de n8n está expuesto públicamente. Si el navegador lo llamara
- * directo, la URL quedaría en el bundle sin autenticación de por medio:
- * cualquiera podría disparar ejecuciones y consumo de IA a costa de Vermur, y
- * el permiso `tarifario.cargar` sería decorativo porque el endpoint no lo
- * verifica.
- *
- * Esta función hace tres cosas y nada más:
- *   1. valida el token de Firebase Auth
- *   2. comprueba `tarifario.cargar`
- *   3. reenvía a n8n con el secreto, que vive del lado del servidor
- *
- * NO escribe en Firestore. El agente extrae y propone; la app decide y
- * escribe, con sus permisos y su pantalla de revisión. La IA se equivoca y una
- * tarifa mal cargada se propaga a cotizaciones reales.
+ * ── Estado (4-sep-2026) ────────────────────────────────────────────────────
+ * El núcleo del proxy se generalizó a `comun/proxyN8n.ts` cuando llegaron los
+ * flujos de expediente KYC y documentos de embarque; el enrutado por flujo
+ * vive en `clasificarDocumento`. Esta función queda como envoltorio delgado
+ * porque el frontend YA DESPLEGADO la llama por nombre: se retira cuando la
+ * pantalla de carga de tarifarios migre a `clasificarDocumento` con
+ * `X-Vermur-Flujo: tarifas`.
  */
 
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret, defineString } from 'firebase-functions/params';
-import * as logger from 'firebase-functions/logger';
-import { verificarUsuario, exigirCapacidad, ErrorAuth } from '../comun/auth.js';
+import { manejarProxyN8n } from '../comun/proxyN8n.js';
 
-/** Secreto compartido con n8n. Se manda en X-Vermur-Token. */
 const VERMUR_N8N_TOKEN = defineSecret('VERMUR_N8N_TOKEN');
 
 /**
- * Endpoint del agente. Configurable para poder apuntar a la de test mientras
- * se depura el agente, sin tocar código ni redesplegar.
- *
- * ⚠️ El default es la de PRODUCCIÓN a propósito. La ruta /webhook-test/ solo
- * responde mientras alguien tiene n8n abierto escuchando: si quedara como
- * default, funcionaría en pruebas y fallaría en uso real — el peor modo de
- * fallo posible, porque se descubre con un cliente esperando.
+ * ⚠️ El default es PRODUCCIÓN a propósito: la ruta /webhook-test/ de n8n solo
+ * responde mientras alguien tiene el editor abierto, así que como default
+ * funcionaría en pruebas y fallaría en uso real — el peor comportamiento
+ * posible. Para probar contra el editor, sobreescribir en functions/.env.
  */
 const N8N_WEBHOOK_URL = defineString('N8N_WEBHOOK_URL', {
   default: 'https://n8n.vermur.mx/webhook/extraer-tarifas',
-  description: 'URL del webhook de n8n que extrae tarifas.',
+  description: 'Webhook de n8n que recibe el documento y devuelve tarifas propuestas.',
 });
-
-/** La IA sobre un PDF escaneado puede tardar. Más allá, algo se atoró. */
-const TIMEOUT_MS = 120_000;
-
-/**
- * Traduce el estado HTTP del agente a algo accionable.
- *
- * Un «error 404» no le dice nada a quien está cotizando: lo que necesita saber
- * es si el problema se arregla solo, si tiene que avisarle a alguien, o si el
- * documento es el que está mal. Mismo criterio que el timeout.
- */
-function mensajeDeError(status: number): string {
-  if (status === 404) {
-    return 'El extractor de tarifas no está disponible. Avisa a sistemas.';
-  }
-  if (status === 401 || status === 403) {
-    return 'El extractor rechazó la conexión. Avisa a sistemas: la credencial no está bien configurada.';
-  }
-  if (status === 413) {
-    return 'El documento es demasiado grande para el extractor.';
-  }
-  if (status === 429) {
-    return 'El extractor está saturado. Espera un momento y vuelve a intentarlo.';
-  }
-  if (status >= 500) {
-    return 'El extractor falló al procesar el documento. Si se repite, avisa a sistemas.';
-  }
-  return `El extractor respondió con error ${status}.`;
-}
 
 export const extraerTarifas = onRequest(
   {
@@ -79,96 +37,15 @@ export const extraerTarifas = onRequest(
     memory: '512MiB',
     cors: true,
     maxInstances: 10,
-    /**
-     * Invocable sin credencial de IAM: la autenticación la hace ESTA función
-     * verificando el token de Firebase Auth y la capacidad `tarifario.cargar`.
-     *
-     * Sin esto, Cloud Run rechaza en su capa y la petición ni siquiera llega
-     * al código — el cliente recibe un 403 en HTML de Google, no el JSON con
-     * el motivo. Público en la red, cerrado en el código.
-     */
+    // Pública en la RED, cerrada en el CÓDIGO: la auth la hace el proxy.
     invoker: 'public',
   },
   async (req, res) => {
-    if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
-    if (req.method !== 'POST') {
-      res.status(405).json({ ok: false, error: 'Solo se acepta POST.' });
-      return;
-    }
-
-    let usuario;
-    try {
-      usuario = await verificarUsuario(req);
-      exigirCapacidad(usuario, 'tarifario.cargar');
-    } catch (err) {
-      const e = err as ErrorAuth;
-      const status = e.status ?? 401;
-      logger.warn('Acceso rechazado a extraerTarifas', { status, mensaje: e.message });
-      res.status(status).json({ ok: false, error: e.message });
-      return;
-    }
-
-    const secreto = VERMUR_N8N_TOKEN.value();
-    if (!secreto) {
-      // Mejor fallar claro que llamar sin el header y que n8n rechace con un
-      // error que no dice nada.
-      logger.error('VERMUR_N8N_TOKEN no está configurado');
-      res.status(500).json({
-        ok: false,
-        error: 'El servidor no tiene configurado el acceso al extractor.',
-      });
-      return;
-    }
-
-    const control = new AbortController();
-    const reloj = setTimeout(() => control.abort(), TIMEOUT_MS);
-
-    try {
-      logger.info('Extrayendo tarifas', { uid: usuario.uid, rol: usuario.rol });
-
-      const respuesta = await fetch(N8N_WEBHOOK_URL.value(), {
-        method: 'POST',
-        headers: {
-          'Content-Type': req.get('content-type') ?? 'application/json',
-          'X-Vermur-Token': secreto,
-        },
-        // rawBody conserva el multipart tal cual llegó, con sus fronteras:
-        // reserializarlo rompería la subida del archivo.
-        body: req.rawBody
-          ? new Uint8Array(req.rawBody)
-          : JSON.stringify(req.body ?? {}),
-        signal: control.signal,
-      });
-
-      const texto = await respuesta.text();
-
-      if (!respuesta.ok) {
-        logger.error('n8n respondió con error', {
-          status: respuesta.status, texto: texto.slice(0, 500),
-        });
-        res.status(502).json({ ok: false, error: mensajeDeError(respuesta.status) });
-        return;
-      }
-
-      // Se devuelve tal cual: la app tiene su propio validador de frontera y
-      // no conviene que dos capas interpreten el mismo contrato.
-      try {
-        res.status(200).json(JSON.parse(texto));
-      } catch {
-        logger.error('n8n devolvió algo que no es JSON', { texto: texto.slice(0, 500) });
-        res.status(502).json({ ok: false, error: 'El extractor devolvió una respuesta ilegible.' });
-      }
-    } catch (err) {
-      const abortado = (err as Error)?.name === 'AbortError';
-      logger.error('Fallo al llamar al extractor', { err: String(err), abortado });
-      res.status(abortado ? 504 : 502).json({
-        ok: false,
-        error: abortado
-          ? 'El extractor tardó demasiado. El documento puede ser muy grande o estar escaneado.'
-          : 'No se pudo contactar al extractor.',
-      });
-    } finally {
-      clearTimeout(reloj);
-    }
+    await manejarProxyN8n(
+      req,
+      res,
+      { flujo: 'tarifas', capacidad: 'tarifario.cargar', url: N8N_WEBHOOK_URL.value() },
+      VERMUR_N8N_TOKEN.value(),
+    );
   },
 );
