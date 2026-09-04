@@ -29,7 +29,14 @@ import { PROSPECTO_COLUMNS, VISTA_DEFAULT_PROSPECTOS } from './quotes/prospectoC
 import FichaProspecto from './quotes/FichaProspecto';
 import { useVistasUsuario } from '../hooks/useVistasUsuario';
 import VistaSelector from './table/VistaSelector';
-import SelectorServicios from './quotes/SelectorServicios';
+import FormCargaServicio, { DraftServicio, nuevoDraft } from './quotes/FormCargaServicio';
+import { usePuertos } from '../hooks/usePuertos';
+import { useConceptos } from '../hooks/useConceptos';
+import {
+  ModalidadSolicitud, ETIQUETA_MODALIDAD, modalidadDeCarga,
+  validarCarga, espejoLegacy, precargarConceptos,
+} from '../lib/cargaSolicitud';
+import { idUnico } from '../lib/idUnico';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Componente principal del módulo de Cotizaciones
@@ -41,6 +48,8 @@ export default function Quotes() {
   const [showForm, setShowForm] = useState(false);
   const [showProspectForm, setShowProspectForm] = useState(false);
   const { serviciosActivos } = useServicios();
+  const { puertos } = usePuertos();
+  const { conceptos: catalogoConceptos } = useConceptos();
   const { agregarNotificacion, notificaciones } = useNotifications();
   const [chatOpen, setChatOpen] = useState(false);
   const chatUnreadCount = notificaciones.filter(n => n.tipo === 'chat' && !n.leida).length;
@@ -434,7 +443,11 @@ export default function Quotes() {
    */
   const [formVendedor, setFormVendedor] = useState('');
   const vendedorEfectivo = formVendedor || user?.nombre || '';
-  const [formServicios, setFormServicios] = useState<string[]>(['maritimo']);
+  /**
+   * Rediseño de la solicitud (sep-2026): una tarjeta por modalidad, cada una
+   * con los campos de SU carga. Los que no aplican no se muestran.
+   */
+  const [formCargas, setFormCargas] = useState<DraftServicio[]>([nuevoDraft('maritimo')]);
 
   /**
    * Origen de la empresa en el formulario de cotización:
@@ -476,18 +489,12 @@ export default function Quotes() {
       setFormEmail('');
     }
   };
-  const [formOrigenRuta, setFormOrigenRuta] = useState('');
-  const [formDestinoRuta, setFormDestinoRuta] = useState('');
-  const [formIncoterm, setFormIncoterm] = useState('FOB');
   /**
    * Tráfico de la solicitud. Pricing lo sabe de entrada, así que se captura
    * aquí y no se deja a la derivación por ruta, que es el respaldo para las
    * cotizaciones viejas. De este dato depende el folio del embarque.
    */
   const [formTrafico, setFormTrafico] = useState<'importacion' | 'exportacion' | ''>('');
-  const [formMercancia, setFormMercancia] = useState('');
-  const [formPeso, setFormPeso] = useState(0);
-  const [formVolumen, setFormVolumen] = useState(0);
 
   // Formulario Nuevo Prospecto
   const [formProspectoEmpresa, setFormProspectoEmpresa] = useState('');
@@ -560,15 +567,18 @@ export default function Quotes() {
     setFormProspectoEmail('');
   };
 
-  const toggleServicioForm = (id: string) => {
-    setFormServicios(prev =>
-      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
-    );
-  };
-
   const handleCreateQuote = async (stage: 'solicitud_cliente' | 'solicitado_pricing' | 'pricing_solicitando') => {
-    if (!formEmpresa.trim() || formServicios.length === 0) {
-      alert('Por favor introduce la empresa y selecciona al menos un servicio requerido.');
+    if (!formEmpresa.trim() || formCargas.length === 0) {
+      alert('Por favor introduce la empresa y agrega al menos una modalidad.');
+      return;
+    }
+
+    // Un «sí» a medias no viaja: peligrosa sin IMO o frío sin temperatura
+    // se detienen aquí, donde todavía se puede preguntar al cliente.
+    const errores = formCargas.flatMap(d =>
+      validarCarga(d.carga).map(m => `${ETIQUETA_MODALIDAD[modalidadDeCarga(d.carga)]}: ${m}`));
+    if (errores.length > 0) {
+      alert(`Faltan datos de la carga:\n\n${errores.join('\n')}`);
       return;
     }
 
@@ -589,21 +599,38 @@ export default function Quotes() {
       // Si la crea Pricing, es suya desde el inicio: no entra al carrusel, que
       // es solo para clientes nuevos que llegan por la página.
       pricingId: puedeCrear ? (user?.uid ?? user?.nombre ?? null) : null,
-      servicios: formServicios.map(id => ({
-        id: `srv-${folio}-${id}`,
-        tipo: id as TipoServicio,
-        ruta: { origen: formOrigenRuta || 'Por definir', destino: formDestinoRuta || 'Por definir' },
-        incoterm: formIncoterm,
-        mercancia: formMercancia || 'Por definir',
-        peso: Number(formPeso) || 0,
-        volumen: Number(formVolumen) || 0,
-        estado: 'pendiente',
-        recargosPct: 0,
-        profit: 0,
-        cotizacionesProveedor: [],
-        conceptos: [],
-        ...(formTrafico ? { trafico: formTrafico } : {}),
-      })),
+      servicios: formCargas.map(d => {
+        const servicioId = idUnico(`srv-${folio}`);
+        const espejo = espejoLegacy(d.carga);
+        // El despacho declara su propio tráfico; el resto hereda el de la
+        // solicitud (que a su vez se declaró solo si ambos puertos son de
+        // catálogo, o lo eligió quien captura).
+        const trafico = d.carga.tipo === 'despacho' ? d.carga.operacion : (formTrafico || undefined);
+        return {
+          id: servicioId,
+          tipo: modalidadDeCarga(d.carga) as TipoServicio,
+          carga: d.carga,
+          conceptosRequeridos: d.conceptosRequeridos,
+          ruta: {
+            origen: d.origen || 'Por definir',
+            destino: d.destino || 'Por definir',
+            origenPuertoId: d.origenPuertoId,
+            destinoPuertoId: d.destinoPuertoId,
+          },
+          incoterm: d.incoterm,
+          mercancia: d.mercancia || 'Por definir',
+          // Espejo legacy: los lectores viejos siguen viendo peso y volumen.
+          peso: espejo.peso,
+          volumen: espejo.volumen,
+          estado: 'pendiente' as const,
+          recargosPct: 0,
+          profit: 0,
+          cotizacionesProveedor: [],
+          // Lo que Ventas señaló nace como líneas en cero: Pricing decide.
+          conceptos: precargarConceptos(servicioId, d.conceptosRequeridos),
+          ...(trafico ? { trafico } : {}),
+        };
+      }),
       valorTotalConsolidado: 0,
       moneda: 'USD',
       estadoFinal: null,
@@ -633,14 +660,8 @@ export default function Quotes() {
     setFormTelefono('');
     setFormEmail('');
     setFormOrigen('web');
-    setFormServicios(['maritimo']);
-    setFormOrigenRuta('');
-    setFormDestinoRuta('');
-    setFormIncoterm('FOB');
+    setFormCargas([nuevoDraft('maritimo')]);
     setFormTrafico('');
-    setFormMercancia('');
-    setFormPeso(0);
-    setFormVolumen(0);
   };
 
   // Conteo de cotizaciones en etapas de Pricing para el badge
@@ -1115,88 +1136,49 @@ export default function Quotes() {
               </div>
             </div>
 
-            {/* Sección 2: Servicios Requeridos */}
+            {/* Sección 2 · Qué se mueve — una tarjeta por modalidad.
+                Los campos cambian según la carga; los que no aplican no se
+                muestran. El selector viejo (serviciosStore, localStorage) se
+                retiró: los conceptos salen del catálogo real en cada tarjeta. */}
             <div className="space-y-3">
-              <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-1.5">
-                Servicios a Cotizar (Consolidación Multimodal) *
-              </h4>
-              <SelectorServicios
-                servicios={serviciosActivos}
-                seleccionados={formServicios}
-                onToggle={toggleServicioForm}
-              />
-            </div>
+              <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
+                <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest">
+                  Qué se mueve *
+                </h4>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-bold text-gray-400 uppercase mr-1">Agregar:</span>
+                  {(['maritimo', 'aereo', 'terrestre', 'despacho_aduanal'] as ModalidadSolicitud[]).map(m => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setFormCargas(prev => [...prev, nuevoDraft(m)])}
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-[#E11D48] hover:text-[#E11D48] transition-colors"
+                    >
+                      + {ETIQUETA_MODALIDAD[m]}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-            {/* Sección 3: Detalles de la Carga */}
-            <div className="space-y-4">
-              <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-1.5">
-                Detalles del Flete y Mercancía (Común para todos los servicios)
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">Puerto / Ciudad de Origen</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Shanghai, CHN"
-                    value={formOrigenRuta}
-                    onChange={e => setFormOrigenRuta(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
+              {formCargas.length === 0 && (
+                <p className="text-[11px] text-gray-400 italic py-3 text-center">
+                  Agrega al menos una modalidad — una impo normal lleva marítimo + despacho + terrestre.
+                </p>
+              )}
+
+              <div className="space-y-3">
+                {formCargas.map(d => (
+                  <FormCargaServicio
+                    key={d.id}
+                    draft={d}
+                    puertos={puertos}
+                    conceptos={catalogoConceptos}
+                    incoterms={INCOTERMS}
+                    onCambio={nd => setFormCargas(prev => prev.map(x => x.id === nd.id ? nd : x))}
+                    onQuitar={() => setFormCargas(prev => prev.filter(x => x.id !== d.id))}
+                    onTraficoDerivado={t => setFormTrafico(t)}
                   />
-                </div>
-                <div>
-                  <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">Puerto / Ciudad de Destino</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Manzanillo, MEX"
-                    value={formDestinoRuta}
-                    onChange={e => setFormDestinoRuta(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">Incoterm</label>
-                  <select
-                    value={formIncoterm}
-                    onChange={e => setFormIncoterm(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] bg-white cursor-pointer"
-                  >
-                    {INCOTERMS.map(inc => (
-                      <option key={inc} value={inc}>{inc}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">Descripción de la Mercancía</label>
-                  <input
-                    type="text"
-                    placeholder="Ej. Componentes electrónicos en pallets..."
-                    value={formMercancia}
-                    onChange={e => setFormMercancia(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">Peso (kg)</label>
-                    <input
-                      type="number"
-                      placeholder="4500"
-                      value={formPeso || ''}
-                      onChange={e => setFormPeso(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">Volumen (m³)</label>
-                    <input
-                      type="number"
-                      placeholder="12"
-                      value={formVolumen || ''}
-                      onChange={e => setFormVolumen(Number(e.target.value))}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
-                    />
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
 
