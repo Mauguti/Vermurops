@@ -21,6 +21,7 @@ import {
   aplicarOrden,
   agregarLinea,
   quitarLinea,
+  moverLineaDeServicio,
   compararConTarget,
   tieneVariosServicios,
   LineaPlana,
@@ -524,3 +525,60 @@ describe('lo escrito tiene que ser guardable en Firestore', () => {
     expect(sinUndefined(q)).toEqual([]);
   });
 });
+
+// ─── moverLineaDeServicio (C.4) ──────────────────────────────────────────────
+//
+// En la tabla única la columna «Servicio» es selector MIENTRAS la línea está
+// fresca, y fija después. De la pertenencia dependen la matriz y los folios
+// del embarque: mover una línea trabajada reagruparía dinero por debajo.
+
+describe('moverLineaDeServicio', () => {
+  const dosServicios = (): KanbanQuote => quote([
+    servicio({ id: 'srv-1', tipo: 'maritimo' }),
+    servicio({ id: 'srv-2', tipo: 'terrestre' }),
+  ]);
+
+  const conLineaFresca = () => agregarLinea(dosServicios(), { servicioId: 'srv-1', concepto: '' });
+
+  const idDeLaFresca = (q: KanbanQuote) =>
+    aplanarCotizacion(q).find(l => l.servicioId === 'srv-1')!.id;
+
+  it('mueve una línea fresca al otro servicio', () => {
+    const q = conLineaFresca();
+    const movida = moverLineaDeServicio(q, idDeLaFresca(q), 'srv-2');
+    expect(movida.servicios[0].conceptos).toHaveLength(0);
+    expect(movida.servicios[1].conceptos).toHaveLength(1);
+  });
+
+  it('la línea movida genera el embarque del servicio NUEVO — la cadena lee datos', () => {
+    const q = conLineaFresca();
+    const movida = moverLineaDeServicio(q, idDeLaFresca(q), 'srv-2');
+    const linea = aplanarCotizacion(movida)[0];
+    expect(linea.servicioId).toBe('srv-2');
+    expect(linea.servicioTipo).toBe('terrestre');
+  });
+
+  it('con conceptoId ya NO se mueve: el selector prometió quedar fijo', () => {
+    let q = conLineaFresca();
+    q = aplicarEdicionLinea(q, idDeLaFresca(q), { conceptoId: 'CON-001', concepto: 'Flete' });
+    const intento = moverLineaDeServicio(q, idDeLaFresca(q), 'srv-2');
+    expect(intento).toBe(q);
+  });
+
+  it('con costo capturado tampoco: lleva dinero colgando', () => {
+    let q = conLineaFresca();
+    q = aplicarEdicionLinea(q, idDeLaFresca(q), { costo: 500 });
+    expect(moverLineaDeServicio(q, idDeLaFresca(q), 'srv-2')).toBe(q);
+  });
+
+  it('a un servicio inexistente no mueve nada', () => {
+    const q = conLineaFresca();
+    expect(moverLineaDeServicio(q, idDeLaFresca(q), 'srv-99')).toBe(q);
+  });
+
+  it('al mismo servicio es un no-op', () => {
+    const q = conLineaFresca();
+    expect(moverLineaDeServicio(q, idDeLaFresca(q), 'srv-1')).toBe(q);
+  });
+});
+

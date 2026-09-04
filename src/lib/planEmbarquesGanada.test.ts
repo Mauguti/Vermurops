@@ -237,3 +237,53 @@ describe('F · el caso degenerado', () => {
     expect(p.pedidosDeFolio).toHaveLength(1);
   });
 });
+
+// ─── G · C.4: la generación lee DATOS, no la agrupación visual ───────────────
+//
+// La ficha pasó de cinco tarjetas por modalidad a una tabla única. Este bloque
+// fija el contrato que hizo seguro ese cambio: los embarques salen de
+// servicio.tipo y de las líneas, nunca de cómo se pinten. Si alguien algún día
+// hace que la generación dependa de la capa visual, esto truena.
+
+import { agregarLinea, moverLineaDeServicio, aplicarEdicionLinea, aplanarCotizacion } from './lineasCotizacion';
+
+describe('G · la tabla única no cambia los embarques', () => {
+  it('mover una línea fresca de servicio la manda al embarque del servicio nuevo', () => {
+    // Cotización multimodal, ambos servicios independientes: dos embarques.
+    const q = quote([
+      { ...SRV_MAR, generaEmbarquePropio: true },
+      { ...SRV_TER, generaEmbarquePropio: true },
+    ]);
+
+    // Línea fresca en el marítimo → se mueve al terrestre → se trabaja ahí.
+    // La fresca se identifica por nombre vacío: los conceptos del fixture
+    // tampoco traen conceptoId, y ese find se equivocaba de línea.
+    let conLinea = agregarLinea(q, { servicioId: 'srv-1', concepto: '' });
+    const fresca = aplanarCotizacion(conLinea).find(l => l.concepto === '')!;
+    conLinea = moverLineaDeServicio(conLinea, fresca.id, 'srv-2');
+    const movida = aplanarCotizacion(conLinea).find(l => l.concepto === '')!;
+    conLinea = aplicarEdicionLinea(conLinea, movida.id, {
+      conceptoId: 'CON-050', concepto: 'Maniobra en destino', costo: 300, profit: 50,
+    });
+
+    const p = plan(conLinea);
+    const terrestre = p.grupos.find(g => g.modalidad === 'terrestre')!;
+    const maritimo = p.grupos.find(g => g.modalidad === 'maritimo')!;
+
+    // El cargo cae en el embarque TERRESTRE, con su folio VLIT — no en el
+    // marítimo donde la línea nació.
+    expect(terrestre.cargos.some(c => c.concepto === 'Maniobra en destino')).toBe(true);
+    expect(maritimo.cargos.some(c => c.concepto === 'Maniobra en destino')).toBe(false);
+    expect(terrestre.prefijo).toBe('VLIT');
+  });
+
+  it('el plan de una multimodal es el mismo que antes del cambio visual', () => {
+    // Los valores fijados el 1-sep en el bloque B, repetidos aquí a propósito:
+    // si el cambio de presentación hubiera tocado la generación, divergen.
+    const p = plan(quote([SRV_MAR, { ...SRV_TER, generaEmbarquePropio: true }]));
+    expect(p.grupos).toHaveLength(2);
+    expect(Object.fromEntries(p.grupos.map(g => [g.modalidad, g.prefijo])))
+      .toEqual({ maritimo: 'VLIM', terrestre: 'VLIT' });
+  });
+});
+

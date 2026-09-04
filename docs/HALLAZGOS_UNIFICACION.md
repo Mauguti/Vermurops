@@ -87,3 +87,12 @@ se retiró esa sección. Quedan fuera del bundle porque nada los alcanza.
 
 Bórrense cuando se confirme que el flujo de solicitudes de cotización no va a
 reusar nada de ahí.
+
+### 7 · TarjetaModalidad.tsx huérfano tras C.4
+
+La tabla única (`TablaConceptos.tsx`) reemplazó a las cinco tarjetas por
+modalidad. `TarjetaModalidad.tsx` quedó sin importadores — mismo criterio que
+`Documents.tsx` y los de Pricing: fuera del bundle, no borrado.
+`agrupacionModalidad.ts` también quedó sin usuarios fuera de sus tests
+(verificado con grep): la generación de embarques usa `modalidadDeServicio` de
+`traficoServicio.ts`, que es otra pieza. Ambos candidatos a borrar juntos.

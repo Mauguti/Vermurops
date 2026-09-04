@@ -528,6 +528,59 @@ export function agregarLinea(quote: KanbanQuote, nueva: NuevaLinea): KanbanQuote
 }
 
 /**
+ * Mueve una línea RECIÉN CREADA a otro servicio.
+ *
+ * ── Para qué existe (C.4) ──────────────────────────────────────────────────
+ * En la tabla única, la columna «Servicio» es un selector MIENTRAS la línea
+ * está fresca —sin concepto del catálogo todavía— y queda fija después. De la
+ * pertenencia al servicio dependen la matriz comparativa (una por servicio) y
+ * la generación de embarques (servicio.tipo → modalidad → folio), así que
+ * mover una línea ya trabajada reagruparía dinero por debajo del usuario.
+ *
+ * Por eso la función se NIEGA a mover:
+ *   - líneas con conceptoId: ya están fijas, es la promesa del selector;
+ *   - líneas con tarifas o costo capturado: llevan dinero colgando;
+ *   - líneas de ruta B: representan al servicio entero, no viven en otro.
+ * En todos esos casos devuelve la cotización sin cambios, igual que
+ * quitarLinea con ruta B: negarse en silencio es seguro porque la UI no
+ * ofrece el selector en esos estados — esto es la red por si acaso.
+ */
+export function moverLineaDeServicio(
+  quote: KanbanQuote,
+  lineaId: string,
+  nuevoServicioId: string,
+): KanbanQuote {
+  const linea = aplanarCotizacion(quote).find(l => l.id === lineaId);
+  if (!linea || linea.origen !== 'concepto' || !linea.conceptoLocalId) return quote;
+  if (linea.conceptoId) return quote;                       // ya quedó fija
+  if (linea.tarifasCount > 0 || linea.costoCapturado) return quote;
+  if (linea.servicioId === nuevoServicioId) return quote;
+  if (!(quote.servicios ?? []).some(s => s.id === nuevoServicioId)) return quote;
+
+  let movido: ConceptoCotizacion | null = null;
+
+  const sinElla = (quote.servicios ?? []).map(srv => {
+    if (srv.id !== linea.servicioId) return srv;
+    const conceptos = (srv.conceptos ?? []).filter(c => {
+      if (c.id === linea.conceptoLocalId) { movido = c; return false; }
+      return true;
+    });
+    return { ...srv, conceptos };
+  });
+
+  if (!movido) return quote;
+
+  return {
+    ...quote,
+    servicios: sinElla.map(srv =>
+      srv.id === nuevoServicioId
+        ? { ...srv, conceptos: [...(srv.conceptos ?? []), movido!] }
+        : srv,
+    ),
+  };
+}
+
+/**
  * Quita una línea.
  *
  * Una línea de ruta B representa al servicio entero: quitarla equivaldría a

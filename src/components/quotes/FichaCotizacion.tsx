@@ -35,9 +35,8 @@ import {
 } from '../../lib/visibilidadCotizacion';
 import {
   aplanarCotizacion, aplicarEdicionLinea, quitarLinea, agregarLinea,
-  reordenarLinea, aplicarOrden, estaCongelada,
+  reordenarLinea, aplicarOrden, estaCongelada, moverLineaDeServicio,
 } from '../../lib/lineasCotizacion';
-import { agruparPorModalidad, modalidadDeServicioTipo } from '../../lib/agrupacionModalidad';
 import {
   matricesPorServicio, escribirCelda, quitarAgenteDeCotizacion, elegirAgente,
   conceptosSinCotizar, claveAgente, construirMatriz, CONCEPTOS_POR_PLANTILLA,
@@ -57,7 +56,7 @@ import { compararColumnas, type MonedaCotizacion } from '../../lib/monedaCompara
 import {
   evaluarProntitud, faltantesPorLinea, resumenFaltantes, textoFaltantesLinea,
 } from '../../lib/prontitudCotizacion';
-import TarjetaModalidad from './TarjetaModalidad';
+import TablaConceptos, { ServicioDeLaTabla } from './TablaConceptos';
 import {
   FichaLayout, FichaHeader, FichaTabs, FichaFooter, BadgeEstado,
 } from '../ui/ficha/FichaLayout';
@@ -646,12 +645,18 @@ export default function FichaCotizacion({
    * que uno ausente: obliga a preguntarse si uno lo está usando mal.
    */
   const prontitud = useMemo(() => evaluarProntitud(quote), [quote]);
-  const tarjetasModalidad = useMemo(
-    () => agruparPorModalidad(
-      lineasPlanas, servicios ?? [],
-      (quote.servicios ?? []).map(sv => ({ id: sv.id, tipo: sv.tipo })),
-    ),
-    [lineasPlanas, servicios, quote.servicios],
+  /**
+   * C.4 · Los servicios de la cotización con nombre legible, para la columna
+   * «Servicio» de la tabla única. El nombre sale del catálogo cuando el tipo
+   * es un id (`srv-def-2`); si no, el tipo tal cual con inicial mayúscula.
+   */
+  const serviciosDeLaTabla = useMemo<ServicioDeLaTabla[]>(
+    () => (quote.servicios ?? []).map(srv => {
+      const delCatalogo = (servicios ?? []).find(c => c.id === srv.tipo);
+      const crudo = delCatalogo?.nombre ?? srv.tipo;
+      return { id: srv.id, etiqueta: crudo.charAt(0).toUpperCase() + crudo.slice(1) };
+    }),
+    [quote.servicios, servicios],
   );
 
   /** Aplica una edición de la tabla plana sobre el árbol anidado. */
@@ -684,19 +689,22 @@ export default function FichaCotizacion({
   };
 
   /**
-   * Agrega un concepto a la modalidad indicada.
+   * C.4 · Agrega un concepto al servicio indicado.
    *
-   * Se cuelga del primer servicio que ya pertenezca a esa modalidad. Si no hay
-   * ninguno, del primer servicio de la cotización: el concepto tiene que
-   * existir en algún lado y es preferible eso a bloquear la captura.
+   * Con un solo servicio la tabla lo preselecciona sola; con varios, la línea
+   * nace en el primero y su columna «Servicio» es el selector mientras esté
+   * fresca. Nace sin nombre: el usuario elige del catálogo — poner «Nuevo
+   * concepto» como texto invitaba a dejarlo así, que es como aparecen los
+   * duplicados.
    */
-  const handleAgregarLineaPlana = (modalidad: string) => {
-    const lineaDeEsaModalidad = tarjetasModalidad.find(t => t.modalidad === modalidad)?.lineas[0];
-    const servicioId = lineaDeEsaModalidad?.servicioId ?? quote.servicios[0]?.id;
+  const handleAgregarLineaPlana = (servicioId: string) => {
     if (!servicioId) return;
-    // Nace sin nombre: el usuario elige del catálogo. Poner «Nuevo concepto»
-    // como texto invitaba a dejarlo así, que es como aparecen los duplicados.
     onUpdateQuote(agregarLinea(quote, { servicioId, concepto: '' }));
+  };
+
+  /** C.4 · Cambia el servicio de una línea fresca. La lib se niega si ya está fija. */
+  const handleCambiarServicioDeLinea = (lineaId: string, servicioId: string) => {
+    onUpdateQuote(moverLineaDeServicio(quote, lineaId, servicioId));
   };
 
   // ── Comparativa por servicio (MC-2/3/4) ────────────────────────────────
@@ -1200,43 +1208,28 @@ export default function FichaCotizacion({
               />
             )}
 
-            {/* ── Tarjetas por modalidad (sesión 30-ago-2026) ──────────────
-                Reemplaza el árbol de servicios → conceptos → cotizaciones de
-                proveedor. Luis: «no me queda claro por qué estamos segmentando
-                los servicios». Una tarjeta por modalidad, con su tabla de
-                conceptos dentro. */}
-            <div className="space-y-4">
-              {tarjetasModalidad.map(t => (
-                <TarjetaModalidad
-                  key={t.modalidad}
-                  tarjeta={t}
-                  moneda={quote.moneda}
-                  editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
-                  onEditarLinea={handleEditarLineaPlana}
-                  onElegirConcepto={handleElegirConcepto}
-                  conceptosActivos={conceptosActivos}
-                  soloLectura={rolActivo === 'ventas'}
-                  onQuitarLinea={handleQuitarLineaPlana}
-                  onMoverLinea={handleMoverLineaPlana}
-                  onAgregarLinea={() => handleAgregarLineaPlana(t.modalidad)}
-                  onCompararProveedor={handleCompararProveedor}
-                  lineaActivaId={lineaActivaId}
-                  onDatosEmbarque={() => {
-                    const srv = quote.servicios.find(
-                      sv => modalidadDeServicioTipo(sv.tipo, servicios ?? []) === t.modalidad);
-                    if (srv) setDatosEmbarqueDe(srv.id);
-                  }}
-                />
-              ))}
-
-              {tarjetasModalidad.length === 0 && (
-                <div className="border-2 border-dashed border-gray-200 rounded-xl py-10 text-center">
-                  <p className="text-[12px] text-gray-400">
-                    Esta cotización todavía no tiene conceptos.
-                  </p>
-                </div>
-              )}
-            </div>
+            {/* ── C.4 · La tabla única (4-sep-2026) ────────────────────────
+                Reemplaza a las cinco tarjetas por modalidad. Luis: «falta
+                quitar los cuadros que teníamos, para que solo quedara 1». La
+                modalidad sigue existiendo como dato en el servicio — de ahí
+                leen la matriz y la generación de embarques — pero deja de ser
+                el criterio de agrupación visual. */}
+            <TablaConceptos
+              lineas={lineasPlanas}
+              servicios={serviciosDeLaTabla}
+              editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
+              soloLectura={rolActivo === 'ventas'}
+              lineaActivaId={lineaActivaId}
+              conceptosActivos={conceptosActivos}
+              onEditarLinea={handleEditarLineaPlana}
+              onElegirConcepto={handleElegirConcepto}
+              onQuitarLinea={handleQuitarLineaPlana}
+              onMoverLinea={handleMoverLineaPlana}
+              onAgregarLinea={handleAgregarLineaPlana}
+              onCompararProveedor={handleCompararProveedor}
+              onCambiarServicio={handleCambiarServicioDeLinea}
+              onDatosEmbarque={(servicioId) => setDatosEmbarqueDe(servicioId)}
+            />
 
             {/* Resumen financiero DENTRO de la ficha: «mientras cotizan no lo
                 pueden ver, se tendrían que salir de lo que están haciendo». */}
