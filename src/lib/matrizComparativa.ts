@@ -71,7 +71,11 @@ export interface AgenteColumna {
 }
 
 export interface FilaMatriz {
-  /** conceptoLocalId del árbol, o clave sintética para filas especiales. */
+  /**
+   * Id de la LÍNEA plana (`servicioId::conceptoLocalId`), o clave sintética
+   * para filas especiales. OJO: no es el conceptoLocalId pelón — este
+   * comentario lo decía y costó un rato de depuración (4-sep-2026).
+   */
   id: string;
   etiqueta: string;
   tipo: TipoFila;
