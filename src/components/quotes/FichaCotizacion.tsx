@@ -1218,7 +1218,42 @@ export default function FichaCotizacion({
               onCompararProveedor={handleCompararProveedor}
               onCambiarServicio={handleCambiarServicioDeLinea}
               onDatosEmbarque={(servicioId) => setDatosEmbarqueDe(servicioId)}
+              onAgregarServicio={rolActivo !== 'ventas' && !estaCongelada(quote)
+                ? () => setShowAddServicio(true)
+                : undefined}
             />
+
+            {/* El alta de servicio vive en el chip «+ Servicio» de la tabla.
+                El formulario aparece aquí, pegado a ella, cuando se pide. */}
+            {rolActivo !== 'ventas' && showAddServicio && (
+              <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-sm">
+                <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Nuevo Servicio</h4>
+                <div className="flex gap-2">
+                  <select
+                    value={newServicioTipo}
+                    onChange={(e) => setNewServicioTipo(e.target.value as TipoServicio)}
+                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#E11D48]"
+                  >
+                    <option value="maritimo">Flete Marítimo</option>
+                    <option value="aereo">Flete Aéreo</option>
+                    <option value="terrestre">Flete Terrestre</option>
+                    <option value="aduanal">Despacho Aduanal</option>
+                  </select>
+                  <button
+                    onClick={handleAddServicio}
+                    className="px-4 py-2 bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase rounded-lg transition-colors"
+                  >
+                    Agregar
+                  </button>
+                  <button
+                    onClick={() => setShowAddServicio(false)}
+                    className="px-3 py-2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* 2 · La comparativa de agentes, una por servicio. Pricing pide
                 la misma ruta «a entre 7 y 10» proveedores, y un agente
@@ -1338,48 +1373,6 @@ export default function FichaCotizacion({
                     .catch(err => setToastLocal(err instanceof Error ? err.message : String(err)));
                 }}
               />
-            )}
-
-            {/* Botón para agregar nuevo servicio (Solo Pricing/Admin) */}
-            {rolActivo !== 'ventas' && (
-              <div className="pt-2">
-                {!showAddServicio ? (
-                  <button
-                    onClick={() => setShowAddServicio(true)}
-                    className="w-full py-3 border-2 border-dashed border-gray-200 hover:border-[#E11D48]/50 hover:bg-[#E11D48]/5 rounded-xl text-xs font-bold text-gray-500 hover:text-[#E11D48] transition-all flex items-center justify-center gap-2 uppercase tracking-wider"
-                  >
-                    <Plus className="w-4 h-4" /> Agregar Servicio
-                  </button>
-                ) : (
-                  <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3 shadow-sm">
-                    <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Nuevo Servicio</h4>
-                    <div className="flex gap-2">
-                      <select
-                        value={newServicioTipo}
-                        onChange={(e) => setNewServicioTipo(e.target.value as TipoServicio)}
-                        className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#E11D48]"
-                      >
-                        <option value="maritimo">Flete Marítimo</option>
-                        <option value="aereo">Flete Aéreo</option>
-                        <option value="terrestre">Flete Terrestre</option>
-                        <option value="aduanal">Despacho Aduanal</option>
-                      </select>
-                      <button
-                        onClick={handleAddServicio}
-                        className="px-4 py-2 bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase rounded-lg transition-colors"
-                      >
-                        Agregar
-                      </button>
-                      <button
-                        onClick={() => setShowAddServicio(false)}
-                        className="px-3 py-2 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
             )}
 
             {/* Total consolidado dentro de la tab */}

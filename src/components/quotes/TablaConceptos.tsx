@@ -59,6 +59,13 @@ interface Props {
   onCambiarServicio: (lineaId: string, servicioId: string) => void;
   /** Abre los datos que el embarque necesita para ese servicio. */
   onDatosEmbarque: (servicioId: string) => void;
+  /**
+   * Agrega un servicio a la cotización YA creada. Vive aquí —junto a los
+   * chips de servicios— y no como botón suelto al pie de la página: el caso
+   * real existe (el cliente pide sumar el despacho a media negociación), pero
+   * es excepción, no flujo.
+   */
+  onAgregarServicio?: () => void;
 }
 
 const money = (n: number) =>
@@ -68,6 +75,7 @@ export default function TablaConceptos({
   lineas, servicios, editable, soloLectura, lineaActivaId, conceptosActivos,
   onCrearConcepto, onEditarLinea, onElegirConcepto, onQuitarLinea, onMoverLinea,
   onAgregarLinea, onCompararProveedor, onCambiarServicio, onDatosEmbarque,
+  onAgregarServicio,
 }: Props) {
   const ordenadas = [...lineas].sort((a, b) => a.orden - b.orden);
 
@@ -107,6 +115,15 @@ export default function TablaConceptos({
                 <Settings2 className="w-3 h-3" /> {s.etiqueta}
               </button>
             ))}
+            {onAgregarServicio && (
+              <button
+                onClick={onAgregarServicio}
+                className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-gray-400 hover:text-[#E11D48] px-2 py-1 rounded border border-dashed border-gray-200 transition-colors"
+                title="Agregar un servicio a esta cotización"
+              >
+                <Plus className="w-3 h-3" /> Servicio
+              </button>
+            )}
           </div>
         )}
       </div>
