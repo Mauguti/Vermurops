@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Search, Anchor, PenLine } from 'lucide-react';
-import type { PuertoVermur } from './PuertosData';
+import type { PuertoVermur, TipoPunto } from './PuertosData';
+import { tipoDePunto } from './PuertosData';
 
 /**
  * Selector de puerto para origen/destino de un servicio (D.3 de la ficha).
@@ -29,13 +30,18 @@ interface Props {
   onChange: (texto: string, puertoId: string | null) => void;
   readOnly?: boolean;
   placeholder?: string;
+  /**
+   * Filtra el catálogo por tipo de punto: la modalidad aérea ofrece
+   * aeropuertos, la marítima puertos. Sin filtro se ofrece todo (legacy).
+   */
+  tipo?: TipoPunto;
 }
 
 const norm = (s: string) =>
   s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 
 export default function PuertoSelector({
-  puertos, valor, puertoId, onChange, readOnly, placeholder = 'Elegir puerto…',
+  puertos, valor, puertoId, onChange, readOnly, placeholder = 'Elegir puerto…', tipo,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -84,7 +90,8 @@ export default function PuertoSelector({
    * puerto mexicano — y alfabético dentro de cada grupo.
    */
   const visibles = useMemo(() => {
-    const activos = puertos.filter(p => p.activo !== false);
+    const activos = puertos.filter(p =>
+      p.activo !== false && (!tipo || tipoDePunto(p) === tipo));
     const q = norm(search);
     if (!q) {
       return [...activos].sort((a, b) => {
@@ -103,7 +110,7 @@ export default function PuertoSelector({
     return activos
       .filter(p => rango(p) < 3)
       .sort((a, b) => rango(a) - rango(b) || a.nombre.localeCompare(b.nombre, 'es'));
-  }, [puertos, search]);
+  }, [puertos, search, tipo]);
 
   const elegido = puertoId ? puertos.find(p => p.id === puertoId) : null;
   const esTextoLibre = !!valor && !elegido;

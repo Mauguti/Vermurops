@@ -610,7 +610,11 @@ export default function Quotes() {
           id: servicioId,
           tipo: modalidadDeCarga(d.carga) as TipoServicio,
           carga: d.carga,
-          conceptosRequeridos: d.conceptosRequeridos,
+          // Renglones sin concepto elegido se descartan; el filaId es del
+          // formulario y no viaja a Firestore.
+          conceptosRequeridos: d.conceptosRequeridos
+            .filter(r => r.conceptoId)
+            .map(({ conceptoId, nombre }) => ({ conceptoId, nombre })),
           ruta: {
             origen: d.origen || 'Por definir',
             destino: d.destino || 'Por definir',
@@ -627,7 +631,7 @@ export default function Quotes() {
           profit: 0,
           cotizacionesProveedor: [],
           // Lo que Ventas señaló nace como líneas en cero: Pricing decide.
-          conceptos: precargarConceptos(servicioId, d.conceptosRequeridos),
+          conceptos: precargarConceptos(servicioId, d.conceptosRequeridos.filter(r => r.conceptoId)),
           ...(trafico ? { trafico } : {}),
         };
       }),

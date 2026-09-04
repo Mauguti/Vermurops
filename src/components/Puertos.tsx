@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Search, Pencil, Anchor } from 'lucide-react';
 import { usePuertos } from '../hooks/usePuertos';
-import { PuertoVermur } from './puertos/PuertosData';
+import { PuertoVermur, TipoPunto, ETIQUETA_TIPO_PUNTO, tipoDePunto } from './puertos/PuertosData';
 import PuertoFormModal from './puertos/PuertoFormModal';
 import { useAuth } from '../auth/AuthContext';
 
@@ -14,6 +14,8 @@ export default function Puertos() {
 
   const [search, setSearch] = useState('');
   const [filterPais, setFilterPais] = useState('');
+  /** '' = todos. Puertos, aeropuertos y puntos terrestres en una pantalla. */
+  const [filterTipo, setFilterTipo] = useState<TipoPunto | ''>('');
   const [showInactivos, setShowInactivos] = useState(false);
   const [modal, setModal] = useState<{ mode: 'crear' | 'editar'; puerto?: PuertoVermur } | null>(null);
 
@@ -26,6 +28,7 @@ export default function Puertos() {
   const filtered = useMemo(() => {
     let list = puertos;
     if (!showInactivos) list = list.filter(p => p.activo);
+    if (filterTipo) list = list.filter(p => tipoDePunto(p) === filterTipo);
     if (filterPais) list = list.filter(p => p.pais === filterPais);
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -36,7 +39,7 @@ export default function Puertos() {
       );
     }
     return list;
-  }, [puertos, search, filterPais, showInactivos]);
+  }, [puertos, search, filterTipo, filterPais, showInactivos]);
 
   if (loading) {
     return (
@@ -59,9 +62,9 @@ export default function Puertos() {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-[20px] font-bold text-text-primary">Catálogo de puertos</h2>
+          <h2 className="text-[20px] font-bold text-text-primary">Puertos y aeropuertos</h2>
           <p className="text-[13px] text-text-muted mt-1">
-            {filtered.length} puerto{filtered.length !== 1 ? 's' : ''} · {puertos.filter(p => p.activo).length} activos
+            {filtered.length} punto{filtered.length !== 1 ? 's' : ''} de origen/destino · {puertos.filter(p => p.activo).length} activos
           </p>
         </div>
         {puedeAltaPuerto && (
@@ -70,9 +73,26 @@ export default function Puertos() {
             className="flex items-center gap-2 bg-brand text-white px-4 py-2 rounded-[8px] text-[13px] font-medium hover:bg-brand-hover transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
-            Nuevo puerto
+            Nuevo punto
           </button>
         )}
+      </div>
+
+      {/* ── Filtro por tipo de punto ───────────────────────────────────────── */}
+      <div className="flex items-center gap-1.5">
+        {([['', 'Todos'], ['maritimo', 'Marítimos'], ['aereo', 'Aeropuertos'], ['terrestre', 'Terrestres']] as [TipoPunto | '', string][]).map(([v, l]) => (
+          <button
+            key={v || 'todos'}
+            onClick={() => setFilterTipo(v)}
+            className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
+              filterTipo === v
+                ? 'bg-brand text-white'
+                : 'bg-white border border-card-border text-text-secondary hover:border-brand/50'
+            }`}
+          >
+            {l}
+          </button>
+        ))}
       </div>
 
       {/* ── Filters ────────────────────────────────────────────────────────── */}
@@ -113,6 +133,7 @@ export default function Puertos() {
               <tr className="border-b border-divider bg-neutral-bg">
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Código</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Puerto</th>
+                <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Tipo</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">País</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">ISO</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Terminales</th>
@@ -123,7 +144,7 @@ export default function Puertos() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center">
+                  <td colSpan={8} className="px-4 py-12 text-center">
                     <Anchor className="w-8 h-8 text-text-muted mx-auto mb-3" />
                     <p className="text-[13px] text-text-muted">
                       {search || filterPais ? 'Sin resultados para los filtros aplicados.' : 'No hay puertos en el catálogo.'}
@@ -139,6 +160,7 @@ export default function Puertos() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-[13px] font-medium text-text-primary">{p.nombre}</td>
+                    <td className="px-4 py-3 text-[12px] text-text-secondary">{ETIQUETA_TIPO_PUNTO[tipoDePunto(p)]}</td>
                     <td className="px-4 py-3 text-[13px] text-text-secondary">{p.pais}</td>
                     <td className="px-4 py-3 text-[12px] text-text-muted font-mono">{p.codigoPais}</td>
                     <td className="px-4 py-3 text-[12px] text-text-muted">

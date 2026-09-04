@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
-import { PuertoVermur, Terminal } from './PuertosData';
+import { PuertoVermur, Terminal, TipoPunto, ETIQUETA_TIPO_PUNTO, tipoDePunto } from './PuertosData';
 
 interface Props {
   mode: 'crear' | 'editar';
@@ -26,6 +26,9 @@ export default function PuertoFormModal({ mode, puerto, onClose, onCreate, onUpd
   const [codigoPais, setCodigoPais] = useState(puerto?.codigoPais ?? '');
   const [terminales, setTerminales] = useState<Terminal[]>(puerto?.terminales ?? []);
   const [activo, setActivo] = useState(puerto?.activo ?? true);
+  // tipoDePunto y no puerto?.tipo: los 21 puertos originales no traen el
+  // campo y son marítimos — editarlos no debe dejar el select vacío.
+  const [tipo, setTipo] = useState<TipoPunto>(puerto ? tipoDePunto(puerto) : 'maritimo');
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -48,6 +51,7 @@ export default function PuertoFormModal({ mode, puerto, onClose, onCreate, onUpd
 
       if (isEdit && onUpdate) {
         await onUpdate(puerto.id, {
+          tipo,
           codigo: codigo.trim().toUpperCase(),
           nombre: nombre.trim(),
           pais: pais.trim(),
@@ -59,6 +63,7 @@ export default function PuertoFormModal({ mode, puerto, onClose, onCreate, onUpd
       } else if (onCreate) {
         const nuevo: PuertoVermur = {
           id: `PTO-${Date.now()}`,
+          tipo,
           codigo: codigo.trim().toUpperCase(),
           nombre: nombre.trim(),
           pais: pais.trim(),
@@ -83,7 +88,7 @@ export default function PuertoFormModal({ mode, puerto, onClose, onCreate, onUpd
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-divider shrink-0">
           <h3 className="text-[15px] font-semibold text-text-primary">
-            {isEdit ? 'Editar puerto' : 'Nuevo puerto'}
+            {isEdit ? 'Editar punto' : 'Nuevo punto de origen/destino'}
           </h3>
           <button onClick={onClose} className="p-1 rounded-lg text-text-muted hover:text-text-primary hover:bg-neutral-bg transition-colors">
             <X className="w-4 h-4" />
@@ -92,6 +97,26 @@ export default function PuertoFormModal({ mode, puerto, onClose, onCreate, onUpd
 
         {/* Body */}
         <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
+          <div>
+            <label className={LABEL}>Tipo de punto *</label>
+            <div className="flex gap-1.5">
+              {(Object.keys(ETIQUETA_TIPO_PUNTO) as TipoPunto[]).map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTipo(t)}
+                  className={`px-3 py-1.5 rounded-full text-[12px] font-semibold transition-colors ${
+                    tipo === t
+                      ? 'bg-brand text-white'
+                      : 'bg-white border border-card-border text-text-secondary hover:border-brand/50'
+                  }`}
+                >
+                  {ETIQUETA_TIPO_PUNTO[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={LABEL}>Código *</label>

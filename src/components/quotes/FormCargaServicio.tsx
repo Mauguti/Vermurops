@@ -229,6 +229,11 @@ function BloqueMercancias({ mercancias, onCambio }: {
  * Requerimientos: Ventas señala del catálogo REAL de conceptos qué necesita
  * el cliente. Sin precios ni proveedores — eso lo decide Pricing en la ficha,
  * donde estas líneas aparecen precargadas.
+ *
+ * Mismo patrón que la tabla de conceptos: «+ Agregar concepto» crea un
+ * renglón con su ConceptoSelector, y el renglón se quita con su bote. Que
+ * Ventas y Pricing hagan lo mismo de la misma forma. Un renglón sin concepto
+ * elegido es un pendiente visible; al enviar se descartan los vacíos.
  */
 function BloqueRequeridos({ requeridos, conceptos, onCambio }: {
   requeridos: ConceptoRequerido[];
@@ -238,27 +243,32 @@ function BloqueRequeridos({ requeridos, conceptos, onCambio }: {
   return (
     <div className="border-t border-gray-100 pt-3">
       <label className={LBL}>Servicios requeridos — del catálogo</label>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {requeridos.map(r => (
-          <span key={r.conceptoId}
-            className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-700 bg-gray-100 border border-gray-200 rounded-full pl-2.5 pr-1 py-1">
-            {r.nombre}
-            <button type="button" className="text-gray-400 hover:text-red-500 p-0.5"
-              onClick={() => onCambio(requeridos.filter(x => x.conceptoId !== r.conceptoId))}>
-              <X className="w-3 h-3" />
+      <div className="space-y-1.5">
+        {requeridos.map((r, i) => (
+          <div key={r.filaId} className="flex items-center gap-2">
+            <div className="flex-1 max-w-[340px]">
+              <ConceptoSelector
+                selectedNombre={r.nombre || null}
+                conceptos={conceptos}
+                onSelect={(conceptoId, nombre) => {
+                  // El mismo concepto no se señala dos veces.
+                  if (requeridos.some((x, j) => j !== i && x.conceptoId === conceptoId)) return;
+                  onCambio(requeridos.map((x, j) => j === i ? { ...x, conceptoId, nombre } : x));
+                }}
+              />
+            </div>
+            <button type="button" className="text-gray-300 hover:text-red-500 p-1" title="Quitar"
+              onClick={() => onCambio(requeridos.filter((_, j) => j !== i))}>
+              <Trash2 className="w-3.5 h-3.5" />
             </button>
-          </span>
+          </div>
         ))}
-        <ConceptoSelector
-          selectedNombre={null}
-          conceptos={conceptos}
-          onSelect={(conceptoId, nombre) => {
-            if (!requeridos.some(r => r.conceptoId === conceptoId)) {
-              onCambio([...requeridos, { conceptoId, nombre }]);
-            }
-          }}
-        />
       </div>
+      <button type="button"
+        className="mt-1.5 flex items-center gap-1 text-[10px] font-bold text-[#E11D48] hover:text-[#BE123C]"
+        onClick={() => onCambio([...requeridos, { filaId: idUnico('req'), conceptoId: '', nombre: '' }])}>
+        <Plus className="w-3 h-3" /> Agregar concepto
+      </button>
       <p className="text-[9px] text-gray-400 mt-1.5">
         Señala qué se necesita; Pricing decide conceptos y precios en la ficha.
       </p>
@@ -342,24 +352,26 @@ export default function FormCargaServicio({
       {esMaritimo && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Campo label="Puerto de origen (POL)">
-            <PuertoSelector puertos={puertos} valor={draft.origen} puertoId={draft.origenPuertoId}
+            <PuertoSelector puertos={puertos} tipo="maritimo" valor={draft.origen} puertoId={draft.origenPuertoId}
               onChange={handlePuerto('origen')} placeholder="Elegir del catálogo…" />
           </Campo>
           <Campo label="Puerto de destino (POD)">
-            <PuertoSelector puertos={puertos} valor={draft.destino} puertoId={draft.destinoPuertoId}
+            <PuertoSelector puertos={puertos} tipo="maritimo" valor={draft.destino} puertoId={draft.destinoPuertoId}
               onChange={handlePuerto('destino')} placeholder="Elegir del catálogo…" />
           </Campo>
         </div>
       )}
       {modalidad === 'aereo' && (
+        /* Un aeropuerto también sabe su país: Frankfurt → Monterrey se
+           declara importación igual que con los puertos. */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <Campo label="Aeropuerto de origen">
-            <input type="text" placeholder="Ej. PVG Shanghai" value={draft.origen} className={INP}
-              onChange={e => onCambio({ ...draft, origen: e.target.value, origenPuertoId: null })} />
+            <PuertoSelector puertos={puertos} tipo="aereo" valor={draft.origen} puertoId={draft.origenPuertoId}
+              onChange={handlePuerto('origen')} placeholder="Elegir aeropuerto…" />
           </Campo>
           <Campo label="Aeropuerto de destino">
-            <input type="text" placeholder="Ej. MEX CDMX" value={draft.destino} className={INP}
-              onChange={e => onCambio({ ...draft, destino: e.target.value, destinoPuertoId: null })} />
+            <PuertoSelector puertos={puertos} tipo="aereo" valor={draft.destino} puertoId={draft.destinoPuertoId}
+              onChange={handlePuerto('destino')} placeholder="Elegir aeropuerto…" />
           </Campo>
         </div>
       )}

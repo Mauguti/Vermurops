@@ -16,6 +16,27 @@ export interface Terminal {
   nombre: string;
 }
 
+// ─── Tipo de punto ──────────────────────────────────────────────────────────
+
+/**
+ * El catálogo dejó de ser solo marítimo (sep-2026): es un catálogo de PUNTOS
+ * de origen y destino. El aéreo llega a aeropuerto, no a puerto, y el
+ * formulario de solicitud filtra por el tipo que corresponde a la modalidad.
+ */
+export type TipoPunto = 'maritimo' | 'aereo' | 'terrestre';
+
+export const ETIQUETA_TIPO_PUNTO: Record<TipoPunto, string> = {
+  maritimo: 'Puerto marítimo',
+  aereo: 'Aeropuerto',
+  terrestre: 'Punto terrestre',
+};
+
+/**
+ * ⚠ Backward compat: los 21 puertos originales no tienen `tipo` y son todos
+ * marítimos. Leer SIEMPRE por esta función, nunca por `p.tipo` directo.
+ */
+export const tipoDePunto = (p: Pick<PuertoVermur, 'tipo'>): TipoPunto => p.tipo ?? 'maritimo';
+
 // ─── Entidad principal ──────────────────────────────────────────────────────
 
 export interface PuertoVermur {
@@ -39,6 +60,9 @@ export interface PuertoVermur {
    * Array embebido en el documento, mismo patrón que contactos de proveedor.
    */
   terminales: Terminal[];
+
+  /** Tipo de punto. Ausente = marítimo (legacy). Leer con tipoDePunto(). */
+  tipo?: TipoPunto;
 
   /** Baja lógica: los inactivos no aparecen en dropdowns. */
   activo: boolean;
@@ -89,4 +113,41 @@ export const initialPuertos: PuertoVermur[] = [
 
   // ── Frontera terrestre (Laredo — incluido como punto de referencia) ────
   { id: 'PTO-021', codigo: 'LRD',   nombre: 'Laredo',           pais: 'Estados Unidos', codigoPais: 'USA', terminales: [], activo: true,  fechaAlta: SEED_FECHA, updatedAt: SEED_TS },
+];
+
+// ─── Seed de aeropuertos (sep-2026) ─────────────────────────────────────────
+// Los que Vermur usa con más frecuencia, por código IATA. Ids fijos PTO-Ann
+// para que la siembra aditiva sea idempotente: volver a escribirlos no crea
+// duplicados. Si falta alguno, Administración lo agrega desde Configuración.
+
+const SEED_AEREO_FECHA = '2026-09-04';
+const SEED_AEREO_TS = '2026-09-04T00:00:00.000Z';
+
+export const initialAeropuertos: PuertoVermur[] = [
+  { id: 'PTO-A01', codigo: 'MEX', nombre: 'Ciudad de México', pais: 'México', codigoPais: 'MEX', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A02', codigo: 'GDL', nombre: 'Guadalajara', pais: 'México', codigoPais: 'MEX', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A03', codigo: 'MTY', nombre: 'Monterrey', pais: 'México', codigoPais: 'MEX', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A04', codigo: 'QRO', nombre: 'Querétaro', pais: 'México', codigoPais: 'MEX', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A05', codigo: 'TIJ', nombre: 'Tijuana', pais: 'México', codigoPais: 'MEX', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A06', codigo: 'BJX', nombre: 'Bajío (León)', pais: 'México', codigoPais: 'MEX', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A07', codigo: 'CUN', nombre: 'Cancún', pais: 'México', codigoPais: 'MEX', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A08', codigo: 'NLU', nombre: 'Felipe Ángeles (CDMX)', pais: 'México', codigoPais: 'MEX', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A09', codigo: 'LAX', nombre: 'Los Ángeles', pais: 'Estados Unidos', codigoPais: 'USA', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A10', codigo: 'JFK', nombre: 'Nueva York JFK', pais: 'Estados Unidos', codigoPais: 'USA', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A11', codigo: 'MIA', nombre: 'Miami', pais: 'Estados Unidos', codigoPais: 'USA', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A12', codigo: 'ORD', nombre: 'Chicago O\'Hare', pais: 'Estados Unidos', codigoPais: 'USA', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A13', codigo: 'DFW', nombre: 'Dallas-Fort Worth', pais: 'Estados Unidos', codigoPais: 'USA', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A14', codigo: 'IAH', nombre: 'Houston', pais: 'Estados Unidos', codigoPais: 'USA', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A15', codigo: 'ATL', nombre: 'Atlanta', pais: 'Estados Unidos', codigoPais: 'USA', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A16', codigo: 'FRA', nombre: 'Frankfurt', pais: 'Alemania', codigoPais: 'DEU', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A17', codigo: 'AMS', nombre: 'Ámsterdam', pais: 'Países Bajos', codigoPais: 'NLD', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A18', codigo: 'CDG', nombre: 'París Charles de Gaulle', pais: 'Francia', codigoPais: 'FRA', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A19', codigo: 'MAD', nombre: 'Madrid', pais: 'España', codigoPais: 'ESP', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A20', codigo: 'LHR', nombre: 'Londres Heathrow', pais: 'Reino Unido', codigoPais: 'GBR', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A21', codigo: 'PVG', nombre: 'Shanghái Pudong', pais: 'China', codigoPais: 'CHN', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A22', codigo: 'HKG', nombre: 'Hong Kong', pais: 'Hong Kong', codigoPais: 'HKG', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A23', codigo: 'ICN', nombre: 'Seúl Incheon', pais: 'Corea del Sur', codigoPais: 'KOR', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A24', codigo: 'NRT', nombre: 'Tokio Narita', pais: 'Japón', codigoPais: 'JPN', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A25', codigo: 'TPE', nombre: 'Taipéi Taoyuan', pais: 'Taiwán', codigoPais: 'TWN', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
+  { id: 'PTO-A26', codigo: 'SIN', nombre: 'Singapur Changi', pais: 'Singapur', codigoPais: 'SGP', tipo: 'aereo', terminales: [], activo: true, fechaAlta: SEED_AEREO_FECHA, updatedAt: SEED_AEREO_TS },
 ];

@@ -188,6 +188,12 @@ export type CargaSolicitada = CargaFCL | CargaLCL | CargaAerea | CargaTerrestre 
 export interface ConceptoRequerido {
   conceptoId: string;
   nombre: string;
+  /**
+   * Identidad del renglón MIENTRAS se captura (un renglón recién agregado
+   * aún no tiene concepto). Se descarta al guardar: en Firestore la
+   * identidad es el conceptoId.
+   */
+  filaId?: string;
 }
 
 // ------------------------------------------------------------

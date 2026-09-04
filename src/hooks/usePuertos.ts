@@ -14,7 +14,7 @@ import { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, setDoc, updateDoc, getDocsFromServer } from 'firebase/firestore';
 import { evaluarSeed } from '../lib/seedGuard';
-import { PuertoVermur, initialPuertos } from '../components/puertos/PuertosData';
+import { PuertoVermur, initialPuertos, initialAeropuertos } from '../components/puertos/PuertosData';
 import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
@@ -30,6 +30,8 @@ export function usePuertos() {
 
   // Evita que el seed corra más de una vez por sesión de usuario.
   const seedAttempted = useRef(false);
+  /** Idem para la siembra aditiva de aeropuertos. */
+  const aeroSeedAttempted = useRef(false);
 
   useEffect(() => {
     if (!user) {
@@ -58,7 +60,7 @@ export function usePuertos() {
             }
 
             await conAviso('los puertos iniciales', () => Promise.all(
-              initialPuertos.map(p =>
+              [...initialPuertos, ...initialAeropuertos].map(p =>
                 setDoc(doc(db, 'puertos', p.id), sanitizarParaFirestore(p))
               )
             ));
@@ -72,6 +74,28 @@ export function usePuertos() {
 
         // Snapshot que no autoriza sembrar: se pinta tal cual. Si venía de
         // caché, el snapshot del servidor llegará después y volverá a evaluar.
+
+        /*
+         * ── Siembra ADITIVA de aeropuertos (sep-2026) ─────────────────────
+         * La colección ya existía con los 21 puertos marítimos cuando el
+         * catálogo se volvió de «puntos», así que el seed de arriba (solo
+         * corre en colección VACÍA) nunca agregaría los aeropuertos en
+         * producción. Aquí se completan los que falten, una vez por sesión:
+         * ids fijos PTO-Ann → setDoc idempotente, y solo sobre un snapshot
+         * del servidor — uno de caché no prueba ausencia.
+         */
+        if (!snapshot.metadata.fromCache && !aeroSeedAttempted.current) {
+          const existentes = new Set(snapshot.docs.map(d => d.id));
+          const faltantes = initialAeropuertos.filter(a => !existentes.has(a.id));
+          if (faltantes.length > 0 && !snapshot.empty) {
+            aeroSeedAttempted.current = true;
+            conAviso('los aeropuertos iniciales', () => Promise.all(
+              faltantes.map(a =>
+                setDoc(doc(db, 'puertos', a.id), sanitizarParaFirestore(a))
+              )
+            )).catch(() => { /* conAviso ya reportó; el catálogo sigue usable */ });
+          }
+        }
 
         // ── Snapshot con datos (normal o post-seed) ───────────────────────
         const data: PuertoVermur[] = [];
