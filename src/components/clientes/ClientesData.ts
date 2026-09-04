@@ -135,6 +135,14 @@ export interface ClienteVermur {
 
   // ── Sub-objetos KYC ───────────────────────────────────────────────────────
   docsAlta?: DocsAlta;
+  /**
+   * Expediente digital (D-2): un documento por tipo, como mapa — es un
+   * checklist, no un archivero. Re-subir un tipo reemplaza la referencia; el
+   * archivo anterior persiste en Storage como historial. Al guardar un doc,
+   * su booleano de docsAlta se ENCIENDE (nunca se apaga: un físico marcado a
+   * mano sigue valiendo). Ver lib/clasificacionDocumentos.ts.
+   */
+  expediente?: import('../../lib/clasificacionDocumentos').ExpedienteCliente;
   contrato?: ContratoCliente;
   pagare?: PagareCliente;
 }

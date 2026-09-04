@@ -47,6 +47,7 @@ const docCargado = (estado: DocExpediente['estado'] = 'cargado'): DocExpediente 
   nombre: 'Acta constitutiva Siemens',
   nombreOriginal: 'IMG.jpg',
   storagePath: 'expedientes/CLI-1/acta.jpg',
+  url: 'https://storage/acta.jpg',
   confianza: 'alta',
   estado,
   datos: {},
@@ -269,5 +270,41 @@ describe('precargaFacturaProveedor y cotejo con la OC', () => {
     const r = cotejarTotalConOC(p, { monto: 5000, moneda: 'MXN' });
     expect(r.coincide).toBe(false);
     expect(r.mensaje).toContain('a mano');
+  });
+});
+
+// ─── G · Adopción de datos en la ficha ───────────────────────────────────────
+
+import { camposAdoptablesExpediente } from './clasificacionDocumentos';
+
+describe('camposAdoptablesExpediente — nada se adopta en automático', () => {
+  const clasif = {
+    rfc: 'SIE840101AAA',
+    datos: { representanteLegal: 'Juan Pérez', domicilio: 'Av. Reforma 100', codigoPostal: '06600' },
+  };
+
+  it('ofrece solo los campos que el documento trae', () => {
+    const campos = camposAdoptablesExpediente({ rfc: '', datos: { domicilio: 'Av. Reforma 100' } }, {});
+    expect(campos.map(c => c.campo)).toEqual(['domicilio']);
+  });
+
+  it('campo vacío en la ficha → adoptable sin conflicto', () => {
+    const campos = camposAdoptablesExpediente(clasif, { rfc: '' });
+    const rfc = campos.find(c => c.campo === 'rfc')!;
+    expect(rfc.enConflicto).toBe(false);
+    expect(rfc.valorDocumento).toBe('SIE840101AAA');
+  });
+
+  it('la ficha ya dice OTRA cosa → lado a lado, marcado en conflicto', () => {
+    const campos = camposAdoptablesExpediente(clasif, { representante: 'Pedro Gómez' });
+    const rep = campos.find(c => c.campo === 'representante')!;
+    expect(rep.enConflicto).toBe(true);
+    expect(rep.valorActual).toBe('Pedro Gómez');
+    expect(rep.valorDocumento).toBe('Juan Pérez');
+  });
+
+  it('mismo valor → no hay nada que adoptar (RFC ignora mayúsculas)', () => {
+    const campos = camposAdoptablesExpediente(clasif, { rfc: 'sie840101aaa', domicilio: 'Av. Reforma 100' });
+    expect(campos.map(c => c.campo)).toEqual(['representante', 'codigoPostal']);
   });
 });

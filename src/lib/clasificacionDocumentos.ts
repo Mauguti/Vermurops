@@ -299,6 +299,8 @@ export interface DocExpediente {
   nombre: string;
   nombreOriginal: string;
   storagePath: string;
+  /** URL de descarga de Storage, para abrir el documento desde la ficha. */
+  url: string;
   confianza: NivelConfianza;
   estado: EstadoDocumento;
   datos: Record<string, unknown>;
@@ -319,7 +321,7 @@ export function estadoChecklist(
   return doc.estado === 'con_observaciones' ? 'con_observaciones' : 'cargado';
 }
 
-const TIPO_A_DOCSALTA: Record<TipoDocExpediente, keyof DocsAlta> = {
+export const TIPO_A_DOCSALTA: Record<TipoDocExpediente, keyof DocsAlta> = {
   acta_constitutiva: 'acta',
   poder_notarial: 'poder',
   identificacion_oficial: 'identificacion',
@@ -410,4 +412,57 @@ export function cotejarTotalConOC(
     coincide: false,
     mensaje: `El total de la factura (${oc.moneda} ${fmt(factura.total)}) no coincide con el de la orden de compra (${oc.moneda} ${fmt(oc.monto)}).`,
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8 · Adopción de datos extraídos en la ficha del cliente (D-2)
+//
+// La constancia trae el RFC y el domicilio; el acta trae al representante.
+// Son justo los campos de la ficha — pero NADA se adopta en automático: cada
+// campo se ofrece con confirmación explícita, y si la ficha ya tiene otro
+// valor, se muestran lado a lado para que el usuario decida cuál es el bueno.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CampoAdoptable {
+  /** Campo de ClienteVermur donde escribiría. */
+  campo: 'rfc' | 'representante' | 'domicilio' | 'codigoPostal';
+  etiqueta: string;
+  valorDocumento: string;
+  /** Lo que la ficha tiene hoy. Vacío si no hay nada. */
+  valorActual: string;
+  /** true = la ficha ya dice OTRA cosa: mostrar lado a lado, no precargar. */
+  enConflicto: boolean;
+}
+
+/**
+ * Cruza lo extraído contra la ficha. Solo ofrece campos donde el documento
+ * trae algo; si la ficha ya tiene el mismo valor, no hay nada que adoptar.
+ */
+export function camposAdoptablesExpediente(
+  clasificacion: Pick<ClasificacionValidada, 'rfc' | 'datos'>,
+  cliente: { rfc?: string; representante?: string; domicilio?: string; codigoPostal?: string | null },
+): CampoAdoptable[] {
+  const candidatos: { campo: CampoAdoptable['campo']; etiqueta: string; valorDocumento: string }[] = [
+    { campo: 'rfc', etiqueta: 'RFC', valorDocumento: clasificacion.rfc },
+    { campo: 'representante', etiqueta: 'Representante legal', valorDocumento: texto(clasificacion.datos.representanteLegal) },
+    { campo: 'domicilio', etiqueta: 'Domicilio fiscal', valorDocumento: texto(clasificacion.datos.domicilio) },
+    { campo: 'codigoPostal', etiqueta: 'Código postal', valorDocumento: texto(clasificacion.datos.codigoPostal) },
+  ];
+
+  const resultado: CampoAdoptable[] = [];
+  for (const c of candidatos) {
+    if (!c.valorDocumento) continue;
+    const valorActual = (cliente[c.campo] ?? '').trim();
+    // Mismo valor (RFC compara sin mayúsculas/minúsculas): nada que adoptar.
+    const iguales = c.campo === 'rfc'
+      ? valorActual.toUpperCase() === c.valorDocumento.toUpperCase()
+      : valorActual === c.valorDocumento;
+    if (iguales) continue;
+    resultado.push({
+      ...c,
+      valorActual,
+      enConflicto: valorActual !== '',
+    });
+  }
+  return resultado;
 }

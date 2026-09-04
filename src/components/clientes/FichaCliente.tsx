@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ClienteVermur, DocsAlta, ContratoCliente, PagareCliente } from './ClientesData';
 import { validarRFC } from '../../lib/validadores';
-import { ChevronRight, Loader2, Check } from 'lucide-react';
+import { ChevronRight, Loader2, Check, Upload, AlertTriangle } from 'lucide-react';
+import {
+  DOCUMENTOS_EXPEDIENTE, TIPO_A_DOCSALTA, estadoChecklist, validarClasificacion,
+  camposAdoptablesExpediente, etiquetaDocExpediente, traducirAviso,
+  type TipoDocExpediente, type DocExpediente, type ClasificacionValidada,
+} from '../../lib/clasificacionDocumentos';
+import { useExpedienteCliente, type ArchivoSubido } from '../../hooks/useExpedienteCliente';
+import RevisionDocumentoClasificado, { EnlaceArchivo, type RevisionConfirmada } from '../documentos/RevisionDocumentoClasificado';
 import { FichaHeader, BadgeEstado } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import { useCotizaciones } from '../../hooks/useCotizaciones';
@@ -123,6 +130,76 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
     setDraft(withDefaults(cliente));
     setRfcError('');
   }, [cliente]);
+
+  /*
+   * ── Expediente digital (D-2) ────────────────────────────────────────────
+   * Subir → clasificar con IA → REVISIÓN → guardar. La revisión es la
+   * frontera: nada de lo que propone n8n toca Firestore sin confirmarse ahí.
+   */
+  const { procesando, subirYClasificar, guardarDocumento } = useExpedienteCliente();
+  const inputArchivo = useRef<HTMLInputElement>(null);
+  const [tipoSubiendo, setTipoSubiendo] = useState<TipoDocExpediente | null>(null);
+  const [errorExpediente, setErrorExpediente] = useState('');
+  const [guardandoDoc, setGuardandoDoc] = useState(false);
+  const [revision, setRevision] = useState<{
+    archivo: ArchivoSubido;
+    clasificacion: ClasificacionValidada;
+    tipoEsperado: TipoDocExpediente;
+  } | null>(null);
+
+  const pedirArchivo = (tipo: TipoDocExpediente) => {
+    setTipoSubiendo(tipo);
+    setErrorExpediente('');
+    inputArchivo.current?.click();
+  };
+
+  const handleArchivoExpediente = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // permite re-elegir el mismo archivo
+    if (!file || !tipoSubiendo) return;
+    try {
+      const archivo = await subirYClasificar(file, cliente, tipoSubiendo);
+      const resultado = validarClasificacion(archivo.clasificacion);
+      if (!resultado.valida || !resultado.datos) {
+        setErrorExpediente(resultado.motivo ?? 'El clasificador devolvió una respuesta ilegible.');
+        return;
+      }
+      setRevision({ archivo, clasificacion: resultado.datos, tipoEsperado: tipoSubiendo });
+    } catch (err) {
+      setErrorExpediente(err instanceof Error ? err.message : 'No se pudo procesar el documento.');
+    }
+  };
+
+  const handleGuardarRevision = async (r: RevisionConfirmada) => {
+    if (!revision) return;
+    setGuardandoDoc(true);
+    try {
+      const documento: DocExpediente = {
+        nombre: r.nombre,
+        nombreOriginal: revision.archivo.nombreOriginal,
+        storagePath: revision.archivo.storagePath,
+        url: revision.archivo.url,
+        confianza: revision.clasificacion.confianza,
+        estado: r.estado,
+        datos: revision.clasificacion.datos,
+        avisos: revision.clasificacion.avisos,
+        observaciones: revision.clasificacion.observaciones || undefined,
+        subidoPor: '',
+        fechaSubida: new Date().toISOString(),
+      };
+      await guardarDocumento(
+        cliente,
+        r.tipoConfirmado as TipoDocExpediente,
+        documento,
+        r.adoptados,
+      );
+      setRevision(null);
+    } catch (err) {
+      setErrorExpediente(err instanceof Error ? err.message : 'No se pudo guardar el documento.');
+    } finally {
+      setGuardandoDoc(false);
+    }
+  };
 
   // ¿El usuario modificó el RFC respecto al valor guardado? Solo entonces se valida
   // (backward compat: RFCs heredados intactos nunca bloquean el guardado).
@@ -407,43 +484,126 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
           {/* ── Expediente ─────────────────────────────────────────────────── */}
           {tab === 'expediente' && (
             <div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                <div>
-                  <p className={LABEL}>Documentos de alta (KYC)</p>
-                  <div className="space-y-3 mt-2">
-                    {docsFields.map(([k, label]) => {
-                      const checked = draft.docsAlta[k];
-                      return (
-                        <label key={k} className="flex items-center gap-3 cursor-pointer group">
-                          <div
-                            onClick={() => setDraft(prev => ({
-                              ...prev,
-                              docsAlta: { ...prev.docsAlta, [k]: !prev.docsAlta[k] },
-                            }))}
-                            className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                              checked ? 'bg-brand border-brand' : 'border-card-border group-hover:border-brand/50'
-                            }`}
-                          >
-                            {checked && <Check className="w-3 h-3 text-white" />}
-                          </div>
-                          <span className={`text-[13px] ${checked ? 'text-text-primary' : 'text-text-secondary'}`}>{label}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
+              {/* input oculto compartido por las 6 tarjetas */}
+              <input
+                ref={inputArchivo}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls,.csv,.eml,.msg"
+                className="hidden"
+                onChange={handleArchivoExpediente}
+              />
 
-                <div>
-                  <p className={LABEL}>Expediente en Drive</p>
-                  <div className="mt-2">
-                    <BoolCheck
-                      checked={draft.expedienteDrive}
-                      label="Carpeta creada en Google Drive"
-                      onToggle={() => set('expedienteDrive', !draft.expedienteDrive)}
-                    />
-                  </div>
+              {errorExpediente && (
+                <div className="mb-4 border border-red-200 bg-red-50 rounded-lg px-3 py-2.5 flex items-start gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-red-600" />
+                  <p className="text-[12px] text-red-700">{errorExpediente}</p>
+                </div>
+              )}
+
+              <p className={LABEL}>Documentos de alta (KYC)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                {DOCUMENTOS_EXPEDIENTE.map(({ tipo, etiqueta }) => {
+                  const docGuardado = draft.expediente?.[tipo];
+                  const estado = estadoChecklist(draft.expediente, tipo);
+                  const claveManual = TIPO_A_DOCSALTA[tipo];
+                  const marcadoAMano = !docGuardado && draft.docsAlta[claveManual];
+                  const subiendoEste = procesando && tipoSubiendo === tipo;
+                  return (
+                    <div
+                      key={tipo}
+                      className={`border rounded-lg px-3.5 py-3 ${
+                        estado === 'con_observaciones'
+                          ? 'border-amber-300 bg-amber-50/40'
+                          : estado === 'cargado' || marcadoAMano
+                            ? 'border-emerald-200 bg-emerald-50/30'
+                            : 'border-card-border'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-[12px] font-semibold text-text-primary">{etiqueta}</p>
+                          {docGuardado ? (
+                            <div className="mt-1 space-y-0.5">
+                              <EnlaceArchivo url={docGuardado.url} nombre={docGuardado.nombre} />
+                              <p className="text-[10px] text-text-muted">
+                                {docGuardado.fechaSubida.slice(0, 10)}
+                                {docGuardado.subidoPor && ` · ${docGuardado.subidoPor}`}
+                              </p>
+                              {docGuardado.avisos.map(a => (
+                                <p key={a} className="text-[10px] text-amber-700 flex items-start gap-1">
+                                  <AlertTriangle className="w-3 h-3 mt-px shrink-0" />
+                                  {traducirAviso(a)}
+                                </p>
+                              ))}
+                            </div>
+                          ) : marcadoAMano ? (
+                            <p className="text-[10px] text-text-muted mt-1">
+                              Marcado como entregado (sin archivo digital).
+                            </p>
+                          ) : (
+                            <p className="text-[10px] text-text-muted mt-1">Pendiente</p>
+                          )}
+                        </div>
+                        <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                          estado === 'con_observaciones'
+                            ? 'bg-amber-100 text-amber-800'
+                            : estado === 'cargado' || marcadoAMano
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {estado === 'con_observaciones' ? 'Observaciones'
+                            : estado === 'cargado' ? 'Cargado'
+                            : marcadoAMano ? 'En físico' : 'Pendiente'}
+                        </span>
+                      </div>
+
+                      {!soloConsulta && (
+                        <div className="mt-2.5 flex items-center gap-3">
+                          <button
+                            type="button"
+                            disabled={procesando}
+                            onClick={() => pedirArchivo(tipo)}
+                            className="flex items-center gap-1.5 text-[11px] font-bold text-brand hover:text-brand-hover disabled:opacity-50"
+                          >
+                            {subiendoEste
+                              ? <Loader2 className="w-3 h-3 animate-spin" />
+                              : <Upload className="w-3 h-3" />}
+                            {subiendoEste ? 'Clasificando…' : docGuardado ? 'Reemplazar' : 'Subir documento'}
+                          </button>
+                          {/* El documento físico en oficina sigue valiendo:
+                              marcar a mano no exige digitalizar. */}
+                          {!docGuardado && (
+                            <button
+                              type="button"
+                              onClick={() => setDraft(prev => ({
+                                ...prev,
+                                docsAlta: { ...prev.docsAlta, [claveManual]: !prev.docsAlta[claveManual] },
+                              }))}
+                              className="text-[10px] text-text-muted hover:text-text-secondary"
+                            >
+                              {marcadoAMano ? 'Quitar marca manual' : 'Marcar en físico'}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6">
+                <p className={LABEL}>Expediente en Drive</p>
+                <div className="mt-2">
+                  <BoolCheck
+                    checked={draft.expedienteDrive}
+                    label="Carpeta creada en Google Drive"
+                    onToggle={() => set('expedienteDrive', !draft.expedienteDrive)}
+                  />
                 </div>
               </div>
+
+              {/* La subida guarda sola al confirmar la revisión; esta barra es
+                  para las marcas manuales y el checkbox de Drive. */}
               <SaveBar oculta={soloConsulta} saving={saving} onSave={() => save({
                 docsAlta: draft.docsAlta,
                 expedienteDrive: draft.expedienteDrive,
@@ -574,6 +734,19 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
 
         </fieldset>
       </div>
+
+      {revision && (
+        <RevisionDocumentoClasificado
+          clasificacion={revision.clasificacion}
+          tipoEsperado={revision.tipoEsperado}
+          tipos={DOCUMENTOS_EXPEDIENTE}
+          etiqueta={etiquetaDocExpediente}
+          camposAdoptables={camposAdoptablesExpediente(revision.clasificacion, cliente)}
+          guardando={guardandoDoc}
+          onGuardar={handleGuardarRevision}
+          onCancelar={() => setRevision(null)}
+        />
+      )}
     </div>
   );
 }
