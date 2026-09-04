@@ -11,10 +11,12 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  elegirCelda, derivarSeleccion, agenteDominante, menorPorFila, resumenSeleccion,
+  elegirCelda, elegirColumna, derivarSeleccion, agenteDominante, menorPorFila, resumenSeleccion,
 } from './seleccionMatriz';
 import { construirMatriz, elegirAgente } from './matrizComparativa';
 import { costoDeConcepto } from '../components/quotes/QuotesData';
+import { evaluarProntitud } from './prontitudCotizacion';
+import { mapearCotizacionAEmbarque } from './cotizacionAEmbarque';
 import type {
   KanbanQuote, ServicioSolicitado, ConceptoCotizacion, CotizacionProveedor,
 } from '../components/quotes/QuotesData';
@@ -206,3 +208,74 @@ describe('D · resumenSeleccion', () => {
     expect(r.sinElegir).toBe(3);
   });
 });
+
+// ─── E · elegirColumna: acotada al servicio de la matriz ─────────────────────
+
+describe('E · elegirColumna', () => {
+  it('elige todas las filas del agente en ESE servicio', () => {
+    const q = elegirColumna(armarQuote(), 'srv-1', SUNWAY);
+    const sel = derivarSeleccion(matrizDe(q), q);
+    expect(sel.porFila['srv-1::c-flete']).toBe(SUNWAY);
+    expect(sel.porFila['srv-1::c-despacho']).toBe(SUNWAY);
+  });
+
+  it('no toca otros servicios: cada matriz manda solo en el suyo', () => {
+    const q0 = armarQuote();
+    q0.servicios.push({
+      ...q0.servicios[0], id: 'srv-2', tipo: 'terrestre',
+      conceptos: [concepto('c-acarreo', 'Acarreo', [
+        tarifa({ id: 't-a-sun', monto: 400, proveedorId: SUNWAY }),
+      ])],
+    });
+    const q = elegirColumna(q0, 'srv-1', SUNWAY);
+    const otro = q.servicios[1].conceptos!.find(c => c.id === 'c-acarreo')!;
+    expect(otro.proveedoresOficialIds).toEqual([]);
+  });
+
+  it('sin toggle: repetir el clic de columna NO des-elige', () => {
+    let q = elegirColumna(armarQuote(), 'srv-1', SUNWAY);
+    q = elegirColumna(q, 'srv-1', SUNWAY);
+    expect(derivarSeleccion(matrizDe(q), q).porFila['srv-1::c-flete']).toBe(SUNWAY);
+  });
+
+  it('columna y luego celda: la excepción del combinado', () => {
+    let q = elegirColumna(armarQuote(), 'srv-1', SUNWAY);
+    q = elegirCelda(q, 'srv-1', 'srv-1::c-maniobras', TERMINAL);
+    const sel = derivarSeleccion(matrizDe(q), q);
+    expect(sel.porFila['srv-1::c-maniobras']).toBe(TERMINAL);
+    expect(agenteDominante(sel)).toBe(SUNWAY);
+  });
+});
+
+// ─── F · M-3: la selección mixta hereda hasta el embarque ────────────────────
+//
+// Elegir es cargar: de la misma marca en concepto.tarifas beben el total, la
+// prontitud y los cargos del embarque. Si una capa leyera otra cosa, el caso
+// B produciría un embarque que le paga al proveedor equivocado.
+
+describe('F · herencia de la selección mixta', () => {
+  const quoteMixta = () => {
+    let q = elegirCelda(armarQuote(), 'srv-1', 'srv-1::c-flete', SUNWAY);
+    q = elegirCelda(q, 'srv-1', 'srv-1::c-maniobras', TERMINAL);
+    return elegirCelda(q, 'srv-1', 'srv-1::c-despacho', SUNWAY);
+  };
+
+  it('la prontitud ve cada línea con SU proveedor', () => {
+    const p = evaluarProntitud(quoteMixta());
+    expect(p.algunProveedor).toBe(true);
+    expect(p.faltantes.filter(f => f.tipo === 'sin_proveedor')).toHaveLength(0);
+  });
+
+  it('los cargos del embarque pagan a cada proveedor lo suyo', () => {
+    const { cargos } = mapearCotizacionAEmbarque(quoteMixta(), {
+      cliente: null, fechaReferencia: '2026-09-04',
+    });
+    const gastos = cargos.filter(c => c.tipo === 'gasto');
+    const porProveedor = Object.fromEntries(gastos.map(g => [g.proveedorId, g.monto]));
+    expect(porProveedor[TERMINAL]).toBe(180);            // maniobras
+    // Sunway cobra flete y despacho, como dos gastos separados.
+    expect(gastos.filter(g => g.proveedorId === SUNWAY).map(g => g.monto).sort((a, b) => a - b))
+      .toEqual([300, 1500]);
+  });
+});
+

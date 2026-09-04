@@ -92,6 +92,46 @@ export function elegirCelda(
   };
 }
 
+/**
+ * Elige la columna completa de un agente, PERO solo en el servicio de esta
+ * matriz.
+ *
+ * `elegirAgente` (la función original del caso A) recorre TODOS los
+ * servicios: con una matriz por servicio, el clic en la columna de Sunway del
+ * marítimo no debe tocar lo elegido en el terrestre. A diferencia de
+ * elegirCelda, aquí no hay toggle: la columna SE ELIGE — el gesto de
+ * des-elegir es de la celda, una por una.
+ */
+export function elegirColumna(
+  quote: KanbanQuote,
+  servicioId: string,
+  agenteId: string,
+): KanbanQuote {
+  return {
+    ...quote,
+    servicios: (quote.servicios ?? []).map(srv => {
+      if (srv.id !== servicioId) return srv;
+      return {
+        ...srv,
+        conceptos: (srv.conceptos ?? []).map(c => {
+          const suya = (c.tarifas ?? []).find(
+            t => claveAgente(t) === agenteId && t.monto > 0,
+          );
+          if (!suya) return c;
+          return {
+            ...c,
+            proveedoresOficialIds: [suya.id],
+            tarifas: (c.tarifas ?? []).map(t => ({
+              ...t,
+              seleccionada: t.id === suya.id,
+            })),
+          };
+        }),
+      };
+    }),
+  };
+}
+
 // ─── Derivar qué está elegido ─────────────────────────────────────────────────
 
 export interface SeleccionMatriz {

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, ChevronUp, ChevronDown, AlertTriangle, Download, Coins } from 'lucide-react';
+import { Plus, Trash2, ChevronUp, ChevronDown, AlertTriangle, Check, Coins } from 'lucide-react';
 import type {
   MatrizComparativa, AgenteColumna, FilaMatriz,
 } from '../../lib/matrizComparativa';
 import { filaVigencia, agentesIncompletos } from '../../lib/matrizComparativa';
+import type { SeleccionMatriz, ResumenSeleccion } from '../../lib/seleccionMatriz';
 import type {
   TotalComparable, ResultadoComparacion, MonedaCotizacion,
 } from '../../lib/monedaComparativa';
@@ -47,8 +48,19 @@ export interface MatrizAgentesProps {
   tipoCambio: React.ReactNode;
   onEditarMoneda: (filaId: string, agente: AgenteColumna, moneda: MonedaCotizacion) => void;
   editable: boolean;
-  /** Agente preseleccionado para cargar. Por defecto, el menor. */
-  agenteElegidoId: string | null;
+  /**
+   * M-2 · La selección DERIVADA de concepto.tarifas — la matriz nunca guarda
+   * la suya. Elegir escribe en las líneas al momento: elegir YA es cargar.
+   */
+  seleccion: SeleccionMatriz;
+  /** Agente con mayoría de filas: contra él se pinta la EXCEPCIÓN. */
+  dominante: string | null;
+  /** El más barato de cada fila — lo que importa en el caso B. */
+  menoresPorFila: Record<string, string | null>;
+  resumen: ResumenSeleccion;
+  /** Clic en una celda: elige (o des-elige) ese agente para esa fila. */
+  onElegirCelda: (fila: FilaMatriz, agenteId: string) => void;
+  /** Clic en el total: elige la columna completa — el caso A. */
   onElegirAgente: (agenteId: string) => void;
   onEditarCelda: (filaId: string, agente: AgenteColumna, valor: number | null, moneda: MonedaCotizacion) => void;
   onEditarVigencia: (agenteId: string, vigencia: string | null) => void;
@@ -57,15 +69,14 @@ export interface MatrizAgentesProps {
   onQuitarFila: (filaId: string) => void;
   onAgregarAgente: () => void;
   onAgregarFila: () => void;
-  onCargarEnLineas: () => void;
 }
 
 export default function MatrizAgentes({
   matriz, titulo, subtitulo, servicios, servicioActivoId, onCambiarServicio,
   totalesComparables, comparacion, tipoCambio, onEditarMoneda,
-  editable, agenteElegidoId,
-  onElegirAgente, onEditarCelda, onEditarVigencia, onEditarEtiqueta,
-  onQuitarAgente, onQuitarFila, onAgregarAgente, onAgregarFila, onCargarEnLineas,
+  editable, seleccion, dominante, menoresPorFila, resumen,
+  onElegirCelda, onElegirAgente, onEditarCelda, onEditarVigencia, onEditarEtiqueta,
+  onQuitarAgente, onQuitarFila, onAgregarAgente, onAgregarFila,
 }: MatrizAgentesProps) {
   const [abierta, setAbierta] = useState(true);
 
@@ -73,13 +84,35 @@ export default function MatrizAgentes({
   const incompletos = agentesIncompletos(matriz);
   const idsIncompletos = new Set(incompletos.map(i => i.agenteId));
   const menorId = comparacion.menorId;
-  const elegido = agenteElegidoId ?? menorId;
+  /*
+   * La columna se pinta «elegida» solo cuando TODA la selección es suya (el
+   * caso A puro). Con selección mixta manda el resumen y las marcas por
+   * celda; el ✓Menor sigue siendo sugerencia visual, nunca selección.
+   */
+  const columnaElegida = resumen.etiqueta?.tipo === 'unico' && resumen.sinElegir === 0
+    ? resumen.etiqueta.agenteId
+    : null;
 
-  const resumenPlegado = menorId
+  /** «Sunway · $1,850» / «3 proveedores · 2 sin elegir · USD…». */
+  const textoResumen = (() => {
+    if (!resumen.etiqueta) return null;
+    const quien = resumen.etiqueta.tipo === 'unico'
+      ? agentes.find(a => a.id === (resumen.etiqueta as { agenteId: string }).agenteId)?.nombre ?? 'Un proveedor'
+      : `${resumen.etiqueta.cuantos} proveedores`;
+    const faltan = resumen.sinElegir > 0
+      ? ` · ${resumen.sinElegir} concepto${resumen.sinElegir !== 1 ? 's' : ''} sin elegir`
+      : '';
+    const monto = resumen.total.equivalente !== null
+      ? fmtEquivalente(resumen.total)
+      : resumen.total.monedasPresentes.map(m => `${m} ${money(resumen.total.porMoneda[m])}`).join(' + ');
+    return `${quien}${faltan} · ${monto}`;
+  })();
+
+  const resumenPlegado = textoResumen ?? (menorId
     ? `${agentes.length} agente${agentes.length !== 1 ? 's' : ''} · menor: ${
         agentes.find(a => a.id === menorId)?.nombre} ${
         fmtEquivalente(totalesComparables[menorId])}`
-    : `${agentes.length} agente${agentes.length !== 1 ? 's' : ''}`;
+    : `${agentes.length} agente${agentes.length !== 1 ? 's' : ''}`);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -180,7 +213,7 @@ export default function MatrizAgentes({
                         <th key={a.id} className="px-3 py-2 text-center min-w-[120px]">
                           <div className="flex items-center justify-center gap-1">
                             <span className={`text-[11px] font-bold truncate ${
-                              a.id === elegido ? 'text-[#E11D48]' : 'text-gray-700'}`}>
+                              a.id === columnaElegida ? 'text-[#E11D48]' : 'text-gray-700'}`}>
                               {a.nombre}
                             </span>
                             {editable && (
@@ -211,6 +244,10 @@ export default function MatrizAgentes({
                         fila={f}
                         agentes={agentes}
                         editable={editable}
+                        seleccionFila={seleccion.porFila[f.id] ?? null}
+                        dominante={dominante}
+                        menorDeFila={menoresPorFila[f.id] ?? null}
+                        onElegirCelda={onElegirCelda}
                         onEditarCelda={onEditarCelda}
                         onEditarMoneda={onEditarMoneda}
                         onEditarEtiqueta={onEditarEtiqueta}
@@ -253,7 +290,7 @@ export default function MatrizAgentes({
                       {agentes.map(a => {
                         const t = totalesComparables[a.id];
                         const esMenor = a.id === menorId;
-                        const esElegido = a.id === elegido;
+                        const esElegido = a.id === columnaElegida;
                         return (
                           <td key={a.id} className="px-3 py-2.5 text-center">
                             <button
@@ -262,7 +299,7 @@ export default function MatrizAgentes({
                               className={`w-full rounded-lg px-1.5 py-1 transition-colors ${
                                 esElegido ? 'ring-2 ring-[#E11D48]/40 bg-[#E11D48]/5' : editable ? 'hover:bg-gray-100' : ''
                               }`}
-                              title={editable ? `Elegir a ${a.nombre}` : undefined}
+                              title={editable ? `Elegir a ${a.nombre} para TODAS las filas (el paquete completo)` : undefined}
                             >
                               {/* El equivalente manda; el desglose original
                                   queda debajo, siempre visible (§4.3). */}
@@ -293,27 +330,25 @@ export default function MatrizAgentes({
               </div>
 
               {editable && (
-                <div className="flex items-center justify-between px-3 py-2 border-t border-gray-100">
+                <div className="flex items-center justify-between gap-3 px-3 py-2 border-t border-gray-100">
                   <button
                     onClick={onAgregarFila}
-                    className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-[#E11D48] hover:bg-[#E11D48]/5 px-2 py-1.5 rounded-lg transition-colors"
+                    className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-[#E11D48] hover:bg-[#E11D48]/5 px-2 py-1.5 rounded-lg transition-colors shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" /> Agregar concepto
                   </button>
 
-                  <button
-                    onClick={onCargarEnLineas}
-                    disabled={!elegido}
-                    className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Cargar en líneas
-                    {elegido && (
-                      <span className="font-normal normal-case">
-                        · {agentes.find(a => a.id === elegido)?.nombre}
-                      </span>
-                    )}
-                  </button>
+                  {/* «Cargar en líneas» ya no existe: ELEGIR ES CARGAR. El
+                      resumen dice qué quedó elegido y qué falta. */}
+                  {textoResumen ? (
+                    <span className="text-[11px] font-semibold text-gray-600 truncate" title={textoResumen}>
+                      {textoResumen}
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-gray-400">
+                      Elige el total de un agente (paquete completo) o celda por celda.
+                    </span>
+                  )}
                 </div>
               )}
             </>
@@ -330,13 +365,21 @@ interface RenglonProps {
   fila: FilaMatriz;
   agentes: AgenteColumna[];
   editable: boolean;
+  /** Agente elegido para esta fila. null = sin elegir o combinada. */
+  seleccionFila: string | null;
+  dominante: string | null;
+  menorDeFila: string | null;
+  onElegirCelda: MatrizAgentesProps['onElegirCelda'];
   onEditarCelda: MatrizAgentesProps['onEditarCelda'];
   onEditarMoneda: MatrizAgentesProps['onEditarMoneda'];
   onEditarEtiqueta: (filaId: string, etiqueta: string) => void;
   onQuitar: (filaId: string) => void;
 }
 
-function Renglon({ fila, agentes, editable, onEditarCelda, onEditarMoneda, onEditarEtiqueta, onQuitar }: RenglonProps) {
+function Renglon({
+  fila, agentes, editable, seleccionFila, dominante, menorDeFila,
+  onElegirCelda, onEditarCelda, onEditarMoneda, onEditarEtiqueta, onQuitar,
+}: RenglonProps) {
   const esDato = fila.tipo === 'dato';
 
   return (
@@ -360,10 +403,49 @@ function Renglon({ fila, agentes, editable, onEditarCelda, onEditarMoneda, onEdi
         const v = fila.celdas[a.id];
         const moneda = fila.monedas?.[a.id] ?? 'USD';
         const hayValor = v !== null && v !== undefined;
+        /*
+         * Marcas de la celda:
+         *   elegida  → check sólido y fondo rojo tenue
+         *   EXCEPCIÓN → además borde ámbar: hay un agente dominante (el
+         *              «paquete») y esta fila se salió de él
+         *   menor    → punto esmeralda discreto: el más barato de la FILA,
+         *              que es lo que importa cuando se elige concepto a
+         *              concepto (caso B)
+         */
+        const elegida = seleccionFila === a.id;
+        const esExcepcion = elegida && dominante !== null && a.id !== dominante;
+        const esMenorFila = menorDeFila === a.id;
+        const elegible = editable && (v ?? 0) > 0;
         return (
-          <td key={a.id} className="px-2 py-1.5">
+          <td key={a.id} className={`px-2 py-1.5 transition-colors ${
+            esExcepcion ? 'bg-amber-50/70 ring-1 ring-inset ring-amber-300'
+            : elegida ? 'bg-[#E11D48]/5'
+            : ''}`}>
             {editable ? (
               <div className="flex items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => elegible && onElegirCelda(fila, a.id)}
+                  disabled={!elegible}
+                  className={`shrink-0 w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
+                    elegida
+                      ? 'bg-[#E11D48] border-[#E11D48] text-white'
+                      : elegible
+                      ? 'border-gray-300 text-transparent hover:border-[#E11D48]'
+                      : 'border-gray-100 text-transparent cursor-default'}`}
+                  title={!elegible ? undefined
+                    : elegida ? 'Quitar la elección de esta fila'
+                    : esExcepcion ? 'Fuera del paquete: esta fila se eligió con otro proveedor'
+                    : `Elegir a ${a.nombre} para «${fila.etiqueta}»`}
+                >
+                  <Check className="w-2.5 h-2.5" />
+                </button>
+                {esMenorFila && (
+                  <span
+                    className="shrink-0 w-1.5 h-1.5 rounded-full bg-emerald-500"
+                    title="El más barato de esta fila"
+                  />
+                )}
                 <input
                   type="number"
                   value={v ?? ''}
@@ -394,7 +476,8 @@ function Renglon({ fila, agentes, editable, onEditarCelda, onEditarMoneda, onEdi
                 </select>
               </div>
             ) : (
-              <span className="block text-right tabular-nums text-gray-700">
+              <span className={`block text-right tabular-nums ${elegida ? 'font-bold text-[#18181B]' : 'text-gray-700'}`}>
+                {elegida && <Check className="inline w-3 h-3 text-[#E11D48] mr-1" />}
                 {hayValor ? `${money(v!)} ${moneda}` : '—'}
               </span>
             )}

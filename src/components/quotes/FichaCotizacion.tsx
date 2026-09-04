@@ -39,8 +39,9 @@ import {
   repararConceptosDuplicados,
 } from '../../lib/lineasCotizacion';
 import {
-  matricesPorServicio, escribirCelda, quitarAgenteDeCotizacion, elegirAgente,
+  matricesPorServicio, escribirCelda, quitarAgenteDeCotizacion,
   conceptosSinCotizar, claveAgente, construirMatriz, CONCEPTOS_POR_PLANTILLA,
+  type FilaMatriz,
   type AgenteColumna,
 } from '../../lib/matrizComparativa';
 import MatrizAgentes from './MatrizAgentes';
@@ -63,6 +64,10 @@ import {
 } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import LineaTiempo from '../ui/ficha/LineaTiempo';
+import {
+  elegirCelda, elegirColumna, derivarSeleccion, agenteDominante,
+  menorPorFila, resumenSeleccion,
+} from '../../lib/seleccionMatriz';
 import ResumenFinancieroInline from './ResumenFinancieroInline';
 import { calcTotales } from '../../lib/cotizacionCalculator';
 
@@ -142,7 +147,6 @@ export default function FichaCotizacion({
    */
   const [agentesGuardados, setAgentesGuardados] = useState<Record<string, AgenteColumna[]>>({});
   /** Agente elegido por servicio. Sin elección explícita manda el menor. */
-  const [agenteElegido, setAgenteElegido] = useState<Record<string, string>>({});
   const [modalAgente, setModalAgente] = useState<string | null>(null);
   /** Extracción recién llegada, esperando la pantalla de revisión (TA-4). */
   const [toastLocal, setToastLocal] = useState<string | null>(null);
@@ -722,6 +726,26 @@ export default function FichaCotizacion({
     [matrices, servicioActivoId],
   );
 
+  /** M-2 · La selección derivada de los datos, nunca guardada aparte. */
+  const seleccionActiva = useMemo(
+    () => matrizActiva
+      ? derivarSeleccion(matrizActiva.matriz, quote)
+      : { porFila: {}, combinadas: [] },
+    [matrizActiva, quote],
+  );
+  const dominanteActivo = useMemo(() => agenteDominante(seleccionActiva), [seleccionActiva]);
+  const menoresActivos = useMemo(
+    () => matrizActiva ? menorPorFila(matrizActiva.matriz) : {},
+    [matrizActiva],
+  );
+  const resumenActivo = useMemo(
+    () => matrizActiva
+      ? resumenSeleccion(matrizActiva.matriz, seleccionActiva,
+          quote.moneda === 'MXN' ? 'MXN' : 'USD', quote.tipoCambio)
+      : null,
+    [matrizActiva, seleccionActiva, quote.moneda, quote.tipoCambio],
+  );
+
   /** Totales que respetan la moneda de cada celda (MO-1/MO-2). */
   const totalesConMoneda = useMemo(
     () => matrizActiva
@@ -809,32 +833,42 @@ export default function FichaCotizacion({
   };
 
   /**
-   * Carga las tarifas del agente elegido como costos de las líneas.
+   * M-2 · Elegir YA es cargar: no hay paso intermedio.
    *
-   * Pregunta antes de reemplazar si ya hay costos capturados: es el puente
-   * entre comparar y cotizar, y borrar trabajo previo sin avisar sería caro.
+   * El clic en una celda elige (o des-elige) ese agente para esa fila y
+   * escribe en concepto.tarifas al momento, igual que toda edición de la
+   * tabla. El clic en el total elige la columna completa — el caso A — y
+   * pregunta SOLO cuando pisa una selección ya hecha de otro agente: ahí sí
+   * hay algo que perder.
    */
-  const handleCargarEnLineas = (servicioId: string, matriz: ReturnType<typeof construirMatriz>) => {
-    const agenteId = agenteElegido[servicioId] ?? matriz.agenteMenorId;
-    if (!agenteId) return;
+  const handleElegirCelda = (fila: FilaMatriz, agenteId: string) => {
+    onUpdateQuote(elegirCelda(quote, fila.servicioId, fila.id, agenteId));
+  };
 
-    const sinCotizar = conceptosSinCotizar(matriz, agenteId);
-    const yaHayCostos = matriz.filas.some(f =>
-      aplanarCotizacion(quote).find(l => l.id === f.id && l.costo > 0));
-
+  const handleElegirColumnaCompleta = (agenteId: string) => {
+    if (!matrizActiva) return;
+    const { matriz, servicioId } = matrizActiva;
     const nombre = matriz.agentes.find(a => a.id === agenteId)?.nombre ?? '';
+
+    // ¿Pisa elecciones de OTROS agentes ya hechas en esta matriz?
+    const sel = derivarSeleccion(matriz, quote);
+    const pisadas = Object.values(sel.porFila).filter(a => a && a !== agenteId).length;
+    const sinCotizar = conceptosSinCotizar(matriz, agenteId);
+
     const avisos = [
-      yaHayCostos ? 'Los costos actuales de estos conceptos se van a reemplazar.' : '',
+      pisadas > 0
+        ? `${pisadas} fila${pisadas !== 1 ? 's' : ''} ya elegida${pisadas !== 1 ? 's' : ''} con otro proveedor se va${pisadas !== 1 ? 'n' : ''} a reemplazar.`
+        : '',
       sinCotizar.length > 0
-        ? `${nombre} no cotizó: ${sinCotizar.join(', ')}. Esos conceptos quedan sin costo.`
+        ? `${nombre} no cotizó: ${sinCotizar.join(', ')}. Esos conceptos quedan sin elegir.`
         : '',
     ].filter(Boolean);
 
     if (avisos.length > 0 && !window.confirm(
-      `Cargar las tarifas de ${nombre} en las líneas.\n\n${avisos.join('\n\n')}\n\n¿Continuar?`
+      `Elegir a ${nombre} para todas las filas.\n\n${avisos.join('\n\n')}\n\n¿Continuar?`
     )) return;
 
-    onUpdateQuote(elegirAgente(quote, agenteId));
+    onUpdateQuote(elegirColumna(quote, servicioId, agenteId));
   };
 
   /**
@@ -1278,9 +1312,12 @@ export default function FichaCotizacion({
                   />
                 }
                 editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
-                agenteElegidoId={agenteElegido[matrizActiva.servicioId] ?? comparacionMatriz.menorId}
-                onElegirAgente={(id) =>
-                  setAgenteElegido(p => ({ ...p, [matrizActiva.servicioId]: id }))}
+                seleccion={seleccionActiva}
+                dominante={dominanteActivo}
+                menoresPorFila={menoresActivos}
+                resumen={resumenActivo!}
+                onElegirCelda={handleElegirCelda}
+                onElegirAgente={handleElegirColumnaCompleta}
                 onEditarCelda={handleEditarCelda}
                 onEditarMoneda={handleEditarMoneda}
                 onEditarVigencia={handleEditarVigencia}
@@ -1291,8 +1328,6 @@ export default function FichaCotizacion({
                 onAgregarAgente={() => setModalAgente(matrizActiva.servicioId)}
                 onAgregarFila={() => onUpdateQuote(
                   agregarLinea(quote, { servicioId: matrizActiva.servicioId, concepto: '' }))}
-                onCargarEnLineas={() =>
-                  handleCargarEnLineas(matrizActiva.servicioId, matrizActiva.matriz)}
               />
             )}
 
