@@ -160,6 +160,14 @@ export interface ServicioSolicitado {
   ruta: {
     origen: string;
     destino: string;
+    /**
+     * FK → puertos/ cuando el extremo se eligió del catálogo (4-sep-2026).
+     * `null`/ausente = texto libre (ruta terrestre, destino sin puerto). Del
+     * puerto sale el país, y del país el tráfico — que decide folio e IVA.
+     * Aditivos: las rutas viejas siguen siendo solo texto.
+     */
+    origenPuertoId?: string | null;
+    destinoPuertoId?: string | null;
     aduanaSalida?: string;
     aduanaRecepcion?: string;
   };

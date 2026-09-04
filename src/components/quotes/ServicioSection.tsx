@@ -11,6 +11,9 @@ import type { ConceptoVermur } from '../conceptos/ConceptosData';
 import { ConceptoSection } from './ConceptoSection';
 import { type Rol } from '../../lib/stateMachine';
 import { resolverTrafico } from '../../lib/traficoServicio';
+import { traficoDesdePuertos } from '../../lib/traficoDesdePuertos';
+import { usePuertos } from '../../hooks/usePuertos';
+import PuertoSelector from '../puertos/PuertoSelector';
 
 export interface ServicioSectionProps {
   /**
@@ -84,6 +87,34 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
   const modality = getModality(servicio.tipo, iconSrv);
 
   const inputCls ='w-full text-xs text-gray-700 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200 rounded-lg px-2 py-1.5 focus:bg-white focus:border-[#E11D48] outline-none transition-all';
+
+  const { puertos } = usePuertos();
+
+  /**
+   * Elige un extremo de la ruta, del catálogo o como texto libre.
+   *
+   * Cuando los DOS extremos están catalogados y el tráfico aún no se declaró,
+   * se declara solo: el país del puerto lo decide por definición de §4.2, y
+   * del tráfico salen el prefijo del folio y el IVA. Un tráfico ya declarado
+   * no se pisa — corregirlo es decisión de quien captura, no del selector.
+   */
+  const handlePuertoChange = (lado: 'origen' | 'destino', texto: string, puertoId: string | null) => {
+    const ruta = {
+      ...servicio.ruta,
+      [lado]: texto,
+      [`${lado}PuertoId`]: puertoId,
+    };
+    let trafico = servicio.trafico;
+    if (!trafico) {
+      const buscar = (id: string | null | undefined) =>
+        id ? puertos.find(pu => pu.id === id) ?? null : null;
+      trafico = traficoDesdePuertos(
+        buscar(ruta.origenPuertoId),
+        buscar(ruta.destinoPuertoId),
+      ) ?? undefined;
+    }
+    onUpdateServicio({ ...servicio, ruta, ...(trafico ? { trafico } : {}) });
+  };
 
   const handleFieldChange = (field: keyof ServicioSolicitado | 'ruta_origen' | 'ruta_destino' | 'ruta_aduana_salida' | 'ruta_aduana_recepcion', value: any) => {
     if (field === 'ruta_origen') {
@@ -160,11 +191,23 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Origen</label>
-              <input type="text" value={servicio.ruta?.origen} onChange={e => handleFieldChange('ruta_origen', e.target.value)} className={inputCls} />
+              {/* Del catálogo: el puerto sabe su país, y el país decide el
+                  tráfico. Texto libre solo como excepción marcada. */}
+              <PuertoSelector
+                puertos={puertos}
+                valor={servicio.ruta?.origen ?? ''}
+                puertoId={servicio.ruta?.origenPuertoId}
+                onChange={(texto, id) => handlePuertoChange('origen', texto, id)}
+              />
             </div>
             <div>
               <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Destino</label>
-              <input type="text" value={servicio.ruta?.destino} onChange={e => handleFieldChange('ruta_destino', e.target.value)} className={inputCls} />
+              <PuertoSelector
+                puertos={puertos}
+                valor={servicio.ruta?.destino ?? ''}
+                puertoId={servicio.ruta?.destinoPuertoId}
+                onChange={(texto, id) => handlePuertoChange('destino', texto, id)}
+              />
             </div>
             <div>
               <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Aduana Salida</label>
