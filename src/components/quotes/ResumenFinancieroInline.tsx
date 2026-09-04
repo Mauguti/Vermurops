@@ -2,6 +2,7 @@ import React from 'react';
 import { TrendingUp } from 'lucide-react';
 import { calcTotales, COSTO_OPE_DEFAULT } from '../../lib/cotizacionCalculator';
 import type { LineaPlana } from '../../lib/lineasCotizacion';
+import { mezclaMonedas } from '../../lib/sumarPorMoneda';
 
 /**
  * Resumen financiero DENTRO de la ficha, no en una sección aparte.
@@ -63,7 +64,16 @@ export default function ResumenFinancieroInline({
       <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3">
         <Dato label="Costo total"  valor={`$${money(t.costo_total)}`} />
         <Dato label="Profit total" valor={`$${money(t.profit_total)}`} />
-        <Dato label={`Venta total ${moneda}`} valor={`$${money(t.venta_total)}`} destacado />
+        {/* La etiqueta sale de las LÍNEAS, no de quote.moneda: el número es
+            de ellas. Con monedas mezcladas no se finge una sola (§4.3) — el
+            desglose fino es la deuda de §6 (cotizacionCalculator). */}
+        <Dato
+          label={mezclaMonedas(lineas, l => l.moneda)
+            ? 'Venta total (mezcla USD y MXN)'
+            : `Venta total ${lineas[0]?.moneda ?? moneda}`}
+          valor={`$${money(t.venta_total)}`}
+          destacado
+        />
         <Dato label="Margen real" valor={`${(t.margen_real * 100).toFixed(1)}%`}
               destacado negativo={t.margen_real < 0} />
 

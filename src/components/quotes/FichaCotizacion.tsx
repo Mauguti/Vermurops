@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../auth/AuthContext';
 import { useNotifications } from '../../notifications/NotificationsContext';
 import { idUnico } from '../../lib/idUnico';
+import { sumarPorMoneda, monedasConMonto, formatearPorMoneda } from '../../lib/sumarPorMoneda';
 import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
 import { useServicios, renderIcon } from '../../config/serviciosStore';
 import { useClientes } from '../../hooks/useClientes';
@@ -646,6 +647,18 @@ export default function FichaCotizacion({
   const lineasPlanas = useMemo(() => aplanarCotizacion(quote), [quote]);
 
   /**
+   * El total del encabezado, POR MONEDA de las líneas (§4.3).
+   *
+   * Antes decía «Total: $350 MXN» leyendo quote.moneda como etiqueta, con las
+   * líneas en USD: el número era de una moneda y el rótulo de otra. La
+   * etiqueta sale de las MISMAS líneas que producen el número.
+   */
+  const totalEncabezado = useMemo(() => {
+    const t = sumarPorMoneda(lineasPlanas, l => l.venta, l => l.moneda);
+    return monedasConMonto(t).length > 0 ? formatearPorMoneda(t) : null;
+  }, [lineasPlanas]);
+
+  /**
    * Qué le falta a la cotización para poder avanzar (BC-1).
    *
    * Gobierna qué botones se muestran. Un botón visible que no aplica es peor
@@ -1182,9 +1195,9 @@ export default function FichaCotizacion({
             </span>
           </>
         }
-        subtitulo={totalConsolidado > 0 ? (
+        subtitulo={totalEncabezado ? (
           <p className="font-black text-[#E11D48] tabular-nums">
-            Total: ${totalConsolidado.toLocaleString()} {quote.moneda}
+            Total: {totalEncabezado}
           </p>
         ) : undefined}
       />
@@ -1454,7 +1467,7 @@ export default function FichaCotizacion({
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Valor de la operación</p>
                   <p className="text-xl font-black text-[#18181B] tabular-nums mt-0.5">
-                    ${totalConsolidado.toLocaleString()} <span className="text-sm font-medium text-gray-400">{quote.moneda}</span>
+                    {totalEncabezado ?? '—'}
                   </p>
                 </div>
                 <div className="text-right">
