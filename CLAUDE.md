@@ -75,6 +75,16 @@ términos de pago) vienen de archivos reales exportados de Magaya y depurados, e
 `src/data/seeds/`. Si no encuentras el archivo, **pregunta** — no lo generes. Un catálogo
 ficticio en producción es peor que no tener catálogo.
 
+**Trabajo terminado sin deployar es trabajo que no existe para el cliente.**
+Tres commits del 2-sep (el fix de las «desapariciones», la separación
+ver/dar-de-alta en Altas y el catálogo de conceptos) se quedaron cuatro días en
+un worktree esperando validación. En esos cuatro días el cliente reportó DOS
+quejas que esos commits ya resolvían, y el backlog se rearmó con pendientes que
+no lo eran. El ciclo se cierra con el deploy, no con el commit: al terminar un
+bloque, pedir la validación EXPLÍCITAMENTE como bloqueante y, validado,
+mergear y publicar en el momento. Un bloque validado sin publicar no está
+terminado, está estacionado.
+
 **Antes de diagnosticar una regresión en local, mira DESDE DÓNDE corre el dev
 server.** `lsof -ti:3000` y revisa la ruta del proceso. Si el trabajo está en un
 worktree y el server corre desde el checkout principal, se ve otra rama y
@@ -424,6 +434,13 @@ En pantalla es UNA sola tabla que cambia de contenido según el servicio activo.
     decisión —cortesía, cargo absorbido, pérdida deliberada— de un olvido.
   - **Botones que cumplen su promesa**: cada acción declara qué necesita, y
     donde no aparece se explica qué falta (`lib/prontitudCotizacion.ts`).
+
+**PENDIENTE — los subconceptos no se ven en la tabla (4-sep-2026).**
+Existen en el modelo y suman al costo, pero solo se editan desde el modal de
+«Datos del embarque», donde nadie los busca. Ventas los pidió explícitamente en
+su Excel: un almacén cobra IN, OUT, pick & pack y etiquetado, y cada uno se
+factura por separado. Deben anidarse bajo su concepto en la tabla de la ficha.
+No se toma hasta cerrar lo pendiente de salir (decisión de Mau).
 
 ## 4.10 Carga de tarifarios con IA (31-ago-2026)
 
