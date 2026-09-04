@@ -2,8 +2,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import {
   X, User, FileText, Plus, Trash2, CheckCircle2, AlertTriangle,
   MessageSquare, Clock, Send, BarChart2, Building2, Search, Link2,
-  ChevronRight,
-} from 'lucide-react';
+  ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import {
   KanbanQuote, QuoteActivity, StageHistory, ORIGENES_PROSPECTO, PIPELINE_STAGES,
   ServicioSolicitado, TipoServicio, CotizacionProveedor,
@@ -150,6 +149,8 @@ export default function FichaCotizacion({
   const [cargandoTarifario, setCargandoTarifario] = useState(false);
   /** Servicio cuyos datos de embarque se están editando. */
   const [datosEmbarqueDe, setDatosEmbarqueDe] = useState<string | null>(null);
+  /** El catálogo de tarifas, colapsable — abierto por default: es el insumo. */
+  const [catalogoAbierto, setCatalogoAbierto] = useState(true);
   const [extraccionPendiente, setExtraccionPendiente] =
     useState<{ documento: import('../../lib/documentoTarifario').DocumentoTarifario; respuesta: unknown } | null>(null);
   /**
@@ -1185,15 +1186,42 @@ export default function FichaCotizacion({
         onCambiar={(id) => { setActiveTab(id); setShowLossReasonForm(false); }}
       />
 
-      {/* ── Contenido: Servicios (dos columnas FC-2 + drag&drop FC-3) ───────── */}
+      {/* ── Contenido: Servicios en UNA columna (4-sep-2026) ─────────────────
+          El catálogo de tarifas deja el panel lateral y baja al final, a todo
+          lo ancho: la tabla recupera el espacio donde se captura y se decide,
+          y el orden vertical refleja cómo se trabaja — defines conceptos,
+          comparas agentes, y las tarifas son el insumo de esa comparación.
+          Es el orden del sistema de Luis. */}
       {activeTab === 'servicios' && visible.desglosePorConcepto && (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
         <div className="flex-1 flex min-h-0">
-          {/* Columna izquierda: servicios */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {/* ── Comparativa de agentes, una por servicio ─────────────────
-                Arriba de la tabla: se compara, se elige, y se cotiza. Pricing
-                pide la misma ruta «a entre 7 y 10» proveedores, y un agente
+            {/* 1 · La tabla de conceptos, a todo el ancho. */}
+            {/* ── C.4 · La tabla única (4-sep-2026) ────────────────────────
+                Reemplaza a las cinco tarjetas por modalidad. Luis: «falta
+                quitar los cuadros que teníamos, para que solo quedara 1». La
+                modalidad sigue existiendo como dato en el servicio — de ahí
+                leen la matriz y la generación de embarques — pero deja de ser
+                el criterio de agrupación visual. */}
+            <TablaConceptos
+              lineas={lineasPlanas}
+              servicios={serviciosDeLaTabla}
+              editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
+              soloLectura={rolActivo === 'ventas'}
+              lineaActivaId={lineaActivaId}
+              conceptosActivos={conceptosActivos}
+              onEditarLinea={handleEditarLineaPlana}
+              onElegirConcepto={handleElegirConcepto}
+              onQuitarLinea={handleQuitarLineaPlana}
+              onMoverLinea={handleMoverLineaPlana}
+              onAgregarLinea={handleAgregarLineaPlana}
+              onCompararProveedor={handleCompararProveedor}
+              onCambiarServicio={handleCambiarServicioDeLinea}
+              onDatosEmbarque={(servicioId) => setDatosEmbarqueDe(servicioId)}
+            />
+
+            {/* 2 · La comparativa de agentes, una por servicio. Pricing pide
+                la misma ruta «a entre 7 y 10» proveedores, y un agente
                 marítimo no compite contra un transportista terrestre. */}
             {matrizActiva && (
               <MatrizAgentes
@@ -1233,28 +1261,51 @@ export default function FichaCotizacion({
               />
             )}
 
-            {/* ── C.4 · La tabla única (4-sep-2026) ────────────────────────
-                Reemplaza a las cinco tarjetas por modalidad. Luis: «falta
-                quitar los cuadros que teníamos, para que solo quedara 1». La
-                modalidad sigue existiendo como dato en el servicio — de ahí
-                leen la matriz y la generación de embarques — pero deja de ser
-                el criterio de agrupación visual. */}
-            <TablaConceptos
-              lineas={lineasPlanas}
-              servicios={serviciosDeLaTabla}
-              editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
-              soloLectura={rolActivo === 'ventas'}
-              lineaActivaId={lineaActivaId}
-              conceptosActivos={conceptosActivos}
-              onEditarLinea={handleEditarLineaPlana}
-              onElegirConcepto={handleElegirConcepto}
-              onQuitarLinea={handleQuitarLineaPlana}
-              onMoverLinea={handleMoverLineaPlana}
-              onAgregarLinea={handleAgregarLineaPlana}
-              onCompararProveedor={handleCompararProveedor}
-              onCambiarServicio={handleCambiarServicioDeLinea}
-              onDatosEmbarque={(servicioId) => setDatosEmbarqueDe(servicioId)}
-            />
+            {/* 3 · El catálogo de tarifas: el insumo de la comparativa, a
+                todo lo ancho y colapsable para que no estorbe cuando ya
+                elegiste. «Usar» y el arrastre alimentan la matriz de arriba
+                vía el concepto activo, igual que siempre. Ya no se oculta en
+                móvil: abajo no le roba ancho a nadie. */}
+            {rolActivo !== 'ventas' && (
+              <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <button
+                  onClick={() => setCatalogoAbierto(v => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/60"
+                >
+                  <span className="flex items-center gap-2 text-[13px] font-bold text-[#18181B]">
+                    Catálogo de tarifas
+                    {activeConceptoData && (
+                      <span className="text-[10px] font-semibold text-[#E11D48] uppercase tracking-wider">
+                        → {activeConceptoData.concepto.nombre}
+                      </span>
+                    )}
+                  </span>
+                  {catalogoAbierto
+                    ? <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
+                    : <ChevronDown className="w-3.5 h-3.5 text-gray-400" />}
+                </button>
+                {catalogoAbierto && (
+                  <TarifaPanel
+                    horizontal
+                    conceptoNombre={activeConceptoData?.concepto.nombre ?? null}
+                    conceptoId={activeConceptoData?.concepto.conceptoId}
+                    contenedorTipo={activeConceptoData?.servicio.fcl_contenedor}
+                    catalogoTarifas={catalogoTarifas}
+                    tarifasYaUsadas={
+                      activeConceptoData
+                        ? (activeConceptoData.concepto.tarifas || []).map(t => t.tarifaOrigenId).filter((id): id is string => !!id)
+                        : []
+                    }
+                    onUsarTarifa={handlePanelUsarTarifa}
+                    onCaptura={handlePanelCaptura}
+                    onCrearTarifaSpot={createTarifa}
+                    costoBaseByMoneda={costoBaseByMoneda}
+                    costoConceptoActualByMoneda={costoConceptoActualByMoneda}
+                    onAplicarSimulacion={handlePanelAplicarSimulacion}
+                  />
+                )}
+              </div>
+            )}
 
             {/* Resumen financiero DENTRO de la ficha: «mientras cotizan no lo
                 pueden ver, se tendrían que salir de lo que están haciendo». */}
@@ -1334,30 +1385,8 @@ export default function FichaCotizacion({
             {/* Total consolidado dentro de la tab */}
             {renderConsolidadoPanel()}
           </div>
-
-          {/* Columna derecha: panel de tarifas (D2: oculto cuando comparativa abierta; D3: oculto <768px) */}
-          {rolActivo !== 'ventas' && !anyComparativaOpen && (
-            <div className="w-[380px] shrink-0 hidden md:flex flex-col border-l border-gray-100 overflow-hidden">
-              <TarifaPanel
-                conceptoNombre={activeConceptoData?.concepto.nombre ?? null}
-                conceptoId={activeConceptoData?.concepto.conceptoId}
-                contenedorTipo={activeConceptoData?.servicio.fcl_contenedor}
-                catalogoTarifas={catalogoTarifas}
-                tarifasYaUsadas={
-                  activeConceptoData
-                    ? (activeConceptoData.concepto.tarifas || []).map(t => t.tarifaOrigenId).filter((id): id is string => !!id)
-                    : []
-                }
-                onUsarTarifa={handlePanelUsarTarifa}
-                onCaptura={handlePanelCaptura}
-                onCrearTarifaSpot={createTarifa}
-                costoBaseByMoneda={costoBaseByMoneda}
-                costoConceptoActualByMoneda={costoConceptoActualByMoneda}
-                onAplicarSimulacion={handlePanelAplicarSimulacion}
-              />
-            </div>
-          )}
         </div>
+
         {/* FC-3: DragOverlay — tarjeta flotante siguiendo el cursor */}
         <DragOverlay dropAnimation={null}>
           {activeDrag && (

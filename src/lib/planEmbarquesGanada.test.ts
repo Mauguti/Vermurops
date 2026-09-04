@@ -245,7 +245,7 @@ describe('F · el caso degenerado', () => {
 // servicio.tipo y de las líneas, nunca de cómo se pinten. Si alguien algún día
 // hace que la generación dependa de la capa visual, esto truena.
 
-import { agregarLinea, moverLineaDeServicio, aplicarEdicionLinea, aplanarCotizacion } from './lineasCotizacion';
+import { agregarLinea, moverLineaDeServicio, aplicarEdicionLinea } from './lineasCotizacion';
 
 describe('G · la tabla única no cambia los embarques', () => {
   it('mover una línea fresca de servicio la manda al embarque del servicio nuevo', () => {

@@ -238,6 +238,13 @@ function SimuladorFooter({
 interface TarifaPanelProps {
   /** Nombre del concepto activo. null = ningún concepto seleccionado. */
   conceptoNombre: string | null;
+  /**
+   * A todo lo ancho, debajo de la comparativa (4-sep-2026). Las tarjetas se
+   * acomodan en rejilla en vez de pila, y el alto lo dicta el contenido en
+   * lugar de estirarse al del contenedor. Todo lo demás —filtros, vigencia,
+   * maniobras, simulador, captura— es idéntico en ambas orientaciones.
+   */
+  horizontal?: boolean;
   /** FK al catálogo conceptos/. undefined = concepto legacy. */
   conceptoId?: string;
   /** Tipo de contenedor del servicio (para resolución de monto). */
@@ -262,6 +269,7 @@ interface TarifaPanelProps {
 
 export default function TarifaPanel({
   conceptoNombre,
+  horizontal = false,
   conceptoId,
   contenedorTipo,
   catalogoTarifas,
@@ -368,13 +376,13 @@ export default function TarifaPanel({
   // ── Sin concepto seleccionado ─────────────────────────────────────────────
   if (!conceptoNombre) {
     return (
-      <div className="h-full bg-gray-50/30 flex flex-col">
+      <div className={`${horizontal ? '' : 'h-full'} bg-gray-50/30 flex flex-col`}>
         <div className="px-4 py-3 border-b border-gray-100">
-          <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+          <h3 className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest items-center gap-1.5 ${horizontal ? 'hidden' : 'flex'}`}>
             <BookOpen className="w-3.5 h-3.5" /> Catálogo de Tarifas
           </h3>
         </div>
-        <div className="flex-1 flex items-center justify-center px-6">
+        <div className={`flex-1 flex items-center justify-center px-6 ${horizontal ? 'py-6' : ''}`}>
           <p className="text-xs text-gray-400 text-center leading-relaxed">
             Haz clic en un renglón de la tabla para ver sus tarifas.
             También puedes arrastrar una tarifa hasta el renglón.
@@ -386,10 +394,10 @@ export default function TarifaPanel({
 
   // ── Panel con concepto activo ─────────────────────────────────────────────
   return (
-    <div className="h-full bg-gray-50/30 flex flex-col">
+    <div className={`${horizontal ? '' : 'h-full'} bg-gray-50/30 flex flex-col`}>
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-100 space-y-2 shrink-0">
-        <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+        <h3 className={`text-[10px] font-bold text-gray-400 uppercase tracking-widest items-center gap-1.5 ${horizontal ? 'hidden' : 'flex'}`}>
           <BookOpen className="w-3.5 h-3.5" /> Catálogo de Tarifas
         </h3>
         <div className="flex items-center gap-1.5 flex-wrap">
@@ -420,10 +428,12 @@ export default function TarifaPanel({
       </div>
 
       {/* Contenido scrollable */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+      <div className={horizontal
+        ? 'px-4 py-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3 max-h-[420px] overflow-y-auto content-start'
+        : 'flex-1 overflow-y-auto px-4 py-3 space-y-2'}>
         {/* Maniobras warning */}
         {esManiobra && terminalInfo && (
-          <div className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-amber-50 border border-amber-200/60 text-[9px] font-semibold text-amber-700">
+          <div className="col-span-full flex items-center gap-1.5 px-2 py-1.5 rounded bg-amber-50 border border-amber-200/60 text-[9px] font-semibold text-amber-700">
             <AlertTriangle className="w-3 h-3 shrink-0" />
             Maniobras: usar el costo más caro por terminal
           </div>
@@ -431,7 +441,7 @@ export default function TarifaPanel({
 
         {/* Concepto no encontrado en el catálogo */}
         {!matchedConcept && conceptoNombre && (
-          <div className="flex items-start gap-2 px-2.5 py-2 rounded-md bg-amber-50 border border-amber-200/60 text-[10px] text-amber-700">
+          <div className="col-span-full flex items-start gap-2 px-2.5 py-2 rounded-md bg-amber-50 border border-amber-200/60 text-[10px] text-amber-700">
             <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
             <span>
               <strong>&quot;{conceptoNombre}&quot;</strong> no está en el catálogo de conceptos.
@@ -442,7 +452,7 @@ export default function TarifaPanel({
 
         {/* Concepto encontrado pero sin tarifas vigentes */}
         {vigentes.length === 0 && matchedConcept && (
-          <div className="flex items-start gap-2 px-2.5 py-2 rounded-md bg-gray-50 border border-gray-150 text-[10px] text-gray-400">
+          <div className="col-span-full flex items-start gap-2 px-2.5 py-2 rounded-md bg-gray-50 border border-gray-150 text-[10px] text-gray-400">
             <BookOpen className="w-3 h-3 shrink-0 mt-0.5" />
             <span>
               Sin tarifas vigentes para <strong>&quot;{matchedConcept.nombre}&quot;</strong> — usa captura manual o crea una tarifa spot.
@@ -452,7 +462,7 @@ export default function TarifaPanel({
 
         {/* Sin resultados por filtro */}
         {vigentes.length > 0 && filtered.length === 0 && (
-          <p className="text-[10px] text-gray-400 italic py-2">
+          <p className="col-span-full text-[10px] text-gray-400 italic py-2">
             Sin resultados para &quot;{provSearch}&quot;
           </p>
         )}
@@ -485,7 +495,7 @@ export default function TarifaPanel({
 
         {/* Nota de resolución por contenedor */}
         {contenedorTipo && vigentes.some(v => v.precios.unidad === 'CONTENEDOR') && (
-          <p className="text-[8px] text-[#E11D48]/60 mt-1">
+          <p className="col-span-full text-[8px] text-[#E11D48]/60 mt-1">
             Contenedor: <strong>{contenedorTipo}</strong> — al usar, se aplica el precio de {etiquetaContenedor(contenedorTipo)}.
           </p>
         )}
