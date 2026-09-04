@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Search, X, Plus } from 'lucide-react';
 import type { ConceptoVermur, CategoriaConcepto } from './ConceptosData';
 
@@ -69,14 +70,53 @@ export default function ConceptoSelector({
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const listaRef = useRef<HTMLDivElement>(null);
+
+  /*
+   * ── Por qué el dropdown sale por PORTAL (4-sep-2026) ─────────────────────
+   * En la tabla única de conceptos, el selector vive dentro de dos
+   * contenedores que recortan: el `overflow-x-auto` de la tabla (113px de
+   * alto con una sola fila) y el `overflow-hidden` de la tarjeta. El dropdown
+   * se abría completo en el DOM y en pantalla solo se veía el buscador — el
+   * cliente no podía elegir concepto, sin concepto no hay match de tarifas, y
+   * sin tarifas la comparativa se queda vacía. Todo el reporte «la
+   * comparativa no recibe conceptos» era este recorte.
+   *
+   * Con el portal, la lista se monta en <body> con posición fija calculada
+   * desde el disparador: ningún ancestro puede recortarla. Se recalcula en
+   * scroll y resize (captura, porque el scroll es de un contenedor interno).
+   */
+  const [posicion, setPosicion] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) { setPosicion(null); return; }
+    const calcular = () => {
+      const r = containerRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const ANCHO = 340, ALTO_MAX = 400;
+      const left = Math.min(r.left, window.innerWidth - ANCHO - 8);
+      // Si no cabe abajo, se abre hacia arriba.
+      const top = r.bottom + ALTO_MAX + 8 > window.innerHeight && r.top > ALTO_MAX
+        ? r.top - ALTO_MAX - 4
+        : r.bottom + 4;
+      setPosicion({ top, left: Math.max(8, left) });
+    };
+    calcular();
+    window.addEventListener('scroll', calcular, true);
+    window.addEventListener('resize', calcular);
+    return () => {
+      window.removeEventListener('scroll', calcular, true);
+      window.removeEventListener('resize', calcular);
+    };
+  }, [open]);
 
   // Cerrar con click fuera
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const dentroDelDisparador = containerRef.current?.contains(e.target as Node);
+      const dentroDeLaLista = listaRef.current?.contains(e.target as Node);
+      if (!dentroDelDisparador && !dentroDeLaLista) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -157,9 +197,11 @@ export default function ConceptoSelector({
       </button>
 
       {/* Dropdown */}
-      {open && (
+      {open && posicion && createPortal(
         <div
-          className="absolute z-50 left-0 top-full mt-1 w-[340px] bg-white border border-gray-200 rounded-lg shadow-lg flex flex-col max-h-[400px] overflow-hidden"
+          ref={listaRef}
+          style={{ position: 'fixed', top: posicion.top, left: posicion.left }}
+          className="z-[200] w-[340px] bg-white border border-gray-200 rounded-lg shadow-lg flex flex-col max-h-[400px] overflow-hidden"
           onClick={e => e.stopPropagation()}
         >
           {/* Buscador */}
@@ -256,7 +298,8 @@ export default function ConceptoSelector({
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

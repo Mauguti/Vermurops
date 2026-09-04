@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Building2, Users, Database, Link as LinkIcon, FileCheck, 
   Settings2, Plus, Search, Shield, Zap, Mail, MessageSquare, 
@@ -26,6 +26,13 @@ export default function Settings() {
   // Solo 'admin' (superusuario técnico) ve la configuración completa.
   // 'administracion' es un área de la operación, no un superusuario.
   const isRestrictedRole = !!user && user.rol !== 'admin';
+
+  // El default del estado no conoce el rol (se declara antes): se corrige al
+  // montar. Para un no-admin, 'users' ni existe en su menú.
+  useEffect(() => {
+    if (isRestrictedRole) setActiveSection('perfil');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRestrictedRole]);
   const isAdmin = user?.rol === 'admin';
 
   const ROLE_BADGE: Record<string, { label: string; bg: string; color: string }> = {
@@ -36,8 +43,12 @@ export default function Settings() {
     admin:          { label: 'Admin',          bg: '#FEE2E2', color: '#B91C1C' },
   };
 
-  // ── Vista de perfil para roles restringidos ───────────────────────────────
-  if (isRestrictedRole && user) {
+  // ── Perfil como SECCIÓN, ya no como salida anticipada ─────────────────────
+  // El early return expulsaba a todo rol no-admin a «Mi Perfil», y con él se
+  // volvía invisible el catálogo de conceptos que es de consulta para todos
+  // (B3). Encontrado el 4-sep probando como Pricing en los emuladores.
+  const renderPerfil = () => {
+    if (!user) return null;
     const badge = ROLE_BADGE[user.rol];
     return (
       <div className="flex flex-col h-full bg-[#F8FAFC]">
@@ -118,9 +129,19 @@ export default function Settings() {
         </div>
       </div>
     );
-  }
+  };
 
-  const menuItems = [
+  /*
+   * Menú por rol. Los no-admin ven su perfil y el catálogo de conceptos —
+   * consulta, con la edición gobernada por concepto.editar. El resto de las
+   * secciones siguen siendo del superusuario, como antes del cambio.
+   */
+  const menuItems = isRestrictedRole
+    ? [
+        { id: 'perfil', label: 'Mi Perfil', icon: <Users className="w-[18px] h-[18px]" /> },
+        { id: 'conceptos', label: 'Catálogo de conceptos', icon: <Package className="w-[18px] h-[18px]" /> },
+      ]
+    : [
     { id: 'company', label: 'Mi empresa', icon: <Building2 className="w-[18px] h-[18px]" /> },
     { id: 'users', label: 'Usuarios y roles', icon: <Users className="w-[18px] h-[18px]" /> },
     { id: 'catalogs', label: 'Catálogos base', icon: <Database className="w-[18px] h-[18px]" /> },
@@ -237,6 +258,8 @@ export default function Settings() {
                  </div>
               </div>
            )}
+
+           {activeSection === 'perfil' && renderPerfil()}
 
            {activeSection === 'conceptos' && (
              <div>
