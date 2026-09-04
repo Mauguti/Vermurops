@@ -72,6 +72,8 @@ import {
 import ResumenFinancieroInline from './ResumenFinancieroInline';
 import { calcTotales } from '../../lib/cotizacionCalculator';
 import { cargaDesdeLegacy, resumenCarga, ETIQUETA_MODALIDAD, ModalidadSolicitud } from '../../lib/cargaSolicitud';
+import DetalleCargaSolicitud from './DetalleCargaSolicitud';
+import TablaVentaConceptos from './TablaVentaConceptos';
 
 // ─── Re-exports for backward compat (other files may import these from here) ──
 export { ServicioSection } from './ServicioSection';
@@ -683,6 +685,9 @@ export default function FichaCotizacion({
     [quote.servicios, servicios],
   );
 
+  /** Servicio expandido en la franja «Lo que pidió el cliente». */
+  const [cargaExpandida, setCargaExpandida] = useState<string | null>(null);
+
   /**
    * La carga que declaró Ventas en la solicitud (S-3), para que Pricing
    * cotice sin volver a preguntar. Solo servicios con algo que decir.
@@ -700,6 +705,44 @@ export default function FichaCotizacion({
     }),
     [quote.servicios, serviciosDeLaTabla],
   );
+
+  /**
+   * La franja «Lo que pidió el cliente» + su detalle expandible. La ven ambos
+   * roles: aquí no hay costos ni proveedores — es lo que el cliente pidió.
+   * «Ver detalle» abre la carga completa y las mercancías (lo que Operaciones
+   * hereda), consultable sin salir de la ficha.
+   */
+  const franjaSolicitud = solicitudDeclarada.length > 0 ? (
+    <div className="border border-gray-200 bg-gray-50/60 rounded-xl px-4 py-2.5 space-y-1">
+      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+        Lo que pidió el cliente
+      </p>
+      {solicitudDeclarada.map(d => {
+        const abierto = cargaExpandida === d.id;
+        const servicio = (quote.servicios ?? []).find(srv => srv.id === d.id);
+        return (
+          <div key={d.id}>
+            <p className="text-[11px] text-gray-600 flex flex-wrap items-center gap-x-2">
+              <span className="font-bold text-gray-700">{d.etiqueta}:</span>
+              <span>{d.resumen}</span>
+              {d.ruta && <span className="text-gray-400">· {d.ruta}</span>}
+              {d.requeridos > 0 && (
+                <span className="text-gray-400">· {d.requeridos} concepto{d.requeridos !== 1 ? 's' : ''} señalado{d.requeridos !== 1 ? 's' : ''}</span>
+              )}
+              <button
+                type="button"
+                onClick={() => setCargaExpandida(abierto ? null : d.id)}
+                className="text-[10px] font-bold text-[#E11D48] hover:text-[#BE123C]"
+              >
+                {abierto ? 'Ocultar detalle' : 'Ver detalle'}
+              </button>
+            </p>
+            {abierto && servicio && <DetalleCargaSolicitud servicio={servicio} />}
+          </div>
+        );
+      })}
+    </div>
+  ) : null;
 
   /** Aplica una edición de la tabla plana sobre el árbol anidado. */
   const handleEditarLineaPlana = (
@@ -1272,23 +1315,7 @@ export default function FichaCotizacion({
                 modalidad sigue existiendo como dato en el servicio — de ahí
                 leen la matriz y la generación de embarques — pero deja de ser
                 el criterio de agrupación visual. */}
-            {solicitudDeclarada.length > 0 && (
-              <div className="border border-gray-200 bg-gray-50/60 rounded-xl px-4 py-2.5 space-y-1">
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
-                  Lo que pidió el cliente
-                </p>
-                {solicitudDeclarada.map(d => (
-                  <p key={d.id} className="text-[11px] text-gray-600 flex flex-wrap items-center gap-x-2">
-                    <span className="font-bold text-gray-700">{d.etiqueta}:</span>
-                    <span>{d.resumen}</span>
-                    {d.ruta && <span className="text-gray-400">· {d.ruta}</span>}
-                    {d.requeridos > 0 && (
-                      <span className="text-gray-400">· {d.requeridos} concepto{d.requeridos !== 1 ? 's' : ''} señalado{d.requeridos !== 1 ? 's' : ''}</span>
-                    )}
-                  </p>
-                ))}
-              </div>
-            )}
+            {franjaSolicitud}
 
             <TablaConceptos
               lineas={lineasPlanas}
@@ -1481,6 +1508,21 @@ export default function FichaCotizacion({
           )}
         </DragOverlay>
         </DndContext>
+      )}
+
+      {/* ── Servicios, versión VENTAS (sep-2026) ─────────────────────────────
+          «que vean la coti... y el margen. Eso es todo». La lista de conceptos
+          con su precio de venta y el total — sin costos, profit, margen por
+          línea, proveedores, comparativa ni catálogo. No es la tabla completa
+          con columnas escondidas: TablaVentaConceptos nunca pinta esos datos. */}
+      {activeTab === 'servicios' && !visible.desglosePorConcepto && visible.ventaPorConcepto && (
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {franjaSolicitud}
+          <TablaVentaConceptos
+            lineas={lineasPlanas}
+            etiquetaServicio={(id) => serviciosDeLaTabla.find(x => x.id === id)?.etiqueta ?? ''}
+          />
+        </div>
       )}
 
       {/* ── Contenido: otros tabs (con scroll y padding) ────────────────────── */}

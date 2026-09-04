@@ -22,8 +22,11 @@ describe('lo que Ventas NO ve', () => {
   it('no ve los proveedores', () => expect(v.proveedores).toBe(false));
   it('no ve los adjuntos de tarifas', () => expect(v.adjuntosTarifa).toBe(false));
 
-  it('la pestaña Servicios no está entre sus pestañas', () => {
-    expect(tabsVisibles('ventas')).not.toContain('servicios');
+  // (sep-2026) La pestaña Servicios VOLVIÓ para Ventas, pero recortada: lo
+  // que no ven es su contenido interno, gobernado por visibilidadDe().
+  it('no ve la comparativa de agentes ni el catálogo de tarifas', () => {
+    expect(v.comparativaAgentes).toBe(false);
+    expect(v.catalogoTarifas).toBe(false);
   });
 });
 
@@ -38,8 +41,11 @@ describe('lo que Ventas SÍ ve', () => {
     expect(visibilidadDe('ventas').lineaTiempo).toBe(true);
   });
 
-  it('información, actividades, historial y chat', () => {
-    expect(tabsVisibles('ventas')).toEqual(['info', 'actividades', 'historial', 'chat']);
+  it('la pestaña Servicios, en su versión: concepto y precio de venta', () => {
+    // «que vean la coti, o sea, la información que tiene una cotización, y el
+    // margen. Eso es todo.» La lista de conceptos con su venta ES la coti.
+    expect(tabsVisibles('ventas')).toContain('servicios');
+    expect(visibilidadDe('ventas').ventaPorConcepto).toBe(true);
   });
 });
 

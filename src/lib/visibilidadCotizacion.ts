@@ -24,8 +24,18 @@ import { PipelineStageId } from '../components/quotes/QuotesData';
 export interface VisibilidadFicha {
   /** Tabla de conceptos con costos, proveedores y profit por línea. */
   desglosePorConcepto: boolean;
+  /**
+   * Tabla de conceptos SOLO con nombre y precio de venta (sep-2026).
+   * Es lo que Ventas necesita para hablar con el cliente: qué lleva la
+   * cotización y cuánto cuesta cada cosa — sin el desglose interno.
+   */
+  ventaPorConcepto: boolean;
   /** Nombre y datos de los proveedores cotizados. */
   proveedores: boolean;
+  /** Comparativa de agentes (costos de proveedor lado a lado). */
+  comparativaAgentes: boolean;
+  /** Catálogo de tarifas dentro de la ficha. */
+  catalogoTarifas: boolean;
   /** Adjuntos de las tarifas (correos, PDFs del proveedor). */
   adjuntosTarifa: boolean;
   /** Margen de la operación completa, sin desglosar. */
@@ -42,7 +52,10 @@ export function visibilidadDe(rol: UserRole | undefined | null): VisibilidadFich
   if (rol === 'ventas') {
     return {
       desglosePorConcepto: false,
+      ventaPorConcepto: true,
       proveedores: false,
+      comparativaAgentes: false,
+      catalogoTarifas: false,
       adjuntosTarifa: false,
       margenGeneral: true,
       lineaTiempo: true,
@@ -50,7 +63,10 @@ export function visibilidadDe(rol: UserRole | undefined | null): VisibilidadFich
   }
   return {
     desglosePorConcepto: true,
+    ventaPorConcepto: true,
     proveedores: true,
+    comparativaAgentes: true,
+    catalogoTarifas: true,
     adjuntosTarifa: true,
     margenGeneral: true,
     lineaTiempo: true,
@@ -113,13 +129,11 @@ export type TabFicha = 'info' | 'servicios' | 'actividades' | 'historial' | 'cha
 /**
  * Pestañas que ve cada rol.
  *
- * Ventas pierde «Servicios», que es donde viven costos, proveedores y profits.
- * Conserva «Actividades»: son sus llamadas, correos y tareas con el cliente —
- * su propio registro de trabajo, no información interna de Pricing.
+ * Ventas SÍ ve «Servicios» (sep-2026), pero en su versión: conceptos con su
+ * precio de venta y el total. Lo que no ve es el contenido interno — costos,
+ * profit, margen por línea, proveedores, comparativa y catálogo de tarifas —
+ * gobernado por visibilidadDe(), no por esta lista.
  */
 export function tabsVisibles(rol: UserRole | undefined | null): TabFicha[] {
-  if (rol === 'ventas') {
-    return ['info', 'actividades', 'historial', 'chat'];
-  }
   return ['info', 'servicios', 'actividades', 'historial', 'chat'];
 }
