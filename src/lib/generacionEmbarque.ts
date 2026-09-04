@@ -20,6 +20,7 @@ import {
 } from '../components/shipments/EmbarquesData';
 import { Advertencia } from './cotizacionAEmbarque';
 import { aplanarCotizacion, LineaPlana } from './lineasCotizacion';
+import { productosDesdeGrupo } from './cargaSolicitud';
 
 /** Cómo nació el embarque. Gobierna qué permiso se exige al guardarlo. */
 export type OrigenEmbarque = 'automatico' | 'manual';
@@ -73,6 +74,13 @@ export interface DatosGeneracion {
   origen: OrigenEmbarque;
   /** Quién disparó. En automático es quien cerró la venta. */
   generadoPor: string;
+  /**
+   * Servicios que viajan en ESTE embarque (S-3). De su carga tipada se
+   * heredan los productos — contenedores, peso, mercancías — para que
+   * Operaciones no recapture lo que Ventas ya declaró. Sin esto se hereda
+   * del servicio de la ruta.
+   */
+  serviciosGrupo?: import('../components/quotes/QuotesData').ServicioSolicitado[];
   /** Marca de tiempo, inyectada para poder probar. */
   ahora: string;
   /**
@@ -144,6 +152,12 @@ export function construirEmbarqueDesdeCotizacion(d: DatosGeneracion): EmbarqueCo
     },
 
     descripcionCarga: primerServicio?.mercancia ?? '',
+    // Herencia S-3: se captura una vez en la solicitud, no dos.
+    productos: productosDesdeGrupo(
+      d.serviciosGrupo ?? (primerServicio ? [primerServicio] : []),
+      empresa,
+      quote.id,
+    ),
     valorDeclarado: 0,
     cierres: { operativo: false, pago: false, administrativo: false },
 

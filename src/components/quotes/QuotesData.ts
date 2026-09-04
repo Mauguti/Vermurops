@@ -539,7 +539,9 @@ export const TIPOS_SERVICIO: Record<string, { label: string; color: string; icon
   'maritimo': { label: 'Marítimo', color: 'bg-blue-100 text-blue-700', icon: 'ship' },
   'aereo': { label: 'Aéreo', color: 'bg-sky-100 text-sky-700', icon: 'plane' },
   'terrestre': { label: 'Terrestre', color: 'bg-emerald-100 text-emerald-700', icon: 'truck' },
-  'aduanal': { label: 'Aduanal', color: 'bg-teal-100 text-teal-700', icon: 'shield-check' }
+  'aduanal': { label: 'Aduanal', color: 'bg-teal-100 text-teal-700', icon: 'shield-check' },
+  // Modalidad del rediseño de la solicitud (sep-2026)
+  'despacho_aduanal': { label: 'Despacho aduanal', color: 'bg-teal-100 text-teal-700', icon: 'shield-check' },
 };
 
 export const INCOTERMS = ['EXW', 'FOB', 'FCA', 'CFR', 'CIF', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP'];

@@ -319,3 +319,112 @@ export function mercanciasAEmbarque(mercancias: MercanciaDetalle[] | undefined):
       pesoKg: m.pesoKg ?? 0,
     }));
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8 · Herencia de la carga al embarque (S-3)
+//
+// Operaciones captura productos → pallets → mercancía en el embarque. Lo que
+// Ventas ya declaró en la solicitud se hereda como punto de partida:
+// contenedores con su tipo (número pendiente), peso, piezas, y el detalle de
+// mercancías como pallet inicial. Nada se inventa: con VARIOS contenedores el
+// peso total no se reparte —repartirlo sería inventar— y queda en el primero
+// solo cuando el contenedor es único.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import type { EmbarqueProducto, Pallet } from '../components/shipments/EmbarquesData';
+
+function palletInicial(
+  mercancias: MercanciaDetalle[] | undefined,
+  clienteNombre: string,
+  cotizacionId: string,
+): Pallet[] {
+  const lineas = mercanciasAEmbarque(mercancias);
+  if (lineas.length === 0) return [];
+  return [{
+    id: idUnico('pal'),
+    numeroPallet: '1',
+    clienteNombre,
+    cotizacionRef: cotizacionId,
+    mercancia: lineas,
+  }];
+}
+
+/**
+ * Productos del embarque a partir de la carga tipada de UN servicio.
+ * Lee vía cargaDesdeLegacy: una solicitud vieja también hereda lo que tenga.
+ * Devuelve [] cuando no hay nada que heredar — el embarque nace como hoy.
+ */
+export function productosDesdeCarga(
+  servicio: ServicioSolicitado,
+  clienteNombre: string,
+  cotizacionId: string,
+): EmbarqueProducto[] {
+  const carga = cargaDesdeLegacy(servicio);
+  if (!carga) return [];
+
+  const descripcion = servicio.mercancia && servicio.mercancia !== 'Por definir'
+    ? servicio.mercancia
+    : 'Mercancía por describir';
+  const pallets = palletInicial(carga.mercancias, clienteNombre, cotizacionId);
+
+  switch (carga.tipo) {
+    case 'fcl': {
+      const unidades = carga.contenedores.flatMap(c =>
+        Array.from({ length: Math.max(0, c.cantidad) }, () => c.tipoContenedor));
+      if (unidades.length === 0) return [];
+      const unico = unidades.length === 1;
+      return unidades.map((tipoContenedor, i) => ({
+        id: idUnico('prod'),
+        descripcion,
+        tipoEmbalaje: 'Contenedor',
+        // El número lo pone Operaciones cuando la naviera lo asigna.
+        datosContenedor: { numeroContenedor: '', tipoContenedor: ETIQUETA_CONTENEDOR[tipoContenedor], numeroSello: '', folioSello: '' },
+        tipoConsolidacion: 'FCL' as const,
+        piezas: 0,
+        peso: unico ? carga.pesoBrutoKg : 0,
+        ...(unico || i === 0 ? { pallets } : { pallets: [] }),
+      }));
+    }
+    case 'lcl':
+      return [{
+        id: idUnico('prod'),
+        descripcion,
+        tipoEmbalaje: 'Bulto',
+        tipoConsolidacion: 'LCL' as const,
+        piezas: carga.piezas,
+        peso: carga.pesoBrutoKg,
+        volumen: carga.volumenM3,
+        pallets,
+      }];
+    case 'aereo':
+      return [{
+        id: idUnico('prod'),
+        descripcion,
+        tipoEmbalaje: 'Bulto',
+        piezas: carga.piezas,
+        peso: carga.pesoBrutoKg,
+        pallets,
+      }];
+    case 'terrestre':
+      return [{
+        id: idUnico('prod'),
+        descripcion,
+        tipoEmbalaje: 'Bulto',
+        piezas: carga.piezas,
+        peso: carga.pesoBrutoKg,
+        pallets,
+      }];
+    case 'despacho':
+      // El despacho no mueve carga propia: no hereda productos.
+      return [];
+  }
+}
+
+/** Productos de un GRUPO de servicios (un embarque puede juntar varios). */
+export function productosDesdeGrupo(
+  servicios: ServicioSolicitado[],
+  clienteNombre: string,
+  cotizacionId: string,
+): EmbarqueProducto[] {
+  return servicios.flatMap(s => productosDesdeCarga(s, clienteNombre, cotizacionId));
+}

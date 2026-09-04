@@ -71,6 +71,7 @@ import {
 } from '../../lib/seleccionMatriz';
 import ResumenFinancieroInline from './ResumenFinancieroInline';
 import { calcTotales } from '../../lib/cotizacionCalculator';
+import { cargaDesdeLegacy, resumenCarga, ETIQUETA_MODALIDAD, ModalidadSolicitud } from '../../lib/cargaSolicitud';
 
 // ─── Re-exports for backward compat (other files may import these from here) ──
 export { ServicioSection } from './ServicioSection';
@@ -673,10 +674,31 @@ export default function FichaCotizacion({
   const serviciosDeLaTabla = useMemo<ServicioDeLaTabla[]>(
     () => (quote.servicios ?? []).map(srv => {
       const delCatalogo = (servicios ?? []).find(c => c.id === srv.tipo);
-      const crudo = delCatalogo?.nombre ?? srv.tipo;
+      // Las solicitudes del rediseño traen la modalidad como tipo
+      // ('despacho_aduanal'): su etiqueta sale del mapa, no del snake_case.
+      const deModalidad = ETIQUETA_MODALIDAD[srv.tipo as ModalidadSolicitud];
+      const crudo = delCatalogo?.nombre ?? deModalidad ?? srv.tipo;
       return { id: srv.id, etiqueta: crudo.charAt(0).toUpperCase() + crudo.slice(1) };
     }),
     [quote.servicios, servicios],
+  );
+
+  /**
+   * La carga que declaró Ventas en la solicitud (S-3), para que Pricing
+   * cotice sin volver a preguntar. Solo servicios con algo que decir.
+   */
+  const solicitudDeclarada = useMemo(
+    () => (quote.servicios ?? []).flatMap(srv => {
+      const carga = cargaDesdeLegacy(srv);
+      if (!carga) return [];
+      const etiqueta = serviciosDeLaTabla.find(x => x.id === srv.id)?.etiqueta ?? srv.tipo;
+      const ruta = srv.ruta?.origen && srv.ruta.origen !== 'Por definir'
+        ? `${srv.ruta.origen.split(',')[0]} → ${srv.ruta.destino.split(',')[0]}`
+        : null;
+      return [{ id: srv.id, etiqueta, resumen: resumenCarga(carga), ruta,
+        requeridos: srv.conceptosRequeridos?.length ?? 0 }];
+    }),
+    [quote.servicios, serviciosDeLaTabla],
   );
 
   /** Aplica una edición de la tabla plana sobre el árbol anidado. */
@@ -1250,6 +1272,24 @@ export default function FichaCotizacion({
                 modalidad sigue existiendo como dato en el servicio — de ahí
                 leen la matriz y la generación de embarques — pero deja de ser
                 el criterio de agrupación visual. */}
+            {solicitudDeclarada.length > 0 && (
+              <div className="border border-gray-200 bg-gray-50/60 rounded-xl px-4 py-2.5 space-y-1">
+                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                  Lo que pidió el cliente
+                </p>
+                {solicitudDeclarada.map(d => (
+                  <p key={d.id} className="text-[11px] text-gray-600 flex flex-wrap items-center gap-x-2">
+                    <span className="font-bold text-gray-700">{d.etiqueta}:</span>
+                    <span>{d.resumen}</span>
+                    {d.ruta && <span className="text-gray-400">· {d.ruta}</span>}
+                    {d.requeridos > 0 && (
+                      <span className="text-gray-400">· {d.requeridos} concepto{d.requeridos !== 1 ? 's' : ''} señalado{d.requeridos !== 1 ? 's' : ''}</span>
+                    )}
+                  </p>
+                ))}
+              </div>
+            )}
+
             <TablaConceptos
               lineas={lineasPlanas}
               servicios={serviciosDeLaTabla}

@@ -204,6 +204,9 @@ export default function Shipments() {
           origen: 'automatico',
           generadoPor: user?.nombre ?? user?.email ?? '',
           ahora: new Date().toISOString(),
+          // Ruta manual: un solo embarque para toda la cotización, así que
+          // hereda los productos de TODOS sus servicios.
+          serviciosGrupo: quote.servicios ?? [],
         });
         await guardarEmbarque(nuevo);
         setSelectedEmbarqueId(nuevo.id);

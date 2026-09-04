@@ -128,6 +128,9 @@ export async function crearEmbarquesDeCotizacionGanada(
         ahora,
         modalidad: grupo.modalidad,
         servicioRuta: (p.quote.servicios ?? []).find(s => grupo.servicioIds.includes(s.id)),
+        // Cada embarque hereda SOLO los productos de sus servicios: heredar
+        // todos duplicaría la carga en la multimodal, igual que los cargos.
+        serviciosGrupo: (p.quote.servicios ?? []).filter(s => grupo.servicioIds.includes(s.id)),
       }));
     });
 

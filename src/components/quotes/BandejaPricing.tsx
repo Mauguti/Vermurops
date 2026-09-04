@@ -19,6 +19,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { useTarifas } from '../../hooks/useTarifas';
 import { useConceptos } from '../../hooks/useConceptos';
 import { buildConceptoMap } from '../tarifas/tarifaMatching';
+import { cargaDesdeLegacy, resumenCarga } from '../../lib/cargaSolicitud';
 import {
   clasificarBandeja,
   calcularProgreso,
@@ -45,7 +46,8 @@ function ServicioIcon({ tipo }: { tipo: TipoServicio }) {
     case 'aereo':     return <Plane className="w-3.5 h-3.5" />;
     case 'maritimo':  return <Ship className="w-3.5 h-3.5" />;
     case 'terrestre': return <Truck className="w-3.5 h-3.5" />;
-    case 'aduanal':   return <ShieldCheck className="w-3.5 h-3.5" />;
+    case 'aduanal':
+    case 'despacho_aduanal': return <ShieldCheck className="w-3.5 h-3.5" />;
   }
 }
 
@@ -124,6 +126,11 @@ function CotizacionRow({ quote, progreso, dias, tarifasCount, bloque, onAbrir, o
   const modalidades = Array.from(new Set(quote.servicios.map(s => s.tipo)));
   // Ruta (del primer servicio)
   const ruta = quote.servicios[0]?.ruta;
+  // La carga que declaró Ventas (S-3): «FCL 2×40' · 18,500 kg». Las
+  // solicitudes viejas sin carga simplemente no pintan la línea.
+  const resumenesCarga = quote.servicios
+    .map(s => { const c = cargaDesdeLegacy(s); return c ? resumenCarga(c) : null; })
+    .filter((r): r is string => !!r);
 
   // Conteo de respondidos para bloque "esperando"
   const respondidos = quote.servicios.filter(s => s.estado === 'cotizado').length;
@@ -164,6 +171,13 @@ function CotizacionRow({ quote, progreso, dias, tarifasCount, bloque, onAbrir, o
                 {ruta.origen.split(',')[0]}
                 <ChevronRight className="w-2.5 h-2.5 text-gray-300 shrink-0" />
                 {ruta.destino.split(',')[0]}
+              </span>
+            )}
+
+            {/* Carga declarada (S-3) */}
+            {resumenesCarga.length > 0 && (
+              <span className="truncate max-w-[260px] text-gray-400" title={resumenesCarga.join('  |  ')}>
+                {resumenesCarga.join(' | ')}
               </span>
             )}
 

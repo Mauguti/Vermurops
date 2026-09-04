@@ -30,7 +30,8 @@ function ServiceIcon({ tipo, size = 'sm' }: { tipo: TipoServicio; size?: 'sm' | 
     case 'aereo':     return <Plane className={cls} />;
     case 'maritimo':  return <Ship className={cls} />;
     case 'terrestre': return <Truck className={cls} />;
-    case 'aduanal':   return <ShieldCheck className={cls} />;
+    case 'aduanal':
+    case 'despacho_aduanal': return <ShieldCheck className={cls} />;
     default:          return <HelpCircle className={cls} />;
   }
 }
@@ -599,7 +600,12 @@ export default function KanbanCotizaciones({
                   Servicios requeridos *
                 </label>
                 <div className="grid grid-cols-2 gap-2">
-                  {(Object.entries(TIPOS_SERVICIO) as [TipoServicio, { label: string; color: string; icon: string }][]).map(([tipo, meta]) => {
+                  {/* Las 4 modalidades del rediseño — el mismo PASO 1 del
+                      formulario completo. El detalle de la carga se captura
+                      después, en la solicitud o en la ficha. */}
+                  {(['maritimo', 'aereo', 'terrestre', 'despacho_aduanal'] as TipoServicio[])
+                    .map(tipo => [tipo, TIPOS_SERVICIO[tipo]] as [TipoServicio, { label: string; color: string; icon: string }])
+                    .map(([tipo, meta]) => {
                     const selected = qaServicios.includes(tipo);
                     return (
                       <button
@@ -614,7 +620,7 @@ export default function KanbanCotizaciones({
                         {tipo === 'aereo' && <Plane className="w-3.5 h-3.5" />}
                         {tipo === 'maritimo' && <Ship className="w-3.5 h-3.5" />}
                         {tipo === 'terrestre' && <Truck className="w-3.5 h-3.5" />}
-                        {tipo === 'aduanal' && <ShieldCheck className="w-3.5 h-3.5" />}
+                        {tipo === 'despacho_aduanal' && <ShieldCheck className="w-3.5 h-3.5" />}
                         {meta.label}
                       </button>
                     );

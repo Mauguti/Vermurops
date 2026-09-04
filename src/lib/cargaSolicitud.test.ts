@@ -249,3 +249,71 @@ describe('mercanciasAEmbarque — se hereda, no se recaptura', () => {
     expect(mercanciasAEmbarque(undefined)).toEqual([]);
   });
 });
+
+// ─── H · Herencia de productos al embarque ───────────────────────────────────
+
+import { productosDesdeCarga, productosDesdeGrupo } from './cargaSolicitud';
+
+describe('productosDesdeCarga — el embarque nace con lo que Ventas declaró', () => {
+  const srv = (carga: Parameters<typeof modalidadDeCarga>[0], mercancia = 'Rollos de tela'):
+    ServicioSolicitado => ({ ...servicioBase, mercancia, carga });
+
+  it('FCL de varios contenedores: un producto por unidad, tipo prellenado, número vacío', () => {
+    const productos = productosDesdeCarga(srv(fcl), 'Importadora del Golfo', 'COT-1');
+    expect(productos).toHaveLength(3); // 2×40' + 1×20'
+    expect(productos.map(p => p.datosContenedor?.tipoContenedor)).toEqual(["40'", "40'", "20'"]);
+    expect(productos.every(p => p.datosContenedor?.numeroContenedor === '')).toBe(true);
+    expect(productos.every(p => p.tipoConsolidacion === 'FCL')).toBe(true);
+  });
+
+  it('con VARIOS contenedores el peso no se reparte — repartirlo sería inventar', () => {
+    const productos = productosDesdeCarga(srv(fcl), 'Cliente', 'COT-1');
+    expect(productos.every(p => p.peso === 0)).toBe(true);
+  });
+
+  it('con UN contenedor el peso total sí viaja en él', () => {
+    const uno = { ...fcl, contenedores: [{ tipoContenedor: '40hc' as const, cantidad: 1 }] };
+    const [p] = productosDesdeCarga(srv(uno), 'Cliente', 'COT-1');
+    expect(p.peso).toBe(18500);
+  });
+
+  it('LCL hereda piezas, peso y volumen como un bulto', () => {
+    const [p] = productosDesdeCarga(srv(lcl), 'Cliente', 'COT-1');
+    expect(p).toMatchObject({ tipoEmbalaje: 'Bulto', tipoConsolidacion: 'LCL', piezas: 12, peso: 2400, volumen: 8.5 });
+  });
+
+  it('las mercancías detalladas nacen como pallet inicial con sus líneas', () => {
+    const conDetalle = { ...lcl, mercancias: [
+      { id: 'm1', descripcion: 'Tela roja', piezas: 20, pesoKg: 1200 },
+      { id: 'm2', descripcion: 'Tela azul', piezas: 18, pesoKg: 1200 },
+    ] };
+    const [p] = productosDesdeCarga(srv(conDetalle), 'Importadora del Golfo', 'COT-9');
+    expect(p.pallets).toHaveLength(1);
+    expect(p.pallets![0].clienteNombre).toBe('Importadora del Golfo');
+    expect(p.pallets![0].cotizacionRef).toBe('COT-9');
+    expect(p.pallets![0].mercancia!.map(m => m.descripcion)).toEqual(['Tela roja', 'Tela azul']);
+  });
+
+  it('el despacho no mueve carga propia: cero productos', () => {
+    expect(productosDesdeCarga(srv(despacho), 'Cliente', 'COT-1')).toEqual([]);
+  });
+
+  it('sin carga legible el embarque nace como hoy: vacío, no inventado', () => {
+    expect(productosDesdeCarga(servicioBase, 'Cliente', 'COT-1')).toEqual([]);
+  });
+
+  it('una solicitud VIEJA (campos E4) también hereda', () => {
+    const viejo = {
+      ...servicioBase, tipo_embarque: 'FCL' as const,
+      fcl_contenedor: "40'HC", fcl_peso: 18, fcl_peso_unidad: 'tons' as const,
+    };
+    const [p] = productosDesdeCarga(viejo, 'Cliente', 'COT-1');
+    expect(p.datosContenedor?.tipoContenedor).toBe("40'HC");
+    expect(p.peso).toBe(18000);
+  });
+
+  it('un grupo junta los productos de sus servicios', () => {
+    const productos = productosDesdeGrupo([srv(fcl), srv(despacho), srv(terrestre)], 'Cliente', 'COT-1');
+    expect(productos).toHaveLength(4); // 3 contenedores + 1 bulto terrestre, despacho aporta 0
+  });
+});
