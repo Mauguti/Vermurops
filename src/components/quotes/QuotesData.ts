@@ -70,6 +70,126 @@ export interface CotizacionProveedor {
   tarifaOrigenId?: string | null;
 }
 
+
+// ------------------------------------------------------------
+// Carga solicitada (rediseño de la solicitud, sep-2026)
+//
+// Lo que Ventas captura depende de QUÉ se mueve: los campos de un FCL no son
+// los de un despacho aduanal. La unión se discrimina por `carga.tipo` y de
+// ahí se DERIVA la modalidad (fcl/lcl → marítimo): no se guarda aparte,
+// porque dos campos que dicen lo mismo terminan contradiciéndose.
+//
+// La lógica (validación, resumen, espejo legacy) vive en lib/cargaSolicitud.ts.
+// ------------------------------------------------------------
+
+export interface MercanciaPeligrosa {
+  esPeligrosa: boolean;
+  claseIMO?: string;
+  numeroUN?: string;
+}
+
+export interface Refrigeracion {
+  requiere: boolean;
+  temperaturaC?: number;
+}
+
+/** Dimensiones de un bulto, en centímetros. */
+export interface Bulto {
+  largoCm: number;
+  anchoCm: number;
+  altoCm: number;
+}
+
+/**
+ * Detalle de la mercancía, cuando el cliente lo da (un packing list con 5
+ * productos). Opcional: a veces basta la descripción general del servicio.
+ *
+ * Fluye al embarque: Operaciones captura contenedor → pallets → mercancía, y
+ * si Ventas ya lo describió aquí, se hereda en vez de recapturarse
+ * (mercanciasAEmbarque en lib/cargaSolicitud.ts mapea a MercanciaLine).
+ */
+export interface MercanciaDetalle {
+  id: string;
+  descripcion: string;
+  fraccionArancelaria?: string;
+  piezas?: number;
+  pesoKg?: number;
+  valorUnitario?: number;
+  moneda?: 'MXN' | 'USD';
+}
+
+interface CargaBase {
+  mercancias?: MercanciaDetalle[];
+}
+
+export type TipoContenedor = '20' | '40' | '40hc' | 'reefer' | 'open_top' | 'flat_rack';
+
+export interface CargaFCL extends CargaBase {
+  tipo: 'fcl';
+  /** «2×40' y 1×20' en la misma operación»: lista tipo+cantidad. */
+  contenedores: { tipoContenedor: TipoContenedor; cantidad: number }[];
+  pesoBrutoKg: number;
+  peligrosa: MercanciaPeligrosa;
+  refrigeracion: Refrigeracion;
+}
+
+export interface CargaLCL extends CargaBase {
+  tipo: 'lcl';
+  pesoBrutoKg: number;
+  volumenM3: number;
+  piezas: number;
+  bultos: Bulto[];
+  /** Lo pidió Ventas explícitamente: cambia cómo se estiba y cotiza. */
+  estibable: boolean;
+  peligrosa: MercanciaPeligrosa;
+}
+
+export interface CargaAerea extends CargaBase {
+  tipo: 'aereo';
+  pesoBrutoKg: number;
+  pesoVolumetricoKg: number;
+  piezas: number;
+  bultos: Bulto[];
+  peligrosa: MercanciaPeligrosa;
+}
+
+export type TipoUnidadTerrestre =
+  | 'caja_seca_53' | 'caja_seca_48' | 'plataforma' | 'refrigerada' | 'torton' | 'rabon';
+
+export interface CargaTerrestre extends CargaBase {
+  tipo: 'terrestre';
+  tipoUnidad: TipoUnidadTerrestre;
+  pesoBrutoKg: number;
+  piezas: number;
+  requiereManiobras: boolean;
+}
+
+export interface CargaDespacho extends CargaBase {
+  tipo: 'despacho';
+  aduana: string;
+  /** Al guardar se declara también como `trafico` del servicio. */
+  operacion: 'importacion' | 'exportacion';
+  /** Puede ser más de una. */
+  fraccionesArancelarias: string[];
+  valorMercancia: { monto: number; moneda: 'MXN' | 'USD' };
+  requierePrevio: boolean;
+  requiereNOM: boolean;
+}
+
+export type CargaSolicitada = CargaFCL | CargaLCL | CargaAerea | CargaTerrestre | CargaDespacho;
+
+/**
+ * Lo que Ventas SEÑALA que el cliente necesita — flete, maniobras, despacho,
+ * seguro — elegido del catálogo real de conceptos (nunca de serviciosStore).
+ * Es una lista de requerimientos, no de cargos: queda como registro de lo
+ * pedido, y al crear la solicitud se precarga en `conceptos[]`, donde Pricing
+ * DECIDE — agrega, quita o cambia libremente. Sin precios ni proveedores.
+ */
+export interface ConceptoRequerido {
+  conceptoId: string;
+  nombre: string;
+}
+
 // ------------------------------------------------------------
 // Servicio solicitado dentro de una cotización maestra
 // ------------------------------------------------------------
@@ -183,7 +303,17 @@ export interface ServicioSolicitado {
   // ── Vista detallada — FichaCotizacion (modelo Luis lineas_cotizacion) ───
   conceptos: ConceptoCotizacion[];
 
+  /**
+   * La carga tipada del rediseño (sep-2026). Ausente = solicitud vieja: se
+   * lee con cargaDesdeLegacy(), que cae a los campos E4 de abajo.
+   */
+  carga?: CargaSolicitada;
+  /** Requerimientos que señaló Ventas (registro de lo pedido; ver el tipo). */
+  conceptosRequeridos?: ConceptoRequerido[];
+
   // ── Campos condicionales de embarque (E4 — modelo Luis solicitudes) ─────
+  // ⚠️ @deprecated desde el rediseño: `carga` los supersede. Se conservan
+  // porque hay solicitudes viejas que solo tienen esto (cargaDesdeLegacy).
   // Marítimo: tipo de embarque
   tipo_embarque?: 'FCL' | 'LCL' | 'ninguno';
   // FCL (Full Container Load)

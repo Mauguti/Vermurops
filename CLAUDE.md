@@ -594,6 +594,14 @@ todo dato en Firestore es escribible por cualquier miembro del equipo.
     y vuelta a cerrar el 31-ago** al rehacer la ficha en tabla. Si algún día se
     cambia la celda de concepto, el `ConceptoSelector` no es negociable.
 
+**🔴 BUG — `serviciosStore` vive en localStorage: cada navegador tiene su copia.**
+Los 10 «servicios» del selector viejo no están en Firestore: lo que
+Administración edita en Configuración solo cambia SU navegador y nadie más lo
+ve. Además `ServicioSolicitado.tipo` guarda a veces `'maritimo'` y a veces
+`'srv-def-1'` según de dónde se marcó. El rediseño de la solicitud (sep-2026)
+lo retiró del formulario; siguen leyéndolo Settings, Shipments y FichaRFQ —
+retiro gradual pendiente. No agregar consumidores nuevos.
+
 **`getCostoOficial` suma tarifas sin mirar la moneda.**
 Con multi-selección de tarifas, `getCostoOficial` hace `reduce((a, t) => a + t.monto)`
 sin comparar `t.moneda`. Un concepto con una tarifa de 1,000 USD y otra de
