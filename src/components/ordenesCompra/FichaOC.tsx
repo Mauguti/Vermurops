@@ -8,6 +8,11 @@ import { transicionesDisponiblesOC, puedeTransicionarOC, type RolOC } from '../.
 import {
   evaluarFondeo, esPagoDeImpuestos, type FondeoEmbarque,
 } from '../../lib/fondeoCliente';
+import {
+  sugerirBancoVermur, sugerirCuentaProveedor, BANCOS_VERMUR, BANCOS_VERMUR_MAP,
+  type BancoVermur,
+} from '../../lib/cuentasPago';
+import type { ProveedorVermur } from '../proveedores/ProveedoresData';
 import { formatearPorMoneda } from '../../lib/sumarPorMoneda';
 import {
   FichaLayout, FichaHeader, FichaContenido, FichaFooter, BadgeEstado, TonoBadge,
@@ -71,12 +76,18 @@ interface Props {
   onActualizar: (cambios: Partial<OrdenCompra>) => void;
   /** 1.1 · Fondeo del embarque. Ausente en gastos de oficina. */
   fondeo?: FondeoEmbarque;
+  /** 1.2 · El proveedor, para sugerir a qué cuenta suya va el pago. */
+  proveedor?: ProveedorVermur | null;
+  /** Categoría del concepto, para decidir si el gasto es aduanal. */
+  categoriaConcepto?: string;
 }
 
 const money = (n: number) =>
   n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function FichaOC({ oc, rol, onBack, onTransicionar, onActualizar, fondeo }: Props) {
+export default function FichaOC({
+  oc, rol, onBack, onTransicionar, onActualizar, fondeo, proveedor, categoriaConcepto,
+}: Props) {
   const [motivo, setMotivo] = useState(oc.motivoRechazo ?? '');
   const [comprobante, setComprobante] = useState(oc.comprobantePago ?? '');
   const [factura, setFactura] = useState(oc.facturaAsociada ?? '');
@@ -117,6 +128,19 @@ export default function FichaOC({ oc, rol, onBack, onTransicionar, onActualizar,
     : { puedeAutorizar: true } as ReturnType<typeof evaluarFondeo>;
   const esImpuestos = esPagoDeImpuestos(ocLocal);
   const puedeMarcarNoPagar = rol === 'administracion' || rol === 'admin';
+
+  // 1.2 · De dónde sale y a dónde entra el dinero. Se sugiere; decide quien
+  // autoriza — la segmentación de abajo es lo que Vermur hace hoy, no una ley.
+  const sugBanco = sugerirBancoVermur(ocLocal, {
+    categoriaConcepto,
+    tiposProveedor: proveedor?.tipos,
+  });
+  const sugCuenta = sugerirCuentaProveedor(proveedor, ocLocal);
+  const bancoElegido = (oc.bancoSalida as BancoVermur | null) ?? sugBanco.banco;
+  const cuentaElegidaId = oc.cuentaBancariaId ?? sugCuenta.cuenta?.id ?? '';
+  const cuentasOfrecidas = sugCuenta.cuenta
+    ? [sugCuenta.cuenta, ...sugCuenta.alternativas]
+    : sugCuenta.alternativas;
 
   return (
     <FichaLayout>
@@ -204,6 +228,81 @@ export default function FichaOC({ oc, rol, onBack, onTransicionar, onActualizar,
                   {oc.noPagar ? 'Quitar «No pagar»' : 'Marcar «No pagar»'}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 1.2 · De dónde sale y a dónde entra ────────────────────────────
+          Un proveedor puede tener una cuenta por servicio, y depositar en la
+          equivocada no rebota: se descubre cuando reclama que no le pagaron.
+          Por eso se resuelve ANTES de autorizar, no al momento de transferir. */}
+      {!terminada && (rol === 'administracion' || rol === 'admin') && (
+        <div className="px-6 pt-3">
+          <div className="rounded-lg border border-card-border bg-white px-4 py-3 space-y-3">
+            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">
+              Ruta del pago
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Banco de Vermur */}
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">
+                  Sale de
+                </label>
+                <select
+                  value={bancoElegido}
+                  onChange={e => onActualizar({ bancoSalida: e.target.value })}
+                  className="w-full px-3 py-2 text-[12px] bg-white border border-card-border rounded-md outline-none focus:border-brand"
+                >
+                  {BANCOS_VERMUR.map(b => (
+                    <option key={b.id} value={b.id} disabled={!b.monedas.includes(oc.moneda)}>
+                      {b.nombre} — {b.usoHabitual}
+                      {!b.monedas.includes(oc.moneda) ? ` (no opera ${oc.moneda})` : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  {oc.bancoSalida
+                    ? `Elegido a mano. Se sugería ${BANCOS_VERMUR_MAP[sugBanco.banco].nombre}: ${sugBanco.razon.toLowerCase()}`
+                    : `Sugerido: ${sugBanco.razon}`}
+                </p>
+                {sugBanco.aviso && !oc.bancoSalida && (
+                  <p className="text-[10px] text-amber-700 mt-0.5">{sugBanco.aviso}</p>
+                )}
+              </div>
+
+              {/* Cuenta del proveedor */}
+              <div>
+                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1.5">
+                  Entra a — cuenta de {oc.proveedorNombre}
+                </label>
+                {cuentasOfrecidas.length === 0 ? (
+                  <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-2">
+                    {sugCuenta.aviso ?? sugCuenta.razon}
+                  </p>
+                ) : (
+                  <>
+                    <select
+                      value={cuentaElegidaId}
+                      onChange={e => onActualizar({ cuentaBancariaId: e.target.value || null })}
+                      className={`w-full px-3 py-2 text-[12px] bg-white border rounded-md outline-none focus:border-brand ${
+                        cuentaElegidaId ? 'border-card-border' : 'border-amber-400'
+                      }`}
+                    >
+                      <option value="">— Elige la cuenta —</option>
+                      {cuentasOfrecidas.map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.banco} · {c.moneda} · ···{c.clabe.slice(-4)}
+                        </option>
+                      ))}
+                    </select>
+                    <p className={`text-[10px] mt-1 ${sugCuenta.aviso ? 'text-amber-700' : 'text-gray-400'}`}>
+                      {sugCuenta.aviso ?? sugCuenta.razon}
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

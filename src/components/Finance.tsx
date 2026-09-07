@@ -175,6 +175,8 @@ export default function Finance() {
           onBack={() => setOcAbiertaId(null)}
           onTransicionar={handleTransicionar}
           onActualizar={handleActualizarOC}
+          proveedor={proveedores.find(p => p.id === ocAbierta.proveedorId) ?? null}
+          categoriaConcepto={conceptos.find(c => c.id === ocAbierta.conceptoId)?.categoria}
           fondeo={ocAbierta.embarqueId
             ? calcularFondeo(
                 depositos.filter(d => d.embarqueId === ocAbierta.embarqueId),
