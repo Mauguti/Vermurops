@@ -23,6 +23,7 @@
 
 import type { CargoDetalle, EmbarqueCompleto } from '../components/shipments/EmbarquesData';
 import type { OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
+import { programarPago } from './calendarioPagos';
 
 // ─── Se puede o no ────────────────────────────────────────────────────────────
 
@@ -87,6 +88,12 @@ export interface ContextoOC {
   solicitante: { uid: string; nombre: string };
   /** ISO. Inyectable para poder probar. */
   ahora: string;
+  /**
+   * Días de crédito del proveedor para ESTA modalidad (1.4). Ausente cuando
+   * no se conocen: entonces la fecha de pago queda sin calcular en vez de
+   * inventarse.
+   */
+  diasCredito?: number;
 }
 
 /**
@@ -96,9 +103,9 @@ export interface ContextoOC {
  * es quien tiene el contador transaccional.
  *
  * Hereda cliente, proveedor, folio del embarque y concepto, que es lo que
- * pidió el cliente. `fechaRequerida` se deja en la fecha de hoy y no se
- * inventa un plazo: los días de crédito del proveedor viven en su ficha y la
- * programación de pagos es C-7.
+ * pidió el cliente. La fecha de pago se programa con los días de crédito del
+ * proveedor cuando el contexto los trae (1.4); sin ellos se deja en null en
+ * vez de inventar un plazo.
  */
 export function construirOCDesdeCargo(
   cargo: CargoDetalle,
@@ -127,7 +134,11 @@ export function construirOCDesdeCargo(
     moneda: cargo.moneda,
 
     fechaRequerida: ahora.slice(0, 10),
-    fechaSugeridaPago: null,
+    // 1.4 · Crédito en días naturales, pago en día hábil. Sin días de
+    // crédito conocidos no se inventa un plazo: queda sin calcular.
+    fechaSugeridaPago: typeof ctx.diasCredito === 'number'
+      ? programarPago(ahora.slice(0, 10), ctx.diasCredito, proveedorNombre).fechaPago
+      : null,
 
     urgencia: 'normal',
     estado: 'solicitada',

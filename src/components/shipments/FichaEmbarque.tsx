@@ -63,6 +63,24 @@ export default function FichaEmbarque({
   const nombreProveedor = (id: string | undefined) =>
     (id ? proveedores.find(p => p.id === id)?.nombre : '') ?? '';
 
+  /**
+   * Días de crédito del proveedor para la modalidad de ESTE embarque (§4.6).
+   * `undefined` cuando no se conocen: la fecha de pago queda sin calcular en
+   * vez de inventarse un plazo que nadie pactó.
+   */
+  const creditoDelProveedor = (id: string | undefined): number | undefined => {
+    const dc = id ? proveedores.find(p => p.id === id)?.diasCredito : undefined;
+    if (!dc) return undefined;
+    // La modalidad del embarque es texto libre; solo tres coinciden con el
+    // desglose del proveedor. El resto usa el crédito general.
+    const m = embarque.modalidad;
+    const porModalidad = m === 'maritimo' ? dc.maritimo
+      : m === 'terrestre' ? dc.terrestre
+      : m === 'aereo' ? dc.aereo
+      : undefined;
+    return porModalidad ?? dc.general;
+  };
+
   const [activeTab, setActiveTab] = useState<PestanaEmbarque>('general');
 
   // Estado temporal de edición general
@@ -217,6 +235,9 @@ export default function FichaEmbarque({
         proveedorNombre: nombreProveedor(cargo.proveedorId) || 'Proveedor sin nombre',
         solicitante: { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' },
         ahora: new Date().toISOString(),
+        // 1.4 · Los días de crédito son POR MODALIDAD: el mismo proveedor
+        // financia distinto un marítimo que un terrestre.
+        diasCredito: creditoDelProveedor(cargo.proveedorId),
       }));
 
       guardarDetalles(marcarCargoConOrden(detalles, cargoId, oc.id));
