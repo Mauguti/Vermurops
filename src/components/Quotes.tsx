@@ -37,6 +37,9 @@ import {
   validarCarga, espejoLegacy, precargarConceptos,
 } from '../lib/cargaSolicitud';
 import { idUnico } from '../lib/idUnico';
+import {
+  medirCotizacionCreada, medirFlujoIniciado, medirFlujoTerminado, medirFlujoAbandonado,
+} from '../lib/analitica';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Componente principal del módulo de Cotizaciones
@@ -459,6 +462,32 @@ export default function Quotes() {
    * perder: preguntar sobre un formulario en blanco entrena a decir que sí
    * sin leer, y entonces la confirmación deja de proteger.
    */
+  /**
+   * Analítica del flujo de solicitud: iniciado / terminado / abandonado.
+   *
+   * La ETAPA del abandono sale de qué tanto se había capturado, no de un
+   * wizard: el formulario es una sola pantalla, y saber si se fueron antes o
+   * después de elegir empresa distingue «entré a ver» de «me atoré».
+   */
+  const FLUJO_SOLICITUD = 'solicitud_cotizacion';
+
+  const etapaDelFormulario = (): string => {
+    if (!formEmpresa.trim()) return 'sin_empresa';
+    const carga = formCargas[0];
+    if (carga && borradorTieneDatos(carga)) return 'datos_carga';
+    return 'sin_carga';
+  };
+
+  const abrirFormulario = () => {
+    medirFlujoIniciado(FLUJO_SOLICITUD);
+    setShowForm(true);
+  };
+
+  const cerrarFormularioSinCrear = () => {
+    medirFlujoAbandonado(FLUJO_SOLICITUD, etapaDelFormulario());
+    setShowForm(false);
+  };
+
   const cambiarModalidad = (m: ModalidadSolicitud) => {
     const actual = formCargas[0];
     if (actual && modalidadDeCarga(actual.carga) === m) return;
@@ -593,6 +622,7 @@ export default function Quotes() {
   const handleCreateQuote = async (stage: 'solicitud_cliente' | 'solicitado_pricing' | 'pricing_solicitando') => {
     if (!formEmpresa.trim() || formCargas.length === 0) {
       alert('Por favor introduce la empresa y agrega al menos una modalidad.');
+      medirFlujoAbandonado(FLUJO_SOLICITUD, 'sin_empresa', 'validacion');
       return;
     }
 
@@ -602,6 +632,9 @@ export default function Quotes() {
       validarCarga(d.carga).map(m => `${ETIQUETA_MODALIDAD[modalidadDeCarga(d.carga)]}: ${m}`));
     if (errores.length > 0) {
       alert(`Faltan datos de la carga:\n\n${errores.join('\n')}`);
+      // Dónde se atoran: la carga incompleta es el punto de fricción más
+      // probable del formulario nuevo.
+      medirFlujoAbandonado(FLUJO_SOLICITUD, 'datos_carga', 'validacion');
       return;
     }
 
@@ -670,6 +703,14 @@ export default function Quotes() {
     };
 
     await createCotizacion(newQuote);
+
+    medirCotizacionCreada(
+      modalidadDeCarga(formCargas[0].carga),
+      'formulario',
+      formCargas.reduce((n, d) => n + d.conceptosRequeridos.filter(r => r.conceptoId).length, 0),
+    );
+    medirFlujoTerminado(FLUJO_SOLICITUD);
+
     setShowForm(false);
 
     // 4.2 y 4.3 · Pricing crea directo: no se envía a nadie ni se notifica —
@@ -879,7 +920,7 @@ export default function Quotes() {
                         )}
                         {viewMode === 'kanban' && puedeSolicitar && (
                           <button
-                            onClick={() => setShowForm(true)}
+                            onClick={abrirFormulario}
                             className="bg-[#E11D48] text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#BE123C] transition-colors shadow-sm flex items-center gap-2"
                           >
                             <Plus className="w-4 h-4" />
@@ -892,7 +933,7 @@ export default function Quotes() {
 
                   {viewMode === 'pricing' && puedeCrear && (
                     <button
-                      onClick={() => setShowForm(true)}
+                      onClick={abrirFormulario}
                       className="bg-[#E11D48] text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#BE123C] transition-colors shadow-sm flex items-center gap-2"
                     >
                       <Plus className="w-4 h-4" /> Nueva cotización
@@ -1039,7 +1080,7 @@ export default function Quotes() {
               <h3 className="text-sm font-bold text-[#18181B] uppercase tracking-wider">Crear nueva cotización consolidada</h3>
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-0.5">Cotizaciones — Registro inicial de RFQ</p>
             </div>
-            <button onClick={() => setShowForm(false)} className="text-xs font-bold text-gray-400 hover:text-gray-600 uppercase tracking-wide">Cancelar</button>
+            <button onClick={cerrarFormularioSinCrear} className="text-xs font-bold text-gray-400 hover:text-gray-600 uppercase tracking-wide">Cancelar</button>
           </div>
 
           <div className="p-8 space-y-6">
@@ -1211,7 +1252,7 @@ export default function Quotes() {
           <div className="px-8 py-5 bg-gray-50/50 border-t border-gray-150 flex justify-end items-center gap-3">
             <button
               type="button"
-              onClick={() => setShowForm(false)}
+              onClick={cerrarFormularioSinCrear}
               className="text-xs font-bold text-gray-500 hover:text-gray-700 uppercase tracking-wider px-4 py-2.5"
             >
               Cancelar

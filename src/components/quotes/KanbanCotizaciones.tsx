@@ -12,6 +12,7 @@ import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
 import { generateFolio } from '../../lib/folioService';
 import { puedeTransicionarA, type Rol } from '../../lib/stateMachine';
 import { useAuth } from '../../auth/AuthContext';
+import { medirCotizacionCreada } from '../../lib/analitica';
 
 interface KanbanCotizacionesProps {
   quotes: KanbanQuote[];
@@ -254,6 +255,10 @@ export default function KanbanCotizaciones({
     };
 
     onUpdateQuotes([newQuote, ...quotes]);
+    // El alta rápida cuenta aparte del formulario completo: saber cuál usan
+    // más dice si el formulario largo estorba.
+    qaServicios.forEach(tipo => medirCotizacionCreada(tipo, 'alta_rapida', 0));
+
     // Reset form
     setQaEmpresa('');
     setQaContacto('');

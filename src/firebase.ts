@@ -9,7 +9,8 @@ const firebaseConfig = {
   projectId: "vermur-logistics-app",
   storageBucket: "vermur-logistics-app.firebasestorage.app",
   messagingSenderId: "968475941446",
-  appId: "1:968475941446:web:8c7537ab1384d5a15fc847"
+  appId: "1:968475941446:web:8c7537ab1384d5a15fc847",
+  measurementId: "G-D75750X233"
 }
 
 const app = initializeApp(firebaseConfig)

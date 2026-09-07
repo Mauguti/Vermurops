@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
 import { AuthUser, isViewAllowed, UserRole } from './users';
 import { Capacidad, puede as puedeCapacidad } from './permisos';
 import { auth, USANDO_EMULADORES } from '../firebase';
+import { medirInicioDeSesion } from '../lib/analitica';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AuthContext — contexto global de autenticación para VermurOps
@@ -82,6 +83,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
+  /*
+   * El rol de la sesión anterior, para no contar como «entrada» cada
+   * revalidación del token: onAuthStateChanged dispara al refrescar la
+   * pestaña y al renovar credenciales, y esos no son inicios de sesión.
+   */
+  const rolMedido = useRef<string | null>(null);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser && firebaseUser.email) {
@@ -97,8 +105,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           rol,
           avatar
         } as unknown as AuthUser); // Casta por backward compat con AuthUser viejo si difiere
+
+        // Qué roles entran y con qué frecuencia. Solo el rol: quién es la
+        // persona no se mide.
+        if (rolMedido.current !== rol) {
+          rolMedido.current = rol;
+          medirInicioDeSesion(rol);
+        }
       } else {
         setUser(null);
+        rolMedido.current = null;
       }
       setLoading(false);
     });

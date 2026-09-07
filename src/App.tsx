@@ -12,6 +12,7 @@ import LoginPage from './components/Login';
 import Sidebar from './components/Sidebar';
 import { NavegacionProvider } from './navegacion/NavegacionContext';
 import EmuladorBadge from './components/ui/EmuladorBadge';
+import { medirVistaDeSeccion } from './lib/analitica';
 import Dashboard from './components/Dashboard';
 import Quotes from './components/Quotes';
 import Bookings from './components/Bookings';
@@ -273,6 +274,20 @@ function AppShell() {
   useTerminosPago();
   // TA-1: listener acotado de tarifas (activo + vigente ± 60d).
   useTarifas();
+
+  /*
+   * Qué módulos se usan y cuáles están muertos. Se mide la sección tras
+   * resolver el permiso —no la intención— porque una vista que el rol no
+   * puede abrir cae al dashboard y contar el intento inflaría el módulo
+   * equivocado.
+   */
+  const vistaEfectiva = currentView === 'notifications' || isAllowed(currentView)
+    ? currentView
+    : 'dashboard';
+  useEffect(() => {
+    if (!user) return;
+    medirVistaDeSeccion(vistaEfectiva, user.rol);
+  }, [vistaEfectiva, user]);
 
   const safeNavigate = (view: string) => {
     // notifications is accessible to all roles

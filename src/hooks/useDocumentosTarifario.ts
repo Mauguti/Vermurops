@@ -21,6 +21,7 @@ import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 import { conAviso, reportarErrorEscritura } from '../lib/erroresEscritura';
+import { medirTarifarioCargado } from '../lib/analitica';
 
 const COL = 'documentosTarifario';
 
@@ -115,8 +116,17 @@ export function useDocumentosTarifario(cotizacionId?: string) {
         return { documento, extraccion: null, duplicadoDe };
       }
 
-      const extraccion = await extraer(file);
-      return { documento, extraccion, duplicadoDe };
+      // Cuántos tarifarios pasan por la IA y cuántas tarifas propuso. Del
+      // documento no viaja nada: ni nombre, ni proveedor, ni montos.
+      try {
+        const extraccion = await extraer(file);
+        const propuestas = (extraccion as { tarifas?: unknown[] } | null)?.tarifas;
+        medirTarifarioCargado('exito', Array.isArray(propuestas) ? propuestas.length : 0);
+        return { documento, extraccion, duplicadoDe };
+      } catch (err) {
+        medirTarifarioCargado('error');
+        throw err;
+      }
     } finally {
       setSubiendo(false);
     }
