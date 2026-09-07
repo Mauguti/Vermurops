@@ -317,3 +317,63 @@ describe('productosDesdeCarga — el embarque nace con lo que Ventas declaró', 
     expect(productos).toHaveLength(4); // 3 contenedores + 1 bulto terrestre, despacho aporta 0
   });
 });
+
+// ─── I · ¿Hay algo que perder al cambiar de modalidad? ───────────────────────
+
+import { borradorTieneDatos } from './cargaSolicitud';
+
+describe('borradorTieneDatos — solo se pregunta cuando hay algo que perder', () => {
+  const vacio = {
+    carga: {
+      tipo: 'fcl' as const,
+      contenedores: [{ tipoContenedor: '40' as const, cantidad: 1 }],
+      pesoBrutoKg: 0,
+      peligrosa: { esPeligrosa: false },
+      refrigeracion: { requiere: false },
+    },
+    origen: '', destino: '', mercancia: '', conceptosRequeridos: [],
+  };
+
+  it('un formulario recién abierto no tiene datos: no se confirma nada', () => {
+    expect(borradorTieneDatos(vacio)).toBe(false);
+  });
+
+  it('un renglón de concepto sin elegir tampoco cuenta', () => {
+    expect(borradorTieneDatos({ ...vacio, conceptosRequeridos: [{ conceptoId: '' }] })).toBe(false);
+  });
+
+  it('la ruta, la descripción o un concepto elegido sí cuentan', () => {
+    expect(borradorTieneDatos({ ...vacio, origen: 'Shanghai' })).toBe(true);
+    expect(borradorTieneDatos({ ...vacio, mercancia: 'Tela' })).toBe(true);
+    expect(borradorTieneDatos({ ...vacio, conceptosRequeridos: [{ conceptoId: 'CON-001' }] })).toBe(true);
+  });
+
+  it('el peso y la peligrosa cuentan en cualquier modalidad', () => {
+    expect(borradorTieneDatos({ ...vacio, carga: { ...vacio.carga, pesoBrutoKg: 100 } })).toBe(true);
+    expect(borradorTieneDatos({ ...vacio, carga: { ...vacio.carga, peligrosa: { esPeligrosa: true } } })).toBe(true);
+  });
+
+  it('FCL: el 1×40 de arranque no es dato; cambiarlo o agregar otro sí', () => {
+    expect(borradorTieneDatos({ ...vacio, carga: { ...vacio.carga, contenedores: [{ tipoContenedor: '20', cantidad: 1 }] } })).toBe(true);
+    expect(borradorTieneDatos({ ...vacio, carga: { ...vacio.carga, contenedores: [{ tipoContenedor: '40', cantidad: 3 }] } })).toBe(true);
+    expect(borradorTieneDatos({ ...vacio, carga: { ...vacio.carga, refrigeracion: { requiere: true } } })).toBe(true);
+  });
+
+  it('LCL: el estibable en NO es una decisión capturada', () => {
+    const lclVacio = { ...vacio, carga: { tipo: 'lcl' as const, pesoBrutoKg: 0, volumenM3: 0, piezas: 0, bultos: [], estibable: true, peligrosa: { esPeligrosa: false } } };
+    expect(borradorTieneDatos(lclVacio)).toBe(false);
+    expect(borradorTieneDatos({ ...lclVacio, carga: { ...lclVacio.carga, estibable: false } })).toBe(true);
+  });
+
+  it('despacho: aduana, fracción, valor o los toggles cuentan', () => {
+    const despVacio = { ...vacio, carga: { tipo: 'despacho' as const, aduana: '', operacion: 'importacion' as const, fraccionesArancelarias: [''], valorMercancia: { monto: 0, moneda: 'USD' as const }, requierePrevio: false, requiereNOM: false } };
+    expect(borradorTieneDatos(despVacio)).toBe(false);
+    expect(borradorTieneDatos({ ...despVacio, carga: { ...despVacio.carga, aduana: 'Manzanillo' } })).toBe(true);
+    expect(borradorTieneDatos({ ...despVacio, carga: { ...despVacio.carga, requiereNOM: true } })).toBe(true);
+  });
+
+  it('las mercancías detalladas cuentan, pero un renglón en blanco no', () => {
+    expect(borradorTieneDatos({ ...vacio, carga: { ...vacio.carga, mercancias: [{ id: 'm1', descripcion: '  ' }] } })).toBe(false);
+    expect(borradorTieneDatos({ ...vacio, carga: { ...vacio.carga, mercancias: [{ id: 'm1', descripcion: 'Tela' }] } })).toBe(true);
+  });
+});

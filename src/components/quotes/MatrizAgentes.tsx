@@ -137,25 +137,25 @@ export default function MatrizAgentes({
 
         {abierta && (
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            {/* Una sola matriz que cambia de contenido: se elige el servicio.
-                Mismo patrón que el panel lateral de tarifas. */}
+            {/* UNA comparativa, sin pestañas (7-sep-2026). Desde que la
+                solicitud lleva una sola modalidad, elegir servicio dejó de
+                tener sentido: el caso normal es una matriz y ya.
+
+                El selector sobrevive SOLO como fallback para las cotizaciones
+                viejas que sí tienen varios servicios — discreto, un select,
+                no una fila de pestañas que sugiera que hay que navegarlas. */}
             <div className="flex items-center gap-1.5 min-w-0">
               {servicios.length > 1 ? (
-                <div className="flex items-center gap-0.5 bg-gray-100 rounded-lg p-0.5">
+                <select
+                  value={servicioActivoId}
+                  onChange={e => onCambiarServicio(e.target.value)}
+                  className="text-[11px] font-semibold text-gray-600 capitalize bg-transparent border border-gray-200 rounded-md px-2 py-1 outline-none focus:border-[#E11D48] cursor-pointer"
+                  title="Esta cotización tiene varios servicios"
+                >
                   {servicios.map(sv => (
-                    <button
-                      key={sv.id}
-                      onClick={() => onCambiarServicio(sv.id)}
-                      className={`px-2.5 py-1 rounded-md text-[11px] font-semibold capitalize transition-all ${
-                        sv.id === servicioActivoId
-                          ? 'bg-white text-[#18181B] shadow-sm'
-                          : 'text-gray-400 hover:text-gray-600'
-                      }`}
-                    >
-                      {sv.etiqueta}
-                    </button>
+                    <option key={sv.id} value={sv.id}>{sv.etiqueta}</option>
                   ))}
-                </div>
+                </select>
               ) : (
                 <span className="text-[11px] font-semibold text-gray-500 capitalize">{titulo}</span>
               )}

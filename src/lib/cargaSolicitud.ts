@@ -428,3 +428,52 @@ export function productosDesdeGrupo(
 ): EmbarqueProducto[] {
   return servicios.flatMap(s => productosDesdeCarga(s, clienteNombre, cotizacionId));
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9 · ¿El borrador tiene algo capturado? (sep-2026)
+//
+// El formulario permite UNA modalidad; cambiarla descarta lo capturado. Se
+// pregunta SOLO cuando hay algo que perder: confirmar sobre un formulario en
+// blanco entrena a la gente a decir que sí sin leer, y entonces la
+// confirmación deja de proteger nada.
+//
+// Recibe lo que la tarjeta tiene en pantalla —carga, ruta, descripción y
+// requerimientos— porque el borrador es del formulario, no del modelo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface BorradorConDatos {
+  carga: CargaSolicitada;
+  origen: string;
+  destino: string;
+  mercancia: string;
+  conceptosRequeridos: { conceptoId: string }[];
+}
+
+export function borradorTieneDatos(b: BorradorConDatos): boolean {
+  if (b.origen.trim() || b.destino.trim() || b.mercancia.trim()) return true;
+  if (b.conceptosRequeridos.some(r => r.conceptoId)) return true;
+
+  const c = b.carga;
+  if ((c.mercancias ?? []).some(m => m.descripcion.trim())) return true;
+  if ('pesoBrutoKg' in c && c.pesoBrutoKg > 0) return true;
+  if ('peligrosa' in c && c.peligrosa.esPeligrosa) return true;
+
+  switch (c.tipo) {
+    case 'fcl':
+      // El arranque es 1×40': solo cuenta como dato si se cambió.
+      return c.contenedores.length > 1
+        || c.contenedores.some(x => x.tipoContenedor !== '40' || x.cantidad !== 1)
+        || c.refrigeracion.requiere;
+    case 'lcl':
+      return c.volumenM3 > 0 || c.piezas > 0 || c.bultos.length > 0 || !c.estibable;
+    case 'aereo':
+      return c.pesoVolumetricoKg > 0 || c.piezas > 0 || c.bultos.length > 0;
+    case 'terrestre':
+      return c.tipoUnidad !== 'caja_seca_53' || c.piezas > 0 || c.requiereManiobras;
+    case 'despacho':
+      return !!c.aduana.trim()
+        || c.fraccionesArancelarias.some(f => f.trim())
+        || c.valorMercancia.monto > 0
+        || c.requierePrevio || c.requiereNOM;
+  }
+}

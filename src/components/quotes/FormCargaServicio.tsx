@@ -12,7 +12,7 @@
  */
 
 import React, { useState } from 'react';
-import { X, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 import type {
   CargaSolicitada, CargaFCL, MercanciaDetalle, ConceptoRequerido, TipoContenedor,
 } from './QuotesData';
@@ -284,13 +284,12 @@ interface Props {
   conceptos: ConceptoVermur[];
   incoterms: string[];
   onCambio: (d: DraftServicio) => void;
-  onQuitar: () => void;
   /** El tráfico derivado del catálogo se declara arriba (nivel solicitud). */
   onTraficoDerivado: (t: 'importacion' | 'exportacion') => void;
 }
 
 export default function FormCargaServicio({
-  draft, puertos, conceptos, incoterms, onCambio, onQuitar, onTraficoDerivado,
+  draft, puertos, conceptos, incoterms, onCambio, onTraficoDerivado,
 }: Props) {
   const { carga } = draft;
   const modalidad = modalidadDeCarga(carga);
@@ -343,9 +342,6 @@ export default function FormCargaServicio({
             </div>
           )}
         </div>
-        <button type="button" onClick={onQuitar} className="text-gray-300 hover:text-red-500 p-1" title="Quitar modalidad">
-          <X className="w-4 h-4" />
-        </button>
       </div>
 
       {/* ── Ruta ── */}

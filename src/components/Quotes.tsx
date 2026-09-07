@@ -33,7 +33,7 @@ import FormCargaServicio, { DraftServicio, nuevoDraft } from './quotes/FormCarga
 import { usePuertos } from '../hooks/usePuertos';
 import { useConceptos } from '../hooks/useConceptos';
 import {
-  ModalidadSolicitud, ETIQUETA_MODALIDAD, modalidadDeCarga,
+  ModalidadSolicitud, ETIQUETA_MODALIDAD, modalidadDeCarga, borradorTieneDatos,
   validarCarga, espejoLegacy, precargarConceptos,
 } from '../lib/cargaSolicitud';
 import { idUnico } from '../lib/idUnico';
@@ -444,10 +444,33 @@ export default function Quotes() {
   const [formVendedor, setFormVendedor] = useState('');
   const vendedorEfectivo = formVendedor || user?.nombre || '';
   /**
-   * Rediseño de la solicitud (sep-2026): una tarjeta por modalidad, cada una
-   * con los campos de SU carga. Los que no aplican no se muestran.
+   * Rediseño de la solicitud (sep-2026): los campos siguen a la carga.
+   *
+   * UNA sola modalidad por solicitud (7-sep-2026, decisión del cliente). Se
+   * conserva como ARREGLO a propósito: `servicios[]` del modelo es 1..n y
+   * toda la cadena —matriz, agrupación, generación de embarques— ya lo
+   * soporta. Si mañana piden varias, se quita el límite del formulario y no
+   * se toca nada más.
    */
   const [formCargas, setFormCargas] = useState<DraftServicio[]>([nuevoDraft('maritimo')]);
+
+  /**
+   * Cambia la modalidad de la solicitud. Confirma SOLO si hay algo que
+   * perder: preguntar sobre un formulario en blanco entrena a decir que sí
+   * sin leer, y entonces la confirmación deja de proteger.
+   */
+  const cambiarModalidad = (m: ModalidadSolicitud) => {
+    const actual = formCargas[0];
+    if (actual && modalidadDeCarga(actual.carga) === m) return;
+    if (actual && borradorTieneDatos(actual)) {
+      const desde = ETIQUETA_MODALIDAD[modalidadDeCarga(actual.carga)];
+      if (!window.confirm(
+        `Cambiar de ${desde} a ${ETIQUETA_MODALIDAD[m]} descarta lo que capturaste en esta modalidad. ¿Continuar?`,
+      )) return;
+    }
+    setFormCargas([nuevoDraft(m)]);
+    setFormTrafico('');
+  };
 
   /**
    * Origen de la empresa en el formulario de cotización:
@@ -1140,50 +1163,47 @@ export default function Quotes() {
               </div>
             </div>
 
-            {/* Sección 2 · Qué se mueve — una tarjeta por modalidad.
-                Los campos cambian según la carga; los que no aplican no se
-                muestran. El selector viejo (serviciosStore, localStorage) se
-                retiró: los conceptos salen del catálogo real en cada tarjeta. */}
+            {/* Sección 2 · Qué se mueve — UNA modalidad (7-sep-2026).
+                Antes se podían agregar varias tarjetas; el cliente pidió una
+                sola por solicitud. El modelo sigue aceptando varias — solo el
+                formulario deja de ofrecerlo. Los campos siguen a la carga: los
+                que no aplican no se muestran. */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-1.5">
-                <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest">
+              <div className="border-b border-gray-100 pb-2">
+                <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest mb-2">
                   Qué se mueve *
                 </h4>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[9px] font-bold text-gray-400 uppercase mr-1">Agregar:</span>
-                  {(['maritimo', 'aereo', 'terrestre', 'despacho_aduanal'] as ModalidadSolicitud[]).map(m => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setFormCargas(prev => [...prev, nuevoDraft(m)])}
-                      className="text-[10px] font-bold px-2.5 py-1 rounded-full border border-gray-200 text-gray-600 hover:border-[#E11D48] hover:text-[#E11D48] transition-colors"
-                    >
-                      + {ETIQUETA_MODALIDAD[m]}
-                    </button>
-                  ))}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {(['maritimo', 'aereo', 'terrestre', 'despacho_aduanal'] as ModalidadSolicitud[]).map(m => {
+                    const activa = formCargas[0] && modalidadDeCarga(formCargas[0].carga) === m;
+                    return (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => cambiarModalidad(m)}
+                        className={`text-[11px] font-bold px-3.5 py-1.5 rounded-full border transition-colors ${
+                          activa
+                            ? 'bg-[#E11D48] border-[#E11D48] text-white'
+                            : 'border-gray-200 text-gray-600 hover:border-[#E11D48] hover:text-[#E11D48]'
+                        }`}
+                      >
+                        {ETIQUETA_MODALIDAD[m]}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {formCargas.length === 0 && (
-                <p className="text-[11px] text-gray-400 italic py-3 text-center">
-                  Agrega al menos una modalidad — una impo normal lleva marítimo + despacho + terrestre.
-                </p>
+              {formCargas[0] && (
+                <FormCargaServicio
+                  draft={formCargas[0]}
+                  puertos={puertos}
+                  conceptos={catalogoConceptos}
+                  incoterms={INCOTERMS}
+                  onCambio={nd => setFormCargas([nd])}
+                  onTraficoDerivado={t => setFormTrafico(t)}
+                />
               )}
-
-              <div className="space-y-3">
-                {formCargas.map(d => (
-                  <FormCargaServicio
-                    key={d.id}
-                    draft={d}
-                    puertos={puertos}
-                    conceptos={catalogoConceptos}
-                    incoterms={INCOTERMS}
-                    onCambio={nd => setFormCargas(prev => prev.map(x => x.id === nd.id ? nd : x))}
-                    onQuitar={() => setFormCargas(prev => prev.filter(x => x.id !== d.id))}
-                    onTraficoDerivado={t => setFormTrafico(t)}
-                  />
-                ))}
-              </div>
             </div>
 
           </div>
