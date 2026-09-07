@@ -13,6 +13,9 @@ import {
   type BancoVermur,
 } from '../../lib/cuentasPago';
 import type { ProveedorVermur } from '../proveedores/ProveedoresData';
+import {
+  anticiposAplicables, aplicarAnticipo, quitarAnticipo, montoATransferir,
+} from '../../lib/anticipos';
 import { formatearPorMoneda } from '../../lib/sumarPorMoneda';
 import {
   FichaLayout, FichaHeader, FichaContenido, FichaFooter, BadgeEstado, TonoBadge,
@@ -80,6 +83,8 @@ interface Props {
   proveedor?: ProveedorVermur | null;
   /** Categoría del concepto, para decidir si el gasto es aduanal. */
   categoriaConcepto?: string;
+  /** 1.3 · Todas las órdenes, para encontrar los anticipos cruzables. */
+  todasLasOrdenes?: OrdenCompra[];
 }
 
 const money = (n: number) =>
@@ -87,6 +92,7 @@ const money = (n: number) =>
 
 export default function FichaOC({
   oc, rol, onBack, onTransicionar, onActualizar, fondeo, proveedor, categoriaConcepto,
+  todasLasOrdenes = [],
 }: Props) {
   const [motivo, setMotivo] = useState(oc.motivoRechazo ?? '');
   const [comprobante, setComprobante] = useState(oc.comprobantePago ?? '');
@@ -141,6 +147,10 @@ export default function FichaOC({
   const cuentasOfrecidas = sugCuenta.cuenta
     ? [sugCuenta.cuenta, ...sugCuenta.alternativas]
     : sugCuenta.alternativas;
+
+  // 1.3 · Anticipos ya pagados a este proveedor que se pueden descontar.
+  const cruzables = anticiposAplicables(oc, todasLasOrdenes);
+  const aTransferir = montoATransferir(oc);
 
   return (
     <FichaLayout>
@@ -304,6 +314,82 @@ export default function FichaOC({
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 1.3 · Anticipos ────────────────────────────────────────────────
+          Un transportista cobra 50% adelantado y semanas después manda la
+          factura por el total. Sin descontar lo entregado, Vermur paga dos
+          veces la mitad del flete. */}
+      {!oc.esAnticipo && !terminada && (cruzables.length > 0 || (oc.anticiposCruzados ?? []).length > 0) && (
+        <div className="px-6 pt-3">
+          <div className="rounded-lg border border-card-border bg-white px-4 py-3 space-y-2">
+            <div className="flex items-baseline justify-between gap-3">
+              <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">
+                Anticipos aplicados
+              </p>
+              {(oc.anticiposCruzados ?? []).length > 0 && (
+                <p className="text-[12px] text-gray-700">
+                  A transferir: <strong>{oc.moneda} {money(aTransferir)}</strong>
+                  <span className="text-gray-400"> de {oc.moneda} {money(oc.monto)}</span>
+                </p>
+              )}
+            </div>
+
+            {(oc.anticiposCruzados ?? []).map(a => (
+              <div key={a.ocId} className="flex items-center justify-between gap-3 text-[12px] border border-emerald-200 bg-emerald-50/40 rounded-md px-3 py-1.5">
+                <span className="text-gray-700">
+                  <span className="font-mono text-[11px] text-gray-500">{a.folio}</span>
+                  {' · '}<strong>{a.moneda} {money(a.montoAplicado)}</strong>
+                </span>
+                {puedeMarcarNoPagar && (
+                  <button
+                    type="button"
+                    onClick={() => onActualizar(quitarAnticipo(oc, a.ocId))}
+                    className="text-[10px] font-bold text-gray-400 hover:text-red-600"
+                  >
+                    Quitar
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {cruzables.length > 0 && puedeMarcarNoPagar && (
+              <div className="pt-1 space-y-1.5">
+                <p className="text-[10px] text-gray-400">
+                  Pagados a {oc.proveedorNombre} y sin usar:
+                </p>
+                {cruzables.map(({ anticipo, disponible }) => (
+                  <div key={anticipo.id} className="flex items-center justify-between gap-3 text-[12px] border border-gray-200 rounded-md px-3 py-1.5">
+                    <span className="text-gray-700">
+                      <span className="font-mono text-[11px] text-gray-500">{anticipo.folio}</span>
+                      {' · '}disponible <strong>{anticipo.moneda} {money(disponible)}</strong>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Se aplica lo que alcance: nunca más de lo disponible
+                        // ni más de lo que la orden debe.
+                        const sugerido = Math.min(disponible, aTransferir);
+                        const texto = window.prompt(
+                          `¿Cuánto de ${anticipo.folio} se aplica a esta orden? (máximo ${anticipo.moneda} ${money(sugerido)})`,
+                          String(sugerido),
+                        );
+                        if (texto === null) return;
+                        const monto = Number(texto);
+                        const r = aplicarAnticipo(oc, anticipo, monto, todasLasOrdenes);
+                        if (!r.ok) { window.alert(r.error); return; }
+                        onActualizar(r.cambios!);
+                      }}
+                      className="text-[10px] font-bold text-brand hover:text-brand-hover"
+                    >
+                      Aplicar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
