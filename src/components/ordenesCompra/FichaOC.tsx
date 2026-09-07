@@ -210,9 +210,12 @@ export default function FichaOC({
                     </span>
                   )}
                 </p>
+                {/* Un cero explícito, no un guion: «depositado —» se lee como
+                    «no aplica» cuando lo que dice es «no ha llegado nada», y
+                    esa diferencia es justo la que frena el pago. */}
                 <p className="text-[12px] text-gray-700 mt-1">
-                  Depositado <strong>{formatearPorMoneda(fondeo.depositado) || '—'}</strong>
-                  {' · '}comprometido <strong>{formatearPorMoneda(fondeo.comprometido) || '—'}</strong>
+                  Depositado <strong>{formatearPorMoneda(fondeo.depositado, { vacio: `${oc.moneda} 0.00` })}</strong>
+                  {' · '}comprometido <strong>{formatearPorMoneda(fondeo.comprometido, { vacio: `${oc.moneda} 0.00` })}</strong>
                 </p>
                 {!veredicto.puedeAutorizar && veredicto.motivo && (
                   <p className="text-[11px] text-amber-800 mt-1.5">{veredicto.motivo}</p>

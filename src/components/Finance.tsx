@@ -5,6 +5,7 @@ import FichaFactura from './finance/FichaFactura';
 import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import { useDepositosCliente } from '../hooks/useDepositosCliente';
 import { calcularFondeo } from '../lib/fondeoCliente';
+import PanelPagos from './ordenesCompra/PanelPagos';
 import BandejaOC from './ordenesCompra/BandejaOC';
 import FichaOC from './ordenesCompra/FichaOC';
 import NuevaOCOficina from './ordenesCompra/NuevaOCOficina';
@@ -107,13 +108,45 @@ export default function Finance() {
     setToast({ mensaje: `${ocAbierta.folio}: ${nuevoEstado.replace('_', ' ')}.`, tipo: 'exito' });
   };
 
+  /**
+   * 1.5 · Registra el pago de un GRUPO: una transferencia cubre varias
+   * órdenes del mismo proveedor, así que todas pasan a pagada con la misma
+   * referencia. Se hace en secuencia y se reporta lo que falló: marcar la
+   * mitad y no decirlo dejaría a Julio creyendo que pagó lo que no pagó.
+   */
+  const registrarPagoDelGrupo = async (ocIds: string[], referencia: string) => {
+    const fallidas: string[] = [];
+    for (const id of ocIds) {
+      const orden = ordenes.find(o => o.id === id);
+      if (!orden) continue;
+      try {
+        await updateOrden(id, { comprobantePago: referencia });
+        const r = await transicionarEstado(
+          { ...orden, comprobantePago: referencia }, 'pagada', rolOC,
+          { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' },
+        );
+        if (!r.ok) fallidas.push(`${orden.folio}: ${r.razon}`);
+      } catch (err) {
+        fallidas.push(`${orden.folio}: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+    setToast(fallidas.length === 0
+      ? { mensaje: `${ocIds.length} orden(es) marcadas como pagadas.`, tipo: 'exito' }
+      : { mensaje: `No se pudieron pagar: ${fallidas.join(' · ')}`, tipo: 'error' });
+  };
+
   const handleActualizarOC = (cambios: Partial<OrdenCompra>) => {
     if (!ocAbierta) return;
     updateOrden(ocAbierta.id, cambios).catch(err =>
       setToast({ mensaje: `No se pudo guardar: ${err instanceof Error ? err.message : err}`, tipo: 'error' }));
   };
 
-  const tabs = ['Facturas (CFDI)', 'Cuentas por cobrar', 'Cuentas por pagar', 'Estados de cuenta'];
+  /*
+   * 1.5 · «Programación de pagos» va ANTES de «Cuentas por pagar»: es la
+   * pantalla que Julio abre cada mañana, y la bandeja es a dónde entra
+   * cuando necesita el detalle de una orden.
+   */
+  const tabs = ['Programación de pagos', 'Facturas (CFDI)', 'Cuentas por cobrar', 'Cuentas por pagar', 'Estados de cuenta'];
 
   const invoices = [
     { id: 'F-2023-085', uuid: '1A2B3C4D-5E6F...', client: 'Grupo Textil Monterrey', rfc: 'GTM991012XXX', concept: 'Flete marítimo y maniobras (QT-1002)', subtotal: 3500, vat: 525, total: 4025, currency: 'USD', cfdiStatus: 'Timbrada', paymentStatus: 'Pagada' },
@@ -260,6 +293,14 @@ export default function Finance() {
              </div>
 
              <div className="p-[24px]">
+                {activeTab === 'Programación de pagos' && (
+                   <PanelPagos
+                     ordenes={ordenes}
+                     onAbrirOC={setOcAbiertaId}
+                     onRegistrarPago={registrarPagoDelGrupo}
+                   />
+                )}
+
                 {activeTab === 'Facturas (CFDI)' && (
                    <ModuloEnDesarrollo
                      descripcion="La emisión de CFDI todavía no está conectada. La factura se generará dentro del embarque, asociada a la operación, para no capturar dos veces los conceptos."
