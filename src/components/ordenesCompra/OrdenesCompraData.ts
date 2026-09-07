@@ -158,6 +158,24 @@ export interface OrdenCompra {
   /** Referencia o URL del comprobante de pago. */
   comprobantePago: string | null;
 
+  // ── Fondeo del cliente (1.1) ───────────────────────────────────────────────
+  /**
+   * ¿Es un pago de impuestos? Los impuestos NO se financian: el cliente
+   * deposita primero (§4.7). Se propone del concepto al crear la OC y se
+   * guarda AQUÍ, para que corregir la lista de conceptos-impuesto no
+   * reescriba la historia de las órdenes ya emitidas. Ausente = se deriva.
+   */
+  esPagoImpuestos?: boolean;
+  /**
+   * Flag «No pagar»: frena la autorización aunque las cuentas cuadren.
+   * Existe porque Administración a veces sabe algo que el sistema no —un
+   * depósito que viene en camino y no debe gastarse en otra cosa— y necesita
+   * detener sin rechazar. Ver lib/fondeoCliente.ts.
+   */
+  noPagar?: boolean;
+  /** Por qué se marcó «No pagar». Se muestra a quien intente autorizarla. */
+  motivoNoPagar?: string | null;
+
   // ── Anticipos ──────────────────────────────────────────────────────────────
   esAnticipo: boolean;
   /** OCs de anticipo aplicadas contra esta OC. Solo en OCs no-anticipo. */

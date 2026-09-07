@@ -13,7 +13,8 @@
  *   transicionesDisponiblesOC(desde, rol, oc, fondeoCtx?)  → EstadoOC[]
  */
 
-import type { EstadoOC, OrdenCompra, FondeoContext } from '../components/ordenesCompra/OrdenesCompraData';
+import type { EstadoOC, OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
+import { evaluarFondeo, type FondeoEmbarque } from './fondeoCliente';
 
 // ─── Tipos internos ────────────────────────────────────────────────────────────
 
@@ -36,7 +37,7 @@ interface TransitionDefOC {
    * Validación de negocio opcional.
    * Devuelve null si todo está bien, o un string con el mensaje de error.
    */
-  validar?: (oc: OrdenCompra, fondeoCtx?: FondeoContext) => string | null;
+  validar?: (oc: OrdenCompra, fondeoCtx?: FondeoEmbarque) => string | null;
 }
 
 // ─── Mapa de transiciones ──────────────────────────────────────────────────────
@@ -72,13 +73,33 @@ const TRANSITIONS_OC: Record<EstadoOC, TransitionDefOC[]> = {
       hacia: 'autorizada',
       roles: ['administracion', 'admin'],
       validar: (oc, fondeoCtx) => {
-        // Fondeo solo aplica para OCs de embarque
-        if (oc.origen === 'embarque' && fondeoCtx) {
-          if (fondeoCtx.totalFondeo < fondeoCtx.totalOCsPendientes) {
-            return `Fondeo insuficiente: depósitos $${fondeoCtx.totalFondeo.toLocaleString()} < OCs pendientes $${fondeoCtx.totalOCsPendientes.toLocaleString()}.`;
-          }
+        /*
+         * ── 1.1 · El fondeo del cliente ────────────────────────────────────
+         * El veredicto vive en lib/fondeoCliente.ts porque tiene dos reglas
+         * distintas —crédito para gastos normales, depósito completo para
+         * impuestos— y ambas necesitan mirar la moneda (§4.3), cosa que un
+         * par de escalares no permite.
+         *
+         * El flag «No pagar» se evalúa SIEMPRE, incluso sin contexto de
+         * fondeo y para gastos de oficina: es una decisión humana explícita
+         * y no puede depender de que quien llame se acuerde de pasar datos.
+         */
+        if (oc.noPagar) {
+          return oc.motivoNoPagar
+            ? `Marcada «No pagar»: ${oc.motivoNoPagar}`
+            : 'Marcada «No pagar»: alguien la detuvo a propósito. Quita la marca para autorizarla.';
         }
-        return null;
+
+        if (oc.origen !== 'embarque') return null;
+
+        if (!fondeoCtx) {
+          // Sin contexto no se puede afirmar que hay dinero. Antes esto
+          // dejaba pasar la orden; ahora se detiene: en una regla que
+          // protege dinero, la ausencia de datos no es una aprobación.
+          return 'No se pudo verificar el fondeo del embarque. Recarga e intenta de nuevo.';
+        }
+
+        return evaluarFondeo(oc, fondeoCtx).motivo ?? null;
       },
     },
     {
@@ -137,7 +158,7 @@ export function puedeTransicionarOC(
   hacia: EstadoOC,
   rol: RolOC,
   oc: OrdenCompra,
-  fondeoCtx?: FondeoContext,
+  fondeoCtx?: FondeoEmbarque,
 ): TransicionResultOC {
   const salidas = TRANSITIONS_OC[desde] ?? [];
   const def = salidas.find(t => t.hacia === hacia);
@@ -167,7 +188,7 @@ export function transicionesDisponiblesOC(
   desde: EstadoOC,
   rol: RolOC,
   oc: OrdenCompra,
-  fondeoCtx?: FondeoContext,
+  fondeoCtx?: FondeoEmbarque,
 ): EstadoOC[] {
   const salidas = TRANSITIONS_OC[desde] ?? [];
   return salidas

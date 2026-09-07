@@ -11,7 +11,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { puedeTransicionarOC, transicionesDisponiblesOC } from './stateMachineOC';
-import type { OrdenCompra, FondeoContext } from '../components/ordenesCompra/OrdenesCompraData';
+import type { OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
+import type { FondeoEmbarque } from './fondeoCliente';
 import {
   calcularSaldoPendiente,
   calcularMontoDisponible,
@@ -63,11 +64,26 @@ function makeOC(opts: Partial<OrdenCompra> = {}): OrdenCompra {
   };
 }
 
-function makeFondeo(opts: Partial<FondeoContext> = {}): FondeoContext {
+/**
+ * Fondeo del embarque para los tests.
+ *
+ * Se sigue expresando como «cuánto entró» y «cuánto está comprometido»
+ * —así lo piensa Administración— y se traduce a la forma POR MONEDA que usa
+ * evaluarFondeo (§4.3).
+ *
+ * Los importes van en USD porque las OCs de estos tests son en USD: un
+ * depósito en la otra moneda NO fondea la orden, que es precisamente lo que
+ * §4.3 protege.
+ */
+function makeFondeo(
+  opts: { totalFondeo?: number; totalOCsPendientes?: number } = {},
+): FondeoEmbarque {
+  const depositado = opts.totalFondeo ?? 50000;
+  const comprometido = opts.totalOCsPendientes ?? 10000;
   return {
-    totalFondeo: 50000,
-    totalOCsPendientes: 10000,
-    ...opts,
+    depositado: { USD: depositado, MXN: 0 },
+    comprometido: { USD: comprometido, MXN: 0 },
+    disponible: { USD: depositado - comprometido, MXN: 0 },
   };
 }
 
@@ -239,7 +255,7 @@ describe('E. Validación de fondeo', () => {
     const fondeo = makeFondeo({ totalFondeo: 5000, totalOCsPendientes: 10000 });
     const r = puedeTransicionarOC('en_gestion', 'autorizada', 'admin', oc, fondeo);
     expect(r.ok).toBe(false);
-    expect(r.razon).toMatch(/fondeo insuficiente/i);
+    expect(r.razon).toMatch(/sobregirado/i);
   });
 
   it('permite autorización si fondeo justo (embarque)', () => {
@@ -265,9 +281,21 @@ describe('E. Validación de fondeo', () => {
     expect(puedeTransicionarOC('en_gestion', 'autorizada', 'admin', oc, fondeo).ok).toBe(true);
   });
 
-  it('OC de embarque sin contexto de fondeo pasa (fondeo no calculado aún)', () => {
+  /*
+   * ── Cambio deliberado (1.1, 7-sep-2026) ────────────────────────────────
+   * Antes, una OC de embarque sin contexto de fondeo PASABA: se asumía que
+   * el fondeo «no se había calculado todavía». Eso convertía un fallo de
+   * carga —o una llamada que se olvidó de pasar los datos— en una
+   * autorización de pago.
+   *
+   * En una regla que protege dinero, la ausencia de datos no es una
+   * aprobación. Ahora se detiene y se pide reintentar.
+   */
+  it('OC de embarque SIN contexto de fondeo se detiene: no saber no es autorizar', () => {
     const oc = makeOC({ estado: 'en_gestion', origen: 'embarque' });
-    expect(puedeTransicionarOC('en_gestion', 'autorizada', 'admin', oc).ok).toBe(true);
+    const r = puedeTransicionarOC('en_gestion', 'autorizada', 'admin', oc);
+    expect(r.ok).toBe(false);
+    expect(r.razon).toMatch(/no se pudo verificar el fondeo/i);
   });
 });
 
@@ -422,9 +450,9 @@ describe('G. Anticipos parciales', () => {
 // y toda OC se quedaba trabada en «en gestión».
 
 describe('H · administracion autoriza y paga', () => {
-  it('autoriza desde en gestión', () => {
+  it('autoriza desde en gestión, con el fondeo a la vista', () => {
     const oc = makeOC({ estado: 'en_gestion' });
-    expect(puedeTransicionarOC('en_gestion', 'autorizada', 'administracion', oc).ok).toBe(true);
+    expect(puedeTransicionarOC('en_gestion', 'autorizada', 'administracion', oc, makeFondeo()).ok).toBe(true);
   });
 
   it('paga desde autorizada, con comprobante', () => {
@@ -446,11 +474,10 @@ describe('H · administracion autoriza y paga', () => {
 
   it('el fondeo insuficiente la sigue frenando', () => {
     const oc = makeOC({ estado: 'en_gestion', origen: 'embarque' });
-    const r = puedeTransicionarOC('en_gestion', 'autorizada', 'administracion', oc, {
-      totalFondeo: 1000, totalOCsPendientes: 10000,
-    });
+    const r = puedeTransicionarOC('en_gestion', 'autorizada', 'administracion', oc,
+      makeFondeo({ totalFondeo: 1000, totalOCsPendientes: 10000 }));
     expect(r.ok).toBe(false);
-    expect(r.razon).toMatch(/fondeo/i);
+    expect(r.razon).toMatch(/sobregirado/i);
   });
 
   it('NO gestiona: gestionar es de Operaciones', () => {

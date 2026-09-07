@@ -6,6 +6,10 @@ import type { OrdenCompra, EstadoOC } from './OrdenesCompraData';
 import { ESTADOS_OC_MAP } from './OrdenesCompraData';
 import { transicionesDisponiblesOC, puedeTransicionarOC, type RolOC } from '../../lib/stateMachineOC';
 import {
+  evaluarFondeo, esPagoDeImpuestos, type FondeoEmbarque,
+} from '../../lib/fondeoCliente';
+import { formatearPorMoneda } from '../../lib/sumarPorMoneda';
+import {
   FichaLayout, FichaHeader, FichaContenido, FichaFooter, BadgeEstado, TonoBadge,
 } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
@@ -65,12 +69,14 @@ interface Props {
   onTransicionar: (nuevoEstado: EstadoOC, cambios?: Partial<OrdenCompra>) => void;
   /** Guarda campos sueltos: comprobante, factura, motivo de rechazo. */
   onActualizar: (cambios: Partial<OrdenCompra>) => void;
+  /** 1.1 · Fondeo del embarque. Ausente en gastos de oficina. */
+  fondeo?: FondeoEmbarque;
 }
 
 const money = (n: number) =>
   n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-export default function FichaOC({ oc, rol, onBack, onTransicionar, onActualizar }: Props) {
+export default function FichaOC({ oc, rol, onBack, onTransicionar, onActualizar, fondeo }: Props) {
   const [motivo, setMotivo] = useState(oc.motivoRechazo ?? '');
   const [comprobante, setComprobante] = useState(oc.comprobantePago ?? '');
   const [factura, setFactura] = useState(oc.facturaAsociada ?? '');
@@ -90,7 +96,7 @@ export default function FichaOC({ oc, rol, onBack, onTransicionar, onActualizar 
     facturaAsociada: factura.trim() || null,
   };
 
-  const disponibles = transicionesDisponiblesOC(oc.estado, rol, ocLocal);
+  const disponibles = transicionesDisponiblesOC(oc.estado, rol, ocLocal, fondeo);
 
   /**
    * Los estados que la máquina rechaza HOY pero podría permitir si el usuario
@@ -99,10 +105,18 @@ export default function FichaOC({ oc, rol, onBack, onTransicionar, onActualizar 
    */
   const bloqueados = (['en_gestion', 'autorizada', 'pagada', 'rechazada'] as EstadoOC[])
     .filter(e => !disponibles.includes(e))
-    .map(e => ({ estado: e, r: puedeTransicionarOC(oc.estado, e, rol, ocLocal) }))
+    .map(e => ({ estado: e, r: puedeTransicionarOC(oc.estado, e, rol, ocLocal, fondeo) }))
     .filter(x => !x.r.ok && x.r.razon && !x.r.razon.includes('no está permitida') && !x.r.razon.includes('Tu rol'));
 
   const terminada = oc.estado === 'pagada' || oc.estado === 'rechazada';
+
+  // 1.1 · Qué dice el fondeo sobre esta orden, para mostrarlo antes de que el
+  // usuario intente autorizar y se lleve la sorpresa.
+  const veredicto = fondeo
+    ? evaluarFondeo(ocLocal, fondeo)
+    : { puedeAutorizar: true } as ReturnType<typeof evaluarFondeo>;
+  const esImpuestos = esPagoDeImpuestos(ocLocal);
+  const puedeMarcarNoPagar = rol === 'administracion' || rol === 'admin';
 
   return (
     <FichaLayout>
@@ -138,6 +152,60 @@ export default function FichaOC({ oc, rol, onBack, onTransicionar, onActualizar 
             ids={[oc.embarqueId]}
             vacio=""
           />
+        </div>
+      )}
+
+      {/* ── 1.1 · El fondeo del cliente ────────────────────────────────────
+          «Tenemos que esperar el dinero del cliente para pagarle al
+          proveedor». Administración necesita ver ESO al decidir, no
+          descubrirlo cuando el botón de autorizar le diga que no. */}
+      {oc.origen === 'embarque' && fondeo && (
+        <div className="px-6 pt-3">
+          <div className={`rounded-lg border px-4 py-3 ${
+            veredicto.puedeAutorizar
+              ? 'border-emerald-200 bg-emerald-50/40'
+              : 'border-amber-300 bg-amber-50/60'
+          }`}>
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">
+                  Fondeo del cliente
+                  {esImpuestos && (
+                    <span className="ml-2 text-amber-700 normal-case tracking-normal font-semibold">
+                      · Pago de impuestos: no se financia
+                    </span>
+                  )}
+                </p>
+                <p className="text-[12px] text-gray-700 mt-1">
+                  Depositado <strong>{formatearPorMoneda(fondeo.depositado) || '—'}</strong>
+                  {' · '}comprometido <strong>{formatearPorMoneda(fondeo.comprometido) || '—'}</strong>
+                </p>
+                {!veredicto.puedeAutorizar && veredicto.motivo && (
+                  <p className="text-[11px] text-amber-800 mt-1.5">{veredicto.motivo}</p>
+                )}
+              </div>
+
+              {/* El flag manual. Solo Administración, que es quien concilia. */}
+              {puedeMarcarNoPagar && !terminada && (
+                <button
+                  type="button"
+                  onClick={() => onActualizar(
+                    oc.noPagar
+                      ? { noPagar: false, motivoNoPagar: null }
+                      : { noPagar: true, motivoNoPagar: window.prompt('¿Por qué se detiene este pago?')?.trim() || null },
+                  )}
+                  className={`shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-md border transition-colors ${
+                    oc.noPagar
+                      ? 'border-red-300 bg-red-100 text-red-800 hover:bg-red-200'
+                      : 'border-gray-200 text-gray-500 hover:border-red-400 hover:text-red-600'
+                  }`}
+                  title={oc.noPagar ? 'Quitar la marca y permitir el pago' : 'Detener este pago sin rechazar la orden'}
+                >
+                  {oc.noPagar ? 'Quitar «No pagar»' : 'Marcar «No pagar»'}
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

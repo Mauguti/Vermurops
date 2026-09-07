@@ -150,6 +150,18 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Depósitos del cliente (1.1) ──────────────────────────────────────
+    // El dinero con el que el cliente fondea las OCs de su embarque.
+    // Eliminar está prohibido: un depósito mal capturado se anula con
+    // activo=false, nunca se borra — es evidencia de que entró dinero,
+    // igual que un comprobante de pago.
+    match /depositosCliente/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // ── Vistas de usuario (TV-4) ─────────────────────────────────────────
     // Lectura: autenticado (para ver vistas compartidas de otros).
     // Creación: autenticado, siempre que usuarioId == su UID.

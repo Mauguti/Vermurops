@@ -26,9 +26,9 @@ import type {
   OrdenCompra,
   EstadoOC,
   RegistroEstadoOC,
-  FondeoContext,
 } from '../components/ordenesCompra/OrdenesCompraData';
 import { puedeTransicionarOC, type RolOC } from '../lib/stateMachineOC';
+import type { FondeoEmbarque } from '../lib/fondeoCliente';
 import { generateFolioOC } from '../lib/folioServiceOC';
 import { conAviso } from '../lib/erroresEscritura';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
@@ -124,7 +124,7 @@ export function useOrdenesCompra() {
     nuevoEstado: EstadoOC,
     rol: RolOC,
     usuario: { uid: string; nombre: string },
-    fondeoCtx?: FondeoContext,
+    fondeoCtx?: FondeoEmbarque,
   ): Promise<{ ok: boolean; razon?: string }> => {
     // Validar con la máquina de estados pura
     const resultado = puedeTransicionarOC(oc.estado, nuevoEstado, rol, oc, fondeoCtx);

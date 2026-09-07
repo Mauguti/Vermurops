@@ -3,6 +3,8 @@ import { initialClients } from '../data';
 import { DollarSign, FileText, CheckCircle, Clock, AlertCircle, Plus, Search, Filter, Download, ArrowRight, X, File, ShieldCheck, Calculator } from 'lucide-react';
 import FichaFactura from './finance/FichaFactura';
 import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
+import { useDepositosCliente } from '../hooks/useDepositosCliente';
+import { calcularFondeo } from '../lib/fondeoCliente';
 import BandejaOC from './ordenesCompra/BandejaOC';
 import FichaOC from './ordenesCompra/FichaOC';
 import NuevaOCOficina from './ordenesCompra/NuevaOCOficina';
@@ -49,6 +51,9 @@ export default function Finance() {
   /** C-3 · El gasto de oficina lo carga Administración. */
   const puedeSolicitarPago = puede('ordenCompra.solicitar');
 
+  // ── 1.1 · El fondeo del cliente ───────────────────────────────────────────
+  const { depositos } = useDepositosCliente();
+
   /*
    * C-2 · La orden abierta se DERIVA del listener, no se guarda en estado.
    *
@@ -79,10 +84,22 @@ export default function Finance() {
       }
     }
 
+    /*
+     * 1.1 · El fondeo del embarque viaja con la transición. Sin esto, la
+     * máquina de estados no puede afirmar que hay dinero y detiene la
+     * autorización: «no saber» no es «autorizar».
+     */
+    const fondeo = conCambios.embarqueId
+      ? calcularFondeo(
+          depositos.filter(d => d.embarqueId === conCambios.embarqueId),
+          ordenes.filter(o => o.embarqueId === conCambios.embarqueId),
+        )
+      : undefined;
+
     const r = await transicionarEstado(conCambios, nuevoEstado, rolOC, {
       uid: user?.uid ?? '',
       nombre: user?.nombre ?? user?.email ?? '',
-    });
+    }, fondeo);
     if (!r.ok) {
       setToast({ mensaje: r.razon ?? 'No se pudo cambiar el estado.', tipo: 'error' });
       return;
@@ -158,6 +175,12 @@ export default function Finance() {
           onBack={() => setOcAbiertaId(null)}
           onTransicionar={handleTransicionar}
           onActualizar={handleActualizarOC}
+          fondeo={ocAbierta.embarqueId
+            ? calcularFondeo(
+                depositos.filter(d => d.embarqueId === ocAbierta.embarqueId),
+                ordenes.filter(o => o.embarqueId === ocAbierta.embarqueId),
+              )
+            : undefined}
         />
         <Toast mensaje={toast?.mensaje ?? null} tipo={toast?.tipo} onClose={() => setToast(null)} />
       </>
