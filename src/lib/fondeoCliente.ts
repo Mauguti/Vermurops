@@ -27,7 +27,7 @@
  */
 
 import type { DepositoCliente, OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
-import { sumarPorMoneda, type TotalPorMoneda } from './sumarPorMoneda';
+import { sumarPorMoneda, type TotalPorMoneda, type Moneda } from './sumarPorMoneda';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1 · Qué es un pago de impuestos
@@ -99,12 +99,19 @@ const MONEDAS: (keyof TotalPorMoneda)[] = ['USD', 'MXN'];
 export function calcularFondeo(
   depositos: DepositoCliente[],
   ocsDelEmbarque: OrdenCompra[],
+  /**
+   * Cobros de facturas de ESTE embarque (2.3). Cobrarle al cliente es lo que
+   * libera el pago al proveedor, así que un cobro fondea igual que un
+   * depósito: son el mismo dinero entrando por dos puertas —el anticipo que
+   * se pide antes de operar y la factura que se cobra después.
+   */
+  cobros: { monto: number; moneda: Moneda; activo?: boolean }[] = [],
 ): FondeoEmbarque {
-  const depositado = sumarPorMoneda(
-    depositos.filter(d => d.activo !== false),
-    d => d.monto,
-    d => d.moneda,
-  );
+  const entradas = [
+    ...depositos.filter(d => d.activo !== false).map(d => ({ monto: d.monto, moneda: d.moneda })),
+    ...cobros.filter(c => c.activo !== false).map(c => ({ monto: c.monto, moneda: c.moneda })),
+  ];
+  const depositado = sumarPorMoneda(entradas, e => e.monto, e => e.moneda);
 
   const vivas = ocsDelEmbarque.filter(
     oc => oc.activo !== false && oc.estado !== 'rechazada' && oc.estado !== 'pagada',

@@ -82,6 +82,11 @@ export interface LineaPlana {
   // ── A dónde pertenece (para el write-back y la columna «Servicio») ───────
   servicioId: string;
   servicioTipo: string;
+  /**
+   * Dónde ocurre el servicio (origen/destino). Se arrastra para que el cargo
+   * del embarque pueda derivar su IVA sin volver a la cotización (§4.2).
+   */
+  ubicacion?: 'origen' | 'destino';
   origen: OrigenLinea;
   /** id del ConceptoCotizacion. Ausente en líneas de ruta B. */
   conceptoLocalId?: string;
@@ -217,6 +222,7 @@ function lineaDesdeConcepto(
     id: `${srv.id}::${concepto.id}`,
     servicioId: srv.id,
     servicioTipo: srv.tipo,
+    ubicacion: srv.ubicacion,
     origen: 'concepto',
     conceptoLocalId: concepto.id,
     concepto: concepto.nombre,
@@ -248,6 +254,7 @@ function lineaDesdeServicio(srv: ServicioSolicitado, indice: number): LineaPlana
     id: `${srv.id}::flat`,
     servicioId: srv.id,
     servicioTipo: srv.tipo,
+    ubicacion: srv.ubicacion,
     origen: 'servicio',
     concepto: srv.tipo,
     conceptoId: seleccionada.conceptoId ?? null,

@@ -205,6 +205,10 @@ function cargosDeLinea(linea: LineaPlana, cotizacionId: string): CargoDetalle[] 
       origen: 'heredado',
       grupoFacturacion: grupo,
       facturaId: null,
+      // 2.1 · Se hereda para que la factura derive su IVA sin volver a la
+      // cotización. Solo en el ingreso: el IVA que importa es el que se le
+      // cobra al cliente.
+      ubicacionIVA: linea.ubicacion,
     });
   }
 

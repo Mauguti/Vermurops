@@ -162,6 +162,25 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Facturas al cliente y sus cobros (2.1 / 2.3) ─────────────────────
+    // ⚠️ NO son CFDI: Vermur timbra por fuera. Aquí se registra lo emitido.
+    // Eliminar está prohibido: una factura emitida existió, y borrarla
+    // dejaría las líneas del embarque apuntando a un documento fantasma.
+    // Una factura mal capturada se cancela; un cobro se anula.
+    match /facturas/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
+    match /cobros/{id} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // ── Vistas de usuario (TV-4) ─────────────────────────────────────────
     // Lectura: autenticado (para ver vistas compartidas de otros).
     // Creación: autenticado, siempre que usuarioId == su UID.

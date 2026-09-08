@@ -163,3 +163,37 @@ describe('el flag «No pagar» gana sobre las cuentas', () => {
     expect(sugerirNoPagar(oc({ conceptoId: 'CON-010', monto: 80000 }), conDeposito)).toBe(false);
   });
 });
+
+// ─── E · El cobro al cliente fondea igual que el depósito (2.3) ──────────────
+
+describe('cobrar al cliente libera el pago al proveedor', () => {
+  it('un cobro suma al fondeo igual que un depósito', () => {
+    const f = calcularFondeo([], [], [{ monto: 50000, moneda: 'MXN' }]);
+    expect(f.depositado.MXN).toBe(50000);
+  });
+
+  it('depósito y cobro se suman: son el mismo dinero por dos puertas', () => {
+    const f = calcularFondeo([deposito(20000)], [], [{ monto: 30000, moneda: 'MXN' }]);
+    expect(f.depositado.MXN).toBe(50000);
+  });
+
+  it('un cobro anulado deja de fondear', () => {
+    const f = calcularFondeo([], [], [{ monto: 50000, moneda: 'MXN', activo: false }]);
+    expect(f.depositado.MXN).toBe(0);
+  });
+
+  it('§4.3: un cobro en USD no fondea una orden de impuestos en MXN', () => {
+    const f = calcularFondeo([], [], [{ monto: 90000, moneda: 'USD' }]);
+    const v = evaluarFondeo(oc({ conceptoId: 'CON-010', monto: 80000, moneda: 'MXN' }), f);
+    expect(v.puedeAutorizar).toBe(false);
+  });
+
+  it('el cobro completo desbloquea la OC de impuestos que estaba frenada', () => {
+    const sinCobro = calcularFondeo([], []);
+    const orden = oc({ conceptoId: 'CON-010', monto: 80000 });
+    expect(evaluarFondeo(orden, sinCobro).puedeAutorizar).toBe(false);
+
+    const conCobro = calcularFondeo([], [], [{ monto: 80000, moneda: 'MXN' }]);
+    expect(evaluarFondeo(orden, conCobro).puedeAutorizar).toBe(true);
+  });
+});

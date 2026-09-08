@@ -127,6 +127,19 @@ export interface CargoDetalle {
    * mismo. Misma regla que usamos para no pagar dos veces una OC.
    */
   facturaId?: string | null;
+
+  /**
+   * Dónde ocurre el servicio: origen o destino (2.1).
+   *
+   * La necesita `calcularIVA` junto con el tráfico (§4.2, regla espejo). Vive
+   * en el servicio de la cotización y se HEREDA aquí al crear el cargo,
+   * porque al facturar desde el embarque la cotización ya no está a la mano.
+   *
+   * Ausente = no se pudo derivar el IVA de esta línea. Se registra la factura
+   * igual —ya se emitió por fuera— pero la línea lo dice en vez de asumir una
+   * tasa: una tasa inventada se ve idéntica a una correcta.
+   */
+  ubicacionIVA?: 'origen' | 'destino';
 }
 
 /** Totales de una sola moneda. Nunca mezclados con otra. */
