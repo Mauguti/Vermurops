@@ -4,6 +4,7 @@ import { DollarSign, FileText, CheckCircle, Clock, AlertCircle, Plus, Search, Fi
 import FichaFactura from './finance/FichaFactura';
 import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import { useDepositosCliente } from '../hooks/useDepositosCliente';
+import { useFacturas } from '../hooks/useFacturas';
 import { calcularFondeo } from '../lib/fondeoCliente';
 import PanelPagos from './ordenesCompra/PanelPagos';
 import BandejaOC from './ordenesCompra/BandejaOC';
@@ -52,8 +53,11 @@ export default function Finance() {
   /** C-3 · El gasto de oficina lo carga Administración. */
   const puedeSolicitarPago = puede('ordenCompra.solicitar');
 
-  // ── 1.1 · El fondeo del cliente ───────────────────────────────────────────
+  // ── 1.1 / 2.3 · El fondeo del cliente ─────────────────────────────────────
+  // Depósitos Y cobros: son el mismo dinero entrando por dos puertas — el
+  // anticipo que se pide antes de operar y la factura que se cobra después.
   const { depositos } = useDepositosCliente();
+  const { cobros } = useFacturas();
 
   /*
    * C-2 · La orden abierta se DERIVA del listener, no se guarda en estado.
@@ -94,6 +98,7 @@ export default function Finance() {
       ? calcularFondeo(
           depositos.filter(d => d.embarqueId === conCambios.embarqueId),
           ordenes.filter(o => o.embarqueId === conCambios.embarqueId),
+          cobros.filter(c => c.embarqueId === conCambios.embarqueId),
         )
       : undefined;
 
@@ -215,6 +220,7 @@ export default function Finance() {
             ? calcularFondeo(
                 depositos.filter(d => d.embarqueId === ocAbierta.embarqueId),
                 ordenes.filter(o => o.embarqueId === ocAbierta.embarqueId),
+                cobros.filter(c => c.embarqueId === ocAbierta.embarqueId),
               )
             : undefined}
         />

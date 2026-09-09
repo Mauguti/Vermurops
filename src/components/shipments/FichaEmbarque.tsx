@@ -6,6 +6,11 @@ import RutaEmbarque from './RutaEmbarque';
 import DocumentosEmbarque from './DocumentosEmbarque';
 import ProductosEmbarque from './ProductosEmbarque';
 import { useClientes } from '../../hooks/useClientes';
+import { useConceptos } from '../../hooks/useConceptos';
+import { useFacturas } from '../../hooks/useFacturas';
+import PanelFacturasEmbarque from '../facturas/PanelFacturasEmbarque';
+import { traficoDeFolio } from '../../lib/facturacionEmbarque';
+import { evaluarCierres, avisoDeOrden } from '../../lib/cierresEmbarque';
 import { useProveedores } from '../../hooks/useProveedores';
 import { useAuth } from '../../auth/AuthContext';
 import TablaCargosEmbarque from './TablaCargosEmbarque';
@@ -20,7 +25,7 @@ import { useOrdenesCompra } from '../../hooks/useOrdenesCompra';
 import Toast, { TipoToast } from '../ui/Toast';
 
 type PestanaEmbarque =
-  | 'general' | 'entidades' | 'ruta' | 'cargos'
+  | 'general' | 'entidades' | 'ruta' | 'cargos' | 'facturas'
   | 'documentos' | 'eventos' | 'productos' | 'master_hijo';
 
 interface FichaEmbarqueProps {
@@ -68,6 +73,37 @@ export default function FichaEmbarque({
    * `undefined` cuando no se conocen: la fecha de pago queda sin calcular en
    * vez de inventarse un plazo que nadie pactó.
    */
+  /*
+   * 2.1 · Facturas y cobros de ESTE embarque. El cobro no solo cierra la
+   * cuenta por cobrar: alimenta el fondeo que libera el pago al proveedor.
+   */
+  const {
+    facturas: facturasDelEmbarque, cobros, registrarFactura, cancelarFactura,
+    registrarCobro, anularCobro,
+  } = useFacturas(embarque.id);
+  const { conceptos } = useConceptos();
+
+  /*
+   * El embarque guarda el NOMBRE del cliente a cobrar, no su id. Se resuelve
+   * contra el catálogo para leer sus días de crédito; si no hace match, el
+   * vencimiento se calcula como contado en vez de con un plazo inventado.
+   */
+  /*
+   * 2.4 · Los tres cierres, evaluados contra datos reales: órdenes de compra,
+   * facturas y cobros de ESTE embarque. No se toma el control del
+   * interruptor; se dice lo que falta o si ya se puede cerrar.
+   */
+  const cierresEvaluados = evaluarCierres({
+    embarque,
+    ordenes: ordenes.filter(o => o.embarqueId === embarque.id),
+    facturas: facturasDelEmbarque,
+    cobros,
+  });
+
+  const clienteVinculado = clientes.find(
+    c => c.nombre === embarque.entidades?.clienteCobrar,
+  ) ?? null;
+
   const creditoDelProveedor = (id: string | undefined): number | undefined => {
     const dc = id ? proveedores.find(p => p.id === id)?.diasCredito : undefined;
     if (!dc) return undefined;
@@ -144,6 +180,13 @@ export default function FichaEmbarque({
   };
 
   const handleToggleCierre = (cierreType: 'operativo' | 'pago' | 'administrativo') => {
+    // §4.7: operativo → pago → administrativo. No se bloquea marcar fuera de
+    // orden —a veces se cobra antes de que Operaciones termine— pero cerrar
+    // administrativamente algo sin cobrar suele ser un clic mal dado.
+    if (!embarque.cierres[cierreType]) {
+      const aviso = avisoDeOrden(cierreType, embarque.cierres);
+      if (aviso && !window.confirm(`${aviso}\n\n¿Marcarlo de todos modos?`)) return;
+    }
     const updated: EmbarqueCompleto = {
       ...embarque,
       cierres: {
@@ -404,6 +447,8 @@ export default function FichaEmbarque({
     { id: 'entidades' as const, label: 'Entidades' },
     { id: 'ruta' as const, label: 'Ruta y aduanas' },
     { id: 'cargos' as const, label: 'Cargos', contador: (embarque.cargos.detalles ?? []).length },
+    // 2.1 · Va después de Cargos porque de ahí salen las líneas facturables.
+    { id: 'facturas' as const, label: 'Facturas', contador: facturasDelEmbarque.length },
     { id: 'documentos' as const, label: 'Documentos', contador: (embarque.documentos ?? []).length },
     { id: 'eventos' as const, label: 'Seguimiento' },
     { id: 'productos' as const, label: 'Productos', contador: (embarque.productos ?? []).length },
@@ -675,18 +720,21 @@ export default function FichaEmbarque({
                     label="Cierre Operativo"
                     desc="Se entregó la carga y se concluyeron los tránsitos."
                     done={embarque.cierres.operativo}
+                    evaluacion={cierresEvaluados.operativo}
                     onToggle={() => handleToggleCierre('operativo')}
                   />
                   <CierreToggle
                     label="Cierre de Pagos / Finanzas"
                     desc="Facturado y costos pagados."
                     done={embarque.cierres.pago}
+                    evaluacion={cierresEvaluados.pago}
                     onToggle={() => handleToggleCierre('pago')}
                   />
                   <CierreToggle
                     label="Cierre Administrativo"
                     desc="Expediente completo y archivado sin pendientes."
                     done={embarque.cierres.administrativo}
+                    evaluacion={cierresEvaluados.administrativo}
                     onToggle={() => handleToggleCierre('administrativo')}
                   />
                 </div>
@@ -953,6 +1001,62 @@ export default function FichaEmbarque({
         )}
 
         {/* DOCUMENTOS TAB */}
+        {activeTab === 'facturas' && (
+          <PanelFacturasEmbarque
+            embarque={embarque}
+            facturas={facturasDelEmbarque}
+            cobros={cobros}
+            conceptos={conceptos}
+            trafico={traficoDeFolio(embarque.folio)}
+            clienteId={clienteVinculado?.id ?? null}
+            credito={clienteVinculado
+              ? (clienteVinculado.diasCreditoPorTipo ?? { general: clienteVinculado.dias })
+              : null}
+            puedeFacturar={puede('factura.generar')}
+            onRegistrar={async (datos, cargoIds) => {
+              try {
+                const f = await registrarFactura(datos);
+                /*
+                 * Las líneas quedan marcadas con la factura que las cubre. La
+                 * marca vive en la LÍNEA: así una línea no puede acabar en dos
+                 * facturas, que es como se cobra dos veces lo mismo.
+                 */
+                guardarDetalles((embarque.cargos?.detalles ?? []).map(c =>
+                  cargoIds.includes(c.id) ? { ...c, facturaId: f.id } : c));
+                setAvisoOC({ mensaje: `Factura ${f.numero} registrada. Vence el ${f.fechaVencimiento}.`, tipo: 'exito' });
+              } catch (err) {
+                setAvisoOC({ mensaje: `No se pudo registrar: ${err instanceof Error ? err.message : err}`, tipo: 'error' });
+              }
+            }}
+            onCancelar={async (id, motivo) => {
+              try {
+                await cancelarFactura(id, motivo);
+                // Las líneas vuelven a estar facturables: la factura ya no las cubre.
+                guardarDetalles((embarque.cargos?.detalles ?? []).map(c =>
+                  c.facturaId === id ? { ...c, facturaId: null } : c));
+                setAvisoOC({ mensaje: 'Factura cancelada. Sus líneas vuelven a estar por facturar.', tipo: 'exito' });
+              } catch (err) {
+                setAvisoOC({ mensaje: `No se pudo cancelar: ${err instanceof Error ? err.message : err}`, tipo: 'error' });
+              }
+            }}
+            onCobrar={async (datos) => {
+              try {
+                await registrarCobro(datos);
+                setAvisoOC({
+                  mensaje: `Cobro registrado. Ese dinero ya fondea las órdenes de compra de este embarque.`,
+                  tipo: 'exito',
+                });
+              } catch (err) {
+                setAvisoOC({ mensaje: `No se pudo registrar el cobro: ${err instanceof Error ? err.message : err}`, tipo: 'error' });
+              }
+            }}
+            onAnularCobro={async (id) => {
+              try { await anularCobro(id); }
+              catch (err) { setAvisoOC({ mensaje: `No se pudo anular: ${err instanceof Error ? err.message : err}`, tipo: 'error' }); }
+            }}
+          />
+        )}
+
         {activeTab === 'documentos' && (
           <DocumentosEmbarque
             documentos={embarque.documentos}
@@ -1194,12 +1298,18 @@ export default function FichaEmbarque({
 // ─── CierreToggle Component ──────────────────────────────────────────────────
 
 function CierreToggle({
-  label, desc, done, onToggle
+  label, desc, done, onToggle, evaluacion,
 }: {
   label: string;
   desc: string;
   done: boolean;
   onToggle: () => void;
+  /**
+   * 2.4 · Lo que los DATOS dicen sobre este cierre. El interruptor sigue
+   * siendo de la persona —a veces sabe algo que el sistema no— pero cuando
+   * marca algo que los datos contradicen, se le dice.
+   */
+  evaluacion?: { listo: boolean; faltantes: string[] };
 }) {
   return (
     <div className="flex items-center justify-between p-3.5 border border-gray-150 rounded-xl bg-gray-50/50 shadow-2xs">
@@ -1213,6 +1323,16 @@ function CierreToggle({
           {label}
         </span>
         <span className="block text-[9px] text-gray-400 font-semibold leading-tight">{desc}</span>
+        {evaluacion && !evaluacion.listo && (
+          <span className={`block text-[10px] leading-tight mt-1 ${done ? 'text-red-600 font-semibold' : 'text-amber-700'}`}>
+            {done && '⚠ Marcado, pero: '}{evaluacion.faltantes[0]}
+          </span>
+        )}
+        {evaluacion?.listo && !done && (
+          <span className="block text-[10px] text-emerald-700 leading-tight mt-1">
+            Los datos ya lo respaldan: se puede cerrar.
+          </span>
+        )}
       </div>
 
       <button

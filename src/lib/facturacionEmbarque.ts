@@ -110,6 +110,14 @@ export interface PropuestaFactura {
 }
 
 /**
+ * Unión con NOMBRE, no anónima: TypeScript estrecha una unión discriminada
+ * con alias de forma más fiable a través de useMemo y de las props.
+ */
+export type ResultadoPropuesta =
+  | { ok: true; propuesta: PropuestaFactura }
+  | { ok: false; error: string };
+
+/**
  * Arma la factura a partir de las líneas facturables.
  *
  * §4.3: UNA moneda por factura. Si las líneas mezclan, se rechaza en vez de
@@ -119,7 +127,7 @@ export interface PropuestaFactura {
 export function proponerFactura(
   cargos: CargoDetalle[],
   ctx: ContextoFactura,
-): { ok: true; propuesta: PropuestaFactura } | { ok: false; error: string } {
+): ResultadoPropuesta {
   if (cargos.length === 0) {
     return { ok: false, error: 'No hay líneas por facturar: todas están cubiertas o no hay ingresos.' };
   }
@@ -259,4 +267,20 @@ export function saldoDeFactura(
       ? { avisoMoneda: `${enOtraMoneda} cobro(s) en otra moneda no cuentan para el saldo de esta factura en ${factura.moneda}.` }
       : {}),
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5 · El tráfico del embarque
+//
+// El embarque no guarda `trafico` como campo: lo codifica el prefijo de su
+// folio (VLIM impo marítimo, VLEM expo marítimo, VLIT impo terrestre…). Se
+// lee de ahí en vez de duplicarlo, por la misma razón de siempre: un dato
+// duplicado es un dato que se desincroniza.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function traficoDeFolio(folio: string): 'impo' | 'expo' | null {
+  const prefijo = folio.split('-')[0]?.toUpperCase() ?? '';
+  // VL + I/E + modalidad. La serie provisional «VL-» no dice el tráfico.
+  if (!/^VL[IE][MTA]$/.test(prefijo)) return null;
+  return prefijo[2] === 'I' ? 'impo' : 'expo';
 }

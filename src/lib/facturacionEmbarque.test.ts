@@ -199,3 +199,22 @@ describe('saldoDeFactura — se deriva de los cobros', () => {
       .toBe('cancelada');
   });
 });
+
+// ─── F · El tráfico sale del folio, no de un campo duplicado ─────────────────
+
+import { traficoDeFolio } from './facturacionEmbarque';
+
+describe('traficoDeFolio', () => {
+  it('lee el tráfico de las series reales', () => {
+    expect(traficoDeFolio('VLIM-0001')).toBe('impo');
+    expect(traficoDeFolio('VLEM-0001')).toBe('expo');
+    expect(traficoDeFolio('VLIT-0042')).toBe('impo');
+    expect(traficoDeFolio('VLET-0042')).toBe('expo');
+  });
+
+  it('la serie provisional no dice el tráfico: null, no una suposición', () => {
+    expect(traficoDeFolio('VL-0001')).toBeNull();
+    expect(traficoDeFolio('SHP-0001')).toBeNull();
+    expect(traficoDeFolio('')).toBeNull();
+  });
+});
