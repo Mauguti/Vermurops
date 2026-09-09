@@ -27,6 +27,7 @@ import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 import { puedeCrearCotizacion, PermisoDenegadoError } from '../auth/permisos';
 import { UserRole } from '../auth/users';
 import { conAviso } from '../lib/erroresEscritura';
+import { estaCongelada, cambiosBloqueados } from '../lib/lineasCotizacion';
 
 export function useCotizaciones() {
   const { user } = useAuth();
@@ -131,6 +132,32 @@ export function useCotizaciones() {
    * resolvimos en useEmbarques.
    */
   const updateCotizacion = async (id: string, data: Partial<KanbanQuote>): Promise<void> => {
+    /*
+     * ── El congelado, de verdad (9-sep-2026) ─────────────────────────────
+     * §4.8: «una vez que pasa a embarques ya así se queda». Hasta hoy eso
+     * solo escondía botones: `camposBloqueados` existía y NINGÚN código de
+     * producción lo llamaba, así que la cotización de un embarque abierto
+     * seguía siendo editable por cualquier vía que no fuera la ficha.
+     *
+     * Se compara contra lo que ya está guardado y no contra las claves del
+     * patch, porque los componentes mandan la cotización entera: `servicios`
+     * viene siempre, cambie o no. Un `servicios` idéntico no es un cambio y
+     * pasa; uno distinto se detiene aquí, que es donde importa.
+     */
+    const actual = quotes.find(q => q.id === id);
+    if (actual && estaCongelada(actual)) {
+      const bloqueados = cambiosBloqueados(
+        actual as unknown as Record<string, unknown>,
+        data as Record<string, unknown>,
+      );
+      if (bloqueados.length > 0) {
+        throw new Error(
+          `${id} ya generó embarque: sus ${bloqueados.join(' y ')} no se pueden cambiar. `
+          + 'Si el embarque necesita otra cosa, corrígelo en el embarque.',
+        );
+      }
+    }
+
     await conAviso('la cotización', () => updateDoc(
       doc(db, 'cotizaciones', id),
       sanitizarParaFirestore(data) as Record<string, unknown>,

@@ -594,6 +594,22 @@ todo dato en Firestore es escribible por cualquier miembro del equipo.
     y vuelta a cerrar el 31-ago** al rehacer la ficha en tabla. Si algún día se
     cambia la celda de concepto, el `ConceptoSelector` no es negociable.
 
+**🔴 BUG RESUELTO (9-sep-2026) — el congelado de §4.8 era solo visual.**
+`estaCongelada` mira `embarqueIds`, pero la ruta manual de apertura de
+embarques —la que se usa hoy con la bandera apagada— nunca lo escribía de
+vuelta en la cotización. Y `camposBloqueados` existía sin que NINGÚN código de
+producción lo llamara. Resultado: se podía editar la cotización de un embarque
+ya abierto, y cotización y embarque divergían sin que nadie se enterara.
+
+Es el mismo patrón que apareció dos veces en Finance.tsx: la lógica existe y
+el call site no la usa. **Al escribir una regla, verificar que alguien la
+llame** — un helper con tests y sin llamadas es documentación, no protección.
+
+El fix: la ruta manual escribe `embarqueIds`, y `updateCotizacion` valida con
+`cambiosBloqueados`, que COMPARA contra lo guardado en vez de mirar las claves
+del patch. Esa comparación es lo que hacía imposible cablearlo antes: los
+componentes mandan la cotización entera, así que `servicios` viene siempre.
+
 **🔴 BUG — `serviciosStore` vive en localStorage: cada navegador tiene su copia.**
 Los 10 «servicios» del selector viejo no están en Firestore: lo que
 Administración edita en Configuración solo cambia SU navegador y nadie más lo

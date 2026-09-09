@@ -678,8 +678,63 @@ export const CAMPOS_EDITABLES_CONGELADA = [
   'updatedAt',
 ] as const;
 
-/** Campos del patch que la cotización congelada NO acepta. Vacío = todo bien. */
+/**
+ * Campos del patch que la cotización congelada NO acepta, mirando solo las
+ * CLAVES.
+ *
+ * ⚠️ No sirve para guardar contra Firestore: los componentes mandan la
+ * cotización entera, así que `servicios` viene siempre y esto marcaría hasta
+ * un mensaje de chat. Para eso está `cambiosBloqueados`, que compara.
+ */
 export function camposBloqueados(patch: Record<string, unknown>): string[] {
   const permitidos = new Set<string>(CAMPOS_EDITABLES_CONGELADA);
   return Object.keys(patch).filter(k => !permitidos.has(k));
+}
+
+/** Igualdad estructural para JSON puro, estable ante el orden de las claves. */
+function igualProfundo(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (a === null || b === null || a === undefined || b === undefined) return a === b;
+  if (typeof a !== 'object' || typeof b !== 'object') return false;
+
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((x, i) => igualProfundo(x, b[i]));
+  }
+
+  const ca = a as Record<string, unknown>;
+  const cb = b as Record<string, unknown>;
+  // Las claves ausentes y las que valen undefined son lo mismo aquí: Firestore
+  // no guarda undefined, así que un campo que se fue y uno que nunca estuvo
+  // llegan igual al leerse de vuelta.
+  const claves = new Set([...Object.keys(ca), ...Object.keys(cb)]);
+  for (const k of claves) {
+    if (!igualProfundo(ca[k], cb[k])) return false;
+  }
+  return true;
+}
+
+/**
+ * Campos que este guardado CAMBIARÍA y que la cotización congelada no acepta.
+ *
+ * ── Por qué compara en vez de mirar las claves ─────────────────────────────
+ * La versión de arriba nunca se pudo cablear: los componentes mandan la
+ * cotización completa en cada guardado, así que `servicios` está siempre
+ * presente y la lista blanca marcaba todo — incluido escribir un mensaje de
+ * chat, que sí está permitido.
+ *
+ * Comparando contra lo que ya está guardado, un `servicios` idéntico no es un
+ * cambio y pasa; uno distinto se detiene. Eso es lo que la regla del cliente
+ * quería decir: «una vez que pasa a embarques ya así se queda» (§4.8).
+ *
+ * Vacío = el guardado no toca nada bloqueado.
+ */
+export function cambiosBloqueados(
+  actual: Record<string, unknown>,
+  patch: Record<string, unknown>,
+): string[] {
+  const permitidos = new Set<string>(CAMPOS_EDITABLES_CONGELADA);
+  return Object.keys(patch).filter(
+    k => !permitidos.has(k) && !igualProfundo(actual[k], patch[k]),
+  );
 }

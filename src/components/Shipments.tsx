@@ -21,7 +21,7 @@ export default function Shipments() {
   // E-1: los embarques viven en Firestore. Antes eran useState sembrado desde
   // el mock y se perdían al recargar.
   const { embarques, loading, error, guardarEmbarque } = useEmbarques();
-  const { quotes } = useCotizaciones();
+  const { quotes, updateCotizacion } = useCotizaciones();
   const { clientes } = useClientes();
   const { user, puede } = useAuth();
   const { serviciosActivos } = useServicios();
@@ -209,6 +209,26 @@ export default function Shipments() {
           serviciosGrupo: quote.servicios ?? [],
         });
         await guardarEmbarque(nuevo);
+
+        /*
+         * ── El enlace de vuelta (9-sep-2026) ──────────────────────────────
+         * La cotización tiene que saber que ya tiene embarque. De ese campo
+         * depende `estaCongelada`, y de ella que sus conceptos dejen de
+         * editarse (§4.8).
+         *
+         * La ruta automática lo escribía en su transacción; esta —la que se
+         * usa hoy con la bandera apagada— no, así que en producción una
+         * cotización con embarque abierto seguía editable y podía divergir
+         * del embarque sin que nadie se enterara.
+         *
+         * Va DESPUÉS de guardar el embarque: si se escribiera antes y el
+         * embarque fallara, la cotización quedaría congelada apuntando a un
+         * embarque que no existe.
+         */
+        await updateCotizacion(quote.id, {
+          embarqueIds: [...(quote.embarqueIds ?? []), nuevo.id],
+        });
+
         setSelectedEmbarqueId(nuevo.id);
         setToast({
           mensaje: advertencias.length > 0

@@ -26,6 +26,7 @@ import {
   compararConTarget,
   tieneVariosServicios,
   LineaPlana,
+  cambiosBloqueados,
 } from './lineasCotizacion';
 import {
   KanbanQuote, ServicioSolicitado, ConceptoCotizacion, CotizacionProveedor,
@@ -674,3 +675,72 @@ describe('repararConceptosDuplicados', () => {
   });
 });
 
+
+// ─── Congelado real: cambiosBloqueados (9-sep-2026) ──────────────────────────
+
+describe('cambiosBloqueados — el congelado que sí se puede cablear', () => {
+  const congelada = {
+    id: 'COT-1',
+    embarqueIds: ['VLIM-0001'],
+    servicios: [{ id: 'srv-1', conceptos: [{ id: 'c1', costo: 1000, venta: 1200 }] }],
+    chat: [{ id: 'm1', texto: 'hola' }],
+    prospecto: { empresa: 'Cliente' },
+    updatedAt: '2026-09-01',
+  } as Record<string, unknown>;
+
+  it('el guardado que manda TODO sin cambiar nada pasa: ese era el bloqueo', () => {
+    // Los componentes mandan la cotización entera en cada guardado. Con la
+    // versión por claves, esto marcaba `servicios` y nada se podía guardar.
+    expect(cambiosBloqueados(congelada, { ...congelada })).toEqual([]);
+  });
+
+  it('escribir un mensaje de chat pasa, aunque el patch traiga servicios', () => {
+    const patch = { ...congelada, chat: [{ id: 'm1', texto: 'hola' }, { id: 'm2', texto: 'nuevo' }] };
+    expect(cambiosBloqueados(congelada, patch)).toEqual([]);
+  });
+
+  it('cambiar un costo se DETIENE: es la divergencia que la regla impide', () => {
+    const patch = {
+      ...congelada,
+      servicios: [{ id: 'srv-1', conceptos: [{ id: 'c1', costo: 9999, venta: 1200 }] }],
+    };
+    expect(cambiosBloqueados(congelada, patch)).toEqual(['servicios']);
+  });
+
+  it('agregar o quitar un concepto también se detiene', () => {
+    const masUno = { ...congelada, servicios: [{ id: 'srv-1', conceptos: [
+      { id: 'c1', costo: 1000, venta: 1200 }, { id: 'c2', costo: 500, venta: 600 },
+    ] }] };
+    expect(cambiosBloqueados(congelada, masUno)).toEqual(['servicios']);
+
+    const menosUno = { ...congelada, servicios: [{ id: 'srv-1', conceptos: [] }] };
+    expect(cambiosBloqueados(congelada, menosUno)).toEqual(['servicios']);
+  });
+
+  it('el orden de las claves no cuenta como cambio', () => {
+    const patch = { ...congelada, prospecto: { empresa: 'Cliente' } };
+    expect(cambiosBloqueados(congelada, patch)).toEqual([]);
+  });
+
+  it('un campo ausente y uno en undefined son lo mismo: Firestore no guarda undefined', () => {
+    expect(cambiosBloqueados({ a: undefined }, { a: undefined })).toEqual([]);
+    expect(cambiosBloqueados({}, { motivoPerdida: undefined })).toEqual([]);
+  });
+
+  it('reporta cada campo bloqueado que cambia, no solo el primero', () => {
+    const patch = {
+      ...congelada,
+      servicios: [{ id: 'srv-2' }],
+      prospecto: { empresa: 'Otro' },
+    };
+    expect(cambiosBloqueados(congelada, patch).sort()).toEqual(['prospecto', 'servicios']);
+  });
+
+  it('los campos de la lista blanca nunca se reportan, cambien o no', () => {
+    const patch = {
+      chat: [{ id: 'z' }], actividades: [{ id: 'a' }], historialEtapas: [{ etapa: 'ganada' }],
+      embarqueIds: ['VLIM-0001', 'VLIM-0002'], updatedAt: '2026-09-09',
+    };
+    expect(cambiosBloqueados(congelada, patch)).toEqual([]);
+  });
+});
