@@ -194,6 +194,13 @@ service cloud.firestore {
     // Lectura: autenticado (para ver vistas compartidas de otros).
     // Creación: autenticado, siempre que usuarioId == su UID.
     // Actualización/Borrado: solo el creador (usuarioId == UID).
+    // ── Preferencias de pantalla por usuario (3.3) ────────────────────────
+    // Un documento por uid: cómo ver los cargos, y lo que venga. Solo el
+    // dueño lee y escribe el suyo.
+    match /preferenciasUsuario/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
     match /vistasUsuario/{id} {
       allow read:   if request.auth != null;
       allow create: if request.auth != null

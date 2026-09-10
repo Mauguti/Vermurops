@@ -81,6 +81,9 @@ import {
   SelectorVersiones, BotonNuevaVersion, AvisoVersionVista, ModalMotivoVersion,
 } from './VersionesCotizacion';
 import TablaVentaConceptos from './TablaVentaConceptos';
+import TablaPorProveedor, { ToggleVistaCargos } from '../cargos/TablaPorProveedor';
+import { consolidarPorProveedor, desdeLineas } from '../../lib/cargosPorProveedor';
+import { usePreferenciasUsuario } from '../../hooks/usePreferenciasUsuario';
 
 // ─── Re-exports for backward compat (other files may import these from here) ──
 export { ServicioSection } from './ServicioSection';
@@ -693,6 +696,12 @@ export default function FichaCotizacion({
 
   // ── Vista plana para las tarjetas por modalidad ─────────────────────────
   const lineasPlanas = useMemo(() => aplanarCotizacion(quote), [quote]);
+  /** 3 · La misma tabla, girada por proveedor. Derivada, no guardada. */
+  const consolidadoProveedores = useMemo(() => consolidarPorProveedor(desdeLineas(lineasPlanas)), [lineasPlanas]);
+  const { prefs, guardar: guardarPreferencia } = usePreferenciasUsuario();
+  const vistaCargos = prefs.vistaCargos ?? 'proveedor';
+  /** La clave del renglón es `${lineaId}::${componenteId}` o la línea sola. */
+  const lineaDeRenglon = (clave: string) => clave.split('::')[0];
 
   /**
    * El total del encabezado, POR MONEDA de las líneas (§4.3).
@@ -1388,6 +1397,54 @@ export default function FichaCotizacion({
                 el criterio de agrupación visual. */}
             {franjaSolicitud}
 
+            {/* 3 · Por proveedor (default) o por concepto. Editar concepto,
+                comparar y arrastrar tarifas viven en la vista por concepto;
+                por proveedor se edita costo y profit de lo que no está
+                compartido, y se responde «¿a quién le debo cuánto?». */}
+            <div className="flex items-center justify-between gap-3">
+              <ToggleVistaCargos vista={vistaCargos} onCambiar={v => guardarPreferencia('vistaCargos', v)} />
+              {vistaCargos === 'proveedor' && (
+                <p className="text-[10px] text-gray-400">Un proveedor, una factura: sus conceptos juntos. Para elegir conceptos o arrastrar tarifas, cambia a «Por concepto».</p>
+              )}
+            </div>
+
+            {vistaCargos === 'proveedor' ? (
+              <TablaPorProveedor
+                consolidado={consolidadoProveedores}
+                nombreProveedor={(id, fallback) => (id ? proveedores.find(p => p.id === id)?.nombre : '') || fallback}
+                conAcciones={rolActivo !== 'ventas'}
+                onClickRenglon={r => handleCompararProveedor(lineaDeRenglon(r.clave))}
+                celdas={r => {
+                  const lineaId = lineaDeRenglon(r.clave);
+                  const linea = lineasPlanas.find(l => l.id === lineaId);
+                  if (!linea) return {};
+                  const editable = rolActivo !== 'ventas' && !bloqueada && !r.compartido;
+                  const input = 'w-[90px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-[#E11D48] focus:bg-white bg-transparent rounded outline-none text-[12px]';
+                  return {
+                    costo: editable && !linea.costoDerivado ? (
+                      <input type="number" value={linea.costoCapturado ? linea.costo : ''} placeholder="—"
+                        onClick={e => e.stopPropagation()}
+                        onChange={e => handleEditarLineaPlana(linea.id, 'costo', Number(e.target.value))} className={input} />
+                    ) : undefined,
+                    profit: editable ? (
+                      <input type="number" value={linea.profit || ''}
+                        onClick={e => e.stopPropagation()}
+                        onChange={e => handleEditarLineaPlana(linea.id, 'profit', Number(e.target.value))} className={input} />
+                    ) : undefined,
+                    acciones: rolActivo !== 'ventas' && !bloqueada && linea.conceptoLocalId ? (
+                      <button onClick={e => { e.stopPropagation(); handleCompararProveedor(linea.id); }} className="text-[11px] font-semibold text-[#E11D48] hover:underline whitespace-nowrap">
+                        Comparar
+                      </button>
+                    ) : undefined,
+                  };
+                }}
+                vacio={(
+                  <div className="bg-white border border-dashed border-gray-200 rounded-xl py-10 text-center">
+                    <p className="text-[12px] text-gray-400">Sin conceptos todavía. Cambia a «Por concepto» para agregar el primero.</p>
+                  </div>
+                )}
+              />
+            ) : (
             <TablaConceptos
               lineas={lineasPlanas}
               servicios={serviciosDeLaTabla}
@@ -1407,6 +1464,7 @@ export default function FichaCotizacion({
                 ? () => setShowAddServicio(true)
                 : undefined}
             />
+            )}
 
             {/* El alta de servicio vive en el chip «+ Servicio» de la tabla.
                 El formulario aparece aquí, pegado a ella, cuando se pide. */}

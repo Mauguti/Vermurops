@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ChevronRight, Save, X, Calendar, Plus, Check, FileText, Landmark, ShieldCheck, DollarSign, Activity, GitCommit, Ship, Plane, Truck, ArrowRight, Trash2, Package, Layers } from 'lucide-react';
 import { EmbarqueCompleto, TIPOS_DOCUMENTO, EVENT_TYPES, CargoDetalle, EmbarqueEvento, EmbarqueDocumento, recalcularCargos, EmbarqueProducto, totalesDe, monedasConMovimiento } from './EmbarquesData';
 import EntidadesEmbarque from './EntidadesEmbarque';
@@ -14,8 +14,11 @@ import { evaluarCierres, avisoDeOrden } from '../../lib/cierresEmbarque';
 import { useProveedores } from '../../hooks/useProveedores';
 import { useAuth, usuariosPorRol } from '../../auth/AuthContext';
 import TablaCargosEmbarque from './TablaCargosEmbarque';
+import TablaPorProveedor, { ToggleVistaCargos } from '../cargos/TablaPorProveedor';
+import { consolidarPorProveedor, desdeCargos, estadoDelProveedor } from '../../lib/cargosPorProveedor';
+import { usePreferenciasUsuario } from '../../hooks/usePreferenciasUsuario';
 import { clienteDelEmbarque } from '../../lib/entidadesEmbarque';
-import { editarMontoCargo, restaurarMontoCargo, desviacionDelEmbarque } from '../../lib/cargosEditables';
+import { editarMontoCargo, restaurarMontoCargo, desviacionDelEmbarque, desviacionDe } from '../../lib/cargosEditables';
 import { construirOCDesdeCargo, marcarCargoConOrden, puedeConvertirse } from '../../lib/ocDesdeCargo';
 import { generateFolioEmbarque, parseFolioNumero } from '../../lib/folioService';
 import { FichaHeader, FichaTabs, BadgeEstado } from '../ui/ficha/FichaLayout';
@@ -24,6 +27,7 @@ import LineaTiempo from '../ui/ficha/LineaTiempo';
 import { ETAPAS_EMBARQUE, estadoDe, patchParaEtapa, type EstadoEmbarque } from '../../lib/estadoEmbarque';
 import { useOrdenesCompra } from '../../hooks/useOrdenesCompra';
 import Toast, { TipoToast } from '../ui/Toast';
+import { sumarPorMoneda, formatearPorMoneda } from '../../lib/sumarPorMoneda';
 
 /**
  * Las pestañas, en el orden en que se trabaja (decisión de Mau, 10-sep-2026):
@@ -61,6 +65,12 @@ export default function FichaEmbarque({
   const [avisoOC, setAvisoOC] = useState<{ mensaje: string; tipo: TipoToast } | null>(null);
 
   const { user, puede } = useAuth();
+  const { prefs, guardar: guardarPreferencia } = usePreferenciasUsuario();
+  const vistaCargos = prefs.vistaCargos ?? 'proveedor';
+  const consolidadoProveedores = useMemo(
+    () => consolidarPorProveedor(desdeCargos(embarque.cargos?.detalles || [])),
+    [embarque.cargos?.detalles],
+  );
 
   /** Solo quien puede solicitar pagos ve la acción. */
   const puedeSolicitarPago = puede('ordenCompra.solicitar');
@@ -863,16 +873,87 @@ export default function FichaEmbarque({
         {activeTab === 'cargos' && (
           <div className="space-y-6">
             
-            {/* A-3 · Cargos por concepto, editables por Operaciones. */}
-            <TablaCargosEmbarque
-              detalles={embarque.cargos.detalles || []}
-              editable={puedeEditarCargos}
-              nombreProveedor={nombreProveedor}
-              onEditarMonto={handleEditarMontoCargo}
-              onRestaurar={handleRestaurarCargo}
-              onQuitar={handleDeleteCargo}
-              onGenerarOC={puedeSolicitarPago ? handleGenerarOC : undefined}
-            />
+            {/* 3 · «¿A quién le debo cuánto?» se responde por proveedor;
+                «¿cuánto me costó el flete?», por concepto. Las dos vistas
+                son la misma tabla girada; la preferencia se guarda por usuario. */}
+            <div className="flex items-center justify-between gap-3">
+              <ToggleVistaCargos vista={vistaCargos} onCambiar={v => guardarPreferencia('vistaCargos', v)} />
+              <p className="text-[10px] text-gray-400">
+                {vistaCargos === 'proveedor'
+                  ? 'Mismas columnas que Pricing: lo cotizado y lo real, por proveedor.'
+                  : 'Por concepto: qué se cobra y qué se paga por cada línea.'}
+              </p>
+            </div>
+
+            {vistaCargos === 'concepto' ? (
+              /* A-3 · Cargos por concepto, editables por Operaciones. */
+              <TablaCargosEmbarque
+                detalles={embarque.cargos.detalles || []}
+                editable={puedeEditarCargos}
+                nombreProveedor={nombreProveedor}
+                onEditarMonto={handleEditarMontoCargo}
+                onRestaurar={handleRestaurarCargo}
+                onQuitar={handleDeleteCargo}
+                onGenerarOC={puedeSolicitarPago ? handleGenerarOC : undefined}
+              />
+            ) : (
+              <TablaPorProveedor
+                consolidado={consolidadoProveedores}
+                nombreProveedor={(id, fallback) => (id ? nombreProveedor(id) : '') || fallback}
+                conAcciones={puedeEditarCargos || puedeSolicitarPago}
+                estadoDe={g => estadoDelProveedor(g, embarque.cargos.detalles || [], ocDelEmbarque)}
+                extraGrupo={g => {
+                  // El desvío contra lo cotizado, sumado al proveedor: donde
+                  // Operaciones lo va a mirar.
+                  const suyos = (embarque.cargos.detalles || []).filter(c => g.renglones.some(r => r.refId === c.id));
+                  const desvio = sumarPorMoneda(suyos, c => desviacionDe(c), c => c.moneda);
+                  const txt = formatearPorMoneda(desvio, { vacio: '' });
+                  return txt ? (
+                    <span className="text-[10px] font-semibold text-amber-700" title="Cuánto se desvió el costo de este proveedor respecto a lo cotizado.">
+                      desvío vs. cotizado: {txt}
+                    </span>
+                  ) : null;
+                }}
+                celdas={r => {
+                  const cargo = r.refId ? (embarque.cargos.detalles || []).find(c => c.id === r.refId) : undefined;
+                  if (!cargo) return {};
+                  const facturado = !!cargo.facturaId;
+                  const conversion = puedeConvertirse(cargo);
+                  return {
+                    costo: puedeEditarCargos && !facturado ? (
+                      <input
+                        type="number"
+                        value={cargo.monto}
+                        onChange={e => handleEditarMontoCargo(cargo.id, Number(e.target.value))}
+                        className="w-[110px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-[#E11D48] focus:bg-white bg-transparent rounded outline-none text-[12px] font-semibold"
+                      />
+                    ) : undefined,
+                    acciones: (
+                      <div className="flex items-center gap-2 justify-end">
+                        {cargo.ordenCompraId ? (
+                          <EnlaceEntidad tipo="ordenCompra" id={cargo.ordenCompraId} title="Ya generó una orden de compra">OC</EnlaceEntidad>
+                        ) : puedeSolicitarPago && conversion.puede ? (
+                          <button onClick={() => handleGenerarOC(cargo.id)} className="text-[11px] font-semibold text-[#E11D48] hover:underline whitespace-nowrap">
+                            Solicitar pago
+                          </button>
+                        ) : null}
+                        {puedeEditarCargos && cargo.montoHeredado !== undefined && (
+                          <button onClick={() => handleRestaurarCargo(cargo.id)} className="text-[10px] text-gray-400 hover:text-gray-700" title="Volver al importe cotizado">restaurar</button>
+                        )}
+                        {puedeEditarCargos && !facturado && (
+                          <button onClick={() => handleDeleteCargo(cargo.id)} className="text-[10px] text-gray-300 hover:text-red-600" title="Quitar cargo">quitar</button>
+                        )}
+                      </div>
+                    ),
+                  };
+                }}
+                vacio={(
+                  <div className="border-2 border-dashed border-gray-200 rounded-xl py-10 text-center">
+                    <p className="text-[12px] text-gray-400">Este embarque no tiene cargos. Los hereda la cotización al ganarse, o se capturan abajo.</p>
+                  </div>
+                )}
+              />
+            )}
 
             {/* Lo que se movió respecto a la cotización. Es lo que dirección
                 revisa: no basta con que el embarque cuadre consigo mismo. */}

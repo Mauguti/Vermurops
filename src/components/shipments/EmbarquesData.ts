@@ -152,6 +152,14 @@ export interface CargoDetalle {
   facturaId?: string | null;
 
   /**
+   * La factura del PROVEEDOR que cubre este gasto, conciliada desde la
+   * pestaña Facturas (5). Solo en líneas de gasto. Null/ausente = el
+   * proveedor todavía no ha facturado esto. Es el «facturado» del estado
+   * por proveedor (lib/cargosPorProveedor.ts).
+   */
+  facturaProveedorId?: string | null;
+
+  /**
    * Dónde ocurre el servicio: origen o destino (2.1).
    *
    * La necesita `calcularIVA` junto con el tráfico (§4.2, regla espejo). Vive
