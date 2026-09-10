@@ -557,6 +557,30 @@ destino (documentos, facturas de proveedor, facturas al cliente) y por tipo.
   - Los contenedores se mandan a n8n como JSON en un solo campo del
     multipart (`contenedores`). Si n8n espera otra forma, se ajusta aquí.
 
+**Filtros de la lista, con responsable (10-sep-2026).** La lista de Embarques
+corre sobre `SpreadsheetTable` con vistas guardables; los filtros
+(responsable, estado, modalidad, cliente, rango ETA/ETD, cierre pendiente)
+se guardan CON la vista (`VistaUsuario.filtros`). «Solo los míos» filtra por
+`embarque.responsableOperativo`, que se hereda de
+`cliente.responsableOperativo` al nacer y se cambia en la ficha. El cliente
+tiene los tres responsables (ventas, pricing, operativo) por CORREO: no hay
+directorio de usuarios, así que `usuariosPorRol` (AuthContext) los saca del
+mapa de correos; cuando exista `usuarios/{uid}` lee de ahí.
+
+## 4.13 Cuentas por cobrar (10-sep-2026)
+
+Finanzas → Cuentas por cobrar es la contraparte de Cuentas por pagar. Todo
+se DERIVA de `facturas` y `cobros` (Bloque 2): `lib/cuentasPorCobrar.ts`.
+  - Estado por vencimiento: por cobrar · por vencer (≤ 7 días) · vencido ·
+    cobrado. El saldo sale de `saldoDeFactura`; nada se guarda.
+  - KPIs y totales por cliente POR MONEDA (§4.3). El único lugar que mezcla
+    monedas es el ORDEN de los clientes (los más atrasados primero), y no se
+    muestra.
+  - Registrar cobro desde el panel escribe el mismo `CobroCliente` que la
+    pestaña Facturas del embarque, así que fondea las OC igual (1.1).
+  - La ficha del cliente (Crédito) resume su cartera: «tiene X por cobrar,
+    Y vencido». El estado de cuenta semanal sale de aquí; va después.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
