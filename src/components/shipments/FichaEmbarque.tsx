@@ -14,6 +14,7 @@ import { evaluarCierres, avisoDeOrden } from '../../lib/cierresEmbarque';
 import { useProveedores } from '../../hooks/useProveedores';
 import { useAuth } from '../../auth/AuthContext';
 import TablaCargosEmbarque from './TablaCargosEmbarque';
+import { clienteDelEmbarque } from '../../lib/entidadesEmbarque';
 import { editarMontoCargo, restaurarMontoCargo, desviacionDelEmbarque } from '../../lib/cargosEditables';
 import { construirOCDesdeCargo, marcarCargoConOrden, puedeConvertirse } from '../../lib/ocDesdeCargo';
 import { generateFolioEmbarque, parseFolioNumero } from '../../lib/folioService';
@@ -107,9 +108,8 @@ export default function FichaEmbarque({
     cobros,
   });
 
-  const clienteVinculado = clientes.find(
-    c => c.nombre === embarque.entidades?.clienteCobrar,
-  ) ?? null;
+  // Por enlace primero; por nombre exacto para los embarques anteriores al enlace.
+  const clienteVinculado = clienteDelEmbarque(embarque, clientes);
 
   const creditoDelProveedor = (id: string | undefined): number | undefined => {
     const dc = id ? proveedores.find(p => p.id === id)?.diasCredito : undefined;
@@ -793,7 +793,14 @@ export default function FichaEmbarque({
         {activeTab === 'informacion' && (
           <EntidadesEmbarque
             entidades={embarque.entidades}
-            onChangeEntidades={updated => onUpdateEmbarque({ ...embarque, entidades: updated, updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') })}
+            refs={embarque.entidadesRef}
+            clientes={clientes}
+            proveedores={proveedores}
+            modalidad={embarque.modalidad}
+            onChange={(entidades, entidadesRef) => onUpdateEmbarque({
+              ...embarque, entidades, entidadesRef,
+              updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+            })}
           />
         )}
 
@@ -801,6 +808,11 @@ export default function FichaEmbarque({
           <RutaEmbarque
             ruta={embarque.ruta}
             onChangeRuta={updated => onUpdateEmbarque({ ...embarque, ruta: updated, updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') })}
+            refs={embarque.entidadesRef}
+            onChangeRefs={entidadesRef => onUpdateEmbarque({ ...embarque, entidadesRef })}
+            proveedores={proveedores}
+            clientes={clientes}
+            modalidad={embarque.modalidad}
           />
         )}
 

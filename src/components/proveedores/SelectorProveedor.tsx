@@ -33,6 +33,8 @@ interface Props {
   placeholder?: string;
   /** Permite usar un nombre libre («probable proveedor» sin dar de alta). */
   onNombreLibre?: (nombre: string) => void;
+  /** Nombre libre YA elegido, para que el botón lo muestre en vez del placeholder. */
+  nombreLibreActual?: string;
   compacto?: boolean;
   disabled?: boolean;
 }
@@ -46,7 +48,7 @@ const ETIQUETA_MODALIDAD: Record<string, string> = {
 
 export default function SelectorProveedor({
   proveedores, valorId, onSelect, modalidadRelevante, excluirIds = [],
-  placeholder = 'Buscar proveedor…', onNombreLibre, compacto, disabled,
+  placeholder = 'Buscar proveedor…', onNombreLibre, nombreLibreActual, compacto, disabled,
 }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState('');
@@ -115,11 +117,11 @@ export default function SelectorProveedor({
         onClick={() => setAbierto(v => !v)}
         className={`w-full flex items-center justify-between gap-1 rounded border transition-colors text-left disabled:opacity-50 ${
           compacto ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1.5 text-[12px]'
-        } ${seleccionado
+        } ${seleccionado || nombreLibreActual
           ? 'border-gray-200 bg-white text-gray-800 hover:border-[#E11D48]/50'
           : 'border-dashed border-gray-300 bg-white text-gray-400 hover:border-[#E11D48] hover:text-[#E11D48]'}`}
       >
-        <span className="truncate">{seleccionado?.nombre ?? 'Seleccionar proveedor'}</span>
+        <span className="truncate">{seleccionado?.nombre ?? nombreLibreActual ?? 'Seleccionar proveedor'}</span>
         <ChevronDown className="w-3 h-3 shrink-0 text-gray-400" />
       </button>
 

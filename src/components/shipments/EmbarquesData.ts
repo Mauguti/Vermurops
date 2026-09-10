@@ -6,6 +6,29 @@
 export type ModalidadEmbarque = 'maritimo' | 'terrestre' | 'aereo';
 export type TipoEmbarque = 'master' | 'hijo';
 
+/**
+ * Enlace de un rol del embarque a su ficha del catálogo (10-sep-2026).
+ *
+ * Los roles de `EmbarqueEntidades` siguen siendo el NOMBRE como se imprime en
+ * el BL: texto libre, porque un shipper extranjero no está en el catálogo y
+ * no tiene por qué estarlo. Esto va aparte y es opcional: cuando existe, la
+ * entidad salió del catálogo y tiene ficha a la que ir; cuando no, el nombre
+ * es una excepción no validada y se pinta como texto.
+ *
+ * Vive en un mapa paralelo y no dentro de cada rol porque quince lugares
+ * leen `entidades.consignatario` como string —lista, buscador, facturas, OC—
+ * y cambiar la forma del rol los tocaría a todos por una referencia.
+ */
+export interface RefEntidad {
+  id: string;
+  coleccion: 'clientes' | 'proveedores';
+}
+
+/** El transportista principal vive en `ruta.origen`, pero su enlace va aquí. */
+export type RolEnlazable = keyof EmbarqueEntidades | 'transportista';
+
+export type EntidadesRef = Partial<Record<RolEnlazable, RefEntidad>>;
+
 export interface EmbarqueEntidades {
   expedidor: string;
   consignatario: string;
@@ -306,6 +329,8 @@ export interface EmbarqueCompleto {
   numeroReservacion: string; // Booking number
   referenciaCliente: string; // PO / Referencia
   entidades: EmbarqueEntidades;
+  /** Qué roles salieron del catálogo. Ausente en los embarques anteriores. */
+  entidadesRef?: EntidadesRef;
   ruta: EmbarqueRuta;
   fechas: EmbarqueFechas;
   descripcionCarga: string;

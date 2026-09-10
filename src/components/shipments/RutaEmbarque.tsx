@@ -1,17 +1,31 @@
 import React from 'react';
 import { MapPin, Navigation, Landmark, ShieldCheck } from 'lucide-react';
-import { EmbarqueRuta } from './EmbarquesData';
+import { EmbarqueRuta, EntidadesRef } from './EmbarquesData';
+import type { ClienteVermur } from '../clientes/ClientesData';
+import type { ProveedorVermur } from '../proveedores/ProveedoresData';
+import { CampoEntidad } from './EntidadesEmbarque';
 
 interface RutaEmbarqueProps {
   ruta: EmbarqueRuta;
   onChangeRuta: (ruta: EmbarqueRuta) => void;
   isReadOnly?: boolean;
+  /**
+   * El transportista principal (la naviera, la aerolínea) se queda en
+   * `ruta.origen.transportista`, pero se elige del catálogo y enlaza a su
+   * ficha como cualquier otra entidad. Sin estos props, es texto como antes.
+   */
+  refs?: EntidadesRef;
+  onChangeRefs?: (refs: EntidadesRef) => void;
+  proveedores?: ProveedorVermur[];
+  clientes?: ClienteVermur[];
+  modalidad?: string;
 }
 
 export default function RutaEmbarque({
   ruta,
   onChangeRuta,
-  isReadOnly = false
+  isReadOnly = false,
+  refs, onChangeRefs, proveedores, clientes, modalidad,
 }: RutaEmbarqueProps) {
 
   const handleOrigenChange = (key: keyof EmbarqueRuta['origen'], value: string) => {
@@ -75,7 +89,21 @@ export default function RutaEmbarque({
 
             <div>
               <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Transportista Principal (Carrier)</label>
-              {isReadOnly ? (
+              {onChangeRefs && proveedores ? (
+                <CampoEntidad
+                  rol="transportista"
+                  nombre={ruta.origen.transportista || ''}
+                  refs={refs}
+                  clientes={clientes ?? []}
+                  proveedores={proveedores}
+                  modalidad={modalidad}
+                  isReadOnly={isReadOnly}
+                  onChange={(nombre, nuevosRefs) => {
+                    handleOrigenChange('transportista', nombre);
+                    onChangeRefs(nuevosRefs);
+                  }}
+                />
+              ) : isReadOnly ? (
                 <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700">{ruta.origen.transportista || '—'}</div>
               ) : (
                 <input

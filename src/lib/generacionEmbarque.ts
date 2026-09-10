@@ -21,6 +21,7 @@ import {
 import { Advertencia } from './cotizacionAEmbarque';
 import { aplanarCotizacion, LineaPlana } from './lineasCotizacion';
 import { productosDesdeGrupo } from './cargaSolicitud';
+import { refsDesdeCotizacion } from './entidadesEmbarque';
 
 /** Cómo nació el embarque. Gobierna qué permiso se exige al guardarlo. */
 export type OrigenEmbarque = 'automatico' | 'manual';
@@ -133,6 +134,9 @@ export function construirEmbarqueDesdeCotizacion(d: DatosGeneracion): EmbarqueCo
       importador: '',
       clienteCobrar: empresa,
     },
+    // El cliente vinculado a la cotización (E6) llega con enlace a su ficha;
+    // los demás roles nacen como texto y se validan en el embarque.
+    entidadesRef: refsDesdeCotizacion(quote),
 
     ruta: {
       origen: {
