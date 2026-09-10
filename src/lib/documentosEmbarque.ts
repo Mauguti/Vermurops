@@ -101,6 +101,33 @@ export const TIPOS_DOC_EMBARQUE: { tipo: TipoDocEmbarque; etiqueta: string }[] =
     tipo, etiqueta: ETIQUETA_DOC_EMBARQUE[tipo],
   }));
 
+/**
+ * Las facturas NO son documentos del embarque: viven en la pestaña Facturas
+ * (reunión con el cliente, 10-sep-2026). En Documentos quedan los operativos.
+ */
+export function esTipoFactura(tipo: string): boolean {
+  return tipo === 'factura_proveedor' || tipo === 'factura_cliente' || tipo === 'factura';
+}
+
+export const TIPOS_DOC_OPERATIVOS = TIPOS_DOC_EMBARQUE.filter(t => !esTipoFactura(t.tipo));
+
+/** Un documento es factura si su tipo o su destino lo dicen. */
+export function esDocumentoFactura(doc: Pick<EmbarqueDocumento, 'tipo' | 'grupo'>): boolean {
+  return esTipoFactura(doc.tipo) || grupoDe(doc) !== 'documentos';
+}
+
+/**
+ * Por qué no se puede guardar en Documentos. Null = sí se puede. Se decide
+ * por lo que DETECTÓ el clasificador (tipo y destino), no por lo que el
+ * usuario confirme: una factura confirmada como «otro» sigue siendo factura.
+ */
+export function bloqueoEnDocumentos(c: Pick<ClasificacionValidada, 'tipo' | 'destinoSugerido'>): string | null {
+  if (esTipoFactura(c.tipo) || (c.destinoSugerido && c.destinoSugerido !== 'documentos')) {
+    return 'El clasificador lo lee como factura. Las facturas no se guardan en Documentos: súbela en la pestaña Facturas, donde se concilia contra los cargos.';
+  }
+  return null;
+}
+
 // ─── Contexto que se manda al clasificador ───────────────────────────────────
 
 /**

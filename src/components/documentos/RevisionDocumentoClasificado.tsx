@@ -41,6 +41,11 @@ interface Props {
   /** Contenido extra del flujo (D-3 meterá aquí el selector de grupo). */
   children?: React.ReactNode;
   guardando: boolean;
+  /**
+   * Motivo por el que NO se puede guardar desde esta pantalla, decidido por
+   * el flujo (una factura en Documentos). Deshabilita Guardar y lo dice.
+   */
+  bloqueo?: string | null;
   onGuardar: (r: RevisionConfirmada) => void;
   onCancelar: () => void;
 }
@@ -53,7 +58,7 @@ const CONFIANZA_ESTILO: Record<ClasificacionValidada['confianza'], string> = {
 
 export default function RevisionDocumentoClasificado({
   clasificacion, tipoEsperado, tipos, etiqueta, camposAdoptables = [],
-  children, guardando, onGuardar, onCancelar,
+  children, guardando, bloqueo = null, onGuardar, onCancelar,
 }: Props) {
   /*
    * El tipo arranca SIN confirmar cuando el detectado contradice al esperado:
@@ -117,6 +122,15 @@ export default function RevisionDocumentoClasificado({
               </p>
             </div>
           </div>
+
+          {bloqueo && (
+            <div className="border border-red-300 bg-red-50 rounded-lg px-3 py-2.5">
+              <p className="text-[12px] text-red-900 font-semibold flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                {bloqueo}
+              </p>
+            </div>
+          )}
 
           {/* Discrepancia esperado vs detectado */}
           {!discrepancia.coincide && (
@@ -265,7 +279,7 @@ export default function RevisionDocumentoClasificado({
               Cancelar
             </button>
             <button
-              disabled={!veredicto.puedeGuardar || guardando}
+              disabled={!veredicto.puedeGuardar || guardando || !!bloqueo}
               onClick={() => tipo && onGuardar({
                 tipoConfirmado: tipo,
                 nombre: nombre.trim(),

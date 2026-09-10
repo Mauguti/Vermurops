@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   etiquetaTipoDocumento, grupoPropuesto, grupoDe, agruparDocumentos,
   contenedoresDelEmbarque, contenedorNoCoincide, documentoDesdeRevision,
-  proponerParaOC, esTipoLegacy, TIPOS_DOC_EMBARQUE,
+  proponerParaOC, esTipoLegacy, TIPOS_DOC_EMBARQUE, TIPOS_DOC_OPERATIVOS, esDocumentoFactura, bloqueoEnDocumentos,
 } from './documentosEmbarque';
 import { precargaFacturaProveedor, type ClasificacionValidada } from './clasificacionDocumentos';
 import type { EmbarqueDocumento } from '../components/shipments/EmbarquesData';
@@ -126,5 +126,28 @@ describe('proponerParaOC — sustituir el folio interno por el número real', ()
     expect(p.facturaDatos.cotejo).toBe('sin_total');
     expect(p.facturaDatos.moneda).toBe('MXN');
     expect(p.aviso).toContain('captura el monto');
+  });
+});
+
+describe('las facturas salen de Documentos', () => {
+  it('los tipos operativos son los 13 menos las dos facturas', () => {
+    expect(TIPOS_DOC_OPERATIVOS).toHaveLength(11);
+    expect(TIPOS_DOC_OPERATIVOS.some(t => t.tipo === 'factura_proveedor' || t.tipo === 'factura_cliente')).toBe(false);
+    // La factura comercial es documento aduanal, no una factura por cobrar o pagar.
+    expect(TIPOS_DOC_OPERATIVOS.some(t => t.tipo === 'factura_comercial')).toBe(true);
+  });
+
+  it('un documento es factura por su tipo o por su destino, legacy incluido', () => {
+    expect(esDocumentoFactura(doc({ tipo: 'factura_proveedor' }))).toBe(true);
+    expect(esDocumentoFactura(doc({ tipo: 'otro', grupo: 'facturas_cliente' }))).toBe(true);
+    expect(esDocumentoFactura(doc({ tipo: 'factura' }))).toBe(true);
+    expect(esDocumentoFactura(doc({ tipo: 'bl_maritimo', grupo: 'documentos' }))).toBe(false);
+  });
+
+  it('se bloquea por lo que DETECTÓ el clasificador, aunque se confirme otro tipo', () => {
+    expect(bloqueoEnDocumentos({ tipo: 'factura_proveedor', destinoSugerido: null })).toContain('Facturas');
+    expect(bloqueoEnDocumentos({ tipo: 'otro', destinoSugerido: 'facturas_proveedor' })).toContain('Facturas');
+    expect(bloqueoEnDocumentos({ tipo: 'bl_maritimo', destinoSugerido: 'documentos' })).toBeNull();
+    expect(bloqueoEnDocumentos({ tipo: 'packing_list', destinoSugerido: null })).toBeNull();
   });
 });
