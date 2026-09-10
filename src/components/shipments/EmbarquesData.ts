@@ -239,6 +239,36 @@ export interface EmbarqueDocumento {
   ocId?: string | null;
 }
 
+/**
+ * Bitácora del embarque (10-sep-2026): lo INTERNO del equipo.
+ *
+ * Distinto del historial (`eventos`), que son los hitos redactados para el
+ * cliente y salen a su portal. Aquí va el rastro de auditoría —lo que el
+ * sistema registra solo, con quién, qué y cuándo— y los comentarios de
+ * Operaciones. Un comentario interno nunca aparece en el portal; un hito del
+ * cliente no ensucia la bitácora con detalle operativo.
+ */
+export type EventoBitacora =
+  | 'etapa' | 'cierre' | 'cargo' | 'orden_compra' | 'factura' | 'cobro'
+  | 'entidad' | 'responsable' | 'documento' | 'otro';
+
+export interface EntradaBitacora {
+  id: string;
+  /** 'sistema' no se edita ni se borra; 'comentario' lo edita solo su autor. */
+  tipo: 'sistema' | 'comentario';
+  /** Qué registró el sistema. Solo en tipo 'sistema'. */
+  evento?: EventoBitacora;
+  titulo: string;
+  detalle?: string;
+  autor: { uid: string; nombre: string };
+  /** ISO. */
+  fecha: string;
+  /** Solo comentarios: cuándo se editó por última vez. */
+  editadoEn?: string;
+  /** Solo comentarios: lo que decía antes de cada edición. Queda registro. */
+  ediciones?: { fecha: string; textoAnterior: string }[];
+}
+
 export interface EmbarqueEvento {
   id: string;
   titulo: string;
@@ -378,6 +408,8 @@ export interface EmbarqueCompleto {
   cargos: EmbarqueCargos;
   documentos: EmbarqueDocumento[];
   eventos: EmbarqueEvento[];
+  /** Lo interno del equipo. Ver EntradaBitacora. Ausente en los anteriores. */
+  bitacora?: EntradaBitacora[];
   createdAt: string;
   updatedAt: string;
 

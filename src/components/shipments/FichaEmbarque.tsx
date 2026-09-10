@@ -14,6 +14,8 @@ import { evaluarCierres, avisoDeOrden } from '../../lib/cierresEmbarque';
 import { useProveedores } from '../../hooks/useProveedores';
 import { useAuth, usuariosPorRol } from '../../auth/AuthContext';
 import TablaCargosEmbarque from './TablaCargosEmbarque';
+import BitacoraEmbarque from './BitacoraEmbarque';
+import { conBitacora, comentario, editarComentario } from '../../lib/bitacoraEmbarque';
 import TablaPorProveedor, { ToggleVistaCargos } from '../cargos/TablaPorProveedor';
 import { consolidarPorProveedor, desdeCargos, estadoDelProveedor } from '../../lib/cargosPorProveedor';
 import { usePreferenciasUsuario } from '../../hooks/usePreferenciasUsuario';
@@ -38,7 +40,7 @@ import { sumarPorMoneda, formatearPorMoneda } from '../../lib/sumarPorMoneda';
  */
 type PestanaEmbarque =
   | 'informacion' | 'cargos' | 'productos' | 'documentos' | 'facturas'
-  | 'historial' | 'master_hijo';
+  | 'historial' | 'bitacora';
 
 interface FichaEmbarqueProps {
   embarque: EmbarqueCompleto;
@@ -65,6 +67,15 @@ export default function FichaEmbarque({
   const [avisoOC, setAvisoOC] = useState<{ mensaje: string; tipo: TipoToast } | null>(null);
 
   const { user, puede } = useAuth();
+  /*
+   * Bitácora: cada guardado que sale de esta ficha se COMPARA contra lo que
+   * había y anota lo que cambió (etapa, cierres, costos, entidades,
+   * documentos…) con quién y cuándo. Instrumentar cada botón dejaría fuera
+   * el siguiente camino que alguien agregue.
+   */
+  const autorBitacora = { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' };
+  const guardar = (updated: EmbarqueCompleto) =>
+    onUpdateEmbarque(conBitacora(embarque, updated, autorBitacora, new Date().toISOString()));
   const { prefs, guardar: guardarPreferencia } = usePreferenciasUsuario();
   const vistaCargos = prefs.vistaCargos ?? 'proveedor';
   const consolidadoProveedores = useMemo(
@@ -193,7 +204,7 @@ export default function FichaEmbarque({
       },
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
     };
-    onUpdateEmbarque(updated);
+    guardar(updated);
   };
 
   const handleToggleCierre = (cierreType: 'operativo' | 'pago' | 'administrativo') => {
@@ -212,7 +223,7 @@ export default function FichaEmbarque({
       },
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
     };
-    onUpdateEmbarque(updated);
+    guardar(updated);
   };
 
   // Cargos Handlers
@@ -234,7 +245,7 @@ export default function FichaEmbarque({
     const newDetalles = [...(embarque.cargos.detalles || []), newCargo];
     const newCargosInfo = recalcularCargos(newDetalles);
 
-    onUpdateEmbarque({
+    guardar({
       ...embarque,
       cargos: newCargosInfo,
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
@@ -252,7 +263,7 @@ export default function FichaEmbarque({
    * y así se queda. La diferencia entre las dos es el dato del profit real.
    */
   const guardarDetalles = (detalles: CargoDetalle[]) => {
-    onUpdateEmbarque({
+    guardar({
       ...embarque,
       cargos: recalcularCargos(detalles),
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
@@ -317,7 +328,7 @@ export default function FichaEmbarque({
     const newDetalles = (embarque.cargos.detalles || []).filter(c => c.id !== id);
     const newCargosInfo = recalcularCargos(newDetalles);
 
-    onUpdateEmbarque({
+    guardar({
       ...embarque,
       cargos: newCargosInfo,
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
@@ -337,7 +348,7 @@ export default function FichaEmbarque({
       tipo: newEventTipo
     };
 
-    onUpdateEmbarque({
+    guardar({
       ...embarque,
       eventos: [newEvento, ...(embarque.eventos || [])],
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
@@ -353,7 +364,7 @@ export default function FichaEmbarque({
       id: `doc-${Date.now()}`,
       ...doc
     };
-    onUpdateEmbarque({
+    guardar({
       ...embarque,
       documentos: [...(embarque.documentos || []), newDocObj],
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
@@ -362,7 +373,7 @@ export default function FichaEmbarque({
   };
 
   const handleDeleteDocumento = (docId: string) => {
-    onUpdateEmbarque({
+    guardar({
       ...embarque,
       documentos: (embarque.documentos || []).filter(d => d.id !== docId),
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
@@ -372,7 +383,7 @@ export default function FichaEmbarque({
   // ── En Tránsito Handler (Magaya: Acciones → Poner/Quitar En Tránsito) ──────────
   const handleEnTransito = () => {
     const now = new Date().toISOString().slice(0, 16).replace('T', ' ');
-    onUpdateEmbarque({
+    guardar({
       ...embarque,
       enTransito: !embarque.enTransito,
       fechaEnTransito: !embarque.enTransito ? now : undefined,
@@ -383,7 +394,7 @@ export default function FichaEmbarque({
   // ── Productos Handlers ───────────────────────────────────────────────────────────
   const handleAddProducto = (prod: Omit<EmbarqueProducto, 'id'>) => {
     const newProd: EmbarqueProducto = { id: `prod-${Date.now()}`, ...prod };
-    onUpdateEmbarque({
+    guardar({
       ...embarque,
       productos: [...(embarque.productos || []), newProd],
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
@@ -391,7 +402,7 @@ export default function FichaEmbarque({
   };
 
   const handleDeleteProducto = (prodId: string) => {
-    onUpdateEmbarque({
+    guardar({
       ...embarque,
       productos: (embarque.productos || []).filter(p => p.id !== prodId),
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
@@ -456,7 +467,7 @@ export default function FichaEmbarque({
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
     };
 
-    onUpdateEmbarque(nuevoHijo); // Esta acción la registra en el listado central
+    guardar(nuevoHijo); // Esta acción la registra en el listado central
     alert(`Se ha creado el HBL Hijo ${nuevoHijo.folio}. Puedes buscarlo en la lista.`);
   };
 
@@ -467,8 +478,10 @@ export default function FichaEmbarque({
     { id: 'documentos' as const, label: 'Documentos', contador: (embarque.documentos ?? []).length },
     // 2.1 · Después de Cargos porque de ahí salen las líneas facturables.
     { id: 'facturas' as const, label: 'Facturas', contador: facturasDelEmbarque.length },
+    // Historial = los hitos para el cliente (salen al portal). Bitácora = lo
+    // interno del equipo y el rastro de auditoría. No se mezclan.
     { id: 'historial' as const, label: 'Historial' },
-    { id: 'master_hijo' as const, label: 'Master / hijo' },
+    { id: 'bitacora' as const, label: 'Bitácora', contador: (embarque.bitacora ?? []).length },
   ];
 
   return (
@@ -586,7 +599,7 @@ export default function FichaEmbarque({
                     onChange={e => {
                       const r = patchParaEtapa(embarque, e.target.value as EstadoEmbarque);
                       if ('error' in r) { setAvisoOC({ mensaje: r.error, tipo: 'error' }); return; }
-                      onUpdateEmbarque({ ...embarque, ...r, updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') });
+                      guardar({ ...embarque, ...r, updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') });
                     }}
                     className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs bg-white disabled:bg-gray-50"
                     title={embarque.cierres?.operativo ? 'Con el cierre operativo hecho, la carga está entregada.' : ETAPAS_EMBARQUE.find(x => x.id === estadoDe(embarque))?.descripcion}
@@ -601,7 +614,7 @@ export default function FichaEmbarque({
                   <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Responsable operativo</label>
                   <select
                     value={embarque.responsableOperativo ?? ''}
-                    onChange={e => onUpdateEmbarque({
+                    onChange={e => guardar({
                       ...embarque,
                       responsableOperativo: e.target.value || null,
                       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
@@ -850,7 +863,7 @@ export default function FichaEmbarque({
             clientes={clientes}
             proveedores={proveedores}
             modalidad={embarque.modalidad}
-            onChange={(entidades, entidadesRef) => onUpdateEmbarque({
+            onChange={(entidades, entidadesRef) => guardar({
               ...embarque, entidades, entidadesRef,
               updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
             })}
@@ -860,13 +873,130 @@ export default function FichaEmbarque({
         {activeTab === 'informacion' && (
           <RutaEmbarque
             ruta={embarque.ruta}
-            onChangeRuta={updated => onUpdateEmbarque({ ...embarque, ruta: updated, updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') })}
+            onChangeRuta={updated => guardar({ ...embarque, ruta: updated, updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') })}
             refs={embarque.entidadesRef}
-            onChangeRefs={entidadesRef => onUpdateEmbarque({ ...embarque, entidadesRef })}
+            onChangeRefs={entidadesRef => guardar({ ...embarque, entidadesRef })}
             proveedores={proveedores}
             clientes={clientes}
             modalidad={embarque.modalidad}
           />
+        )}
+
+        {/* Master / hijo: información de estructura, no de consulta diaria.
+            Bajó de pestaña propia al final de Información (10-sep-2026). */}
+        {activeTab === 'informacion' && (
+          <div className="bg-white p-6 rounded-xl border border-gray-150 shadow-2xs space-y-6">
+            <div className="border-b border-gray-100 pb-3">
+              <h3 className="text-xs font-bold text-[#18181B] uppercase tracking-wider">
+                Relación y Consolidación de Embarques
+              </h3>
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-1">
+                Administración de Bill of Ladings consolidados (Master MBL vs Hijos HBL).
+              </p>
+            </div>
+
+            {embarque.tipo === 'master' ? (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#E11D48]/5 border border-[#E11D48]/10 rounded-xl">
+                  <div>
+                    <span className="text-xs font-bold text-[#BE123C] flex items-center gap-1.5">
+                      <Layers className="w-4 h-4" />
+                      Embarque Master Consolidado (MBL)
+                    </span>
+                    <span className="block text-[10px] text-[#E11D48] font-semibold leading-tight mt-1">
+                      Este embarque agrupa múltiples guías/cargas hijas (House BL) bajo un solo Bill of Lading maestro.
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={handleCrearHijo}
+                    className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-[10px] font-bold uppercase tracking-wider px-3.5 py-2 rounded-lg shadow-sm transition-colors flex items-center gap-1 shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Crear HBL Hijo
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    Embarques Hijos Asociados ({hijos.length})
+                  </h4>
+
+                  {hijos.length === 0 ? (
+                    <p className="text-xs text-gray-400 italic">No hay embarques hijos asociados a este consolidado master.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {hijos.map(h => (
+                        <div
+                          key={h.id}
+                          onClick={() => onSelectEmbarqueById(h.id)}
+                          className="p-4 border border-gray-200 hover:border-[#E11D48]/30 rounded-xl cursor-pointer hover:bg-[#E11D48]/5 transition-all flex flex-col justify-between"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <span className="text-xs font-bold text-gray-800 hover:text-[#E11D48]">
+                                {h.folio}
+                              </span>
+                              <span className="block text-[9px] text-gray-400 font-bold uppercase mt-0.5">
+                                HBL: {h.numeroGuia}
+                              </span>
+                            </div>
+                            <span className="text-[9px] font-extrabold uppercase bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
+                              Hijo
+                            </span>
+                          </div>
+
+                          <div className="border-t border-gray-100 pt-2.5 mt-3 flex items-center justify-between text-[10px]">
+                            <span className="font-semibold text-gray-600 truncate max-w-[150px]">
+                              {h.entidades.consignatario}
+                            </span>
+                            <span className="font-bold text-gray-500 tabular-nums">
+                              Val: ${h.valorDeclarado.toLocaleString()} USD
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                  <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                    <Ship className="w-4 h-4 text-sky-500" />
+                    Embarque Hijo (House Bill of Lading / HBL)
+                  </span>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-1">
+                    Este embarque es una carga individual consignada a un cliente específico.
+                  </p>
+                </div>
+
+                {master ? (
+                  <div className="p-4 border border-gray-150 rounded-xl flex items-center justify-between bg-white shadow-2xs">
+                    <div>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase">Embarque Master Asociado</span>
+                      <span className="block text-xs font-bold text-[#BE123C] hover:underline cursor-pointer mt-1" onClick={() => onSelectEmbarqueById(master.id)}>
+                        {master.folio} — MBL: {master.numeroGuia}
+                      </span>
+                    </div>
+
+                    <button
+                      onClick={() => onSelectEmbarqueById(master.id)}
+                      className="text-[#E11D48] hover:text-[#9F1239] text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
+                    >
+                      Ver Master <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-amber-50 border border-amber-100 text-amber-800 text-xs rounded-xl flex items-start gap-2">
+                    <span>
+                      Este embarque está configurado como Hijo, pero el Embarque Master con ID <strong>{embarque.masterId || 'ninguno'}</strong> no fue encontrado o no está asociado.
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
 
         {/* CARGOS TAB */}
@@ -1206,6 +1336,24 @@ export default function FichaEmbarque({
           />
         )}
 
+        {activeTab === 'bitacora' && (
+          <BitacoraEmbarque
+            bitacora={embarque.bitacora ?? []}
+            usuarioUid={user?.uid ?? ''}
+            puedeComentar={puede('embarque.generar')}
+            onComentar={texto => {
+              const c = comentario(texto, autorBitacora, new Date().toISOString());
+              if (c) guardar({ ...embarque, bitacora: [...(embarque.bitacora ?? []), c] });
+            }}
+            onEditar={(id, texto) => {
+              const r = editarComentario(embarque.bitacora ?? [], id, texto, user?.uid ?? '', new Date().toISOString());
+              if ('razon' in r) return r.razon;
+              guardar({ ...embarque, bitacora: r.bitacora });
+              return null;
+            }}
+          />
+        )}
+
         {/* HISTORIAL · la línea de tiempo del embarque */}
         {activeTab === 'historial' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1316,120 +1464,6 @@ export default function FichaEmbarque({
         )}
 
         {/* MASTER / HIJO TAB */}
-        {activeTab === 'master_hijo' && (
-          <div className="bg-white p-6 rounded-xl border border-gray-150 shadow-2xs space-y-6">
-            <div className="border-b border-gray-100 pb-3">
-              <h3 className="text-xs font-bold text-[#18181B] uppercase tracking-wider">
-                Relación y Consolidación de Embarques
-              </h3>
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-1">
-                Administración de Bill of Ladings consolidados (Master MBL vs Hijos HBL).
-              </p>
-            </div>
-
-            {embarque.tipo === 'master' ? (
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#E11D48]/5 border border-[#E11D48]/10 rounded-xl">
-                  <div>
-                    <span className="text-xs font-bold text-[#BE123C] flex items-center gap-1.5">
-                      <Layers className="w-4 h-4" />
-                      Embarque Master Consolidado (MBL)
-                    </span>
-                    <span className="block text-[10px] text-[#E11D48] font-semibold leading-tight mt-1">
-                      Este embarque agrupa múltiples guías/cargas hijas (House BL) bajo un solo Bill of Lading maestro.
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={handleCrearHijo}
-                    className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-[10px] font-bold uppercase tracking-wider px-3.5 py-2 rounded-lg shadow-sm transition-colors flex items-center gap-1 shrink-0"
-                  >
-                    <Plus className="w-3.5 h-3.5" /> Crear HBL Hijo
-                  </button>
-                </div>
-
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                    Embarques Hijos Asociados ({hijos.length})
-                  </h4>
-
-                  {hijos.length === 0 ? (
-                    <p className="text-xs text-gray-400 italic">No hay embarques hijos asociados a este consolidado master.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {hijos.map(h => (
-                        <div
-                          key={h.id}
-                          onClick={() => onSelectEmbarqueById(h.id)}
-                          className="p-4 border border-gray-200 hover:border-[#E11D48]/30 rounded-xl cursor-pointer hover:bg-[#E11D48]/5 transition-all flex flex-col justify-between"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <span className="text-xs font-bold text-gray-800 hover:text-[#E11D48]">
-                                {h.folio}
-                              </span>
-                              <span className="block text-[9px] text-gray-400 font-bold uppercase mt-0.5">
-                                HBL: {h.numeroGuia}
-                              </span>
-                            </div>
-                            <span className="text-[9px] font-extrabold uppercase bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">
-                              Hijo
-                            </span>
-                          </div>
-
-                          <div className="border-t border-gray-100 pt-2.5 mt-3 flex items-center justify-between text-[10px]">
-                            <span className="font-semibold text-gray-600 truncate max-w-[150px]">
-                              {h.entidades.consignatario}
-                            </span>
-                            <span className="font-bold text-gray-500 tabular-nums">
-                              Val: ${h.valorDeclarado.toLocaleString()} USD
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
-                  <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
-                    <Ship className="w-4 h-4 text-sky-500" />
-                    Embarque Hijo (House Bill of Lading / HBL)
-                  </span>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-1">
-                    Este embarque es una carga individual consignada a un cliente específico.
-                  </p>
-                </div>
-
-                {master ? (
-                  <div className="p-4 border border-gray-150 rounded-xl flex items-center justify-between bg-white shadow-2xs">
-                    <div>
-                      <span className="text-[10px] font-bold text-gray-400 uppercase">Embarque Master Asociado</span>
-                      <span className="block text-xs font-bold text-[#BE123C] hover:underline cursor-pointer mt-1" onClick={() => onSelectEmbarqueById(master.id)}>
-                        {master.folio} — MBL: {master.numeroGuia}
-                      </span>
-                    </div>
-
-                    <button
-                      onClick={() => onSelectEmbarqueById(master.id)}
-                      className="text-[#E11D48] hover:text-[#9F1239] text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
-                    >
-                      Ver Master <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-amber-50 border border-amber-100 text-amber-800 text-xs rounded-xl flex items-start gap-2">
-                    <span>
-                      Este embarque está configurado como Hijo, pero el Embarque Master con ID <strong>{embarque.masterId || 'ninguno'}</strong> no fue encontrado o no está asociado.
-                    </span>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
       </div>
     </div>

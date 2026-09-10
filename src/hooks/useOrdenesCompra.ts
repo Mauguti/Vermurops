@@ -35,6 +35,8 @@ import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
 import { totalesPorPagar, TotalesPorPagar } from '../lib/cuentasPorPagar';
+import { anotarBitacora } from './anotarBitacora';
+import { tituloOC } from '../lib/bitacoraEmbarque';
 
 // ─── Colección ──────────────────────────────────────────────────────────────
 
@@ -102,6 +104,11 @@ export function useOrdenesCompra() {
     };
 
     await conAviso('la orden de compra', () => setDoc(doc(db, COLLECTION, id), sanitizarParaFirestore(oc)));
+    await anotarBitacora(oc.embarqueId, 'orden_compra',
+      tituloOC('generada', oc.folio, oc.proveedorNombre, oc.solicitadaPor?.nombre ?? user?.nombre ?? ''),
+      { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' },
+      `${oc.moneda} ${oc.monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })} · ${oc.conceptoNombre}`);
+
     return oc;
   }, [user]);
 
@@ -154,6 +161,14 @@ export function useOrdenesCompra() {
       ...actorField,
       updatedAt: new Date().toISOString(),
     }) as Record<string, unknown>));
+
+    // Bitácora del embarque: autorizada, pagada y rechazada son hitos del
+    // rastro de auditoría; en gestión es trámite interno de la OC.
+    if (nuevoEstado === 'autorizada' || nuevoEstado === 'pagada' || nuevoEstado === 'rechazada') {
+      await anotarBitacora(oc.embarqueId, 'orden_compra',
+        tituloOC(nuevoEstado, oc.folio, oc.proveedorNombre, usuario.nombre), usuario,
+        `${oc.moneda} ${oc.monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })} · ${oc.conceptoNombre}`);
+    }
     return { ok: true };
   }, []);
 

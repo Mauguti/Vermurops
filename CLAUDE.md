@@ -609,6 +609,22 @@ Entregado (`lib/estadoEmbarque.ts`). Derivadas, con override manual
 si el clasificador detecta factura, la revisión se bloquea y manda a la
 pestaña Facturas. La factura comercial (documento aduanal) sí es operativo.
 
+**Bitácora del embarque (10-sep-2026).** Dos registros con públicos distintos,
+que NO se mezclan:
+  - **Historial** (`eventos`): los hitos redactados para el cliente —«En
+    arribo», «Liberado»—; es lo que saldrá a su portal.
+  - **Bitácora** (`bitacora`): lo interno. Lo que el sistema registra solo
+    (etapa, cierres, costos con el valor anterior, OC, facturas, cobros,
+    entidades, responsable, documentos — con quién y cuándo) y las notas de
+    Operaciones. Las entradas del sistema no se editan ni se borran; una nota
+    la edita solo su autor y queda lo que decía.
+  Cómo se registra solo: `conBitacora` COMPARA el embarque antes y después de
+  cada guardado de la ficha (`lib/bitacoraEmbarque.ts`), así un cambio que
+  llegue por un camino nuevo también queda. Lo que pasa en otras colecciones
+  lo anotan sus hooks con `anotarBitacora` (OC generada/autorizada/pagada,
+  factura, cobro) — la regla y su call site juntos.
+  Master/hijo dejó de ser pestaña: es estructura, vive al final de Información.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

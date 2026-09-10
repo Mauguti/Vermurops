@@ -18,6 +18,7 @@ import { conAviso } from '../lib/erroresEscritura';
 import { idUnico } from '../lib/idUnico';
 import type { FacturaCliente, CobroCliente } from '../components/facturas/FacturasData';
 import { saldoDeFactura } from '../lib/facturacionEmbarque';
+import { anotarBitacora } from './anotarBitacora';
 
 const COL_FACTURAS = 'facturas';
 const COL_COBROS = 'cobros';
@@ -77,6 +78,11 @@ export function useFacturas(embarqueId?: string) {
     await conAviso('la factura', () =>
       setDoc(doc(db, COL_FACTURAS, factura.id), sanitizarParaFirestore(factura)));
 
+    await anotarBitacora(factura.embarqueId, 'factura',
+      `${factura.registradaPor.nombre} registró la factura ${factura.numero} a ${factura.clienteNombre}`,
+      factura.registradaPor,
+      `${factura.moneda} ${factura.total.toLocaleString('es-MX', { minimumFractionDigits: 2 })} · vence ${factura.fechaVencimiento}`);
+
     return factura;
   };
 
@@ -118,6 +124,11 @@ export function useFacturas(embarqueId?: string) {
 
     await conAviso('el cobro', () =>
       setDoc(doc(db, COL_COBROS, cobro.id), sanitizarParaFirestore(cobro)));
+
+    await anotarBitacora(cobro.embarqueId, 'cobro',
+      `${cobro.registradoPor.nombre} registró un cobro de ${cobro.clienteNombre} contra ${cobro.facturaNumero}`,
+      cobro.registradoPor,
+      `${cobro.moneda} ${cobro.monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })} · ${cobro.banco} · ${cobro.referencia}`);
 
     /*
      * El estado de la factura se guarda además de derivarse, porque los
