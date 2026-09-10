@@ -2129,7 +2129,7 @@ export default function FichaCotizacion({
                     id: `notif-${Date.now()}-${Math.random().toString(36).substring(2,7)}`,
                     tipo: 'chat',
                     cotizacionId: quote.id,
-                    cotizacionFolio: quote.folio,
+                    cotizacionFolio: quote.id,
                     destinatarios: [],
                     destinatarioId: destId,
                     remitenteNombre: newMessage.autorNombre,

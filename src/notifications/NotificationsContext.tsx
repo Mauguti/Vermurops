@@ -5,6 +5,7 @@ import { Notificacion, INITIAL_NOTIFICATIONS } from './notificationsStore';
 import { useAuth } from '../auth/AuthContext';
 import { UserRole } from '../auth/users';
 import { db } from '../firebase';
+import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 import { collection, onSnapshot, query, where, addDoc, updateDoc, doc, writeBatch } from 'firebase/firestore';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -73,7 +74,11 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     if (n.destinatarioId) {
       try {
         const { id, ...data } = n;
-        await addDoc(collection(db, 'notificaciones'), data);
+        // Firestore rechaza `undefined` y tumba la escritura entera; el chat
+        // mandaba `cotizacionFolio: quote.folio` (campo que no existe) y
+        // NINGUNA notificación de chat se guardaba. Mismo estándar que los
+        // hooks: sanitizar antes de escribir.
+        await addDoc(collection(db, 'notificaciones'), sanitizarParaFirestore(data));
       } catch (err) {
         console.error("Error adding notification:", err);
       }
