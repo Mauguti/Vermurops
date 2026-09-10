@@ -4,6 +4,7 @@
 // ============================================================
 import { calcLinea } from '../../lib/cotizacionCalculator';
 import type { TipoCambioCotizacion } from '../../lib/monedaComparativa';
+import type { OrigenVersion, ResumenVersion } from '../../lib/versionesCotizacion';
 
 // ------------------------------------------------------------
 // Tipos base
@@ -420,6 +421,23 @@ export interface KanbanQuote {
    * de esas no se sabe de dónde salieron, y fingir que sí sería peor.
    */
   prospectoId?: string;
+
+  /**
+   * Versionado (V-1, 10-sep-2026). Ver `lib/versionesCotizacion.ts`.
+   *
+   * El documento raíz ES la versión viva: se sigue editando como siempre y
+   * nada de lo que ya lee `cotizaciones/{id}` cambia. Las versiones pasadas
+   * viven como fotos inmutables en `cotizaciones/{id}/versiones/{n}`; aquí
+   * solo queda su resumen, para pintar el selector sin leerlas.
+   *
+   * Todo opcional: una cotización sin estos campos es una v1 sin historia,
+   * que es exactamente lo que son las cotizaciones anteriores al versionado.
+   */
+  versionActual?: number;
+  /** Cómo nació la versión viva. Ausente en la v1. */
+  origenVersion?: OrigenVersion;
+  /** Resumen de las versiones congeladas, de la más vieja a la más nueva. */
+  versiones?: ResumenVersion[];
 
   // Timestamps y auditoría
   createdAt: string;
