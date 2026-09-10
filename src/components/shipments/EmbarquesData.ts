@@ -202,13 +202,33 @@ export interface EmbarqueCargos {
   moneda: string;
 }
 
+/** Tipos del primer modelo (antes de D-3). Se siguen leyendo. */
+export type TipoDocumentoLegacy =
+  | 'cotizacion' | 'pedimento' | 'bl' | 'mbl' | 'hbl' | 'factura' | 'packing_list' | 'otro';
+
 export interface EmbarqueDocumento {
   id: string;
-  tipo: 'cotizacion' | 'pedimento' | 'bl' | 'mbl' | 'hbl' | 'factura' | 'packing_list' | 'otro';
+  /** Legacy o la taxonomía del clasificador (lib/clasificacionDocumentos). */
+  tipo: TipoDocumentoLegacy | string;
   nombre: string;
   url: string;
   fechaCarga: string;
   cargadoPor: string;
+
+  // ── D-3 · Lo que deja el clasificador. Ausente en los documentos anteriores. ──
+  /** Ruta en Storage. Los anteriores a D-3 traen `url` de objeto, ya muerta. */
+  storagePath?: string;
+  nombreOriginal?: string;
+  /** Dónde cae: documentos, facturas de proveedor o facturas al cliente. */
+  grupo?: 'documentos' | 'facturas_proveedor' | 'facturas_cliente';
+  confianza?: 'alta' | 'media' | 'baja';
+  estado?: 'cargado' | 'con_observaciones';
+  /** Códigos crudos del clasificador, para volver a mostrarlos. */
+  avisos?: string[];
+  /** Lo extraído, tal cual. Cada pantalla decide qué le importa. */
+  datos?: Record<string, unknown>;
+  /** Si es factura de proveedor y se asoció a una OC del embarque. */
+  ocId?: string | null;
 }
 
 export interface EmbarqueEvento {

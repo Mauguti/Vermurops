@@ -53,7 +53,7 @@ export default function FichaEmbarque({
 }: FichaEmbarqueProps) {
   const { clientes } = useClientes();
   const { proveedores } = useProveedores();
-  const { ordenes, createOrden } = useOrdenesCompra();
+  const { ordenes, createOrden, updateOrden } = useOrdenesCompra();
 
   /** U-4 · Las órdenes de compra que se pagan por este embarque. */
   const ocDelEmbarque = ordenes.filter(o => o.embarqueId === embarque.id);
@@ -338,7 +338,7 @@ export default function FichaEmbarque({
   };
 
   // Documentos Handlers
-  const handleAddDocumento = (doc: Omit<EmbarqueDocumento, 'id'>) => {
+  const handleAddDocumento = (doc: Omit<EmbarqueDocumento, 'id'>): string => {
     const newDocObj = {
       id: `doc-${Date.now()}`,
       ...doc
@@ -348,6 +348,7 @@ export default function FichaEmbarque({
       documentos: [...(embarque.documentos || []), newDocObj],
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
     });
+    return newDocObj.id;
   };
 
   const handleDeleteDocumento = (docId: string) => {
@@ -1074,9 +1075,13 @@ export default function FichaEmbarque({
 
         {activeTab === 'documentos' && (
           <DocumentosEmbarque
-            documentos={embarque.documentos}
+            embarque={embarque}
+            ordenes={ocDelEmbarque}
+            puedeSubir={puede('embarque.generar')}
             onAddDocumento={handleAddDocumento}
             onDeleteDocumento={handleDeleteDocumento}
+            onPrecargarOC={(ocId, patch) => updateOrden(ocId, patch)}
+            onAviso={(mensaje, tipo) => setAvisoOC({ mensaje, tipo })}
           />
         )}
 

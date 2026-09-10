@@ -155,6 +155,22 @@ export interface OrdenCompra {
   cuentaSalida: string | null;
   /** Referencia o URL de la factura — puede llegar después. */
   facturaAsociada: string | null;
+  /**
+   * D-3 · Lo que el clasificador leyó de la factura del proveedor, ya
+   * confirmado por Operaciones. `facturaAsociada` es la referencia legible;
+   * esto es el desglose para cuadrar montos sin abrir el PDF.
+   */
+  facturaDatos?: {
+    numero: string;
+    fecha: string;
+    emisor: string;
+    total: number | null;
+    moneda: string;
+    /** El documento del embarque del que salió. */
+    documentoId: string;
+    /** Resultado del cotejo contra el monto de la OC al asociarla. */
+    cotejo: 'coincide' | 'difiere' | 'sin_total';
+  } | null;
   /** Referencia o URL del comprobante de pago. */
   comprobantePago: string | null;
 

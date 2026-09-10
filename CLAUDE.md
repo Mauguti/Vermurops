@@ -522,6 +522,41 @@ registro.» Ver `lib/versionesCotizacion.ts` y `hooks/useVersionesCotizacion.ts`
   - `plantillaVersionId` queda reservado en null: el PDF de cada versión
     llegará con el módulo de Plantillas, que arranca por la de cotización.
 
+## 4.12 La ficha de embarque (10-sep-2026)
+
+**Pestañas, en el orden en que se trabaja:** Información · Cargos · Productos
+· Documentos · Facturas · Historial · Master/hijo. Información fusiona lo que
+eran General, Entidades y Ruta —las tres secciones del encabezado del BL—.
+Plantillas se monta cuando exista el módulo; no se monta una pestaña vacía.
+
+**Las entidades salen del catálogo y enlazan a su ficha.** El nombre
+(`entidades.consignatario`…) sigue siendo texto: es lo que se imprime en el
+BL y un shipper extranjero no tiene por qué estar en el catálogo. El enlace
+va aparte, en `entidadesRef`, y es opcional: elegir del catálogo escribe
+nombre y enlace; teclear un nombre distinto suelta el enlace y queda «sin
+validar». Cliente a cobrar e importador → `clientes`; el resto y la naviera
+(`ruta.origen.transportista`) → `proveedores`. Ver `lib/entidadesEmbarque.ts`.
+  - Deuda: `TipoProveedor` no tiene `agente_aduanal` ni `naviera`; el
+    selector ORDENA por modalidad, no filtra. Agregarlos toca los 544
+    proveedores.
+
+**Documentos con clasificador (D-3).** La pestaña anterior «guardaba» con
+`URL.createObjectURL`: el archivo nunca llegaba a Storage y moría al recargar
+— todo documento subido ahí antes del 10-sep se perdió, y la lista lo dice.
+Ahora: Storage (`embarques/{id}/docs/`) → `clasificarDocumento` con
+`X-Vermur-Flujo: documento-embarque` (capacidad `embarque.generar`) →
+`RevisionDocumentoClasificado` → se guarda solo lo confirmado, agrupado por
+destino (documentos, facturas de proveedor, facturas al cliente) y por tipo.
+  - **Una factura de proveedor precarga la OC del embarque**: número, fecha y
+    emisor en `facturaAsociada`, el desglose en `facturaDatos`, y el cotejo
+    del total contra `oc.monto` (§4.3: monedas distintas no se comparan). Es
+    lo del levantamiento: «sustituir el folio interno por el número real,
+    cuadrar montos y adjuntar el respaldo».
+  - `contenedor_no_coincide` se pinta en rojo y aparte: un BL de OTRO
+    embarque se ve idéntico; el contenedor es lo único que lo delata.
+  - Los contenedores se mandan a n8n como JSON en un solo campo del
+    multipart (`contenedores`). Si n8n espera otra forma, se ajusta aquí.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

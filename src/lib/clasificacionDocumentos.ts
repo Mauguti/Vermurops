@@ -200,6 +200,9 @@ const TRADUCCION_AVISOS: Record<string, string> = {
   sin_fecha: 'No se encontró la fecha del documento.',
   sin_firma: 'El documento no parece estar firmado.',
   moneda_no_detectada: 'No se pudo determinar la moneda de los importes.',
+  // Flujo embarque (contenedor_no_coincide ya está arriba)
+  factura_sin_total: 'La factura no trae un total legible.',
+  sin_numero_documento: 'No se encontró el número del documento.',
 };
 
 /** Traduce un código de aviso. Desconocido → humanizado, nunca oculto. */
