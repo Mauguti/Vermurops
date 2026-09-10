@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { initialClients } from '../data';
 import { DollarSign, FileText, CheckCircle, Clock, AlertCircle, Plus, Search, Filter, Download, ArrowRight, X, File, ShieldCheck, Calculator } from 'lucide-react';
 import FichaFactura from './finance/FichaFactura';
@@ -17,6 +17,9 @@ import type { RolOC } from '../lib/stateMachineOC';
 import { useAuth } from '../auth/AuthContext';
 import Toast, { TipoToast } from './ui/Toast';
 import ModuloEnDesarrollo from './ui/ModuloEnDesarrollo';
+import PanelCuentasPorCobrar from './facturas/PanelCuentasPorCobrar';
+import { cartera, resumenCartera } from '../lib/cuentasPorCobrar';
+import { monedasConMonto } from '../lib/sumarPorMoneda';
 import { useDestinoPendiente } from '../navegacion/NavegacionContext';
 
 export default function Finance() {
@@ -57,7 +60,11 @@ export default function Finance() {
   // Depósitos Y cobros: son el mismo dinero entrando por dos puertas — el
   // anticipo que se pide antes de operar y la factura que se cobra después.
   const { depositos } = useDepositosCliente();
-  const { cobros } = useFacturas();
+  const { facturas, cobros, registrarCobro } = useFacturas();
+  const carteraResumen = useMemo(() => {
+    const hoy = new Date().toISOString().slice(0, 10);
+    return resumenCartera(cartera(facturas, cobros, hoy), cobros, hoy);
+  }, [facturas, cobros]);
 
   /*
    * C-2 · La orden abierta se DERIVA del listener, no se guarda en estado.
@@ -270,13 +277,21 @@ export default function Finance() {
               monedas={porPagar.monedasActivas}
               cargando={loadingOC}
             />
-            <div className="col-span-2 bg-white p-[20px] rounded-[12px] border border-dashed border-card-border shadow-sm flex items-center">
-               <p className="text-[12px] text-text-secondary leading-snug">
-                 Facturado, por cobrar y vencido todavía no existen: se
-                 calculan de las facturas emitidas, y la facturación se
-                 construye dentro del embarque.
-               </p>
-            </div>
+            {/* La cartera, derivada de facturas y cobros (Cuentas por cobrar). */}
+            <TarjetaKPI
+              titulo="Por cobrar"
+              detalle={`${carteraResumen.facturasAbiertas} factura${carteraResumen.facturasAbiertas !== 1 ? 's' : ''} abierta${carteraResumen.facturasAbiertas !== 1 ? 's' : ''}`}
+              montos={carteraResumen.porCobrar}
+              monedas={monedasConMonto(carteraResumen.porCobrar)}
+              cargando={false}
+            />
+            <TarjetaKPI
+              titulo="Vencido"
+              detalle={`${carteraResumen.facturasVencidas} vencida${carteraResumen.facturasVencidas !== 1 ? 's' : ''}`}
+              montos={carteraResumen.vencido}
+              monedas={monedasConMonto(carteraResumen.vencido)}
+              cargando={false}
+            />
           </div>
 
           <div className="bg-card border border-card-border rounded-[12px] shadow-sm flex flex-col overflow-hidden">
@@ -315,8 +330,16 @@ export default function Finance() {
                 )}
 
                 {activeTab === 'Cuentas por cobrar' && (
-                   <ModuloEnDesarrollo
-                     descripcion="La cartera por cobrar se alimentará de las facturas emitidas desde el embarque. Hoy no hay facturas reales que mostrar."
+                   <PanelCuentasPorCobrar
+                     facturas={facturas}
+                     cobros={cobros}
+                     puedeCobrar={puede('factura.generar')}
+                     onCobrar={async (c) => {
+                       // El mismo registro que desde el embarque: el cobro
+                       // fondea las OC de ese embarque (1.1).
+                       await registrarCobro(c);
+                       setToast({ mensaje: `Cobro de ${c.moneda} ${c.monto.toLocaleString('en-US', { minimumFractionDigits: 2 })} registrado contra ${c.facturaNumero}.`, tipo: 'exito' });
+                     }}
                    />
                 )}
 

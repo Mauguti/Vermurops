@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { ClienteVermur, DocsAlta, ContratoCliente, PagareCliente } from './ClientesData';
 import { validarRFC } from '../../lib/validadores';
 import { ChevronRight, Loader2, Check, Upload, AlertTriangle } from 'lucide-react';
@@ -13,6 +13,9 @@ import { FichaHeader, BadgeEstado } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import { useCotizaciones } from '../../hooks/useCotizaciones';
 import { useEmbarques } from '../../hooks/useEmbarques';
+import { useFacturas } from '../../hooks/useFacturas';
+import { resumenDeCliente } from '../../lib/cuentasPorCobrar';
+import { formatearPorMoneda } from '../../lib/sumarPorMoneda';
 import { usuariosPorRol, useAuth } from '../../auth/AuthContext';
 
 interface Props {
@@ -117,6 +120,11 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
   // U-4 · Lo que este cliente tiene abierto, enlazado desde su propia ficha.
   const { quotes } = useCotizaciones();
   const { embarques } = useEmbarques();
+  const { facturas, cobros } = useFacturas();
+  const carteraCliente = useMemo(
+    () => resumenDeCliente(cliente.id, facturas, cobros, new Date().toISOString().slice(0, 10)),
+    [cliente.id, facturas, cobros],
+  );
   const susCotizaciones = quotes.filter(q => q.clienteId === cliente.id);
   // Por su cotización, o porque el embarque lo enlaza como cliente a cobrar:
   // los capturados a mano no tienen cotización y antes quedaban fuera.
@@ -439,6 +447,19 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
           {/* ── Crédito ────────────────────────────────────────────────────── */}
           {tab === 'credito' && (
             <div>
+              {/* Su cartera, derivada de facturas y cobros: «tiene 45,000 por
+                  cobrar, 12,000 vencidos». Por moneda, nunca revuelto. */}
+              {carteraCliente && (
+                <div className={`mb-5 rounded-lg border px-4 py-3 text-[12px] ${formatearPorMoneda(carteraCliente.vencido, { vacio: '' }) ? 'border-red-200 bg-red-50 text-red-900' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>
+                  <p>
+                    Tiene <strong>{formatearPorMoneda(carteraCliente.porCobrar)}</strong> por cobrar en {carteraCliente.facturas.length} factura{carteraCliente.facturas.length !== 1 ? 's' : ''}
+                    {formatearPorMoneda(carteraCliente.vencido, { vacio: '' })
+                      ? <>, <strong>{formatearPorMoneda(carteraCliente.vencido)}</strong> vencido{carteraCliente.maxDiasVencido > 0 ? ` (hasta ${carteraCliente.maxDiasVencido} días de atraso)` : ''}.</>
+                      : ', nada vencido.'}
+                  </p>
+                  <p className="text-[10px] mt-1 opacity-70">El detalle y el registro de cobros están en Finanzas → Cuentas por cobrar.</p>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <Field label="Tipo de crédito">
                   <select className={INPUT} value={draft.tipoCredito}
