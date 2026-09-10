@@ -581,6 +581,34 @@ se DERIVA de `facturas` y `cobros` (Bloque 2): `lib/cuentasPorCobrar.ts`.
   - La ficha del cliente (Crédito) resume su cartera: «tiene X por cobrar,
     Y vencido». El estado de cuenta semanal sale de aquí; va después.
 
+## 4.14 Cargos por proveedor, etapas y documentos (reunión con el cliente, 10-sep-2026)
+
+**Un proveedor emite UNA factura por todo lo que prestó.** Los cargos se
+AGRUPAN por proveedor al mostrarse —cotización y embarque— con las columnas
+de Pricing: concepto · costo · profit · venta · margen %, total por proveedor
+y total general, por moneda. Es una VISTA: el dato sigue siendo por concepto
+(la comparativa compara concepto contra concepto). No repetir la dualidad de
+§6: `lib/cargosPorProveedor.ts` deriva, no guarda.
+  - Carga dividida (dos terminales en un concepto): la venta se reparte
+    proporcional al costo y el renglón se marca «compartido» con el cálculo
+    en el tooltip. Asignarla al primero inflaría su margen y pondría al otro
+    en pérdida.
+  - Toggle «Por proveedor | Por concepto», default proveedor, preferencia por
+    usuario en `preferenciasUsuario/{uid}`. Elegir concepto, comparar y
+    arrastrar tarifas viven en la vista por concepto.
+  - **Ventas NO ve proveedores**: conserva su vista por concepto con solo
+    venta. Textual: «que vean la coti y el margen. Eso es todo».
+  - Estado por proveedor en el embarque: sin factura · facturado · en orden
+    de compra · pagado — el MENOS avanzado de sus cargos.
+
+**Etapas del embarque:** Nuevo · Cargado · En tránsito · En destino ·
+Entregado (`lib/estadoEmbarque.ts`). Derivadas, con override manual
+(`etapaOperativa`); el cierre operativo siempre es entregado.
+
+**Las facturas no viven en Documentos.** Documentos acepta solo operativos;
+si el clasificador detecta factura, la revisión se bloquea y manda a la
+pestaña Facturas. La factura comercial (documento aduanal) sí es operativo.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
