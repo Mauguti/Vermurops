@@ -12,7 +12,7 @@ import PanelFacturasEmbarque from '../facturas/PanelFacturasEmbarque';
 import { traficoDeFolio } from '../../lib/facturacionEmbarque';
 import { evaluarCierres, avisoDeOrden } from '../../lib/cierresEmbarque';
 import { useProveedores } from '../../hooks/useProveedores';
-import { useAuth } from '../../auth/AuthContext';
+import { useAuth, usuariosPorRol } from '../../auth/AuthContext';
 import TablaCargosEmbarque from './TablaCargosEmbarque';
 import { clienteDelEmbarque } from '../../lib/entidadesEmbarque';
 import { editarMontoCargo, restaurarMontoCargo, desviacionDelEmbarque } from '../../lib/cargosEditables';
@@ -564,6 +564,29 @@ export default function FichaEmbarque({
                 <div>
                   <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">ID de Cotización Origen</label>
                   <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-gray-600">{embarque.cotizacionId || 'Sin cotización asociada'}</div>
+                </div>
+
+                {/* Quién lo opera. Se hereda del cliente al nacer; aquí se
+                    cambia. Es por lo que la lista filtra «Solo los míos». */}
+                <div className="col-span-2">
+                  <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Responsable operativo</label>
+                  <select
+                    value={embarque.responsableOperativo ?? ''}
+                    onChange={e => onUpdateEmbarque({
+                      ...embarque,
+                      responsableOperativo: e.target.value || null,
+                      updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+                    })}
+                    className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs bg-white"
+                  >
+                    <option value="">— Sin asignar —</option>
+                    {usuariosPorRol('operaciones').map(u => (
+                      <option key={u.email} value={u.email}>{u.nombre}</option>
+                    ))}
+                    {embarque.responsableOperativo
+                      && !usuariosPorRol('operaciones').some(u => u.email === embarque.responsableOperativo)
+                      && <option value={embarque.responsableOperativo}>{embarque.responsableOperativo}</option>}
+                  </select>
                 </div>
 
                 <div>

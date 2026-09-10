@@ -351,6 +351,11 @@ export interface EmbarqueCompleto {
   entidades: EmbarqueEntidades;
   /** Qué roles salieron del catálogo. Ausente en los embarques anteriores. */
   entidadesRef?: EntidadesRef;
+  /**
+   * Quién lo opera, por correo. Se hereda del cliente al nacer y se cambia
+   * en la ficha. Es por lo que Operaciones filtra todos los días.
+   */
+  responsableOperativo?: string | null;
   ruta: EmbarqueRuta;
   fechas: EmbarqueFechas;
   descripcionCarga: string;

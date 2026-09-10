@@ -114,11 +114,12 @@ export function useVistasUsuario(modulo: ModuloVista) {
   const crearVista = useCallback(async (
     nombre: string,
     columnas: ColumnaVista[],
-    opts?: { compartida?: boolean; esDefault?: boolean },
+    opts?: { compartida?: boolean; esDefault?: boolean; filtros?: Record<string, string | null> },
   ): Promise<string> => {
     if (!user?.uid) throw new Error('No autenticado');
 
     const data = crearVistaVacia(modulo, user.uid, user.nombre, nombre, columnas);
+    if (opts?.filtros) data.filtros = opts.filtros;
     if (opts?.compartida) data.compartida = true;
     if (opts?.esDefault) data.esDefault = true;
 
@@ -133,7 +134,7 @@ export function useVistasUsuario(modulo: ModuloVista) {
 
   const actualizarVista = useCallback(async (
     id: string,
-    cambios: Partial<Pick<VistaUsuario, 'nombre' | 'columnas' | 'ordenamiento' | 'compartida' | 'esDefault'>>,
+    cambios: Partial<Pick<VistaUsuario, 'nombre' | 'columnas' | 'ordenamiento' | 'compartida' | 'esDefault' | 'filtros'>>,
   ) => {
     if (!user?.uid) throw new Error('No autenticado');
 

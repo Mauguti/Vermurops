@@ -68,6 +68,32 @@ const ROL_POR_EMAIL: Record<string, UserRole> = Object.fromEntries(
 
 const ROL_FALLBACK: UserRole = "ventas";
 
+/**
+ * El equipo, por rol, para los selectores de responsable (10-sep-2026).
+ *
+ * No hay directorio de usuarios todavía (épica de Gestión de Usuarios): la
+ * única lista es este mapa. El identificador es el CORREO —estable y
+ * legible—; el nombre se deriva del correo porque no hay otro dato. Cuando
+ * exista `usuarios/{uid}`, esto lee de ahí y nada más cambia.
+ */
+export interface UsuarioEquipo { email: string; nombre: string; rol: UserRole }
+
+export function usuariosPorRol(rol?: UserRole): UsuarioEquipo[] {
+  return Object.entries(ROL_POR_EMAIL)
+    .filter(([, r]) => !rol || r === rol)
+    .map(([email, r]) => ({
+      email,
+      nombre: email.split('@')[0].split('.').map(t => t.charAt(0).toUpperCase() + t.slice(1)).join(' '),
+      rol: r,
+    }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+export function nombreDeUsuario(email: string | null | undefined): string {
+  if (!email) return '';
+  return usuariosPorRol().find(u => u.email === email.toLowerCase().trim())?.nombre ?? email;
+}
+
 const getRolByEmail = (email: string): UserRole => {
   const rol = ROL_POR_EMAIL[email.toLowerCase().trim()];
   if (rol) return rol;

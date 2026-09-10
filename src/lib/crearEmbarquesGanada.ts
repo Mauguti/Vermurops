@@ -126,6 +126,7 @@ export async function crearEmbarquesDeCotizacionGanada(
         origen: 'automatico',
         generadoPor: p.generadoPor,
         ahora,
+        responsableOperativo: p.cliente?.responsableOperativo ?? null,
         modalidad: grupo.modalidad,
         servicioRuta: (p.quote.servicios ?? []).find(s => grupo.servicioIds.includes(s.id)),
         // Cada embarque hereda SOLO los productos de sus servicios: heredar

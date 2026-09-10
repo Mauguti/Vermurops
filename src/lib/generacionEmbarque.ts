@@ -84,6 +84,8 @@ export interface DatosGeneracion {
   serviciosGrupo?: import('../components/quotes/QuotesData').ServicioSolicitado[];
   /** Marca de tiempo, inyectada para poder probar. */
   ahora: string;
+  /** El operativo del cliente, si lo tiene: el embarque nace asignado. */
+  responsableOperativo?: string | null;
   /**
    * Modalidad del embarque, cuando ya la decidió la agrupación.
    *
@@ -137,6 +139,7 @@ export function construirEmbarqueDesdeCotizacion(d: DatosGeneracion): EmbarqueCo
     // El cliente vinculado a la cotización (E6) llega con enlace a su ficha;
     // los demás roles nacen como texto y se validan en el embarque.
     entidadesRef: refsDesdeCotizacion(quote),
+    responsableOperativo: d.responsableOperativo ?? null,
 
     ruta: {
       origen: {

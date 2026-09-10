@@ -33,8 +33,10 @@ interface VistaSelectorProps {
   /** Callbacks. */
   onSeleccionar: (vistaId: string | null) => void;
   onGuardar: (nombre: string) => void;
-  onActualizar: (id: string, cambios: Partial<Pick<VistaUsuario, 'nombre' | 'columnas' | 'ordenamiento' | 'compartida' | 'esDefault'>>) => void;
+  onActualizar: (id: string, cambios: Partial<Pick<VistaUsuario, 'nombre' | 'columnas' | 'ordenamiento' | 'compartida' | 'esDefault' | 'filtros'>>) => void;
   onEliminar: (id: string) => void;
+  /** Filtros vigentes, para guardarlos junto con las columnas (Embarques). */
+  filtrosActuales?: Record<string, string | null>;
 }
 
 // ─── Componente ─────────────────────────────────────────────────────────────
@@ -44,6 +46,7 @@ export default function VistaSelector({
   vistaActivaId,
   currentUserId,
   vistaActual,
+  filtrosActuales,
   labelDefault = 'Vista por defecto',
   onSeleccionar,
   onGuardar,
@@ -70,8 +73,9 @@ export default function VistaSelector({
     onActualizar(vistaActiva.id, {
       columnas: vistaActual.columnas,
       ordenamiento: vistaActual.ordenamiento,
+      ...(filtrosActuales ? { filtros: filtrosActuales } : {}),
     });
-  }, [vistaActiva, esMia, vistaActual, onActualizar]);
+  }, [vistaActiva, esMia, vistaActual, onActualizar, filtrosActuales]);
 
   return (
     <div className="relative flex items-center gap-1.5">

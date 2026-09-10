@@ -13,7 +13,7 @@ import { FichaHeader, BadgeEstado } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import { useCotizaciones } from '../../hooks/useCotizaciones';
 import { useEmbarques } from '../../hooks/useEmbarques';
-import { useAuth } from '../../auth/AuthContext';
+import { usuariosPorRol, useAuth } from '../../auth/AuthContext';
 
 interface Props {
   cliente: ClienteVermur;
@@ -118,7 +118,11 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
   const { quotes } = useCotizaciones();
   const { embarques } = useEmbarques();
   const susCotizaciones = quotes.filter(q => q.clienteId === cliente.id);
-  const susEmbarques = embarques.filter(e => susCotizaciones.some(q => q.id === e.cotizacionId));
+  // Por su cotización, o porque el embarque lo enlaza como cliente a cobrar:
+  // los capturados a mano no tienen cotización y antes quedaban fuera.
+  const susEmbarques = embarques.filter(e =>
+    susCotizaciones.some(q => q.id === e.cotizacionId)
+    || e.entidadesRef?.clienteCobrar?.id === cliente.id);
   const [tab, setTab] = useState<TabId>('informacion');
   const [draft, setDraft] = useState<ClienteVermur>(() => withDefaults(cliente));
   const [saving, setSaving] = useState(false);
@@ -355,6 +359,25 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                   <input className={INPUT} value={draft.comercial}
                     onChange={e => set('comercial', e.target.value)} />
                 </Field>
+                {/* Quién lo atiende en cada área. El embarque hereda el
+                    operativo al nacer, y la lista de Embarques filtra por él. */}
+                <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-5 border border-gray-150 rounded-lg p-4 bg-gray-50/40">
+                  {([
+                    ['responsableVentas', 'Responsable de Ventas', 'ventas'],
+                    ['responsablePricing', 'Responsable de Pricing', 'pricing'],
+                    ['responsableOperativo', 'Responsable operativo', 'operaciones'],
+                  ] as const).map(([campo, label, rol]) => (
+                    <Field key={campo} label={label}>
+                      <select className={INPUT} value={draft[campo] ?? ''}
+                        onChange={e => set(campo, e.target.value || null)}>
+                        <option value="">— Sin asignar —</option>
+                        {usuariosPorRol(rol).map(u => <option key={u.email} value={u.email}>{u.nombre}</option>)}
+                        {draft[campo] && !usuariosPorRol(rol).some(u => u.email === draft[campo])
+                          && <option value={draft[campo]!}>{draft[campo]}</option>}
+                      </select>
+                    </Field>
+                  ))}
+                </div>
                 <Field label="Representante legal">
                   <input className={INPUT} value={draft.representante}
                     onChange={e => set('representante', e.target.value)} />

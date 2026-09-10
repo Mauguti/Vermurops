@@ -127,6 +127,16 @@ export interface ClienteVermur {
   fechaAltaMagaya?: string;
   updatedAt?: string;
 
+  // ── Responsables (10-sep-2026) ───────────────────────────────────────────
+  /**
+   * Quién atiende a este cliente en cada área, por CORREO (ver
+   * usuariosPorRol en AuthContext). El embarque hereda el operativo al
+   * nacer; los filtros de Embarques y «Solo los míos» salen de ahí.
+   */
+  responsableVentas?: string | null;
+  responsablePricing?: string | null;
+  responsableOperativo?: string | null;
+
   // ── Preferencias de proveedores (CP-1: comparativa de pricing) ────────────
   /** IDs de ProveedorVermur que el cliente prefiere. */
   proveedoresPreferidos?: string[];

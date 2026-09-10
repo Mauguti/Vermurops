@@ -36,6 +36,13 @@ export interface VistaUsuario {
 
   /** Ordenamiento guardado. null = sin ordenamiento fijo. */
   ordenamiento?: { columnaId: string; direccion: 'asc' | 'desc' } | null;
+  /**
+   * Filtros de la vista (Embarques). Se guardan para no repetirlos cada
+   * mañana: «mis embarques marítimos en proceso» es una vista, no tres
+   * clics. Cada módulo decide qué llaves usa; una llave desconocida se
+   * ignora al aplicar.
+   */
+  filtros?: Record<string, string | null>;
 
   /** ¿Es la vista predeterminada de este usuario para este módulo? */
   esDefault: boolean;
