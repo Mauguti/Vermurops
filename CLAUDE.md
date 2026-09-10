@@ -492,6 +492,36 @@ de ahí a facturas.
   - Evidencias en Storage bajo `tarifarios/{año}/{mes}/`, máximo 10 MB, sin
     sobrescribir ni borrar: la evidencia de un costo no se edita.
 
+## 4.11 Versiones de la cotización (10-sep-2026)
+
+«Ventas regresa la cotización, Pricing hace la v2, y la v1 queda como
+registro.» Ver `lib/versionesCotizacion.ts` y `hooks/useVersionesCotizacion.ts`.
+
+  - **La raíz ES la versión viva.** `cotizaciones/{id}` se sigue editando
+    igual; el Kanban, la bandeja y el embarque no saben que hay versiones.
+  - **Las fotos viven en `cotizaciones/{id}/versiones/{n}`**, inmutables
+    (la regla prohíbe update y delete). En la raíz solo queda `versiones[]`
+    con el resumen —motivo, autor, etapa, total POR MONEDA— para pintar el
+    selector sin bajar las fotos. Embebidas, cada sesión del Kanban bajaría
+    todas las fotos de todas las cotizaciones.
+  - **La foto NO lleva chat, actividades ni historial de etapas**: son la
+    conversación, no el contenido, y siguen corriendo en la viva.
+  - **Solo Pricing y Admin versionan** (`cotizacion.crear`). Ventas regresa
+    la cotización; no la reescribe (§4.1). Ventas sí ve el historial.
+  - **Una congelada no se versiona** (§4.8): la v2 divergiría del embarque.
+  - **Una perdida sí**: la nueva versión la REABRE en `cotizaciones_recibidas`
+    y el selector lo dice: «v3 · creada tras rechazo». ⚠️ Decisión marcada:
+    se eligió esa etapa por ser la de trabajo de Pricing.
+  - **Restaurar = versión nueva con el contenido de la vieja.** Restaura
+    servicios, tipo de cambio y moneda; NO la etapa, el cliente ni los
+    responsables: eso es el estado actual de la operación.
+  - **Foto y resumen se escriben en UNA transacción**, calculada sobre el
+    documento del servidor: dos personas versionando a la vez no producen
+    dos v2. Y un guardado de una pantalla que se quedó en la v1 se rechaza
+    en `updateCotizacion` en vez de pisar la bitácora.
+  - `plantillaVersionId` queda reservado en null: el PDF de cada versión
+    llegará con el módulo de Plantillas, que arranca por la de cotización.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
