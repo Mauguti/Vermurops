@@ -28,6 +28,7 @@ import { puedeCrearCotizacion, PermisoDenegadoError } from '../auth/permisos';
 import { UserRole } from '../auth/users';
 import { conAviso } from '../lib/erroresEscritura';
 import { estaCongelada, cambiosBloqueados } from '../lib/lineasCotizacion';
+import { guardadoAtrasado, numeroVersionActual, sinCamposDeVersion } from '../lib/versionesCotizacion';
 
 export function useCotizaciones() {
   const { user } = useAuth();
@@ -145,6 +146,20 @@ export function useCotizaciones() {
      * pasa; uno distinto se detiene aquí, que es donde importa.
      */
     const actual = quotes.find(q => q.id === id);
+
+    /*
+     * V-2 · Una pantalla que se quedó en una versión anterior no escribe.
+     * Las pantallas reescriben la cotización ENTERA; si la nueva versión se
+     * creó después de abrir la ficha, este guardado pisaría la bitácora y,
+     * en una perdida, hasta la reapertura.
+     */
+    if (actual && guardadoAtrasado(actual, data)) {
+      throw new Error(
+        `${id} ya va en la v${numeroVersionActual(actual)} y esta pantalla tenía una versión anterior. `
+        + 'Vuelve a abrir la ficha para no pisar el trabajo.',
+      );
+    }
+
     if (actual && estaCongelada(actual)) {
       const bloqueados = cambiosBloqueados(
         actual as unknown as Record<string, unknown>,
@@ -160,7 +175,9 @@ export function useCotizaciones() {
 
     await conAviso('la cotización', () => updateDoc(
       doc(db, 'cotizaciones', id),
-      sanitizarParaFirestore(data) as Record<string, unknown>,
+      // Los campos de versión solo los escribe la transacción de
+      // useVersionesCotizacion: aquí nunca viajan, vengan como vengan.
+      sanitizarParaFirestore(sinCamposDeVersion(data)) as Record<string, unknown>,
     ));
   };
 

@@ -18,6 +18,15 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Versiones de la cotización (V-2) ──────────────────────────────────
+    // Fotos INMUTABLES: se crean al hacer «Nueva versión» y nunca se editan
+    // ni se borran. Restaurar una vieja crea otra nueva; no la reescribe.
+    match /cotizaciones/{id}/versiones/{numero} {
+      allow read:   if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+
     // ── Prospectos / leads ────────────────────────────────────────────────
     // Antes vivían solo en memoria: se perdían al recargar. Mismo patrón que
     // cotizaciones — un lead perdido se marca, no se borra del historial.

@@ -15,6 +15,7 @@ import {
 import { useServicios, renderIcon } from '../config/serviciosStore';
 import { useNotifications } from '../notifications/NotificationsContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
+import { alDiaConVersion } from '../lib/versionesCotizacion';
 import { useProspectos } from '../hooks/useProspectos';
 import { useClientes } from '../hooks/useClientes';
 import { generateFolio, generateFolioProspecto } from '../lib/folioService';
@@ -1301,7 +1302,7 @@ export default function Quotes() {
         /* ─── Vista Prospectos / Negociación (con sub-vista tabla/kanban) ─── */
         selectedQuote ? (
           <FichaCotizacion
-            quote={selectedQuote}
+            quote={alDiaConVersion(selectedQuote, kanbanQuotes)}
             onBack={() => setSelectedQuote(null)}
             onUpdateQuote={(updated) => {
               // El error se AVISA. Antes la promesa se rechazaba en silencio,

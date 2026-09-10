@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { alDiaConVersion } from '../../lib/versionesCotizacion';
 import {
   Search, Plus, X, Plane, Ship, Truck, ShieldCheck, Calendar, ArrowRight, HelpCircle,
 } from 'lucide-react';
@@ -292,7 +293,7 @@ export default function KanbanCotizaciones({
   if (selectedQuote) {
     return (
       <FichaCotizacion
-        quote={selectedQuote}
+        quote={alDiaConVersion(selectedQuote, quotes)}
         onBack={() => setSelectedQuote(null)}
         onUpdateQuote={handleUpdateQuote}
         onConvertToShipment={onConvertToShipment}

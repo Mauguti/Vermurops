@@ -73,6 +73,13 @@ import ResumenFinancieroInline from './ResumenFinancieroInline';
 import { calcTotales } from '../../lib/cotizacionCalculator';
 import { cargaDesdeLegacy, resumenCarga, ETIQUETA_MODALIDAD, ModalidadSolicitud } from '../../lib/cargaSolicitud';
 import DetalleCargaSolicitud from './DetalleCargaSolicitud';
+import { useVersionesCotizacion } from '../../hooks/useVersionesCotizacion';
+import {
+  opcionesSelector, vistaDeVersion, puedeVersionar, numeroVersionActual,
+} from '../../lib/versionesCotizacion';
+import {
+  SelectorVersiones, BotonNuevaVersion, AvisoVersionVista, ModalMotivoVersion,
+} from './VersionesCotizacion';
 import TablaVentaConceptos from './TablaVentaConceptos';
 
 // ─── Re-exports for backward compat (other files may import these from here) ──
@@ -129,9 +136,47 @@ const ADVANCE_CONFIG: Partial<Record<PipelineStageId, { label: string; cls: stri
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function FichaCotizacion({
-  quote, onBack, onUpdateQuote, onConvertToShipment, rolActivo,
+  quote: quoteViva, onBack, onUpdateQuote: onUpdateQuoteViva,
+  onConvertToShipment: onConvertToShipmentViva, rolActivo,
 }: FichaCotizacionProps) {
   const { user } = useAuth();
+
+  /*
+   * ── Versiones (V-3) ─────────────────────────────────────────────────────
+   * Ver una versión pasada es pintar su FOTO con la misma ficha, en solo
+   * lectura. `quote` es lo que se pinta; `quoteViva`, lo que está guardado.
+   * Todo guardado pasa por `onUpdateQuote`, así que cortarlo aquí vuelve de
+   * solo lectura la ficha entera sin tocar cada control.
+   */
+  const {
+    versiones: fotos, error: errorVersiones, crearVersion, restaurarVersion,
+  } = useVersionesCotizacion(quoteViva.id);
+  const [versionVista, setVersionVista] = useState<number | null>(null);
+  const [modalVersion, setModalVersion] = useState<
+    { modo: 'nueva' } | { modo: 'restaurar'; numero: number } | null
+  >(null);
+  React.useEffect(() => { setVersionVista(null); }, [quoteViva.id]);
+
+  const viendoVersion = versionVista !== null;
+  const fotoVista = viendoVersion ? fotos.find(v => v.numero === versionVista) ?? null : null;
+  const quote = useMemo(
+    () => (fotoVista ? vistaDeVersion(quoteViva, fotoVista) : quoteViva),
+    [quoteViva, fotoVista],
+  );
+  const onUpdateQuote = (q: KanbanQuote) => {
+    if (viendoVersion) {
+      setToastLocal('Estás viendo una versión pasada: es solo lectura. Vuelve a la actual para editar.');
+      return;
+    }
+    onUpdateQuoteViva(q);
+  };
+  const onConvertToShipment = (q: KanbanQuote) => {
+    if (!viendoVersion) onConvertToShipmentViva(q);
+  };
+  /** Congelada por embarque, o una versión pasada en pantalla. */
+  const bloqueada = estaCongelada(quote) || viendoVersion;
+  const puedeHacerVersion = puedeVersionar(quoteViva, user?.rol).ok;
+  const opcionesVersion = opcionesSelector(quoteViva);
   const { agregarNotificacion } = useNotifications();
   const { servicios } = useServicios();
   const { clientes } = useClientes();
@@ -1030,7 +1075,7 @@ export default function FichaCotizacion({
    */
   const reparacionHecha = React.useRef<string | null>(null);
   React.useEffect(() => {
-    if (rolActivo === 'ventas' || estaCongelada(quote)) return;
+    if (rolActivo === 'ventas' || bloqueada) return;
     if (reparacionHecha.current === quote.id) return;
     const { quote: reparada, reparados } = repararConceptosDuplicados(quote);
     if (reparados === 0) { reparacionHecha.current = quote.id; return; }
@@ -1265,7 +1310,33 @@ export default function FichaCotizacion({
             Total: {totalEncabezado}
           </p>
         ) : undefined}
+        acciones={(opcionesVersion.length > 0 || (puedeHacerVersion && !viendoVersion)) ? (
+          <>
+            <SelectorVersiones
+              opciones={opcionesVersion}
+              numeroVisto={versionVista}
+              onElegir={setVersionVista}
+            />
+            {puedeHacerVersion && !viendoVersion && (
+              <BotonNuevaVersion onClick={() => setModalVersion({ modo: 'nueva' })} />
+            )}
+          </>
+        ) : undefined}
       />
+
+      {viendoVersion && (
+        <AvisoVersionVista
+          resumen={fotoVista?.resumen ?? null}
+          numeroActual={numeroVersionActual(quoteViva)}
+          onVolver={() => setVersionVista(null)}
+          onRestaurar={puedeHacerVersion && versionVista !== null
+            ? () => setModalVersion({ modo: 'restaurar', numero: versionVista })
+            : undefined}
+        />
+      )}
+      {errorVersiones && (
+        <p className="mx-6 mt-2 text-[11px] text-red-600 font-semibold">{errorVersiones}</p>
+      )}
 
       {/* U-4/U-8 · De dónde vino y a dónde fue. Cada bloque aparece solo si
           hay algo que enlazar: una cotización sin ganar no tiene embarques, y
@@ -1320,7 +1391,7 @@ export default function FichaCotizacion({
             <TablaConceptos
               lineas={lineasPlanas}
               servicios={serviciosDeLaTabla}
-              editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
+              editable={rolActivo !== 'ventas' && !bloqueada}
               soloLectura={rolActivo === 'ventas'}
               lineaActivaId={lineaActivaId}
               conceptosActivos={conceptosActivos}
@@ -1332,7 +1403,7 @@ export default function FichaCotizacion({
               onCompararProveedor={handleCompararProveedor}
               onCambiarServicio={handleCambiarServicioDeLinea}
               onDatosEmbarque={(servicioId) => setDatosEmbarqueDe(servicioId)}
-              onAgregarServicio={rolActivo !== 'ventas' && !estaCongelada(quote)
+              onAgregarServicio={rolActivo !== 'ventas' && !bloqueada
                 ? () => setShowAddServicio(true)
                 : undefined}
             />
@@ -1384,14 +1455,14 @@ export default function FichaCotizacion({
                 tipoCambio={
                   <CapturaTipoCambio
                     tipoCambio={quote.tipoCambio}
-                    editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
+                    editable={rolActivo !== 'ventas' && !bloqueada}
                     onCambiar={(tc) => onUpdateQuote({
                       ...quote,
                       ...(tc ? { tipoCambio: tc } : { tipoCambio: undefined }),
                     })}
                   />
                 }
-                editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
+                editable={rolActivo !== 'ventas' && !bloqueada}
                 seleccion={seleccionActiva}
                 dominante={dominanteActivo}
                 menoresPorFila={menoresActivos}
@@ -1472,7 +1543,7 @@ export default function FichaCotizacion({
             {visible.adjuntosTarifa && (
               <EvidenciasTarifas
                 documentos={documentos}
-                editable={rolActivo !== 'ventas' && !estaCongelada(quote)}
+                editable={rolActivo !== 'ventas' && !bloqueada}
                 subiendo={subiendoDoc}
                 onCargarTarifario={() => setCargandoTarifario(true)}
                 onSubir={(file) => {
@@ -2091,6 +2162,9 @@ export default function FichaCotizacion({
       )}
 
       {/* ── Footer de acciones (Pre-TA: jerarquía corregida) ─────────────────── */}
+      {/* Viendo una versión pasada no hay acciones: avanzar la etapa o
+          marcarla ganada desde una foto actuaría sobre la cotización viva. */}
+      {!viendoVersion && (
       <FichaFooter>
 
         {/* ── Primario: avanzar etapa (dinámico según etapa + rol) ── */}
@@ -2174,6 +2248,31 @@ export default function FichaCotizacion({
           <span className="text-[10px] text-gray-400">Guardado automáticamente</span>
         </div>
       </FichaFooter>
+      )}
+
+      {modalVersion && (
+        <ModalMotivoVersion
+          titulo={modalVersion.modo === 'nueva'
+            ? `Nueva versión · v${numeroVersionActual(quoteViva) + 1}`
+            : `Restaurar la v${modalVersion.numero}`}
+          descripcion={modalVersion.modo === 'nueva'
+            ? `La v${numeroVersionActual(quoteViva)} se congela tal como está —servicios, costos, ventas y tipo de cambio— y queda consultable desde el selector. Sigues trabajando sobre la v${numeroVersionActual(quoteViva) + 1}. El chat y las actividades continúan.`
+              + (quoteViva.etapa === 'perdida'
+                ? ' Esta cotización está perdida: la nueva versión la reabre en «Cotizaciones recibidas».'
+                : '')
+            : `La v${numeroVersionActual(quoteViva)} se congela primero, y se abre la v${numeroVersionActual(quoteViva) + 1} con el contenido de la v${modalVersion.numero}. Ninguna versión se pierde.`}
+          accion={modalVersion.modo === 'nueva' ? 'Crear versión' : 'Restaurar'}
+          onCancelar={() => setModalVersion(null)}
+          onConfirmar={async (motivo) => {
+            const n = modalVersion.modo === 'nueva'
+              ? await crearVersion(motivo)
+              : await restaurarVersion(modalVersion.numero, motivo);
+            setModalVersion(null);
+            setVersionVista(null);
+            setToastLocal(`Listo: estás en la v${n}. La v${n - 1} quedó como registro.`);
+          }}
+        />
+      )}
 
       {/* ═══ Modales ═══════════════════════════════════════════════════════
           Estaban declarados como estado pero nunca se renderizaban: los

@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { alDiaConVersion } from '../../lib/versionesCotizacion';
 import {
   Plane, Ship, Truck, ShieldCheck, Check, Clock,
   ChevronRight, BookOpen, Inbox,
@@ -359,7 +360,7 @@ export default function BandejaPricing({
   if (selectedQuote) {
     return (
       <FichaCotizacion
-        quote={selectedQuote}
+        quote={alDiaConVersion(selectedQuote, quotes)}
         onBack={() => setSelectedQuote(null)}
         onUpdateQuote={handleUpdateQuote}
         onConvertToShipment={onConvertToShipment}

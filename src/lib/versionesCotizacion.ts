@@ -337,6 +337,49 @@ function planear(
   return { ok: true, documento, patch };
 }
 
+// ─── Sincronía con la ficha abierta ──────────────────────────────────────────
+
+/**
+ * La cotización que debe pintar una ficha abierta.
+ *
+ * Las pantallas guardan la cotización abierta en su propio estado y la
+ * reescriben ENTERA en cada guardado. La nueva versión se escribe por fuera
+ * —en una transacción—, así que sin esto el siguiente guardado mandaría la
+ * copia vieja y pisaría lo que la transacción acaba de escribir: la bitácora,
+ * y en una perdida, hasta la reapertura.
+ *
+ * Se adopta la del listener solo cuando cambió de versión. Adoptarla siempre
+ * haría que cada tecla esperara la vuelta de Firestore.
+ */
+export function alDiaConVersion(abierta: KanbanQuote, lista: readonly KanbanQuote[]): KanbanQuote {
+  const viva = lista.find(q => q.id === abierta.id);
+  if (!viva) return abierta;
+  return numeroVersionActual(viva) !== numeroVersionActual(abierta) ? viva : abierta;
+}
+
+/**
+ * ¿Este guardado viene de una pantalla que se quedó en una versión anterior?
+ *
+ * Solo se puede saber si el guardado trae el número: los patches parciales
+ * (`{ embarqueIds }`) no lo traen y no pisan nada de la versión.
+ */
+export function guardadoAtrasado(
+  guardada: Pick<KanbanQuote, 'versionActual'>,
+  patch: Partial<KanbanQuote>,
+): boolean {
+  if (!('versionActual' in patch) && !('servicios' in patch)) return false;
+  return numeroVersionActual(patch) < numeroVersionActual(guardada);
+}
+
+/** Los campos que SOLO escribe la transacción de versionado. */
+export const CAMPOS_DE_VERSION = ['versionActual', 'origenVersion', 'versiones'] as const;
+
+export function sinCamposDeVersion<T extends Partial<KanbanQuote>>(patch: T): T {
+  const copia = { ...patch } as Record<string, unknown>;
+  for (const c of CAMPOS_DE_VERSION) delete copia[c];
+  return copia as T;
+}
+
 // ─── Presentación ─────────────────────────────────────────────────────────────
 
 export interface OpcionVersion {

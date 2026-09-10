@@ -10,6 +10,7 @@ import { describe, it, expect } from 'vitest';
 import {
   numeroVersionActual, puedeVersionar, planearNuevaVersion, planearRestauracion,
   fotoDeCotizacion, opcionesSelector, vistaDeVersion, totalPorMonedaDe,
+  alDiaConVersion, guardadoAtrasado, sinCamposDeVersion,
   type DocumentoVersion, type OpcionesNuevaVersion,
 } from './versionesCotizacion';
 import type {
@@ -306,6 +307,32 @@ describe('vistaDeVersion y restauración', () => {
     expect(plan.patch.origenVersion!.restauradaDe).toBe(1);
     // restaurar el contenido no devuelve la etapa de hace dos semanas
     expect(plan.patch).not.toHaveProperty('etapa');
+  });
+
+  it('una ficha abierta adopta la del listener SOLO al cambiar de versión', () => {
+    const abierta = quote();
+    const { quote: v2 } = aplicar(abierta);
+    expect(alDiaConVersion(abierta, [v2])).toBe(v2);
+    // misma versión: se queda con la suya, para no esperar a Firestore en cada tecla
+    const editada = { ...abierta, motivoPerdida: 'x' };
+    expect(alDiaConVersion(editada, [abierta])).toBe(editada);
+    expect(alDiaConVersion(abierta, [])).toBe(abierta);
+  });
+
+  it('un guardado de una versión anterior se detecta; un patch parcial no', () => {
+    const { quote: v2 } = aplicar(quote());
+    expect(guardadoAtrasado(v2, quote())).toBe(true);
+    expect(guardadoAtrasado(v2, v2)).toBe(false);
+    expect(guardadoAtrasado(v2, { embarqueIds: ['SHP-1'] })).toBe(false);
+  });
+
+  it('los campos de versión nunca viajan en un guardado normal', () => {
+    const { quote: v2 } = aplicar(quote());
+    const limpio = sinCamposDeVersion(v2);
+    expect(limpio).not.toHaveProperty('versionActual');
+    expect(limpio).not.toHaveProperty('versiones');
+    expect(limpio).not.toHaveProperty('origenVersion');
+    expect(limpio.servicios).toBe(v2.servicios);
   });
 
   it('no restaura una versión de otra cotización', () => {
