@@ -36,7 +36,7 @@ describe('«Solo los míos» y el responsable', () => {
 
 describe('estado, modalidad, cliente, fechas, cierres, búsqueda', () => {
   it('estado se deriva (estadoDe), no se guarda', () => {
-    expect(aplicarFiltros([A, C], { ...FILTROS_VACIOS, estado: 'finalizado' }, ctx).map(e => e.id)).toEqual(['C']);
+    expect(aplicarFiltros([A, C], { ...FILTROS_VACIOS, estado: 'entregado' }, ctx).map(e => e.id)).toEqual(['C']);
   });
 
   it('modalidad', () => {
@@ -69,9 +69,9 @@ describe('estado, modalidad, cliente, fechas, cierres, búsqueda', () => {
 
 describe('guardar en la vista', () => {
   it('solo viaja lo que no está vacío, y vuelve igual', () => {
-    const f = { ...FILTROS_VACIOS, responsable: 'a@v.com', estado: 'en_proceso' as const };
+    const f = { ...FILTROS_VACIOS, responsable: 'a@v.com', estado: 'en_transito' as const };
     const guardado = filtrosParaVista(f);
-    expect(guardado).toEqual({ responsable: 'a@v.com', estado: 'en_proceso' });
+    expect(guardado).toEqual({ responsable: 'a@v.com', estado: 'en_transito' });
     expect(filtrosDesdeVista(guardado)).toEqual(f);
     expect(filtrosActivos(f)).toBe(2);
   });

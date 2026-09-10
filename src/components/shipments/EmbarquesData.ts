@@ -356,6 +356,12 @@ export interface EmbarqueCompleto {
    * en la ficha. Es por lo que Operaciones filtra todos los días.
    */
   responsableOperativo?: string | null;
+  /**
+   * Etapa fijada a mano por Operaciones (nuevo · cargado · en_transito ·
+   * en_destino · entregado). Ausente = se deriva de cierres, tránsito y ETA.
+   * Ver lib/estadoEmbarque.ts.
+   */
+  etapaOperativa?: string | null;
   ruta: EmbarqueRuta;
   fechas: EmbarqueFechas;
   descripcionCarga: string;

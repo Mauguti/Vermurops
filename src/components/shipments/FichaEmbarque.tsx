@@ -21,7 +21,7 @@ import { generateFolioEmbarque, parseFolioNumero } from '../../lib/folioService'
 import { FichaHeader, FichaTabs, BadgeEstado } from '../ui/ficha/FichaLayout';
 import { EnlaceEntidad, BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import LineaTiempo from '../ui/ficha/LineaTiempo';
-import { ETAPAS_EMBARQUE, estadoDe } from '../../lib/estadoEmbarque';
+import { ETAPAS_EMBARQUE, estadoDe, patchParaEtapa, type EstadoEmbarque } from '../../lib/estadoEmbarque';
 import { useOrdenesCompra } from '../../hooks/useOrdenesCompra';
 import Toast, { TipoToast } from '../ui/Toast';
 
@@ -566,9 +566,28 @@ export default function FichaEmbarque({
                   <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-semibold text-gray-600">{embarque.cotizacionId || 'Sin cotización asociada'}</div>
                 </div>
 
+                {/* La etapa se deriva (cierres, tránsito, ETA); aquí se fija
+                    a mano cuando la realidad va adelante de los datos. */}
+                <div>
+                  <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Etapa</label>
+                  <select
+                    value={estadoDe(embarque)}
+                    disabled={!!embarque.cierres?.operativo}
+                    onChange={e => {
+                      const r = patchParaEtapa(embarque, e.target.value as EstadoEmbarque);
+                      if ('error' in r) { setAvisoOC({ mensaje: r.error, tipo: 'error' }); return; }
+                      onUpdateEmbarque({ ...embarque, ...r, updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') });
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs bg-white disabled:bg-gray-50"
+                    title={embarque.cierres?.operativo ? 'Con el cierre operativo hecho, la carga está entregada.' : ETAPAS_EMBARQUE.find(x => x.id === estadoDe(embarque))?.descripcion}
+                  >
+                    {ETAPAS_EMBARQUE.map(et => <option key={et.id} value={et.id}>{et.label}</option>)}
+                  </select>
+                </div>
+
                 {/* Quién lo opera. Se hereda del cliente al nacer; aquí se
                     cambia. Es por lo que la lista filtra «Solo los míos». */}
-                <div className="col-span-2">
+                <div>
                   <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Responsable operativo</label>
                   <select
                     value={embarque.responsableOperativo ?? ''}
@@ -1099,11 +1118,9 @@ export default function FichaEmbarque({
         {activeTab === 'documentos' && (
           <DocumentosEmbarque
             embarque={embarque}
-            ordenes={ocDelEmbarque}
             puedeSubir={puede('embarque.generar')}
             onAddDocumento={handleAddDocumento}
             onDeleteDocumento={handleDeleteDocumento}
-            onPrecargarOC={(ocId, patch) => updateOrden(ocId, patch)}
             onAviso={(mensaje, tipo) => setAvisoOC({ mensaje, tipo })}
           />
         )}

@@ -28,11 +28,6 @@ function BadgeModalidad({ modalidad }: { modalidad: ModalidadEmbarque }) {
   );
 }
 
-const ESTADO_CLS: Record<string, string> = {
-  nuevo: 'bg-gray-100 text-gray-700',
-  en_proceso: 'bg-[#E11D48]/5 text-[#BE123C]',
-  finalizado: 'bg-emerald-50 text-emerald-700',
-};
 
 function CierreDot({ label, done }: { label: string; done: boolean }) {
   return (
@@ -72,8 +67,8 @@ export const EMBARQUE_COLUMNS = [
     id: 'estado', header: 'Estado', size: 110,
     cell: info => {
       const id = info.getValue();
-      const label = ETAPAS_EMBARQUE.find(x => x.id === id)?.label ?? id;
-      return <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${ESTADO_CLS[id] ?? ''}`}>{label}</span>;
+      const et = ETAPAS_EMBARQUE.find(x => x.id === id);
+      return <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${et?.badge ?? ''}`}>{et?.label ?? id}</span>;
     },
   }),
   col.accessor('modalidad', {

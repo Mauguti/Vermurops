@@ -320,7 +320,7 @@ export default function Shipments() {
       )}
 
       {!selectedEmbarque && vista === 'kanban' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           {grupos.map(g => (
             <div key={g.estado} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-3 py-2.5 border-b border-gray-200 bg-white flex items-center justify-between">

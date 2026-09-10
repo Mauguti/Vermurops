@@ -11,36 +11,30 @@
 
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  UploadCloud, FileText, Eye, Trash2, AlertCircle, AlertTriangle, Loader2, Link2, Check,
+  UploadCloud, FileText, Eye, Trash2, AlertCircle, AlertTriangle, Loader2,
 } from 'lucide-react';
 import type { EmbarqueCompleto, EmbarqueDocumento } from './EmbarquesData';
-import type { OrdenCompra } from '../ordenesCompra/OrdenesCompraData';
 import RevisionDocumentoClasificado, { type RevisionConfirmada } from '../documentos/RevisionDocumentoClasificado';
 import {
-  ETIQUETA_GRUPO, type GrupoDocumentoEmbarque, precargaFacturaProveedor, traducirAviso,
+  ETIQUETA_GRUPO, type GrupoDocumentoEmbarque, traducirAviso,
 } from '../../lib/clasificacionDocumentos';
 import {
-  TIPOS_DOC_EMBARQUE, ORDEN_GRUPOS, agruparDocumentos, etiquetaTipoDocumento, grupoPropuesto,
-  contenedorNoCoincide, documentoDesdeRevision, proponerParaOC,
-  type SubidaClasificada, type PropuestaOC,
+  TIPOS_DOC_OPERATIVOS, agruparDocumentos, etiquetaTipoDocumento,
+  contenedorNoCoincide, documentoDesdeRevision, esDocumentoFactura, bloqueoEnDocumentos,
+  type SubidaClasificada,
 } from '../../lib/documentosEmbarque';
 import { useDocumentosEmbarque } from '../../hooks/useDocumentosEmbarque';
-import { EnlaceEntidad } from '../ui/ficha/EnlaceEntidad';
 
 interface Props {
   embarque: EmbarqueCompleto;
-  /** Las OC de ESTE embarque, para asociar una factura de proveedor. */
-  ordenes: OrdenCompra[];
   puedeSubir: boolean;
   onAddDocumento: (doc: Omit<EmbarqueDocumento, 'id'>) => string;
   onDeleteDocumento: (id: string) => void;
-  /** Precarga confirmada en la OC. Recibe el patch ya armado. */
-  onPrecargarOC: (ocId: string, patch: Partial<OrdenCompra>) => Promise<void>;
   onAviso: (mensaje: string, tipo: 'exito' | 'error') => void;
 }
 
 export default function DocumentosEmbarque({
-  embarque, ordenes, puedeSubir, onAddDocumento, onDeleteDocumento, onPrecargarOC, onAviso,
+  embarque, puedeSubir, onAddDocumento, onDeleteDocumento, onAviso,
 }: Props) {
   const { procesando, subirYClasificar, autor } = useDocumentosEmbarque();
   const [dragActive, setDragActive] = useState(false);
@@ -50,22 +44,17 @@ export default function DocumentosEmbarque({
   const [guardando, setGuardando] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Estado de la revisión (lo que la pantalla compartida no sabe de embarques)
-  const [grupo, setGrupo] = useState<GrupoDocumentoEmbarque>('documentos');
-  const [ocId, setOcId] = useState<string>('');
-  const [precargarOC, setPrecargarOC] = useState(true);
+  /** Aquí solo caen operativos; las facturas van a la pestaña Facturas. */
+  const grupo: GrupoDocumentoEmbarque = 'documentos';
 
-  const documentos = embarque.documentos ?? [];
+  // Solo los operativos: las facturas viven en la pestaña Facturas.
+  const documentos = useMemo(() => (embarque.documentos ?? []).filter(d => !esDocumentoFactura(d)), [embarque.documentos]);
   const grupos = useMemo(() => agruparDocumentos(documentos), [documentos]);
 
   const procesar = async (file: File) => {
     setError(null);
     try {
       const subida = await subirYClasificar(file, embarque, tipoEsperado || null);
-      const c = subida.clasificacion;
-      setGrupo(grupoPropuesto(c.tipo, c.destinoSugerido));
-      setOcId('');
-      setPrecargarOC(true);
       setPendiente(subida);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -83,42 +72,17 @@ export default function DocumentosEmbarque({
     if (f && puedeSubir && !procesando) void procesar(f);
   };
 
-  // ── La precarga en la OC, derivada de la revisión ──────────────────────────
-  const oc = ordenes.find(o => o.id === ocId) ?? null;
-  const precarga = pendiente ? precargaFacturaProveedor(pendiente.clasificacion.datos) : null;
-  const propuestaOC: PropuestaOC | null = pendiente && oc && precarga
-    ? proponerParaOC(precarga, oc, '(pendiente)')
-    : null;
-
   const guardar = async (r: RevisionConfirmada) => {
     if (!pendiente) return;
     setGuardando(true);
     try {
-      const esFacturaProveedor = r.tipoConfirmado === 'factura_proveedor';
-      const asociarOC = esFacturaProveedor && precargarOC && oc !== null;
-
-      const nuevoId = onAddDocumento(documentoDesdeRevision(
+      onAddDocumento(documentoDesdeRevision(
         pendiente,
-        { tipoConfirmado: r.tipoConfirmado, nombre: r.nombre, estado: r.estado, grupo, ocId: asociarOC ? oc!.id : null },
+        { tipoConfirmado: r.tipoConfirmado, nombre: r.nombre, estado: r.estado, grupo, ocId: null },
         autor,
         new Date().toISOString(),
       ));
-
-      if (asociarOC && precarga) {
-        const p = proponerParaOC(precarga, oc!, nuevoId);
-        await onPrecargarOC(oc!.id, {
-          facturaAsociada: p.facturaAsociada,
-          facturaDatos: p.facturaDatos,
-        });
-        onAviso(
-          p.aviso
-            ? `Documento guardado y factura asociada a ${oc!.folio}. ⚠️ ${p.aviso}`
-            : `Documento guardado. ${oc!.folio} ya trae la factura ${p.facturaDatos.numero || ''} y el total cuadra.`,
-          p.aviso ? 'error' : 'exito',
-        );
-      } else {
-        onAviso(`Documento guardado en «${ETIQUETA_GRUPO[grupo]}».`, 'exito');
-      }
+      onAviso(`Documento guardado en «${ETIQUETA_GRUPO[grupo]}».`, 'exito');
       setPendiente(null);
     } catch (err) {
       onAviso(`No se pudo guardar: ${err instanceof Error ? err.message : err}`, 'error');
@@ -127,7 +91,6 @@ export default function DocumentosEmbarque({
     }
   };
 
-  const esFacturaProveedorPendiente = pendiente?.clasificacion.tipo === 'factura_proveedor';
   const avisoContenedor = pendiente ? contenedorNoCoincide(pendiente.clasificacion.avisos) : false;
 
   return (
@@ -152,7 +115,7 @@ export default function DocumentosEmbarque({
                 className="w-full text-xs font-bold text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-[#E11D48]"
               >
                 <option value="">— Que lo detecte el clasificador —</option>
-                {TIPOS_DOC_EMBARQUE.map(t => <option key={t.tipo} value={t.tipo}>{t.etiqueta}</option>)}
+                {TIPOS_DOC_OPERATIVOS.map(t => <option key={t.tipo} value={t.tipo}>{t.etiqueta}</option>)}
               </select>
             </div>
 
@@ -215,7 +178,7 @@ export default function DocumentosEmbarque({
                 {t.etiqueta}
               </div>
               <div className="divide-y divide-gray-100">
-                {t.documentos.map(d => <FilaDocumento key={d.id} doc={d} ordenes={ordenes} onDelete={puedeSubir ? onDeleteDocumento : undefined} />)}
+                {t.documentos.map(d => <FilaDocumento key={d.id} doc={d} onDelete={puedeSubir ? onDeleteDocumento : undefined} />)}
               </div>
             </div>
           ))}
@@ -227,7 +190,8 @@ export default function DocumentosEmbarque({
         <RevisionDocumentoClasificado
           clasificacion={pendiente.clasificacion}
           tipoEsperado={tipoEsperado || null}
-          tipos={TIPOS_DOC_EMBARQUE}
+          tipos={TIPOS_DOC_OPERATIVOS}
+          bloqueo={bloqueoEnDocumentos(pendiente.clasificacion)}
           etiqueta={etiquetaTipoDocumento}
           guardando={guardando}
           onGuardar={guardar}
@@ -248,91 +212,18 @@ export default function DocumentosEmbarque({
             </div>
           )}
 
-          {/* Dónde cae */}
-          <div>
-            <label className="block text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-              Dónde se guarda
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {ORDEN_GRUPOS.map(gr => (
-                <button
-                  key={gr}
-                  type="button"
-                  onClick={() => setGrupo(gr)}
-                  className={`text-[11px] font-bold px-3 py-1.5 rounded-md border transition-colors ${
-                    grupo === gr ? 'border-[#E11D48] bg-[#E11D48]/5 text-[#E11D48]' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}
-                >
-                  {ETIQUETA_GRUPO[gr]}
-                </button>
-              ))}
-            </div>
-            {pendiente.clasificacion.destinoSugerido && (
-              <p className="text-[10px] text-gray-400 mt-1">
-                El clasificador sugiere «{ETIQUETA_GRUPO[pendiente.clasificacion.destinoSugerido]}».
-              </p>
-            )}
-          </div>
-
-          {/* La precarga en la OC: lo más valioso */}
-          {esFacturaProveedorPendiente && (
-            <div className="border border-gray-200 rounded-lg px-3 py-3 space-y-2.5">
-              <div className="flex items-center gap-2">
-                <Link2 className="w-3.5 h-3.5 text-[#E11D48]" />
-                <p className="text-[11px] font-semibold text-gray-700 uppercase tracking-wider">Factura de proveedor → orden de compra</p>
-              </div>
-              {ordenes.length === 0 ? (
-                <p className="text-[11px] text-gray-500">
-                  Este embarque no tiene órdenes de compra. Se guarda como documento; la asociación se hace desde la OC cuando exista.
-                </p>
-              ) : (
-                <>
-                  <select
-                    value={ocId}
-                    onChange={e => setOcId(e.target.value)}
-                    className="w-full px-3 py-2 text-[12px] bg-white border border-gray-200 rounded-md focus:outline-none focus:border-[#E11D48]"
-                  >
-                    <option value="">— Elige la OC a la que pertenece —</option>
-                    {ordenes.map(o => (
-                      <option key={o.id} value={o.id}>
-                        {o.folio} · {o.proveedorNombre} · {o.moneda} {o.monto.toLocaleString('en-US', { minimumFractionDigits: 2 })} · {o.estado}
-                      </option>
-                    ))}
-                  </select>
-
-                  {precarga && oc && propuestaOC && (
-                    <div className={`rounded-md px-3 py-2 text-[11px] ${propuestaOC.aviso ? 'bg-amber-50 border border-amber-300 text-amber-900' : 'bg-emerald-50 border border-emerald-200 text-emerald-900'}`}>
-                      <p className="font-semibold">Se escribirá en {oc.folio}:</p>
-                      <p className="font-mono mt-0.5">{propuestaOC.facturaAsociada}</p>
-                      <p className="mt-1 flex items-start gap-1.5">
-                        {propuestaOC.aviso
-                          ? <><AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />{propuestaOC.aviso}</>
-                          : <><Check className="w-3.5 h-3.5 mt-0.5 shrink-0" />El total de la factura ({precarga.moneda} {precarga.total?.toLocaleString('en-US', { minimumFractionDigits: 2 })}) cuadra con la OC.</>}
-                      </p>
-                    </div>
-                  )}
-
-                  <label className="flex items-center gap-2 text-[11px] text-gray-600">
-                    <input type="checkbox" checked={precargarOC} onChange={e => setPrecargarOC(e.target.checked)} />
-                    Precargar número, fecha y emisor en la OC al guardar
-                  </label>
-                </>
-              )}
-            </div>
-          )}
         </RevisionDocumentoClasificado>
       )}
     </div>
   );
 }
 
-function FilaDocumento({ doc, ordenes, onDelete }: {
+function FilaDocumento({ doc, onDelete }: {
   doc: EmbarqueDocumento;
-  ordenes: OrdenCompra[];
   onDelete?: (id: string) => void;
 }) {
   // Los anteriores a D-3 tienen una URL de objeto que murió con la sesión.
   const sinArchivo = !doc.storagePath && (doc.url === '#' || doc.url.startsWith('blob:'));
-  const oc = doc.ocId ? ordenes.find(o => o.id === doc.ocId) : null;
 
   return (
     <div className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50/50 transition-colors">
@@ -347,7 +238,6 @@ function FilaDocumento({ doc, ordenes, onDelete }: {
             <span>•</span>
             <span>Por: {doc.cargadoPor}</span>
             {doc.confianza && <><span>•</span><span>Confianza {doc.confianza}</span></>}
-            {oc && <><span>•</span><span className="inline-flex items-center gap-1">OC <EnlaceEntidad tipo="ordenCompra" id={oc.id}>{oc.folio}</EnlaceEntidad></span></>}
           </div>
           {doc.estado === 'con_observaciones' && (doc.avisos?.length ?? 0) > 0 && (
             <p className="text-[10px] text-amber-700 mt-1">{doc.avisos!.map(traducirAviso).join(' ')}</p>
