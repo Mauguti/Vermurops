@@ -24,9 +24,16 @@ import { ETAPAS_EMBARQUE, estadoDe } from '../../lib/estadoEmbarque';
 import { useOrdenesCompra } from '../../hooks/useOrdenesCompra';
 import Toast, { TipoToast } from '../ui/Toast';
 
+/**
+ * Las pestañas, en el orden en que se trabaja (decisión de Mau, 10-sep-2026):
+ * Información fusiona General + Entidades + Ruta y aduanas —son las tres
+ * secciones del encabezado del BL y se consultan juntas—; Historial es la
+ * línea de tiempo que antes se llamaba Seguimiento. Plantillas se agrega
+ * cuando exista: no se monta una pestaña vacía.
+ */
 type PestanaEmbarque =
-  | 'general' | 'entidades' | 'ruta' | 'cargos' | 'facturas'
-  | 'documentos' | 'eventos' | 'productos' | 'master_hijo';
+  | 'informacion' | 'cargos' | 'productos' | 'documentos' | 'facturas'
+  | 'historial' | 'master_hijo';
 
 interface FichaEmbarqueProps {
   embarque: EmbarqueCompleto;
@@ -117,7 +124,7 @@ export default function FichaEmbarque({
     return porModalidad ?? dc.general;
   };
 
-  const [activeTab, setActiveTab] = useState<PestanaEmbarque>('general');
+  const [activeTab, setActiveTab] = useState<PestanaEmbarque>('informacion');
 
   // Estado temporal de edición general
   const [desc, setDesc] = useState(embarque.descripcionCarga);
@@ -443,15 +450,13 @@ export default function FichaEmbarque({
   };
 
   const PESTANAS = [
-    { id: 'general' as const, label: 'General' },
-    { id: 'entidades' as const, label: 'Entidades' },
-    { id: 'ruta' as const, label: 'Ruta y aduanas' },
+    { id: 'informacion' as const, label: 'Información' },
     { id: 'cargos' as const, label: 'Cargos', contador: (embarque.cargos.detalles ?? []).length },
-    // 2.1 · Va después de Cargos porque de ahí salen las líneas facturables.
-    { id: 'facturas' as const, label: 'Facturas', contador: facturasDelEmbarque.length },
-    { id: 'documentos' as const, label: 'Documentos', contador: (embarque.documentos ?? []).length },
-    { id: 'eventos' as const, label: 'Seguimiento' },
     { id: 'productos' as const, label: 'Productos', contador: (embarque.productos ?? []).length },
+    { id: 'documentos' as const, label: 'Documentos', contador: (embarque.documentos ?? []).length },
+    // 2.1 · Después de Cargos porque de ahí salen las líneas facturables.
+    { id: 'facturas' as const, label: 'Facturas', contador: facturasDelEmbarque.length },
+    { id: 'historial' as const, label: 'Historial' },
     { id: 'master_hijo' as const, label: 'Master / hijo' },
   ];
 
@@ -539,8 +544,8 @@ export default function FichaEmbarque({
       {/* Contenedor del Tab activo */}
       <div className="space-y-6">
         
-        {/* GENERAL TAB */}
-        {activeTab === 'general' && (
+        {/* INFORMACIÓN · General + Entidades + Ruta y aduanas, apiladas */}
+        {activeTab === 'informacion' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             {/* Detalles principales */}
@@ -785,16 +790,14 @@ export default function FichaEmbarque({
           </div>
         )}
 
-        {/* ENTIDADES TAB */}
-        {activeTab === 'entidades' && (
+        {activeTab === 'informacion' && (
           <EntidadesEmbarque
             entidades={embarque.entidades}
             onChangeEntidades={updated => onUpdateEmbarque({ ...embarque, entidades: updated, updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') })}
           />
         )}
 
-        {/* RUTA TAB (CON ADUANAS) */}
-        {activeTab === 'ruta' && (
+        {activeTab === 'informacion' && (
           <RutaEmbarque
             ruta={embarque.ruta}
             onChangeRuta={updated => onUpdateEmbarque({ ...embarque, ruta: updated, updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') })}
@@ -1065,8 +1068,8 @@ export default function FichaEmbarque({
           />
         )}
 
-        {/* EVENTOS TAB */}
-        {activeTab === 'eventos' && (
+        {/* HISTORIAL · la línea de tiempo del embarque */}
+        {activeTab === 'historial' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
             {/* Timeline */}
