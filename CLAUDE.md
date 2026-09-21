@@ -625,6 +625,48 @@ que NO se mezclan:
   factura, cobro) — la regla y su call site juntos.
   Master/hijo dejó de ser pestaña: es estructura, vive al final de Información.
 
+## 4.15 Sprint de la prueba con el cliente (21-sep-2026 → jueves 24)
+
+**El recorrido Playwright ES la definición de terminado.**
+`./scripts/e2e.sh` (o `npm run e2e`) levanta emuladores + app en :3100 y
+corre `tests/e2e/recorrido-jueves.spec.ts`: los cuatro roles de punta a
+punta — Ventas solicita, Pricing cotiza/versiona/PDF, Ventas envía y gana,
+Operaciones abre con serie/captura/concilia factura/pide pago/gestiona,
+Administración deposita/autoriza/paga/factura/cobra/cierra. n8n se simula
+por ruta (`clasificarDocumento`): el PDF y el clasificador no aceptan un
+token del emulador. Si cambias una pantalla del recorrido, corre esto.
+  - Pricing NO envía al cliente: `consolidada → enviada_cliente` es de
+    Ventas/Admin (§4.1). Pricing consolida y genera el PDF; Ventas envía y
+    marca ganada.
+
+**PDF de la cotización (B1).** `clasificarDocumento` con
+`X-Vermur-Flujo: pdf-cotizacion` (capacidad `cotizacion.crear`) reenvía al
+webhook `generar-pdf-cotizacion` y devuelve el binario (proxy `respuesta:
+'binario'`). `lib/pdfCotizacion.ts` arma el payload: líneas SOLO con
+concepto y venta; carga tipada → bloque de carga; vigencia sugerida = la
+tarifa elegida más corta. Se descarga «COT-2026-0014 v2.pdf» y queda en
+Storage `cotizaciones/{id}/pdf/` ligado a la versión (`quote.pdfs[]`,
+escrito con arrayUnion: una ganada está congelada y el PDF es evidencia).
+`functions/.env` está en .gitignore; la URL tiene default en el código.
+
+**Factura de proveedor, versión mínima (B2).** En Facturas del embarque:
+se sube, se clasifica, se elige el proveedor del consolidado, y se
+concilia contra sus cargos pendientes (`lib/conciliacionFactura.ts`:
+emparejamiento por nombre y monto, o aplicar completa). Al confirmar:
+cargos con `facturaProveedorId` (grupo «Facturado»), documento en
+`facturas_proveedor`, y la OC del proveedor precargada con número, fecha
+y total + cotejo. `conceptos[]` del clasificador puede venir como strings
+o como objetos; se aceptan los dos. Parcial y notas de crédito: después.
+
+**Serie al abrir el embarque (B3).** La ruta manual reserva el folio de la
+serie elegida (VLIM, VLEM, VLIT, VLET, VLIA, VLEA) con `reservarFoliosSerie`;
+`traficoDeFolio` lo lee y el IVA se deriva. Contador sin sembrar =
+advertencia en el embarque, no bloqueo. La bandera automática sigue apagada.
+
+**Depósito del cliente.** `registrarDeposito` existía sin pantalla (otra
+regla sin call site). Ahora se captura en la ficha de la OC, panel de
+fondeo, solo con `ordenCompra.autorizar`.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
