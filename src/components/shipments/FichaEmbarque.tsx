@@ -15,6 +15,8 @@ import { useProveedores } from '../../hooks/useProveedores';
 import { useAuth, usuariosPorRol } from '../../auth/AuthContext';
 import TablaCargosEmbarque from './TablaCargosEmbarque';
 import BitacoraEmbarque from './BitacoraEmbarque';
+import ConciliacionFacturaProveedor from '../facturas/ConciliacionFacturaProveedor';
+import { marcarCargosConFactura } from '../../lib/conciliacionFactura';
 import { conBitacora, comentario, editarComentario } from '../../lib/bitacoraEmbarque';
 import TablaPorProveedor, { ToggleVistaCargos } from '../cargos/TablaPorProveedor';
 import { consolidarPorProveedor, desdeCargos, estadoDelProveedor } from '../../lib/cargosPorProveedor';
@@ -1271,6 +1273,27 @@ export default function FichaEmbarque({
 
         {/* DOCUMENTOS TAB */}
         {activeTab === 'facturas' && (
+          <>
+          {/* B2 · La factura del PROVEEDOR vive aquí, no en Documentos. */}
+          <ConciliacionFacturaProveedor
+            embarque={embarque}
+            ordenes={ocDelEmbarque}
+            nombreProveedor={nombreProveedor}
+            puedeCargar={puede('embarque.generar')}
+            onAviso={(mensaje, tipo) => setAvisoOC({ mensaje, tipo })}
+            onConfirmar={async ({ documento, cargoIds, oc }) => {
+              const nuevoDoc = { id: `doc-${Date.now()}`, ...documento };
+              // Documento y cargos marcados en UN guardado: una factura que
+              // existe sin sus cargos, o al revés, es una conciliación a medias.
+              guardar({
+                ...embarque,
+                documentos: [...(embarque.documentos || []), nuevoDoc],
+                cargos: recalcularCargos(marcarCargosConFactura(embarque.cargos.detalles || [], cargoIds, nuevoDoc.id)),
+                updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+              });
+              if (oc) await updateOrden(oc.id, { ...oc.patch, facturaDatos: oc.patch.facturaDatos ? { ...oc.patch.facturaDatos, documentoId: nuevoDoc.id } : oc.patch.facturaDatos });
+            }}
+          />
           <PanelFacturasEmbarque
             embarque={embarque}
             facturas={facturasDelEmbarque}
@@ -1324,6 +1347,7 @@ export default function FichaEmbarque({
               catch (err) { setAvisoOC({ mensaje: `No se pudo anular: ${err instanceof Error ? err.message : err}`, tipo: 'error' }); }
             }}
           />
+          </>
         )}
 
         {activeTab === 'documentos' && (
