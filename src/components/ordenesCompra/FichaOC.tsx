@@ -85,6 +85,12 @@ interface Props {
   categoriaConcepto?: string;
   /** 1.3 · Todas las órdenes, para encontrar los anticipos cruzables. */
   todasLasOrdenes?: OrdenCompra[];
+  /**
+   * 1.1 · Registrar el depósito del cliente que fondea esta orden. Solo
+   * Administración; ausente cuando el rol no puede. Antes existía el hook
+   * y ninguna pantalla lo llamaba: el fondeo no se podía registrar.
+   */
+  onRegistrarDeposito?: (d: { monto: number; moneda: 'USD' | 'MXN'; fechaDeposito: string; referencia: string }) => Promise<void>;
 }
 
 const money = (n: number) =>
@@ -92,8 +98,13 @@ const money = (n: number) =>
 
 export default function FichaOC({
   oc, rol, onBack, onTransicionar, onActualizar, fondeo, proveedor, categoriaConcepto,
-  todasLasOrdenes = [],
+  todasLasOrdenes = [], onRegistrarDeposito,
 }: Props) {
+  const [depMonto, setDepMonto] = useState('');
+  const [depFecha, setDepFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [depRef, setDepRef] = useState('');
+  const [depGuardando, setDepGuardando] = useState(false);
+  const [depError, setDepError] = useState<string | null>(null);
   const [motivo, setMotivo] = useState(oc.motivoRechazo ?? '');
   const [comprobante, setComprobante] = useState(oc.comprobantePago ?? '');
   const [factura, setFactura] = useState(oc.facturaAsociada ?? '');
@@ -242,6 +253,53 @@ export default function FichaOC({
                 </button>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 1.1 · Registrar el depósito del cliente ─────────────────────────
+          El dinero que fondea esta orden. Sin este formulario el fondeo solo
+          se alimentaba de cobros de facturas; el anticipo previo a operar no
+          se podía capturar en ninguna pantalla. */}
+      {oc.origen === 'embarque' && oc.embarqueId && !terminada && onRegistrarDeposito && (
+        <div className="px-6 pt-3">
+          <div className="rounded-lg border border-card-border bg-white px-4 py-3 space-y-2">
+            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Registrar depósito del cliente</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+              <label className="block">
+                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Monto ({oc.moneda})</span>
+                <input type="number" min={0} step="0.01" value={depMonto} onChange={e => setDepMonto(e.target.value)} placeholder="0.00"
+                  className="w-full px-3 py-2 text-[12px] border border-card-border rounded-md outline-none focus:border-brand tabular-nums" />
+              </label>
+              <label className="block">
+                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Fecha</span>
+                <input type="date" value={depFecha} onChange={e => setDepFecha(e.target.value)}
+                  className="w-full px-3 py-2 text-[12px] border border-card-border rounded-md outline-none focus:border-brand" />
+              </label>
+              <label className="block">
+                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Referencia</span>
+                <input value={depRef} onChange={e => setDepRef(e.target.value)} placeholder="Ref. bancaria"
+                  className="w-full px-3 py-2 text-[12px] border border-card-border rounded-md outline-none focus:border-brand font-mono" />
+              </label>
+              <button
+                type="button"
+                disabled={depGuardando || !(Number(depMonto) > 0) || !depRef.trim()}
+                onClick={async () => {
+                  setDepGuardando(true); setDepError(null);
+                  try {
+                    await onRegistrarDeposito({ monto: Math.round(Number(depMonto) * 100) / 100, moneda: oc.moneda, fechaDeposito: depFecha, referencia: depRef.trim() });
+                    setDepMonto(''); setDepRef('');
+                  } catch (err) {
+                    setDepError(err instanceof Error ? err.message : String(err));
+                  } finally { setDepGuardando(false); }
+                }}
+                className="px-3 py-2 bg-[#18181B] hover:bg-black text-white text-[11px] font-bold uppercase tracking-wider rounded-md disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {depGuardando ? 'Guardando…' : 'Registrar depósito'}
+              </button>
+            </div>
+            {depError && <p className="text-[11px] text-red-600 font-semibold">{depError}</p>}
+            <p className="text-[10px] text-gray-400">Entra al fondeo del embarque {oc.embarqueFolio ?? ''}: es lo que libera este pago y los demás del mismo embarque.</p>
           </div>
         </div>
       )}

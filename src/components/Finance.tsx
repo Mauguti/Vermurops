@@ -59,7 +59,7 @@ export default function Finance() {
   // ── 1.1 / 2.3 · El fondeo del cliente ─────────────────────────────────────
   // Depósitos Y cobros: son el mismo dinero entrando por dos puertas — el
   // anticipo que se pide antes de operar y la factura que se cobra después.
-  const { depositos } = useDepositosCliente();
+  const { depositos, registrarDeposito } = useDepositosCliente();
   const { facturas, cobros, registrarCobro } = useFacturas();
   const carteraResumen = useMemo(() => {
     const hoy = new Date().toISOString().slice(0, 10);
@@ -223,6 +223,17 @@ export default function Finance() {
           todasLasOrdenes={ordenes}
           proveedor={proveedores.find(p => p.id === ocAbierta.proveedorId) ?? null}
           categoriaConcepto={conceptos.find(c => c.id === ocAbierta.conceptoId)?.categoria}
+          onRegistrarDeposito={puede('ordenCompra.autorizar') && ocAbierta.embarqueId ? async (d) => {
+            await registrarDeposito({
+              ...d,
+              embarqueId: ocAbierta.embarqueId!,
+              embarqueFolio: ocAbierta.embarqueFolio ?? '',
+              clienteId: ocAbierta.clienteId ?? '',
+              clienteNombre: ocAbierta.clienteNombre ?? '',
+              comprobante: null,
+            });
+            setToast({ mensaje: `Depósito de ${d.moneda} ${d.monto.toLocaleString('en-US', { minimumFractionDigits: 2 })} registrado. Ya fondea las órdenes del embarque.`, tipo: 'exito' });
+          } : undefined}
           fondeo={ocAbierta.embarqueId
             ? calcularFondeo(
                 depositos.filter(d => d.embarqueId === ocAbierta.embarqueId),
