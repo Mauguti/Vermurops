@@ -676,6 +676,8 @@ export const CAMPOS_EDITABLES_CONGELADA = [
   'historialEtapas',
   'embarqueIds',
   'updatedAt',
+  // El PDF de una ganada se genera después de congelarla: es evidencia, no edición.
+  'pdfs',
 ] as const;
 
 /**

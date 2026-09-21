@@ -352,6 +352,21 @@ export interface ServicioSolicitado {
 // Cotización maestra (raíz del pipeline)
 // ------------------------------------------------------------
 
+export interface PdfCotizacion {
+  id: string;
+  /** Versión de la cotización con la que se generó. */
+  version: number;
+  idioma: 'es' | 'en';
+  nombreArchivo: string;
+  storagePath: string;
+  url: string;
+  generadoPor: { uid: string; nombre: string };
+  /** ISO. */
+  fecha: string;
+  /** Reservado: con qué versión de la plantilla salió. Null hasta el módulo de Plantillas. */
+  plantillaVersionId: string | null;
+}
+
 export interface KanbanQuote {
   id: string; // Folio ej. "COT-2026-0142"
 
@@ -438,6 +453,13 @@ export interface KanbanQuote {
   origenVersion?: OrigenVersion;
   /** Resumen de las versiones congeladas, de la más vieja a la más nueva. */
   versiones?: ResumenVersion[];
+
+  /**
+   * PDFs generados (Bloque 1, sep-2026): uno por cada vez que se generó,
+   * ligado a la versión de la cotización y guardado en Storage como
+   * evidencia de lo que se le mandó al cliente.
+   */
+  pdfs?: PdfCotizacion[];
 
   // Timestamps y auditoría
   createdAt: string;

@@ -7,6 +7,7 @@ rules_version = '2';
 //   tarifarios/   evidencias de costos (el documento del que salió una tarifa)
 //   expedientes/  documentos KYC del alta de clientes (§D, 4-sep-2026)
 //   embarques/    documentos operativos del embarque (BL, pedimento, facturas)
+//   cotizaciones/ el PDF de cada versión de la cotización
 //
 // ⚠️ Igual que en Firestore, estas reglas NO distinguen roles: el rol se deriva
 // en el cliente y no viaja en el token (ver §6 del CLAUDE.md). La capacidad
@@ -32,6 +33,15 @@ service firebase.storage {
     // Expediente KYC del cliente. Mismo patrón que tarifarios: un documento
     // legal (acta, CSF, comprobante) es evidencia y no se edita ni se pisa.
     match /expedientes/{clienteId}/{archivo} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.size < 10 * 1024 * 1024;
+      allow update, delete: if false;
+    }
+
+    // El PDF de cada versión de la cotización: evidencia de lo que se le
+    // mandó al cliente. Inmutable, como toda evidencia.
+    match /cotizaciones/{cotizacionId}/pdf/{archivo} {
       allow read: if request.auth != null;
       allow create: if request.auth != null
                     && request.resource.size < 10 * 1024 * 1024;

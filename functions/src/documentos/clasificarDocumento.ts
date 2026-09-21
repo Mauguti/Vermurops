@@ -11,6 +11,7 @@
  *   tarifas             → extractor de tarifarios     → tarifario.cargar
  *   expediente          → KYC del cliente             → cliente.alta
  *   documento-embarque  → documentos del embarque     → embarque.generar
+ *   pdf-cotizacion      → PDF de la cotización (binario) → cotizacion.crear
  *
  * La capacidad es LA DEL FLUJO: el expediente es del alta (Administración) y
  * los documentos del embarque son de Operaciones. Un flujo desconocido se
@@ -45,6 +46,10 @@ const N8N_WEBHOOK_URL_DOC_EMBARQUE = defineString('N8N_WEBHOOK_URL_DOC_EMBARQUE'
   default: 'https://n8n.vermur.mx/webhook/clasificar-documento-embarque',
   description: 'Webhook de n8n que clasifica documentos del embarque.',
 });
+const N8N_WEBHOOK_URL_PDF_COTIZACION = defineString('N8N_WEBHOOK_URL_PDF_COTIZACION', {
+  default: 'https://n8n.vermur.mx/webhook/generar-pdf-cotizacion',
+  description: 'Webhook de n8n que genera el PDF de la cotización (devuelve application/pdf).',
+});
 
 export const clasificarDocumento = onRequest(
   {
@@ -65,6 +70,9 @@ export const clasificarDocumento = onRequest(
       'tarifas': { capacidad: 'tarifario.cargar', url: N8N_WEBHOOK_URL.value() },
       'expediente': { capacidad: 'cliente.alta', url: N8N_WEBHOOK_URL_EXPEDIENTE.value() },
       'documento-embarque': { capacidad: 'embarque.generar', url: N8N_WEBHOOK_URL_DOC_EMBARQUE.value() },
+      // No clasifica: GENERA. Va por aquí porque el webhook no se llama desde
+      // el navegador y el proxy ya resuelve auth, capacidad y secreto.
+      'pdf-cotizacion': { capacidad: 'cotizacion.crear', url: N8N_WEBHOOK_URL_PDF_COTIZACION.value(), respuesta: 'binario' },
     };
 
     const destino = destinos[flujo];

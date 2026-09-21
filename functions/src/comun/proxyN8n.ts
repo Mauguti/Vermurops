@@ -54,6 +54,12 @@ export interface DestinoProxy {
   capacidad: string;
   /** URL del webhook de n8n. */
   url: string;
+  /**
+   * Qué devuelve n8n. 'json' (default) se valida y se reenvía como JSON;
+   * 'binario' se reenvía tal cual con su Content-Type — el PDF de la
+   * cotización llega así.
+   */
+  respuesta?: 'json' | 'binario';
 }
 
 /**
@@ -120,6 +126,30 @@ export async function manejarProxyN8n(
         : JSON.stringify(req.body ?? {}),
       signal: control.signal,
     });
+
+    if (destino.respuesta === 'binario') {
+      if (!respuesta.ok) {
+        const texto = await respuesta.text();
+        logger.error('n8n respondió con error', {
+          flujo: destino.flujo, status: respuesta.status, texto: texto.slice(0, 500),
+        });
+        res.status(502).json({ ok: false, error: mensajeDeError(respuesta.status) });
+        return;
+      }
+      const cuerpo = Buffer.from(await respuesta.arrayBuffer());
+      const tipo = respuesta.headers.get('content-type') ?? 'application/octet-stream';
+      // Un PDF que llega como JSON de error se vería como archivo corrupto:
+      // se rechaza aquí, donde todavía se puede decir qué pasó.
+      if (tipo.includes('application/json') || cuerpo.length === 0) {
+        logger.error('n8n devolvió JSON o vacío donde se esperaba un archivo', {
+          flujo: destino.flujo, tipo, texto: cuerpo.toString('utf8').slice(0, 500),
+        });
+        res.status(502).json({ ok: false, error: 'El generador no devolvió el archivo.' });
+        return;
+      }
+      res.status(200).set('Content-Type', tipo).send(cuerpo);
+      return;
+    }
 
     const texto = await respuesta.text();
 

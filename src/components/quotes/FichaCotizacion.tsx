@@ -81,6 +81,8 @@ import {
   SelectorVersiones, BotonNuevaVersion, AvisoVersionVista, ModalMotivoVersion,
 } from './VersionesCotizacion';
 import TablaVentaConceptos from './TablaVentaConceptos';
+import ModalGenerarPdf from './ModalGenerarPdf';
+import { usePdfCotizacion } from '../../hooks/usePdfCotizacion';
 import TablaPorProveedor, { ToggleVistaCargos } from '../cargos/TablaPorProveedor';
 import { consolidarPorProveedor, desdeLineas } from '../../lib/cargosPorProveedor';
 import { usePreferenciasUsuario } from '../../hooks/usePreferenciasUsuario';
@@ -120,9 +122,10 @@ const FORWARD_TARGETS: Partial<Record<PipelineStageId, PipelineStageId[]>> = {
  * que se llaman distinto a lo que hacen».
  *
  * El PDF es trabajo propio: sin margen, sin proveedores y sin desglose de
- * costos, solo montos individuales y totales. Al construirlo, poner en true.
+ * costos, solo montos individuales y totales. Encendido el 21-sep-2026 con
+ * el generador de n8n (lib/pdfCotizacion.ts, hooks/usePdfCotizacion.ts).
  */
-const PDF_DISPONIBLE = false;
+const PDF_DISPONIBLE = true;
 
 const ADVANCE_CONFIG: Partial<Record<PipelineStageId, { label: string; cls: string }>> = {
   solicitado_pricing:     { label: 'Enviar a Pricing',        cls: 'bg-[#4B2A8C] hover:bg-[#3d2277]' },
@@ -155,6 +158,8 @@ export default function FichaCotizacion({
     versiones: fotos, error: errorVersiones, crearVersion, restaurarVersion,
   } = useVersionesCotizacion(quoteViva.id);
   const [versionVista, setVersionVista] = useState<number | null>(null);
+  const [modalPdf, setModalPdf] = useState(false);
+  const { generando: generandoPdf, generar: generarPdf } = usePdfCotizacion();
   const [modalVersion, setModalVersion] = useState<
     { modo: 'nueva' } | { modo: 'restaurar'; numero: number } | null
   >(null);
@@ -1343,6 +1348,18 @@ export default function FichaCotizacion({
             : undefined}
         />
       )}
+      {(quote.pdfs?.length ?? 0) > 0 && (
+        <div className="px-6 pt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">PDF generados</span>
+          {[...(quote.pdfs ?? [])].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 5).map(p => (
+            <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer"
+              className="text-[11px] font-mono font-semibold text-[#E11D48] hover:underline"
+              title={`${p.generadoPor.nombre} · ${p.fecha.slice(0, 16).replace('T', ' ')}`}>
+              {p.nombreArchivo}
+            </a>
+          ))}
+        </div>
+      )}
       {errorVersiones && (
         <p className="mx-6 mt-2 text-[11px] text-red-600 font-semibold">{errorVersiones}</p>
       )}
@@ -2283,7 +2300,7 @@ export default function FichaCotizacion({
               esconde, pero el PDF sigue sin construirse. */}
           {puedeGenerarPDF && (
             <button
-              onClick={() => alert('Generando PDF de la cotización consolidada...')}
+              onClick={() => setModalPdf(true)}
               className="flex-1 px-4 py-2.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               <FileText className="w-3.5 h-3.5 text-gray-400" /> Generar PDF
@@ -2306,6 +2323,15 @@ export default function FichaCotizacion({
           <span className="text-[10px] text-gray-400">Guardado automáticamente</span>
         </div>
       </FichaFooter>
+      )}
+
+      {modalPdf && (
+        <ModalGenerarPdf
+          quote={quote}
+          generando={generandoPdf}
+          onGenerar={o => generarPdf(quote, { ...o, cliente: clienteVinculado })}
+          onCerrar={() => setModalPdf(false)}
+        />
       )}
 
       {modalVersion && (
