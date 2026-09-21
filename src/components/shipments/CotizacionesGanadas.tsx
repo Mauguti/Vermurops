@@ -1,7 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Ship, Plane, Truck, ArrowRight, CheckCircle2 } from 'lucide-react';
 import type { KanbanQuote } from '../quotes/QuotesData';
 import { aplanarCotizacion, totalVenta } from '../../lib/lineasCotizacion';
+import { modalidadDominante, PREFIJO_FOLIO } from '../../lib/generacionEmbarque';
+import { SERIES_EMBARQUE } from '../../lib/folioService';
+
+/** Las series reales (sin la provisional VL): la que se elige va impresa en documentos. */
+export const SERIES_ELEGIBLES = SERIES_EMBARQUE.filter(s => s !== 'VL');
+export const ETIQUETA_SERIE: Record<string, string> = {
+  VLIM: 'VLIM · impo marítimo', VLEM: 'VLEM · expo marítimo',
+  VLIT: 'VLIT · impo terrestre', VLET: 'VLET · expo terrestre',
+  VLIA: 'VLIA · impo aéreo',     VLEA: 'VLEA · expo aéreo',
+};
+
+/** La serie que corresponde a la cotización, si su tráfico se conoce. */
+export function serieSugerida(q: KanbanQuote): string {
+  const modalidad = modalidadDominante(q).modalidad;
+  const t = q.servicios?.find(s => s.trafico)?.trafico;
+  const trafico = t === 'importacion' ? 'impo' : t === 'exportacion' ? 'expo' : null;
+  return trafico ? PREFIJO_FOLIO[modalidad][trafico] : PREFIJO_FOLIO[modalidad].impo;
+}
 
 /**
  * Embarques por capturar.
@@ -22,7 +40,8 @@ interface Props {
   ganadas: KanbanQuote[];
   /** Cotizaciones que ya generaron embarque, para no ofrecerlas otra vez. */
   yaConEmbarque: Set<string>;
-  onAbrirEmbarque: (quote: KanbanQuote) => void;
+  /** La serie elegida decide el folio y, de él, el tráfico y el IVA. */
+  onAbrirEmbarque: (quote: KanbanQuote, serie: string) => void;
   puedeGenerar: boolean;
 }
 
@@ -39,6 +58,8 @@ export default function CotizacionesGanadas({
   ganadas, yaConEmbarque, onAbrirEmbarque, puedeGenerar,
 }: Props) {
   const pendientes = ganadas.filter(q => !yaConEmbarque.has(q.id));
+  const [series, setSeries] = useState<Record<string, string>>({});
+  const serieDe = (q: KanbanQuote) => series[q.id] ?? serieSugerida(q);
 
   if (pendientes.length === 0) {
     return (
@@ -80,6 +101,7 @@ export default function CotizacionesGanadas({
               <th className="px-4 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Cliente</th>
               <th className="px-4 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Modalidades</th>
               <th className="px-4 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Valor</th>
+              <th className="px-4 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Serie</th>
               <th className="px-4 py-2 w-[150px]" />
             </tr>
           </thead>
@@ -101,9 +123,23 @@ export default function CotizacionesGanadas({
                   <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-[#18181B]">
                     ${money(totalVenta(lineas))} {q.moneda}
                   </td>
+                  <td className="px-4 py-2.5">
+                    {/* B3 · El tráfico se deriva del folio (VLIM impo, VLEM
+                        expo…), y de él el IVA. Se sugiere por la cotización
+                        y Operaciones lo confirma. */}
+                    <select
+                      value={serieDe(q)}
+                      onChange={e => setSeries(prev => ({ ...prev, [q.id]: e.target.value }))}
+                      disabled={!puedeGenerar}
+                      aria-label={`Serie del embarque de ${q.id}`}
+                      className="px-2 py-1 text-[11px] font-semibold bg-white border border-gray-200 rounded-md outline-none focus:border-[#E11D48]"
+                    >
+                      {SERIES_ELEGIBLES.map(s => <option key={s} value={s}>{ETIQUETA_SERIE[s] ?? s}</option>)}
+                    </select>
+                  </td>
                   <td className="px-4 py-2.5 text-right">
                     <button
-                      onClick={() => onAbrirEmbarque(q)}
+                      onClick={() => onAbrirEmbarque(q, serieDe(q))}
                       disabled={!puedeGenerar}
                       className="inline-flex items-center gap-1.5 bg-[#E11D48] text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg hover:bg-[#BE123C] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       title={puedeGenerar ? undefined : 'Solo Operaciones puede abrir embarques'}

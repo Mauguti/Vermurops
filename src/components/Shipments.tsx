@@ -14,7 +14,9 @@ import { EMBARQUE_AUTOMATICO_DISPONIBLE } from '../config/banderas';
 import { useServicios } from '../config/serviciosStore';
 import { useDestinoPendiente } from '../navegacion/NavegacionContext';
 import { useAuth } from '../auth/AuthContext';
-import { generateFolioEmbarque } from '../lib/folioService';
+import { reservarFoliosSerie, generateFolioEmbarque } from '../lib/folioService';
+import { db } from '../firebase';
+import { runTransaction } from 'firebase/firestore';
 import Toast, { TipoToast } from './ui/Toast';
 
 export default function Shipments() {
@@ -184,7 +186,7 @@ export default function Shipments() {
    * Hereda los conceptos a cobrar y a pagar con el mapeo de E-3, y arrastra
    * sus advertencias: quien cerró la venta no vio el resultado.
    */
-  const abrirEmbarqueDesdeCotizacion = async (quote: typeof quotes[number]) => {
+  const abrirEmbarqueDesdeCotizacion = async (quote: typeof quotes[number], serie: string) => {
     if (creando) return;
     setCreando(true);
 
@@ -198,7 +200,20 @@ export default function Shipments() {
       try {
         const cliente = clientes.find(c => c.id === quote.clienteId) ?? null;
         const { cargos, advertencias } = mapearCotizacionAEmbarque(quote, { cliente });
-        const folio = await generateFolioEmbarque();
+        /*
+         * B3 (21-sep-2026): la ruta manual ya usa la SERIE que Operaciones
+         * elige (VLIM, VLIT…), no el SHP- genérico. Del prefijo sale el
+         * tráfico y del tráfico el IVA de las facturas. La bandera automática
+         * sigue apagada; el contador sin sembrar se avisa, no bloquea.
+         */
+        const reserva = await runTransaction(db, tx => reservarFoliosSerie(tx, serie, 1));
+        const folio = reserva.folios[0];
+        if (!reserva.sembrado) {
+          advertencias.push({
+            tipo: 'contador_sin_sembrar', lineaId: '', concepto: '',
+            detalle: `La serie ${serie} no tiene sembrado el consecutivo de Magaya: ${folio} puede duplicar un folio histórico. Siémbralo en Configuración → Contadores de folio.`,
+          });
+        }
         const nuevo = construirEmbarqueDesdeCotizacion({
           quote, folio, cargos, advertencias,
           origen: 'automatico',
