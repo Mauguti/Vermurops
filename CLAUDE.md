@@ -767,24 +767,6 @@ autorizada por Hosting); si Firebase la rechazara, se reintenta sin ella.
   - Contra emuladores, el «correo» se lee en
     `GET 127.0.0.1:9099/emulator/v1/projects/vermur-logistics-app/oobCodes`.
 
-## 4.17 Restablecer contraseña (24-sep-2026)
-
-«¿Olvidaste tu contraseña?» en el login → pantalla que pide el correo y
-dispara `sendPasswordResetEmail` (`components/RecuperarContrasena.tsx`,
-mensajes en `lib/recuperarContrasena.ts`, nunca un código crudo). El correo
-es el de Firebase por defecto; `auth.languageCode = 'es'` lo manda en
-español. La URL de regreso es el origen de la página (producción está
-autorizada por Hosting); si Firebase la rechazara, se reintenta sin ella.
-  - El enlace del correo lo atiende la página de Firebase (en español) por
-    defecto. Si en la consola se apunta la URL de acción de la plantilla a
-    la app, `?mode=resetPassword&oobCode=…` abre la pantalla propia:
-    verifica el código (vencido / ya usado, en español), pide la
-    contraseña nueva y regresa al login con el correo precargado.
-  - El éxito es neutro («si ese correo tiene cuenta…»): Firebase puede
-    tener activa la protección contra enumeración de correos.
-  - Contra emuladores, el «correo» se lee en
-    `GET 127.0.0.1:9099/emulator/v1/projects/vermur-logistics-app/oobCodes`.
-
 ## 5. Estado de los módulos
 
 ### Construido y validado
@@ -955,6 +937,21 @@ Definido pero nunca invocado. Candidato a eliminar.
 
 **`window.confirm` provisional.**
 En el simulador de costo. Reemplazar por modal propio.
+
+**La ficha guarda el documento entero y `actividades[]` vive dentro.**
+`updateCotizacion` hace `updateDoc` con la cotización completa, y el
+historial (notas, cambios de etapa, cambios de operación) es un array del
+mismo documento. Dos ediciones simultáneas —dos pantallas, dos personas—
+no se funden: la última pisa a la primera y se pueden perder entradas de
+Historial / Notas. Candidato: `arrayUnion` para `actividades` y `updateDoc`
+por campos en vez del documento entero. Anotado 25-sep-2026, sin arreglar.
+
+**`firestore.rules` permite `update` en `cotizaciones` a cualquier
+autenticado.** Los permisos por rol y por etapa —quién edita la operación,
+quién avanza de etapa, el congelado— existen solo en la UI y en los hooks.
+Es el mismo agujero de «las reglas no distinguen roles» de arriba, en su
+caso más concreto. Hay que llevarlos a reglas antes de abrir más usuarios.
+Anotado 25-sep-2026, sin arreglar.
 
 **Roles hardcodeados.**
 `getRolByEmail` en `AuthContext.tsx` tiene los correos del equipo. Se elimina cuando GU
