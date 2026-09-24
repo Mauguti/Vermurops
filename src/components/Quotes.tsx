@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { exigirExpediente } from '../lib/frenoExpediente';
 import { initialQuotes, initialClients, initialProspectos, Prospecto } from '../data';
 import { X, Plus, Search, Filter, Download, Upload, List, LayoutGrid, MessageSquare } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -139,6 +140,19 @@ export default function Quotes() {
    */
   const handleCotizacionGanada = async (ganada: KanbanQuote) => {
     /*
+     * Bloque 2b: el expediente del cliente, aquí, que es por donde pasan la
+     * ficha Y el arrastre del Kanban. La ficha ya trae el salto de admin en
+     * `saltoExpediente` cuando lo hubo; el Kanban no puede justificar y se
+     * detiene con la razón.
+     */
+    try {
+      const clienteDeGanada = clientes.find(c => c.id === ganada.clienteId) ?? null;
+      exigirExpediente(ganada, { cliente: clienteDeGanada, rol: user?.rol as UserRole | undefined, saltoPrevio: ganada.saltoExpediente });
+    } catch (err) {
+      setToast({ mensaje: `${err instanceof Error ? err.message : err} Para justificar un salto, usa la ficha de la cotización.`, tipo: 'error' });
+      return;
+    }
+    /*
      * A-1 apagado: marcar ganada solo marca ganada, como producción hoy.
      * La cotización SÍ se guarda —este handler recibe la versión ya
      * actualizada y es el único que la persiste en esta ruta— y el embarque
@@ -166,6 +180,7 @@ export default function Quotes() {
         cliente,
         catalogoServicios: serviciosActivos,
         generadoPor: user?.nombre ?? user?.email ?? '',
+        salto: ganada.saltoExpediente ?? null,
       });
 
       if (selectedQuote?.id === ganada.id) {

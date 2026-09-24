@@ -20,6 +20,7 @@ import { useClientes } from '../../hooks/useClientes';
 import { calcLinea } from '../../lib/cotizacionCalculator';
 import { puedeTransicionarA, transicionesDisponibles, salidasPara, rolesQuePueden, type Rol } from '../../lib/stateMachine';
 import { razonSinCliente, RAZON_SIN_CLIENTE_CORTA, esRazonSinCliente } from '../../lib/frenoCliente';
+import { frenoExpediente, razonExpediente, esRazonExpediente, textoSalto } from '../../lib/frenoExpediente';
 import { useTarifas } from '../../hooks/useTarifas';
 import { useConceptos } from '../../hooks/useConceptos';
 import OperacionServicio from './OperacionServicio';
@@ -175,6 +176,9 @@ export default function FichaCotizacion({
   const { agregarNotificacion } = useNotifications();
   const { servicios } = useServicios();
   const { clientes } = useClientes();
+  /** El cliente vinculado, para el freno del expediente (Bloque 2b). null = vinculado a uno que no existe. */
+  const clienteCtx = quote.clienteId ? (clientes.find(c => c.id === quote.clienteId) ?? null) : null;
+  const ctxTransicion = { cliente: clienteCtx };
   const { tarifas: catalogoTarifas, createTarifa } = useTarifas();
   const { proveedores } = useProveedores();
   const { puertos } = usePuertos();
@@ -283,7 +287,7 @@ export default function FichaCotizacion({
 
   // ─── Handlers: stage ────────────────────────────────────────────────────
 
-  const handleStageChange = (newEtapa: PipelineStageId, lossReasonText: string | null = null) => {
+  const handleStageChange = (newEtapa: PipelineStageId, lossReasonText: string | null = null, justificacionSalto?: string) => {
     if (quote.etapa === newEtapa) return;
 
     // ── Guard E5.2: validar transición antes de ejecutar ──────────────────
@@ -337,7 +341,31 @@ export default function FichaCotizacion({
      * dentro de la misma transacción que crea los embarques.
      */
     if (newEtapa === 'ganada') {
-      onConvertToShipment(actualizada);
+      // Bloque 2b: el expediente del cliente. Fail closed: si no se puede
+      // verificar, no se gana. Con salto de admin, queda registrado en la
+      // cotización (permanente) y como nota en Historial.
+      const r = frenoExpediente(quote, {
+        cliente: clienteCtx, rol: rolActivo, justificacion: justificacionSalto,
+        saltoPrevio: quote.saltoExpediente, por: user?.nombre ?? user?.email ?? 'admin',
+      });
+      if ('razon' in r) { setToastLocal(r.razon); return; }
+      const conSalto: KanbanQuote = r.salto && !quote.saltoExpediente
+        ? {
+            ...actualizada,
+            saltoExpediente: r.salto,
+            actividades: [...actualizada.actividades, {
+              id: `act-salto-${Date.now()}`,
+              titulo: 'Salto de expediente sin validar',
+              descripcion: textoSalto(r.salto),
+              responsableId: r.salto.por,
+              fechaLimite: fechaActual.split(' ')[0],
+              estado: 'hecha',
+              tipo: 'nota',
+              createdAt: fechaActual,
+            }],
+          }
+        : actualizada;
+      onConvertToShipment(conSalto);
     } else {
       onUpdateQuote(actualizada);
     }
@@ -1133,7 +1161,7 @@ export default function FichaCotizacion({
   // ─── Render ──────────────────────────────────────────────────────────────
 
   /** Etapas a las que el rol activo puede transicionar desde la etapa actual. */
-  const disponibles = transicionesDisponibles(quote.etapa, rolActivo, quote);
+  const disponibles = transicionesDisponibles(quote.etapa, rolActivo, quote, ctxTransicion);
 
   /**
    * El siguiente paso (23-sep-2026). La franja de arriba lo pinta y ofrece el
@@ -1170,7 +1198,7 @@ export default function FichaCotizacion({
    */
   const porqueNoAvanza = condicionAvance?.porque
     || (advanceTarget && !paso.disponible
-      ? (puedeTransicionarA(quote.etapa, advanceTarget, rolActivo, quote).razon ?? '')
+      ? (puedeTransicionarA(quote.etapa, advanceTarget, rolActivo, quote, ctxTransicion).razon ?? '')
       : '');
 
   /** «Marcar ganada» como botón secundario obedece la misma condición. */
@@ -1198,15 +1226,31 @@ export default function FichaCotizacion({
    * solo dejan leer las propias; las de rol viven en memoria del navegador
    * que las crea. Avisar a un área exige campos o reglas nuevas. Ver §6.
    */
+  /**
+   * Bloque 2b: el expediente. Si el veto es del expediente, admin ve
+   * «Continuar con justificación»; los demás solo la razón.
+   */
+  const [modalSalto, setModalSalto] = useState(false);
+  const [justificacionSalto, setJustificacionSalto] = useState('');
+  const razonExp = puedeGanarDesdeAqui && !razonCliente
+    ? razonExpediente(quote, { cliente: clienteCtx, rol: rolActivo, saltoPrevio: quote.saltoExpediente })
+    : null;
   const bloqueoCliente = razonCliente
     ? { texto: razonCliente, acciones: [{ etiqueta: 'Vincular cliente', onClick: irAVincularCliente }] }
-    : undefined;
+    : razonExp
+      ? {
+          texto: razonExp,
+          acciones: rolActivo === 'admin'
+            ? [{ etiqueta: 'Continuar con justificación', onClick: () => setModalSalto(true) }]
+            : [],
+        }
+      : undefined;
 
   /** Avanza de etapa. Ganada pide confirmación: de ahí nace el embarque. */
-  const avanzarA = (hacia: PipelineStageId) => {
+  const avanzarA = (hacia: PipelineStageId, justificacionSalto?: string) => {
     if (hacia === 'ganada') {
       if (confirm(`¿Marcar ${quote.id} como GANADA?\n\nSe generará el embarque en automático con los conceptos a cobrar y a pagar, y la cotización quedará congelada.`)) {
-        handleStageChange('ganada');
+        handleStageChange('ganada', null, justificacionSalto);
       }
       return;
     }
@@ -1802,13 +1846,13 @@ export default function FichaCotizacion({
                     no cumple se ve deshabilitada con la razón (Bloque 2a), en
                     vez de esconderse en silencio. */}
                 {(() => {
-                  const salidas = salidasPara(quote.etapa, rolActivo, quote);
+                  const salidas = salidasPara(quote.etapa, rolActivo, quote, ctxTransicion);
                   const etiqueta = (id: PipelineStageId) => PIPELINE_STAGES.find(s => s.id === id)?.label ?? id;
                   return [
                     <option key={quote.etapa} value={quote.etapa}>{etiqueta(quote.etapa)}</option>,
                     ...salidas.map(s => (
                       <option key={s.hacia} value={s.hacia} disabled={!s.ok} title={s.razon ?? undefined}>
-                        {etiqueta(s.hacia)}{!s.ok ? ` — ${esRazonSinCliente(s.razon) ? RAZON_SIN_CLIENTE_CORTA : (s.razon ?? 'no disponible').slice(0, 70)}` : ''}
+                        {etiqueta(s.hacia)}{!s.ok ? ` — ${esRazonSinCliente(s.razon) ? RAZON_SIN_CLIENTE_CORTA : esRazonExpediente(s.razon) ? 'expediente sin validar' : (s.razon ?? 'no disponible').slice(0, 70)}` : ''}
                       </option>
                     )),
                   ];
@@ -2386,6 +2430,35 @@ export default function FichaCotizacion({
           <span className="text-[10px] text-gray-400">Guardado automáticamente</span>
         </div>
       </FichaFooter>
+      )}
+
+      {/* Bloque 2b: la justificación del salto de expediente (solo admin). */}
+      {modalSalto && (
+        <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4" onClick={() => setModalSalto(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-3" onClick={e => e.stopPropagation()}>
+            <h3 className="text-[14px] font-bold text-[#18181B]">Continuar con el expediente sin validar</h3>
+            <p className="text-[12px] text-gray-600">
+              El expediente de «{clienteCtx?.nombre ?? quote.prospecto.empresa}» no está validado. Escribe por qué se avanza igual;
+              queda registrado en el Historial de la cotización y en la bitácora del embarque, y el embarque se marcará
+              «Expediente pendiente» hasta que Administración valide al cliente.
+            </p>
+            <textarea
+              autoFocus rows={3} value={justificacionSalto} onChange={e => setJustificacionSalto(e.target.value)}
+              placeholder="Ej. Cliente recurrente desde 2019; Administración completa el expediente esta semana."
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#E11D48]"
+            />
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setModalSalto(false)} className="px-3 py-2 text-[12px] font-semibold text-gray-500 hover:bg-gray-50 rounded-lg">Cancelar</button>
+              <button
+                disabled={!justificacionSalto.trim()}
+                onClick={() => { setModalSalto(false); avanzarA('ganada', justificacionSalto); }}
+                className="px-4 py-2 bg-[#E11D48] hover:bg-[#BE123C] disabled:opacity-40 disabled:cursor-not-allowed text-white text-[12px] font-bold uppercase tracking-wider rounded-lg"
+              >
+                Marcar ganada con justificación
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {modalPdf && (

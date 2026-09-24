@@ -442,6 +442,13 @@ export interface EmbarqueCompleto {
    * porque quien disparó la generación no vio el resultado.
    */
   advertenciasHeredadas?: unknown[];
+  /**
+   * Registro PERMANENTE de que admin abrió este embarque con el expediente
+   * del cliente sin validar (Bloque 2b). Nunca se pone en null. El aviso
+   * «expediente pendiente» se calcula: hay salto Y el cliente sigue sin
+   * validar (lib/frenoExpediente.ts).
+   */
+  saltoExpediente?: { por: string; fecha: string; justificacion: string } | null;
 }
 
 // ────────────────────────────────────────────────────────────

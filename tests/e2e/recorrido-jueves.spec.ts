@@ -216,6 +216,23 @@ test('Pricing · comparativa, elige el paquete, versión nueva, consolida y gene
 // Pricing consolida; ENVIAR al cliente y cerrar la venta es de Ventas (§4.1:
 // consolidada → enviada_cliente solo ventas/admin).
 
+// ─── 2c · Administración: valida el expediente del cliente ──────────────────
+// Bloque 2b: un cliente creado en VermurOps pasa por validación antes de que
+// la cotización se pueda ganar (los importados de Magaya cuentan como
+// validados de origen). Es lo que hará Administración con cada alta nueva.
+
+test('Administración · valida el expediente del cliente', async ({ browser }) => {
+  const { page, ctx } = await entrar(browser, 'administracion@vermur.com');
+  await irA(page, 'Altas');
+  await page.getByPlaceholder('Buscar por razón social, RFC, representante...').fill('Plásticos Ramírez S.A. de C.V.');
+  await page.getByText('Ver ficha', { exact: true }).first().click();
+  await page.getByRole('button', { name: 'Expediente' }).click();
+  await page.getByPlaceholder(/Notas|checklist/).fill('Prueba: expediente físico completo en archivo de Administración.');
+  await page.getByRole('button', { name: /Validar expediente|Validar formalmente/ }).click();
+  await expect(page.getByText(/Validado por/)).toBeVisible({ timeout: 15_000 });
+  await ctx.close();
+});
+
 test('Ventas · envía la cotización al cliente y la marca ganada', async ({ browser }) => {
   const { page, ctx } = await entrar(browser, 'ventas@vermur.com');
   await irA(page, 'CRM');

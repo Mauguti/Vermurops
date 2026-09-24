@@ -429,6 +429,13 @@ export interface KanbanQuote {
    * queda». Sin divergencia posible entre lo cotizado y lo que se va a cobrar.
    */
   embarqueIds?: string[];
+  /**
+   * El salto de expediente que admin autorizó al marcarla ganada (Bloque
+   * 2b). Permanente. Con la bandera automática apagada, el embarque se abre
+   * después y desde aquí hereda el salto; sin esto, Operaciones no podría
+   * abrirlo. Ver lib/frenoExpediente.ts.
+   */
+  saltoExpediente?: { por: string; fecha: string; justificacion: string } | null;
 
   /**
    * Prospecto del que nació esta cotización (U-8).

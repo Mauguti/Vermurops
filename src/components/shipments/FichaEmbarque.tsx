@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { expedientePendiente, textoSalto } from '../../lib/frenoExpediente';
 import { ChevronRight, Save, X, Calendar, Plus, Check, FileText, Landmark, ShieldCheck, DollarSign, Activity, GitCommit, Ship, Plane, Truck, ArrowRight, Trash2, Package, Layers } from 'lucide-react';
 import { EmbarqueCompleto, TIPOS_DOCUMENTO, EVENT_TYPES, CargoDetalle, EmbarqueEvento, EmbarqueDocumento, recalcularCargos, EmbarqueProducto, totalesDe, monedasConMovimiento } from './EmbarquesData';
 import EntidadesEmbarque from './EntidadesEmbarque';
@@ -505,6 +506,14 @@ export default function FichaEmbarque({
                 title="Nació de una cotización ganada y le falta la captura operativa."
               >
                 Por capturar
+              </BadgeEstado>
+            )}
+            {expedientePendiente(embarque, clientes.find(c => c.id === embarque.entidadesRef?.clienteCobrar?.id) ?? null) && (
+              <BadgeEstado
+                tono="espera"
+                title={`Se abrió con el expediente del cliente sin validar. ${embarque.saltoExpediente ? textoSalto(embarque.saltoExpediente) : ''} Desaparece cuando Administración valide al cliente.`}
+              >
+                Expediente pendiente
               </BadgeEstado>
             )}
             {embarque.cierres?.administrativo ? (

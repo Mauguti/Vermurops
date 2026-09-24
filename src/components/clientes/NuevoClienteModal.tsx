@@ -49,6 +49,8 @@ export default function NuevoClienteModal({ onClose, onCreate }: Props) {
       const cliente: ClienteVermur = {
         id:                `CLI-${Date.now()}`,
         nombre:            form.nombre.trim(),
+        // Bloque 2b: creado en VermurOps → pasa por validación de expediente.
+        origenDatos:       'manual',
         comercial:         form.comercial.trim(),
         representante:     form.representante.trim(),
         rfc:               form.rfc.trim().toUpperCase(),

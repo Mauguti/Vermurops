@@ -486,3 +486,25 @@ describe('Bloque 2a · sin cliente vinculado no se gana', () => {
     expect(salidasPara('negociacion', 'operaciones', makeQuote({ etapa: 'negociacion' }))).toEqual([]);
   });
 });
+
+// ─── Bloque 2b · el expediente entra por el contexto ─────────────────────────
+describe('Bloque 2b · expediente del cliente en la transición a ganada', () => {
+  const nuevo = { id: 'CLI-TEST', nombre: 'Nuevo' } as never;
+  const magaya = { id: 'CLI-TEST', nombre: 'Viejo', origenDatos: 'magaya' } as never;
+  it('sin contexto, la máquina solo revisa el clienteId (los que escriben exigen aparte)', () => {
+    expect(puedeTransicionarA('negociacion', 'ganada', 'ventas', makeQuote({ etapa: 'negociacion' })).ok).toBe(true);
+  });
+  it('con cliente heredado de Magaya, pasa', () => {
+    expect(puedeTransicionarA('negociacion', 'ganada', 'ventas', makeQuote({ etapa: 'negociacion' }), { cliente: magaya }).ok).toBe(true);
+  });
+  it('con cliente sin validar, ventas no; admin solo con justificación', () => {
+    const q = makeQuote({ etapa: 'negociacion' });
+    expect(puedeTransicionarA('negociacion', 'ganada', 'ventas', q, { cliente: nuevo }).ok).toBe(false);
+    expect(puedeTransicionarA('negociacion', 'ganada', 'admin', q, { cliente: nuevo }).ok).toBe(false);
+    expect(puedeTransicionarA('negociacion', 'ganada', 'admin', q, { cliente: nuevo, justificacion: 'urge' }).ok).toBe(true);
+  });
+  it('salidasPara enseña la razón del expediente', () => {
+    const s = salidasPara('negociacion', 'ventas', makeQuote({ etapa: 'negociacion' }), { cliente: nuevo });
+    expect(s.find(x => x.hacia === 'ganada')?.razon).toMatch(/expediente/);
+  });
+});

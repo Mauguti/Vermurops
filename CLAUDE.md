@@ -767,6 +767,46 @@ autorizada por Hosting); si Firebase la rechazara, se reintenta sin ella.
   - Contra emuladores, el «correo» se lee en
     `GET 127.0.0.1:9099/emulator/v1/projects/vermur-logistics-app/oobCodes`.
 
+## 4.18 Cliente vinculado y expediente validado (Bloques 2a y 2b, 25-sep-2026)
+
+**Sin cliente vinculado no se gana ni se abre embarque.** Una regla
+(`lib/frenoCliente.ts`) en tres call sites: la máquina de estados (`validar`
+de toda transición a ganada: franja, selector, Kanban), la ruta automática
+(`crearEmbarquesDeCotizacionGanada`) y la ruta manual de «Abrir embarque».
+Sin salto para nadie. La franja ofrece «Vincular cliente →», que enfoca el
+buscador de Información; el selector muestra «Ganada — sin cliente
+vinculado» deshabilitada. El formulario de solicitud escribe `clienteId` al
+elegir un cliente existente (antes nunca lo hacía: de ahí los huérfanos).
+
+**El expediente del cliente** (`lib/frenoExpediente.ts`, junto al otro):
+  - **Los importados de Magaya cuentan como validados de origen**:
+    `origenDatos === 'magaya' || numeroEntidadMagaya`. Se LEE así, sin
+    migración. Ficha: «Validado · heredado de Magaya». Administración puede
+    validarlos formalmente si quiere.
+  - **Los creados en VermurOps pasan por validación**: `expedienteValidado:
+    { por, fecha, notas }` lo escribe quien tiene `cliente.alta`
+    (Administración y admin) en Altas → ficha → Expediente, con el
+    checklist de `docsAlta` completo o notas obligatorias. El modal de alta
+    escribe `origenDatos: 'manual'`.
+  - **Salto de admin, con justificación obligatoria** (ni vacía ni solo
+    espacios). Queda como registro PERMANENTE: `saltoExpediente: { por,
+    fecha, justificacion }` en la cotización (para que la ruta manual, con
+    la bandera automática apagada, lo herede) y en cada embarque; nota en
+    `actividades` y entrada en la bitácora. Nunca se pone en null.
+  - **«Expediente pendiente» se calcula** (`expedientePendiente`): hay salto
+    Y el cliente sigue sin validar. Al validar al cliente el aviso
+    desaparece solo; el registro se queda.
+  - Los puntos que ESCRIBEN exigen el expediente con `exigirExpediente`
+    (fail closed); la máquina de estados lo evalúa solo si recibe el
+    contexto `{ cliente }`, para explicar antes de intentar. El Kanban no
+    tiene clientes en scope: su arrastre se detiene en el handler de ganada
+    con la razón y manda a la ficha a justificar.
+  - Reglas: `clientes` y `embarques` ya permitían `update` a cualquier
+    autenticado; no hubo cambio de reglas. Las de rol siguen siendo deuda (§6).
+  - El recorrido e2e tiene un paso nuevo: Administración valida el
+    expediente del cliente antes de que Ventas marque ganada. Los clientes
+    de desarrollo del emulador no vienen de Magaya.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
