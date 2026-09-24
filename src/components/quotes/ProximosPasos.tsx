@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Check, CheckCircle2, Send, X } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, Send, Undo2, X } from 'lucide-react';
 import type { PipelineStageId } from './QuotesData';
 import type { UserRole } from '../../auth/users';
 import {
@@ -50,11 +50,16 @@ interface Props {
    * los faltantes y aunque el botón principal no sea «ganada».
    */
   bloqueo?: { texto: string; acciones: { etiqueta: string; onClick: () => void }[] };
+  /**
+   * Regresar a la etapa anterior (Bloque 6): era lo único que solo vivía en
+   * el selector de «Etapa del Pipeline» de Información, que se retiró.
+   */
+  atras?: { etiqueta: string; onClick: () => void } | null;
 }
 
 export default function ProximosPasos({
   rol, etapa, paso, prontitud, puedeAvanzar, porque,
-  onAvanzar, ganadaSecundaria, onMarcarGanada, soloLectura = false, bloqueo,
+  onAvanzar, ganadaSecundaria, onMarcarGanada, soloLectura = false, bloqueo, atras,
 }: Props) {
   const linea = lineaDeEtapas(rol);
   const actual = indiceEnLinea(linea, etapa);
@@ -135,8 +140,17 @@ export default function ProximosPasos({
       </div>
 
       {/* ── La acción que sigue ── */}
-      {(muestraBoton || (!soloLectura && ganadaSecundaria)) && (
+      {(muestraBoton || (!soloLectura && ganadaSecundaria) || (!soloLectura && atras)) && (
         <div className="shrink-0 flex items-center gap-2">
+          {!soloLectura && atras && (
+            <button
+              onClick={atras.onClick}
+              title={`Devolver la cotización a «${atras.etiqueta}»`}
+              className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-500 hover:text-[#E11D48] hover:bg-[#E11D48]/5 rounded-lg transition-colors flex items-center gap-1.5"
+            >
+              <Undo2 className="w-3.5 h-3.5" /> Regresar a {atras.etiqueta}
+            </button>
+          )}
           {muestraBoton && paso.hacia && (
             <button
               onClick={() => onAvanzar(paso.hacia!)}

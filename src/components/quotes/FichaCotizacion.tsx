@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { antesDeLaComa } from '../../lib/texto';
+import { textoBaseDelTotal } from '../../lib/serviciosDelTotal';
 import {
   X, User, FileText, Plus, Trash2, CheckCircle2, AlertTriangle,
   MessageSquare, Clock, Send, BarChart2, Building2, Search, Link2,
@@ -72,7 +73,7 @@ import {
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import ProximosPasos from './ProximosPasos';
 import { buscarClientes } from '../../lib/buscarClientes';
-import { proximoPaso } from '../../lib/proximosPasos';
+import { proximoPaso, pasoAtras } from '../../lib/proximosPasos';
 import {
   elegirCelda, elegirColumna, derivarSeleccion, agenteDominante,
   menorPorFila, resumenSeleccion,
@@ -1154,10 +1155,6 @@ export default function FichaCotizacion({
     )?.id ?? null;
   }, [activeConcepto, lineasPlanas]);
 
-  const serviciosConProveedor = quote.servicios.filter(
-    s => (s.cotizacionesProveedor ?? []).some(cp => cp.seleccionada)
-  );
-
   // ─── Render ──────────────────────────────────────────────────────────────
 
   /** Etapas a las que el rol activo puede transicionar desde la etapa actual. */
@@ -1200,6 +1197,15 @@ export default function FichaCotizacion({
     || (advanceTarget && !paso.disponible
       ? (puedeTransicionarA(quote.etapa, advanceTarget, rolActivo, quote, ctxTransicion).razon ?? '')
       : '');
+
+  /**
+   * Bloque 6: regresar una etapa. Vivía solo en el selector de «Etapa del
+   * Pipeline», que se retiró de Información.
+   */
+  const atrasPosible = viendoVersion ? null : pasoAtras(quote.etapa, rolActivo, quote, ctxTransicion);
+  const atrasDisponible = atrasPosible
+    ? { etiqueta: atrasPosible.etiqueta, onClick: () => handleStageChange(atrasPosible.hacia) }
+    : null;
 
   /** «Marcar ganada» como botón secundario obedece la misma condición. */
   const puedeMarcarGanada = disponibles.includes('ganada') && prontitud.lista;
@@ -1382,7 +1388,7 @@ export default function FichaCotizacion({
             <div>
               <p className="text-[10px] text-gray-500 uppercase font-bold">Total Venta Consolidado</p>
               <p className="text-[9px] text-gray-400">
-                Basado en {serviciosConProveedor.length} servicio{serviciosConProveedor.length !== 1 ? 's' : ''} con proveedor
+                {textoBaseDelTotal(quote)}
               </p>
             </div>
             <p className="text-2xl font-black text-[#E11D48] tabular-nums">
@@ -1512,6 +1518,7 @@ export default function FichaCotizacion({
         onMarcarGanada={() => avanzarA('ganada')}
         soloLectura={viendoVersion}
         bloqueo={bloqueoCliente}
+        atras={atrasDisponible}
       />
 
       <FichaTabs
@@ -1825,40 +1832,21 @@ export default function FichaCotizacion({
           </div>
         )}
 
+        {/* Bloque 6: dos columnas que usan el ancho. Prospecto a la izquierda;
+            Responsables y el consolidado a la derecha; la Operación abajo, a
+            todo el ancho, porque su formulario de carga ya trae rejillas de
+            tres y cuatro campos que en media columna se apretarían. En
+            pantallas angostas vuelve a una sola columna. */}
         {activeTab === 'info' && (
-          <div className="max-w-3xl mx-auto space-y-6">
+          <div className="space-y-6">
 
-            {/* Etapa del Pipeline */}
-            <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-3">
-              <label className="block text-[10px] font-bold text-[#18181B] uppercase tracking-wider">
-                Etapa del Pipeline
-              </label>
-              <select
-                value={quote.etapa}
-                onChange={e => {
-                  const val = e.target.value as PipelineStageId;
-                  if (val === 'perdida') setShowLossReasonForm(true);
-                  else handleStageChange(val);
-                }}
-                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 outline-none focus:border-[#E11D48] shadow-xs"
-              >
-                {/* La etapa actual + las salidas del rol. Una que la cotización
-                    no cumple se ve deshabilitada con la razón (Bloque 2a), en
-                    vez de esconderse en silencio. */}
-                {(() => {
-                  const salidas = salidasPara(quote.etapa, rolActivo, quote, ctxTransicion);
-                  const etiqueta = (id: PipelineStageId) => PIPELINE_STAGES.find(s => s.id === id)?.label ?? id;
-                  return [
-                    <option key={quote.etapa} value={quote.etapa}>{etiqueta(quote.etapa)}</option>,
-                    ...salidas.map(s => (
-                      <option key={s.hacia} value={s.hacia} disabled={!s.ok} title={s.razon ?? undefined}>
-                        {etiqueta(s.hacia)}{!s.ok ? ` — ${esRazonSinCliente(s.razon) ? RAZON_SIN_CLIENTE_CORTA : esRazonExpediente(s.razon) ? 'expediente sin validar' : (s.razon ?? 'no disponible').slice(0, 70)}` : ''}
-                      </option>
-                    )),
-                  ];
-                })()}
-              </select>
-
+            {/* Bloque 6 (25-sep-2026): el selector de «Etapa del Pipeline» se
+                retiró. La barra de etapas de arriba ya dice dónde va, y lo
+                único que solo se podía hacer aquí —regresar una etapa— es
+                ahora el botón «Regresar a …» de la franja, que respeta los
+                frenos de cliente y expediente. Queda lo que informa: el
+                motivo de pérdida y su captura. */}
+            <div className="space-y-3">
               {quote.etapa === 'perdida' && quote.motivoPerdida && (
                 <div className="text-xs text-red-700 bg-red-50 border border-red-100 rounded-lg p-2.5 flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -1884,7 +1872,9 @@ export default function FichaCotizacion({
               )}
             </div>
 
-            {/* Prospecto */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6 items-start">
+
+            {/* ── Columna izquierda: Prospecto / Cliente ── */}
             <div className="space-y-4">
               <h3 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-2 flex items-center gap-1.5">
                 <User className="w-4 h-4" /> Prospecto / Cliente
@@ -2017,7 +2007,9 @@ export default function FichaCotizacion({
               </div>
             </div>
 
-            {/* Responsables */}
+            {/* ── Columna derecha: Responsables y el consolidado ── */}
+            <div className="space-y-6">
+
             <div className="space-y-3">
               <h3 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-2 flex items-center gap-1.5">
                 <User className="w-4 h-4" /> Responsables
@@ -2045,6 +2037,9 @@ export default function FichaCotizacion({
 
             {/* Total consolidado */}
             {renderConsolidadoPanel()}
+
+            </div>{/* fin columna derecha */}
+            </div>{/* fin rejilla de dos columnas */}
 
           {/* ── Operación (Fase A, 24-sep-2026) ───────────────────────────
               Lo que antes vivía en el modal «Datos del embarque», editable

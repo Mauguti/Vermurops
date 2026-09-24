@@ -807,6 +807,46 @@ elegir un cliente existente (antes nunca lo hacía: de ahí los huérfanos).
     expediente del cliente antes de que Ventas marque ganada. Los clientes
     de desarrollo del emulador no vienen de Magaya.
 
+## 4.19 La pestaña Información y el filtro de proveedores (Bloques 5 y 6, 25-sep-2026)
+
+**Las pestañas de proveedores en Altas nunca filtraron.** Se pintaban desde
+el checkpoint inicial como botones sin `onClick` y con el resaltado fijo en
+«Todos». Y sus etiquetas —Navieras, Aerolíneas, Aduanales— no existen como
+dato: el modelo tiene `tipos[] = proveedor | transportista | agente_carga`
+y `modalidades[]` está vacío en los 544. Ahora las pestañas son esos tipos,
+con su conteo (`lib/filtrarProveedores.ts`). Navieras y Aerolíneas vuelven
+cuando `TipoProveedor` crezca (deuda §4.12). `SelectorProveedor` y
+`ModalAgregarAgente` ORDENAN por modalidad sin excluir: no es el mismo bug.
+
+**Información, sin selector de etapa y a dos columnas.** La barra de arriba
+ya dice en qué etapa va. Lo único que solo se podía hacer desde el selector
+era **regresar una etapa** (seis transiciones, una por etapa): ahora es el
+botón «Regresar a …» de la franja, derivado de `salidasPara` —no de una
+segunda tabla— con `pasoAtras` en `lib/proximosPasos.ts`. Respeta los
+frenos de cliente y expediente. El motivo de pérdida y su captura se
+quedan; «Marcar perdida» sigue en el pie.
+  - Izquierda: Prospecto / Cliente. Derecha: Responsables y el consolidado.
+    **Operación a todo el ancho**, porque su formulario de carga ya trae
+    rejillas de tres y cuatro campos. Una sola columna por debajo de `lg`.
+
+**El pie del consolidado mentía de dos maneras** (COT-2026-0031: «Basado en
+0 servicios con proveedor» junto a $6,100):
+  1. contaba solo la ruta B (`cotizacionesProveedor` seleccionada) mientras
+     el total recorre las dos y cae a `conceptos` — la dualidad de §6
+     asomando en la interfaz;
+  2. **el total puede no venir de los servicios**: la ficha usa
+     `quote.valorTotalConsolidado` —un campo GUARDADO— cuando es mayor que
+     cero, y solo si no, calcula. Tres de las ocho cotizaciones de ejemplo
+     están así.
+  `lib/serviciosDelTotal.ts` dice de dónde sale el número: «Suma de N de M
+  servicios con montos capturados» o «Total guardado en la cotización: sus
+  M servicios no tienen montos capturados». Un test amarra que si el total
+  derivado es mayor que cero, el conteo no puede ser cero.
+
+**La campanita ya no trae notificaciones de ejemplo.** Eran cuatro
+`notif-mock-*` de cotizaciones de demostración que todo Vermur veía en
+producción. Queda vacía hasta que las de rol persistan (§6).
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
@@ -1001,6 +1041,25 @@ reglas de `notificaciones` solo dejan leer las propias por uid. Avisar a un
 área exige documentos por uid (no hay directorio de usuarios) o una consulta
 por rol con cambio de reglas. Por eso «Pedir alta a Administración» quedó
 fuera del Bloque 2a. Anotado 25-sep-2026, sin arreglar.
+
+**Portal del cliente: debe ser un ROL, no un botón del header.**
+Hoy «Portal del Cliente» es un botón que solo ve admin y que abre una vista
+dentro de la misma sesión. Lo correcto es un rol `cliente` con su propio
+acceso. **Depende de Usuarios y roles** (rol en custom claims) y de reglas
+por rol: con las reglas de hoy —cualquier autenticado lee todo— un usuario
+cliente podría leer las cotizaciones, los costos y los márgenes de TODOS
+los clientes. El botón se queda como está hasta ese bloque. Anotado
+25-sep-2026 por decisión de Mau.
+
+**«PDF generados» repite el mismo nombre de archivo.** En COT-2026-0031
+aparece dos veces «COT-2026-0031 v1.pdf»: dos generaciones de la misma
+versión, con el mismo nombre y sin hora visible. Entra al bloque de PDF con
+historial de versiones. Anotado 25-sep-2026.
+
+**El Kanban avisa del freno al soltar, no antes de mover.** `handleDrop`
+valida con `puedeTransicionarA` y muestra la razón cuando la tarjeta ya se
+arrastró; las columnas a las que no se puede mover deberían verse
+inalcanzables antes. Anotado 25-sep-2026.
 
 **Roles hardcodeados.**
 `getRolByEmail` en `AuthContext.tsx` tiene los correos del equipo. Se elimina cuando GU

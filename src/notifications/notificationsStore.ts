@@ -81,55 +81,18 @@ export function tiempoRelativo(fecha: string): string {
 // ─── Notificaciones mock iniciales ────────────────────────────────────────────
 
 const now = new Date();
-const ago = (minutes: number) => new Date(now.getTime() - minutes * 60000).toISOString();
 
-export const INITIAL_NOTIFICATIONS: Notificacion[] = [
-  {
-    id: 'notif-mock-001',
-    tipo: 'cambio_etapa',
-    titulo: 'CRM · Nueva etapa asignada',
-    mensaje: "Distribuidora Nacional (COT-2026-0002) pasó de 'Solicitud del cliente' a 'Solicitado a Pricing'",
-    cotizacionId: 'COT-2026-0002',
-    etapaAnterior: 'solicitud_cliente',
-    etapaNueva: 'solicitado_pricing',
-    destinatarios: ['pricing'],
-    leida: false,
-    fecha: ago(12),
-  },
-  {
-    id: 'notif-mock-002',
-    tipo: 'cambio_etapa',
-    titulo: 'CRM · Nueva etapa asignada',
-    mensaje: "Importadora del Golfo (COT-2026-0005) pasó de 'Cotizaciones de proveedor recibidas' a 'Cotización consolidada'",
-    cotizacionId: 'COT-2026-0005',
-    etapaAnterior: 'cotizaciones_recibidas',
-    etapaNueva: 'consolidada',
-    destinatarios: ['ventas'],
-    leida: false,
-    fecha: ago(45),
-  },
-  {
-    id: 'notif-mock-003',
-    tipo: 'cambio_etapa',
-    titulo: 'CRM · Nueva etapa asignada',
-    mensaje: "Industrias Metalúrgicas (COT-2026-0003) pasó de 'Solicitado a Pricing' a 'Pricing — Solicitando proveedores'",
-    cotizacionId: 'COT-2026-0003',
-    etapaAnterior: 'solicitado_pricing',
-    etapaNueva: 'pricing_solicitando',
-    destinatarios: ['pricing'],
-    leida: true,
-    fecha: ago(130),
-  },
-  {
-    id: 'notif-mock-004',
-    tipo: 'cambio_etapa',
-    titulo: 'CRM · Nueva etapa asignada',
-    mensaje: "Electrodomésticos Premium (COT-2026-0007) pasó de 'Enviada al cliente' a 'En negociación'",
-    cotizacionId: 'COT-2026-0007',
-    etapaAnterior: 'enviada_cliente',
-    etapaNueva: 'negociacion',
-    destinatarios: ['ventas'],
-    leida: false,
-    fecha: ago(60 * 6),
-  },
-];
+/**
+ * Sin notificaciones de ejemplo (Bloque 6, 25-sep-2026).
+ *
+ * Eran cuatro `notif-mock-*` de cotizaciones de demostración y TODO el
+ * equipo de Vermur las veía en la campanita, en producción, desde el primer
+ * día. La lista local arranca vacía: lo que se vea en la campanita ocurrió
+ * de verdad.
+ *
+ * ⚠️ Las notificaciones por ROL siguen viviendo solo en memoria del
+ * navegador que las crea (§6): con la lista vacía, la campanita queda en
+ * blanco hasta que persistan. Es lo correcto —mejor vacía que mintiendo— y
+ * se resuelve con Usuarios y roles.
+ */
+export const INITIAL_NOTIFICATIONS: Notificacion[] = [];
