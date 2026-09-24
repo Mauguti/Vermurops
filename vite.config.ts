@@ -11,6 +11,8 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    // Los tests de reglas necesitan emuladores: van con `npm run test:reglas`.
+    test: { exclude: ['tests/reglas/**', 'node_modules/**', 'tests/e2e/**'] },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
