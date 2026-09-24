@@ -13,6 +13,7 @@
  */
 
 import { KanbanQuote, PipelineStageId } from '../components/quotes/QuotesData';
+import { razonSinCliente } from './frenoCliente';
 import type { UserRole } from '../auth/users';
 import { evaluarProntitud, resumenFaltantes, serviciosSinLineas } from './prontitudCotizacion';
 
@@ -179,6 +180,8 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
       // depender de Ventas para cerrarlas. Corregido el 28-ago-2026.
       hacia: 'ganada',
       roles: ['ventas', 'pricing', 'admin'],
+      // Bloque 2a: sin cliente vinculado no se gana. Sin salto para nadie.
+      validar: razonSinCliente,
     },
     {
       hacia: 'perdida',
@@ -199,6 +202,8 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
       // depender de Ventas para cerrarlas. Corregido el 28-ago-2026.
       hacia: 'ganada',
       roles: ['ventas', 'pricing', 'admin'],
+      // Bloque 2a: sin cliente vinculado no se gana. Sin salto para nadie.
+      validar: razonSinCliente,
     },
     {
       hacia: 'perdida',
@@ -283,4 +288,23 @@ export function transicionesDisponibles(
 export function rolesQuePueden(desde: PipelineStageId, hacia: PipelineStageId): Rol[] {
   const def = (TRANSITIONS[desde] ?? []).find(t => t.hacia === hacia);
   return def ? [...def.roles] : [];
+}
+
+/**
+ * Todas las salidas de una etapa para un rol, con su veredicto. Para el
+ * selector de etapa (Bloque 2a): una transición que el rol SÍ tiene pero la
+ * cotización no cumple se muestra deshabilitada con la razón, en vez de
+ * esconderse en silencio.
+ */
+export function salidasPara(
+  desde: PipelineStageId,
+  rol: Rol,
+  quote: KanbanQuote,
+): { hacia: PipelineStageId; ok: boolean; razon: string | null }[] {
+  return (TRANSITIONS[desde] ?? [])
+    .filter(def => def.roles.includes(rol))
+    .map(def => {
+      const r = puedeTransicionarA(desde, def.hacia, rol, quote);
+      return { hacia: def.hacia, ok: r.ok, razon: r.ok ? null : (r.razon ?? null) };
+    });
 }

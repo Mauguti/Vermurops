@@ -953,6 +953,15 @@ Es el mismo agujero de «las reglas no distinguen roles» de arriba, en su
 caso más concreto. Hay que llevarlos a reglas antes de abrir más usuarios.
 Anotado 25-sep-2026, sin arreglar.
 
+**Las notificaciones por ROL no llegan a nadie más.** `agregarNotificacion`
+solo escribe en Firestore las que traen `destinatarioId` (chat, por uid);
+las de `destinatarios: [rol]` —cambio de etapa, y cualquier «avisar a
+Administración»— se quedan en memoria del navegador que las crea, y las
+reglas de `notificaciones` solo dejan leer las propias por uid. Avisar a un
+área exige documentos por uid (no hay directorio de usuarios) o una consulta
+por rol con cambio de reglas. Por eso «Pedir alta a Administración» quedó
+fuera del Bloque 2a. Anotado 25-sep-2026, sin arreglar.
+
 **Roles hardcodeados.**
 `getRolByEmail` en `AuthContext.tsx` tiene los correos del equipo. Se elimina cuando GU
 implemente custom claims.

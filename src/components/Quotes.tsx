@@ -642,9 +642,20 @@ export default function Quotes() {
     const folio = await generateFolio();
     const fechaActual = new Date().toISOString().slice(0, 16).replace('T', ' ');
 
+    /*
+     * Bloque 2a (25-sep-2026): si la empresa se eligió de «Clientes
+     * existentes», la cotización nace YA vinculada. Antes el formulario
+     * nunca escribía clienteId, ni eligiendo cliente, y con el freno «sin
+     * cliente vinculado» ninguna cotización nueva habría podido ganarse sin
+     * volver a vincularlo a mano en la ficha.
+     */
+    const [tipoOrigen, idOrigen] = formProspectoOrigenId.split(':');
+    const clienteElegidoId = tipoOrigen === 'cliente' && idOrigen ? idOrigen : null;
+
     const newQuote: KanbanQuote = {
       id: folio,
       etapa: stage,
+      ...(clienteElegidoId ? { clienteId: clienteElegidoId } : {}),
       prospecto: {
         empresa: formEmpresa,
         contacto: formContacto || 'Por definir',
