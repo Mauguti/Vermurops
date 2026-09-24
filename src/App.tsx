@@ -9,6 +9,8 @@ import { NotificationsProvider, useNotifications } from './notifications/Notific
 import { tiempoRelativo } from './notifications/notificationsStore';
 import { NotifCard } from './pages/Notificaciones';
 import LoginPage from './components/Login';
+import { SolicitarRecuperacion, RestablecerContrasena } from './components/RecuperarContrasena';
+import { leerAccionDeUrl } from './lib/recuperarContrasena';
 import Sidebar from './components/Sidebar';
 import { NavegacionProvider } from './navegacion/NavegacionContext';
 import EmuladorBadge from './components/ui/EmuladorBadge';
@@ -387,18 +389,48 @@ function AppShell() {
 // ─── Root with auth flow ──────────────────────────────────────────────────────
 function Root() {
   const { user } = useAuth();
-  const [showLanding, setShowLanding] = useState(true);
+  // El enlace del correo de «restablecer contraseña» trae ?mode=resetPassword
+  // &oobCode=… y manda a esa pantalla antes que a cualquier otra, con o sin
+  // sesión: quien lo abre viene a cambiarla.
+  const [accion] = useState(() => leerAccionDeUrl(window.location.search));
+  const [pantalla, setPantalla] = useState<'landing' | 'login' | 'recuperar' | 'restablecer'>(
+    accion ? 'restablecer' : 'landing',
+  );
+  const [correoLogin, setCorreoLogin] = useState('');
+  const [avisoLogin, setAvisoLogin] = useState('');
+
+  if (pantalla === 'restablecer' && accion) {
+    return (
+      <RestablecerContrasena
+        oobCode={accion.oobCode}
+        onTerminado={(correo) => {
+          // Limpia el código de la URL: recargar no debe volver a la pantalla.
+          window.history.replaceState(null, '', window.location.pathname);
+          setCorreoLogin(correo);
+          setAvisoLogin(correo ? 'Tu contraseña cambió. Entra con la nueva.' : '');
+          setPantalla('login');
+        }}
+      />
+    );
+  }
 
   if (user) return <AppShell />;
 
-  if (showLanding) {
-    return <LandingPage onShowLogin={() => setShowLanding(false)} />;
+  if (pantalla === 'recuperar') {
+    return <SolicitarRecuperacion correoInicial={correoLogin} onVolver={() => setPantalla('login')} />;
+  }
+
+  if (pantalla === 'landing') {
+    return <LandingPage onShowLogin={() => setPantalla('login')} />;
   }
 
   return (
     <LoginPage
       onLoginSuccess={() => { /* user state updates reactively via AuthContext */ }}
-      onBack={() => setShowLanding(true)}
+      onBack={() => setPantalla('landing')}
+      onOlvideContrasena={(correo) => { setCorreoLogin(correo); setPantalla('recuperar'); }}
+      correoInicial={correoLogin}
+      aviso={avisoLogin}
     />
   );
 }
