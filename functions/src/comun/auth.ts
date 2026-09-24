@@ -16,11 +16,26 @@ import type { Request } from 'firebase-functions/v2/https';
 
 export type UserRole = 'ventas' | 'pricing' | 'operaciones' | 'administracion' | 'admin';
 
+/**
+ * ⚠️ SOLO el equipo real de Vermur (Bloque 8, 25-sep-2026).
+ *
+ * Aquí estaban también las cuentas de prueba —admin@, pricing@, ventas@,
+ * operaciones@— que el cliente mete SOLO cuando corre contra emuladores
+ * (`USANDO_EMULADORES` en src/auth/AuthContext.tsx). Estas Functions corren
+ * siempre contra producción, así que valían ahí: quien pudiera crear
+ * `admin@vermur.com` en el Auth de producción obtenía capacidad `admin` en
+ * el clasificador y el extractor. Y el registro público estaba ABIERTO, así
+ * que crear esa cuenta no requería acceso a la consola.
+ *
+ * Las Functions no tienen emuladores en este proyecto; si algún día los
+ * tienen, las cuentas de prueba entran bajo una guardia de entorno
+ * explícita, nunca sueltas en el mapa.
+ *
+ * Un correo fuera de este mapa cae al fallback de MENOR alcance, igual que
+ * en el cliente: un correo desconocido no puede convertirse en un ascenso.
+ * Todo esto desaparece cuando Usuarios y roles ponga el rol en el token.
+ */
 const ROL_POR_EMAIL: Record<string, UserRole> = {
-  'admin@vermur.com': 'admin',
-  'pricing@vermur.com': 'pricing',
-  'ventas@vermur.com': 'ventas',
-  'operaciones@vermur.com': 'operaciones',
   'itzel.laurean@vermur.com': 'ventas',
   'nohema.sosa@vermur.com': 'pricing',
   'julio.gutierrez@vermur.com': 'administracion',
@@ -28,6 +43,13 @@ const ROL_POR_EMAIL: Record<string, UserRole> = {
   'gabriela.huerta@vermur.com': 'admin',
   'luis.renteria@vermur.com': 'admin',
 };
+
+/**
+ * Rol de un correo que no está en el mapa: el de MENOR alcance. Ninguna de
+ * sus capacidades habilita un flujo de n8n, así que un desconocido no puede
+ * disparar consumo de IA a costa de Vermur.
+ */
+const ROL_FALLBACK: UserRole = 'ventas';
 
 /** Capacidades por rol. Espejo reducido de src/auth/permisos.ts. */
 const CAPACIDADES: Record<UserRole, string[]> = {
@@ -77,7 +99,7 @@ export async function verificarUsuario(req: Request): Promise<UsuarioVerificado>
   const email = (decoded.email ?? '').toLowerCase().trim();
   if (!email) throw new ErrorAuth(401, 'El token no trae correo.');
 
-  return { uid: decoded.uid, email, rol: ROL_POR_EMAIL[email] ?? 'ventas' };
+  return { uid: decoded.uid, email, rol: ROL_POR_EMAIL[email] ?? ROL_FALLBACK };
 }
 
 /** Lanza si el usuario no tiene la capacidad. */
