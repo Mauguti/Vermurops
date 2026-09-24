@@ -1195,8 +1195,9 @@ importacionesTarifas borradores de la carga con IA · respuesta cruda de n8n
 **Storage:** `tarifarios/{año}/{mes}/` — los documentos de los que salen las
 tarifas. Máximo 10 MB, sin sobrescribir ni borrar.
 
-**Cloud Functions** (`functions/`, us-central1): `extraerTarifas` es el proxy
-hacia n8n. Estructurada para varias — Gestión de Usuarios reutilizará
+**Cloud Functions** (`functions/`, us-central1, **Node 22**,
+firebase-functions 7 / firebase-admin 14 desde el 26-sep-2026):
+`extraerTarifas` es el proxy hacia n8n. Estructurada para varias — Gestión de Usuarios reutilizará
 `comun/auth.ts`.
 
 **Convenciones:**
