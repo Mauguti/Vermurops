@@ -1,0 +1,231 @@
+{
+  "name": "Generar PDF de cotización",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generar-pdf-cotizacion",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "96b68f74-24f7-4491-a3eb-7691253a0eea",
+      "name": "Recibe cotización",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        -48
+      ],
+      "webhookId": "vermur-pdf-cotizacion"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\n\nconst esc = s => String(s ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst num = n => new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);\n\nconst idioma = (body.idioma === 'en') ? 'en' : 'es';\n\nconst T = {\n  es: {\n    titulo: 'COTIZACIÓN', folio: 'Folio', fecha: 'Fecha', cliente: 'Cliente',\n    atencion: 'Atención', vigencia: 'Vigencia', ruta: 'Ruta', modalidad: 'Modalidad',\n    incoterm: 'Incoterm', mercancia: 'Mercancía', carga: 'Detalle de la carga',\n    concepto: 'Concepto', importe: 'Importe', subtotal: 'Subtotal', total: 'Total',\n    notas: 'Notas y condiciones', sinVigencia: 'Sujeta a confirmación',\n    piePagina: 'Esta cotización no incluye cargos que surjan por causas ajenas a lo aquí descrito.',\n    contacto: 'Contacto'\n  },\n  en: {\n    titulo: 'QUOTATION', folio: 'Reference', fecha: 'Date', cliente: 'Client',\n    atencion: 'Attention', vigencia: 'Validity', ruta: 'Route', modalidad: 'Mode',\n    incoterm: 'Incoterm', mercancia: 'Commodity', carga: 'Cargo details',\n    concepto: 'Description', importe: 'Amount', subtotal: 'Subtotal', total: 'Total',\n    notas: 'Notes and conditions', sinVigencia: 'Subject to confirmation',\n    piePagina: 'This quotation does not include charges arising from causes other than those described herein.',\n    contacto: 'Contact'\n  }\n}[idioma];\n\nconst lineas = Array.isArray(body.lineas) ? body.lineas : [];\nconst porMoneda = {};\nfor (const l of lineas) {\n  const m = l.moneda || 'USD';\n  if (!porMoneda[m]) porMoneda[m] = { lineas: [], total: 0 };\n  porMoneda[m].lineas.push(l);\n  porMoneda[m].total += Number(l.venta) || 0;\n}\nconst monedas = Object.keys(porMoneda);\nconst filas = monedas.map(m => {\n  const g = porMoneda[m];\n  const renglones = g.lineas.map(l => `\n    <tr>\n      <td class=\"concepto\">${esc(l.concepto)}${l.detalle ? `<span class=\"detalle\">${esc(l.detalle)}</span>` : ''}</td>\n      <td class=\"importe\">${num(l.venta)}</td>\n    </tr>`).join('');\n  return `\n    <table class=\"conceptos\">\n      <thead>\n        <tr>\n          <th>${T.concepto}</th>\n          <th class=\"importe\">${T.importe} ${esc(m)}</th>\n        </tr>\n      </thead>\n      <tbody>${renglones}</tbody>\n      <tfoot>\n        <tr>\n          <td class=\"total-label\">${T.total} ${esc(m)}</td>\n          <td class=\"total-monto\">${num(g.total)}</td>\n        </tr>\n      </tfoot>\n    </table>`;\n}).join('');\n\nconst carga = body.carga || {};\nconst detallesCarga = [];\nif (carga.tipo) detallesCarga.push(['Tipo', carga.tipo.toUpperCase()]);\nif (carga.contenedores) detallesCarga.push(['Contenedores', carga.contenedores]);\nif (carga.piezas) detallesCarga.push([idioma==='es'?'Piezas':'Pieces', carga.piezas]);\nif (carga.peso) detallesCarga.push([idioma==='es'?'Peso':'Weight', carga.peso + ' kg']);\nif (carga.volumen) detallesCarga.push([idioma==='es'?'Volumen':'Volume', carga.volumen + ' m³']);\nconst filasCarga = detallesCarga.map(([k,v]) => `<div class=\"dato\"><span class=\"k\">${esc(k)}</span><span class=\"v\">${esc(v)}</span></div>`).join('');\n\nconst html = `<!DOCTYPE html>\n<html lang=\"${idioma}\">\n<head>\n<meta charset=\"utf-8\">\n<style>\n  @page { size: letter; margin: 18mm 16mm; }\n  * { box-sizing: border-box; }\n  body { font-family: Helvetica, Arial, sans-serif; color: #1F2937; font-size: 10pt; margin: 0; }\n  .encabezado { display: flex; justify-content: space-between; align-items: flex-start;\n                border-bottom: 2px solid #E11D48; padding-bottom: 14px; margin-bottom: 20px; }\n  .marca { font-size: 24pt; font-weight: bold; letter-spacing: -0.5px; }\n  .marca .v { color: #E11D48; }\n  .marca .resto { color: #1F2937; }\n  .marca-sub { font-size: 8pt; color: #6B7280; margin-top: 2px; }\n  .doc { text-align: right; }\n  .doc-titulo { font-size: 15pt; font-weight: bold; color: #E11D48; letter-spacing: 1px; }\n  .doc-folio { font-family: 'Courier New', monospace; font-size: 11pt; margin-top: 4px; }\n  .doc-fecha { font-size: 9pt; color: #6B7280; margin-top: 2px; }\n  .vigencia { background: #FEF3C7; border-left: 3px solid #D97706; padding: 9px 13px;\n              margin-bottom: 18px; font-size: 10pt; }\n  .vigencia strong { color: #92400E; }\n  .bloques { display: flex; gap: 22px; margin-bottom: 20px; }\n  .bloque { flex: 1; }\n  .bloque h3 { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.6px;\n               color: #6B7280; margin: 0 0 7px 0; font-weight: bold; }\n  .dato { display: flex; gap: 8px; font-size: 9.5pt; margin-bottom: 3px; }\n  .dato .k { color: #6B7280; min-width: 78px; }\n  .dato .v { color: #1F2937; font-weight: 500; }\n  .cliente-nombre { font-size: 12pt; font-weight: bold; margin-bottom: 5px; }\n  table.conceptos { width: 100%; border-collapse: collapse; margin-bottom: 16px; }\n  table.conceptos th { background: #1F2937; color: #fff; padding: 8px 11px;\n                       font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.4px;\n                       text-align: left; }\n  table.conceptos th.importe, table.conceptos td.importe { text-align: right; }\n  table.conceptos td { padding: 8px 11px; border-bottom: 1px solid #E5E7EB; font-size: 10pt; }\n  table.conceptos td.concepto { color: #1F2937; }\n  table.conceptos .detalle { display: block; font-size: 8.5pt; color: #6B7280; margin-top: 2px; }\n  table.conceptos td.importe { font-variant-numeric: tabular-nums; }\n  table.conceptos tfoot td { border-top: 2px solid #1F2937; border-bottom: none;\n                             padding-top: 10px; font-weight: bold; font-size: 11pt; }\n  table.conceptos tfoot .total-monto { text-align: right; color: #E11D48;\n                                       font-variant-numeric: tabular-nums; }\n  .notas { margin-top: 22px; padding-top: 14px; border-top: 1px solid #E5E7EB; }\n  .notas h3 { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.6px;\n              color: #6B7280; margin: 0 0 6px 0; }\n  .notas p { font-size: 9pt; line-height: 1.5; color: #374151; margin: 0 0 5px 0;\n             white-space: pre-line; }\n  .pie { margin-top: 26px; padding-top: 11px; border-top: 1px solid #E5E7EB;\n         font-size: 8pt; color: #9CA3AF; line-height: 1.5; }\n  .pie .contacto { color: #6B7280; margin-bottom: 4px; }\n</style>\n</head>\n<body>\n  <div class=\"encabezado\">\n    <div>\n      <div class=\"marca\"><span class=\"v\">Vermur</span><span class=\"resto\">Ops</span></div>\n      <div class=\"marca-sub\">Importaciones y Logística Vermur, S. de R.L. de C.V.</div>\n    </div>\n    <div class=\"doc\">\n      <div class=\"doc-titulo\">${T.titulo}</div>\n      <div class=\"doc-folio\">${esc(body.folio || '')}</div>\n      <div class=\"doc-fecha\">${esc(body.fecha || new Date().toLocaleDateString(idioma === 'es' ? 'es-MX' : 'en-US'))}</div>\n    </div>\n  </div>\n  <div class=\"vigencia\">\n    <strong>${T.vigencia}:</strong> ${esc(body.vigencia || T.sinVigencia)}\n  </div>\n  <div class=\"bloques\">\n    <div class=\"bloque\">\n      <h3>${T.cliente}</h3>\n      <div class=\"cliente-nombre\">${esc(body.cliente?.nombre || '')}</div>\n      ${body.cliente?.contacto ? `<div class=\"dato\"><span class=\"k\">${T.atencion}</span><span class=\"v\">${esc(body.cliente.contacto)}</span></div>` : ''}\n      ${body.cliente?.correo ? `<div class=\"dato\"><span class=\"k\">Email</span><span class=\"v\">${esc(body.cliente.correo)}</span></div>` : ''}\n    </div>\n    <div class=\"bloque\">\n      <h3>${T.carga}</h3>\n      ${body.modalidad ? `<div class=\"dato\"><span class=\"k\">${T.modalidad}</span><span class=\"v\">${esc(body.modalidad)}</span></div>` : ''}\n      ${body.ruta ? `<div class=\"dato\"><span class=\"k\">${T.ruta}</span><span class=\"v\">${esc(body.ruta)}</span></div>` : ''}\n      ${body.incoterm ? `<div class=\"dato\"><span class=\"k\">${T.incoterm}</span><span class=\"v\">${esc(body.incoterm)}</span></div>` : ''}\n      ${body.mercancia ? `<div class=\"dato\"><span class=\"k\">${T.mercancia}</span><span class=\"v\">${esc(body.mercancia)}</span></div>` : ''}\n      ${filasCarga}\n    </div>\n  </div>\n  ${filas}\n  ${body.notas ? `<div class=\"notas\"><h3>${T.notas}</h3><p>${esc(body.notas)}</p></div>` : ''}\n  <div class=\"pie\">\n    ${body.contacto ? `<div class=\"contacto\">${T.contacto}: ${esc(body.contacto)}</div>` : ''}\n    ${T.piePagina}\n  </div>\n</body>\n</html>`;\n\n// ── El archivo se arma AQUÍ, en binario, con el HTML en UTF-8 (24-sep-2026) ──\n// Antes lo hacía «HTML a archivo» (Convert to File · Move Base64 String to\n// File), que espera BASE64 en la propiedad y recibía HTML en texto plano:\n// decodificaba 14 bytes de basura y Gotenberg pintaba eso. El PDF salía\n// siempre de 7,883 bytes con una sola línea ilegible.\n// Gotenberg exige que el archivo se llame index.html; la propiedad binaria\n// se llama «archivo» (sin punto: n8n lee «a.b» como ruta anidada).\nconst archivo = await this.helpers.prepareBinaryData(Buffer.from(html, 'utf8'), 'index.html', 'text/html');\nreturn [{\n  json: { nombreArchivo: `${body.folio || 'cotizacion'}.pdf`, folio: body.folio || '', bytesHtml: Buffer.byteLength(html, 'utf8') },\n  binary: { archivo },\n}];"
+      },
+      "id": "f95290c3-ae4c-4b88-9c88-fdac82eb1a6a",
+      "name": "Arma el HTML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        -48
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://gotenberg:3000/forms/chromium/convert/html",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "files",
+              "inputDataFieldName": "archivo"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "pdf"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "d129cf17-3892-4c86-9c89-58cf0ec62506",
+      "name": "Gotenberg convierte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        432,
+        -48
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst nombre = $('Arma el HTML').first().json.nombreArchivo;\nconst bin = item.binary && item.binary.pdf;\nif (!bin) {\n  throw new Error('Gotenberg no devolvió el archivo PDF.');\n}\n// Un PDF válido empieza con «%PDF-». Si Gotenberg devolvió otra cosa, es\n// error, no archivo: que lo diga el flujo y no el navegador.\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'pdf');\nif (buffer.subarray(0, 5).toString('latin1') !== '%PDF-') {\n  throw new Error('Gotenberg devolvió algo que no es un PDF: ' + buffer.subarray(0, 40).toString('latin1'));\n}\nbin.fileName = nombre;\nbin.mimeType = 'application/pdf';\nreturn [{ json: { ok: true, nombreArchivo: nombre, folio: $('Arma el HTML').first().json.folio, bytes: buffer.length }, binary: { pdf: bin } }];"
+      },
+      "id": "26e2b4e6-167c-423a-9c5e-b5ca21aa99e1",
+      "name": "Prepara respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        -48
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "binary",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/pdf"
+              }
+            ]
+          }
+        }
+      },
+      "id": "e9b16794-10cb-46bb-b673-420c550c1432",
+      "name": "Devuelve el PDF",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        912,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Rama de error: Gotenberg falló o devolvió algo que no es PDF. Antes el\n// webhook no respondía y la Function esperaba hasta el timeout. Se contesta\n// un JSON que el modal puede mostrar; el detalle técnico queda en el log\n// de la ejecución de n8n.\nconst item = $input.first();\nconst detalle = (item.json && (item.json.error && (item.json.error.message || item.json.error))) || item.json?.message || 'sin detalle';\nreturn [{ json: {\n  ok: false,\n  error: 'El generador de PDF falló al armar el documento. Vuelve a intentarlo; si se repite, avisa a sistemas.',\n  detalle: String(detalle).slice(0, 500),\n} }];"
+      },
+      "id": "5a1c9e0a-7b3d-4c2e-9f1a-2d6b8e4c7a10",
+      "name": "Arma el error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 502,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "8c4f2b6d-1e9a-4d3c-8b7f-5a2e9c1d4f60",
+      "name": "Devuelve el error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        912,
+        176
+      ]
+    }
+  ],
+  "connections": {
+    "Recibe cotización": {
+      "main": [
+        [
+          {
+            "node": "Arma el HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Arma el HTML": {
+      "main": [
+        [
+          {
+            "node": "Gotenberg convierte",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Arma el error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gotenberg convierte": {
+      "main": [
+        [
+          {
+            "node": "Prepara respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Arma el error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara respuesta": {
+      "main": [
+        [
+          {
+            "node": "Devuelve el PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Arma el error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Arma el error": {
+      "main": [
+        [
+          {
+            "node": "Devuelve el error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "f3024ab9024330c239d0563c9e57f3a123a82a94323514320004223dc0c45dd8"
+  }
+}

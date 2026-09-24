@@ -317,6 +317,12 @@ export interface ServicioSolicitado {
   carga?: CargaSolicitada;
   /** Requerimientos que señaló Ventas (registro de lo pedido; ver el tipo). */
   conceptosRequeridos?: ConceptoRequerido[];
+  /**
+   * Texto libre de la operación (Fase A, 24-sep-2026): lo que antes eran
+   * «requerimientos especiales», FTL/LTL y estibable del modal legacy.
+   * Aditivo. Si Gaby los usa para filtrar, se promueven a campos.
+   */
+  notasOperativas?: string;
 
   // ── Campos condicionales de embarque (E4 — modelo Luis solicitudes) ─────
   // ⚠️ @deprecated desde el rediseño: `carga` los supersede. Se conservan

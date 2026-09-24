@@ -117,8 +117,8 @@ export default function TablaConceptos({
             {ordenadas.length} concepto{ordenadas.length !== 1 ? 's' : ''}
           </span>
         </div>
-        {/* «Datos del embarque» era un botón por tarjeta; ahora uno por
-            servicio, aquí, porque tráfico y ruta viven en el SERVICIO. */}
+        {/* «Datos de la operación»: tráfico, ruta y carga viven en Información
+            (Fase A, 24-sep-2026). El chip solo lleva ahí. */}
         {editable && (
           <div className="flex items-center gap-1.5 flex-wrap justify-end">
             {servicios.map(s => (
@@ -126,7 +126,7 @@ export default function TablaConceptos({
                 key={s.id}
                 onClick={() => onDatosEmbarque(s.id)}
                 className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-400 hover:text-[#E11D48] px-2 py-1 rounded border border-gray-150 transition-colors"
-                title={`Ruta, tráfico e información que el embarque de ${s.etiqueta} necesita`}
+                title={`Ruta, tráfico y carga de ${s.etiqueta}: se editan en Información`}
               >
                 <Settings2 className="w-3 h-3" /> {s.etiqueta}
               </button>

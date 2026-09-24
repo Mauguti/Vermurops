@@ -13,7 +13,20 @@ Plataforma web que reemplaza **Magaya** (software de logística internacional y 
 **Stack:** React + Vite + TypeScript + Firebase (Auth, Firestore, Hosting, Functions)
 **Proyecto Firebase:** `vermur-logistics-app` (plan Blaze)
 **Producción:** https://vermur-logistics-app.web.app
-**Local:** `npm run dev` → localhost:3000
+**Local contra producción:** `npm run dev` → localhost:3000 (escribe en la base real, ver §6)
+**Local contra emuladores (validar sin tocar producción):**
+
+```bash
+./scripts/dev-emuladores.sh
+```
+
+Levanta Auth + Firestore + Storage, siembra las cuentas y sirve la app en
+**http://localhost:3100**. Siempre arranca limpio (apaga lo que haya en los
+puertos). Cuentas: `ventas@vermur.com`, `pricing@vermur.com`,
+`operaciones@vermur.com`, `administracion@vermur.com`, `admin@vermur.com`;
+contraseña `123456`. Los datos de ejemplo (COT-2026-0001…0008) los siembra
+la app sola al entrar por primera vez. Ctrl+C apaga todo. Si el trabajo
+está en un worktree, correrlo DESDE el worktree: sirve ese checkout.
 **Identidad:** rojo `#E11D48`, dark `#1F2937`
 
 **El equipo de Vermur ya está usando la plataforma en producción.** Cualquier cambio que se
@@ -693,11 +706,66 @@ principal a la derecha y, si no se puede avanzar, en una línea qué falta.
 16 px. Los formularios que quieren estar centrados lo dicen ellos
 (`max-w-3xl mx-auto` en Información).
 
+**Bloque 0 (24-sep-2026): ninguna línea nace vacía.** «Agregar concepto» en
+la tabla y en la comparativa abría una línea sin nombre que el autoguardado
+escribía al instante; abandonarla dejaba un «(sin nombre)» que bloquea
+«Marcar ganada». Ahora el renglón es un borrador local del componente y la
+línea existe solo al elegir el concepto del catálogo (`autoAbrir` en
+`ConceptoSelector`). Las vacías que ya existan en producción las lista
+`scripts/auditarServiciosPorCotizacion.ts`; borrarlas es decisión de Mau.
+
+**Fase A (24-sep-2026): la operación se edita en Información, sin modal.**
+El modal «Datos del embarque» editaba los campos legacy E4 y no leía la
+carga tipada que captura la solicitud: lo que Ventas capturó no se podía
+corregir en ninguna parte. Ahora Información tiene la sección «Operación»
+(`components/quotes/OperacionServicio.tsx`, lógica en
+`lib/operacionServicio.ts`): tráfico, ubicación, aduanas, embarque propio,
+el MISMO `FormCargaServicio` de la solicitud editando `servicio.carga`
+(ruta con puertos, incoterm, carga por modalidad, descripción y detalle de
+mercancía), y `notasOperativas` (campo nuevo, texto libre).
+  - Legacy: se lee con `cargaDesdeLegacy`; lo que la carga tipada no
+    representa (`fcl_reqs`, food grade, FTL/LTL, medidas…) se enseña como
+    «Del registro anterior», sin editor. Nada se reescribe hasta editar.
+  - Quién edita (`puedeEditarOperacion`): Ventas en `solicitud_cliente`;
+    Pricing y Admin hasta que se congele. Los demás leen.
+  - Toda edición después de «A Pricing» deja UNA entrada en Historial /
+    Notas («Datos de la operación modificados: se cambió la carga y la
+    ruta»), acumulando las del mismo autor en diez minutos.
+  - Los requeridos de Ventas no se editan en la ficha: ya son líneas.
+  - En Servicios queda «Lo que pidió el cliente» en lectura.
+
 **Errores del generador de PDF.** El proxy (`functions/src/comun/proxyN8n.ts`)
 nombra al agente según el flujo —«el generador de PDF» o «el clasificador»—
 y guarda hasta 4,000 caracteres de la respuesta de n8n con url, status y
 content-type. El 404 de n8n significa **flujo no activado** y el mensaje lo
 dice; fue la causa del 502 del 24-sep (`generar-pdf-cotizacion` inactivo).
+El binario va de punta a punta sin pasar por `text()`; el proxy registra
+los primeros bytes de lo que n8n entregó y rechaza con 502 lo que no
+empiece con `%PDF-`.
+
+**El PDF «roto» (24-sep-2026) era el flujo de n8n, no el proxy.** El nodo
+«HTML a archivo» decodificaba el HTML como base64: 14 bytes de basura, PDF
+de 7,883 bytes con una línea ilegible. Diagnóstico, reproducción con
+Gotenberg local y el JSON corregido en `docs/n8n/`. **Los flujos de n8n se
+versionan ahí**; el que manda es el de n8n.vermur.mx y lo importa Mau.
+
+## 4.17 Restablecer contraseña (24-sep-2026)
+
+«¿Olvidaste tu contraseña?» en el login → pantalla que pide el correo y
+dispara `sendPasswordResetEmail` (`components/RecuperarContrasena.tsx`,
+mensajes en `lib/recuperarContrasena.ts`, nunca un código crudo). El correo
+es el de Firebase por defecto; `auth.languageCode = 'es'` lo manda en
+español. La URL de regreso es el origen de la página (producción está
+autorizada por Hosting); si Firebase la rechazara, se reintenta sin ella.
+  - El enlace del correo lo atiende la página de Firebase (en español) por
+    defecto. Si en la consola se apunta la URL de acción de la plantilla a
+    la app, `?mode=resetPassword&oobCode=…` abre la pantalla propia:
+    verifica el código (vencido / ya usado, en español), pide la
+    contraseña nueva y regresa al login con el correo precargado.
+  - El éxito es neutro («si ese correo tiene cuenta…»): Firebase puede
+    tener activa la protección contra enumeración de correos.
+  - Contra emuladores, el «correo» se lee en
+    `GET 127.0.0.1:9099/emulator/v1/projects/vermur-logistics-app/oobCodes`.
 
 ## 4.17 Restablecer contraseña (24-sep-2026)
 

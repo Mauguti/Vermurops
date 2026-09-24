@@ -20,7 +20,10 @@ import { calcLinea } from '../../lib/cotizacionCalculator';
 import { puedeTransicionarA, transicionesDisponibles, type Rol } from '../../lib/stateMachine';
 import { useTarifas } from '../../hooks/useTarifas';
 import { useConceptos } from '../../hooks/useConceptos';
-import { ServicioSection } from './ServicioSection';
+import OperacionServicio from './OperacionServicio';
+import {
+  puedeEditarOperacion, camposOperacionCambiados, anotarCambioOperacion,
+} from '../../lib/operacionServicio';
 import TarifaPanel from '../tarifas/TarifaPanel';
 import { resolverMonto, fmtPrecio } from '../tarifas/tarifaMatching';
 import { useProveedores } from '../../hooks/useProveedores';
@@ -190,7 +193,6 @@ export default function FichaCotizacion({
   const [toastLocal, setToastLocal] = useState<string | null>(null);
   const [cargandoTarifario, setCargandoTarifario] = useState(false);
   /** Servicio cuyos datos de embarque se están editando. */
-  const [datosEmbarqueDe, setDatosEmbarqueDe] = useState<string | null>(null);
   /** El catálogo de tarifas, colapsable — abierto por default: es el insumo. */
   const [catalogoAbierto, setCatalogoAbierto] = useState(true);
   const [extraccionPendiente, setExtraccionPendiente] =
@@ -350,6 +352,28 @@ export default function FichaCotizacion({
   };
 
   // ─── Handlers: servicios ─────────────────────────────────────────────────
+
+  /**
+   * Cambio de la operación desde Información (Fase A). Después de «A
+   * Pricing», deja constancia en Historial / Notas de qué cambió, para que
+   * Pricing vea si le cambiaron la mercancía a media cotización.
+   */
+  const handleCambioOperacion = (servicioId: string, nuevo: ServicioSolicitado) => {
+    const viejo = quote.servicios.find(sv => sv.id === servicioId);
+    if (!viejo) return;
+    let q: KanbanQuote = {
+      ...quote,
+      servicios: quote.servicios.map(sv => (sv.id === servicioId ? nuevo : sv)),
+      updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+    };
+    if (quote.etapa !== 'solicitud_cliente') {
+      q = anotarCambioOperacion(
+        q, camposOperacionCambiados(viejo, nuevo),
+        user?.nombre ?? user?.email ?? user?.uid ?? '', new Date().toISOString(),
+      );
+    }
+    onUpdateQuote(q);
+  };
 
   const handleUpdateServicio = (servicioId: string, updatedServicio: ServicioSolicitado) => {
     const fechaActual = new Date().toISOString().slice(0, 16).replace('T', ' ');
@@ -1503,7 +1527,7 @@ export default function FichaCotizacion({
               onAgregarLinea={handleAgregarLineaPlana}
               onCompararProveedor={handleCompararProveedor}
               onCambiarServicio={handleCambiarServicioDeLinea}
-              onDatosEmbarque={(servicioId) => setDatosEmbarqueDe(servicioId)}
+              onDatosEmbarque={() => { setActiveTab('info'); setShowLossReasonForm(false); }}
               onAgregarServicio={rolActivo !== 'ventas' && !bloqueada
                 ? () => setShowAddServicio(true)
                 : undefined}
@@ -1937,6 +1961,33 @@ export default function FichaCotizacion({
 
             {/* Total consolidado */}
             {renderConsolidadoPanel()}
+
+          {/* ── Operación (Fase A, 24-sep-2026) ───────────────────────────
+              Lo que antes vivía en el modal «Datos del embarque», editable
+              en línea y sobre la carga tipada. Sin modal. */}
+          <div className="space-y-4">
+            <h3 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-2 flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5" /> Operación
+              {!puedeEditarOperacion(rolActivo, quote.etapa, bloqueada) && (
+                <span className="ml-auto normal-case tracking-normal font-semibold text-gray-400">solo lectura</span>
+              )}
+            </h3>
+            {quote.servicios.length === 0 && (
+              <p className="text-[11px] text-gray-400">Esta cotización no tiene servicios.</p>
+            )}
+            {quote.servicios.map(srv => (
+              <div key={srv.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+                <OperacionServicio
+                  servicio={srv}
+                  editable={puedeEditarOperacion(rolActivo, quote.etapa, bloqueada)}
+                  puertos={puertos}
+                  conceptos={conceptosActivos}
+                  conTitulo={quote.servicios.length > 1}
+                  onCambio={nuevo => handleCambioOperacion(srv.id, nuevo)}
+                />
+              </div>
+            ))}
+          </div>
           </div>
         )}
 
@@ -2371,51 +2422,6 @@ export default function FichaCotizacion({
           }}
         />
       )}
-
-      {/* Datos que el embarque necesita —tráfico, ruta, FCL/LCL— y que la
-          tabla no cubre. Los conceptos se agregan SOLO en la tabla. */}
-      {datosEmbarqueDe && (() => {
-        const srv = quote.servicios.find(sv => sv.id === datosEmbarqueDe);
-        if (!srv) return null;
-        return (
-          <div
-            className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4"
-            onClick={() => setDatosEmbarqueDe(null)}
-          >
-            <div
-              className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto"
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="px-5 py-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50 sticky top-0 z-10">
-                <div>
-                  <h3 className="text-[14px] font-bold text-[#18181B]">Datos del embarque</h3>
-                  <p className="text-[11px] text-gray-400 capitalize">{srv.tipo}</p>
-                </div>
-                <button onClick={() => setDatosEmbarqueDe(null)} className="text-gray-400 hover:text-gray-600">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="p-4">
-                <ServicioSection
-                  soloDatosOperacion
-                  servicio={srv}
-                  rolActivo={rolActivo}
-                  onUpdateServicio={updated => handleUpdateServicio(srv.id, updated)}
-                  servicios={servicios}
-                  renderIcon={renderIcon}
-                  moneda={quote.moneda}
-                  diasCredito={clienteVinculado?.dias ?? 30}
-                  catalogoTarifas={catalogoTarifas}
-                  onCrearTarifaSpot={createTarifa}
-                  panelVisible={false}
-                  onComparativaToggle={handleComparativaToggle}
-                  conceptosActivos={conceptosActivos}
-                />
-              </div>
-            </div>
-          </div>
-        );
-      })()}
 
       <Toast mensaje={toastLocal} tipo="exito" onClose={() => setToastLocal(null)} />
     </FichaLayout>

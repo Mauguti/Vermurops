@@ -286,10 +286,15 @@ interface Props {
   onCambio: (d: DraftServicio) => void;
   /** El tráfico derivado del catálogo se declara arriba (nivel solicitud). */
   onTraficoDerivado: (t: 'importacion' | 'exportacion') => void;
+  /**
+   * En la ficha (Fase A) los requeridos ya se convirtieron en líneas de la
+   * tabla al crear la solicitud: editarlos aquí no crearía ninguna. Se ocultan.
+   */
+  sinRequeridos?: boolean;
 }
 
 export default function FormCargaServicio({
-  draft, puertos, conceptos, incoterms, onCambio, onTraficoDerivado,
+  draft, puertos, conceptos, incoterms, onCambio, onTraficoDerivado, sinRequeridos,
 }: Props) {
   const { carga } = draft;
   const modalidad = modalidadDeCarga(carga);
@@ -594,8 +599,10 @@ export default function FormCargaServicio({
       <BloqueMercancias mercancias={carga.mercancias ?? []}
         onCambio={m => setCarga({ ...carga, mercancias: m })} />
 
-      <BloqueRequeridos requeridos={draft.conceptosRequeridos} conceptos={conceptos}
-        onCambio={r => onCambio({ ...draft, conceptosRequeridos: r })} />
+      {!sinRequeridos && (
+        <BloqueRequeridos requeridos={draft.conceptosRequeridos} conceptos={conceptos}
+          onCambio={r => onCambio({ ...draft, conceptosRequeridos: r })} />
+      )}
     </div>
   );
 }
