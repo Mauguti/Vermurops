@@ -1061,6 +1061,19 @@ valida con `puedeTransicionarA` y muestra la razón cuando la tarjeta ya se
 arrastró; las columnas a las que no se puede mover deberían verse
 inalcanzables antes. Anotado 25-sep-2026.
 
+**🔴 Las cuentas de prueba tienen rol en el mapa de las Functions, sin
+guardia de entorno.** `src/auth/AuthContext.tsx` mete `admin@vermur.com`,
+`pricing@vermur.com`, etc. SOLO cuando `USANDO_EMULADORES`, y lo explica:
+«en producción, si estas cuentas existieran, caen al fallback de menor
+alcance». `functions/src/comun/auth.ts` las tiene en el mapa **sin esa
+condición**, y las Functions corren siempre contra producción. Si alguien
+crea `admin@vermur.com` en el Auth de producción, obtiene capacidad `admin`
+en `clasificarDocumento` y `extraerTarifas`. Los dos mapas están duplicados
+a propósito (el cliente no puede mandar su propio rol), pero divergieron.
+Se cierra con Usuarios y roles, que borra los dos mapas; mientras tanto,
+**no crear esas cuentas en producción**. Hallado 25-sep-2026 en el
+inventario de roles.
+
 **Roles hardcodeados.**
 `getRolByEmail` en `AuthContext.tsx` tiene los correos del equipo. Se elimina cuando GU
 implemente custom claims.
