@@ -108,10 +108,10 @@ export default function ModalAgregarAgente({
           {nombreLibre && !hayExacto && (
             <button
               onClick={() => onAgregar({ proveedorId: null, nombre: nombreLibre })}
-              className="w-full flex items-center gap-2 px-3 py-2.5 text-left border-t border-gray-100 hover:bg-[#E11D48]/5 transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-left border-t border-gray-100 hover:bg-primario/5 transition-colors"
             >
-              <Plus className="w-3.5 h-3.5 text-[#E11D48] shrink-0" />
-              <span className="text-[12px] text-[#E11D48] font-semibold">
+              <Plus className="w-3.5 h-3.5 text-primario shrink-0" />
+              <span className="text-[12px] text-primario font-semibold">
                 Usar «{nombreLibre}» como agente
               </span>
               <span className="text-[10px] text-gray-400 ml-auto shrink-0">sin dar de alta</span>
@@ -123,7 +123,7 @@ export default function ModalAgregarAgente({
           <div className="px-3 py-2.5 border-t border-gray-100 bg-gray-50/50 shrink-0">
             <button
               onClick={onAltaRapida}
-              className="text-[11px] font-semibold text-gray-500 hover:text-[#E11D48] transition-colors"
+              className="text-[11px] font-semibold text-gray-500 hover:text-primario transition-colors"
             >
               ¿No está? Dar de alta un proveedor nuevo
             </button>

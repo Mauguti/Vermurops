@@ -106,7 +106,7 @@ export default function SelectorProveedor({
         <span className="block text-[12px] text-gray-800 leading-tight truncate">{p.nombre}</span>
         {p.rfc && <span className="block text-[10px] text-gray-400">{p.rfc}</span>}
       </span>
-      {p.id === valorId && <Check className="w-3 h-3 text-[#E11D48] shrink-0 mt-[3px]" />}
+      {p.id === valorId && <Check className="w-3 h-3 text-primario shrink-0 mt-[3px]" />}
     </button>
   );
 
@@ -119,8 +119,8 @@ export default function SelectorProveedor({
         className={`w-full flex items-center justify-between gap-1 rounded border transition-colors text-left disabled:opacity-50 ${
           compacto ? 'px-2 py-1 text-[11px]' : 'px-2.5 py-1.5 text-[12px]'
         } ${seleccionado || nombreLibreActual
-          ? 'border-gray-200 bg-white text-gray-800 hover:border-[#E11D48]/50'
-          : 'border-dashed border-gray-300 bg-white text-gray-400 hover:border-[#E11D48] hover:text-[#E11D48]'}`}
+          ? 'border-gray-200 bg-white text-gray-800 hover:border-primario/50'
+          : 'border-dashed border-gray-300 bg-white text-gray-400 hover:border-primario hover:text-primario'}`}
       >
         <span className="truncate">{seleccionado?.nombre ?? nombreLibreActual ?? 'Seleccionar proveedor'}</span>
         <ChevronDown className="w-3 h-3 shrink-0 text-gray-400" />
@@ -180,9 +180,9 @@ export default function SelectorProveedor({
               <button
                 type="button"
                 onClick={() => { onNombreLibre(nombreLibre); setAbierto(false); setBusqueda(''); }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left border-t border-gray-100 hover:bg-[#E11D48]/5 transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-left border-t border-gray-100 hover:bg-primario/5 transition-colors"
               >
-                <span className="text-[11px] text-[#E11D48] font-semibold truncate">
+                <span className="text-[11px] text-primario font-semibold truncate">
                   Usar «{nombreLibre}»
                 </span>
                 <span className="text-[10px] text-gray-400 ml-auto shrink-0">sin dar de alta</span>

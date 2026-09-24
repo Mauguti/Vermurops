@@ -92,19 +92,19 @@ export default function ProximosPasos({
                 >
                   <span className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
                     enRojo ? 'bg-red-500 border-red-500 text-white'
-                    : hecho ? 'bg-[#E11D48] border-[#E11D48] text-white'
-                    : esActual ? 'bg-white border-[#E11D48] ring-2 ring-[#E11D48]/20'
+                    : hecho ? 'bg-primario border-primario text-white'
+                    : esActual ? 'bg-white border-primario ring-2 ring-primario/20'
                     : 'bg-white border-gray-300'}`}
                   >
                     {enRojo ? <X className="w-2.5 h-2.5" strokeWidth={3} />
                       : hecho ? <Check className="w-2.5 h-2.5" strokeWidth={3} />
-                      : esActual ? <span className="w-1.5 h-1.5 rounded-full bg-[#E11D48]" />
+                      : esActual ? <span className="w-1.5 h-1.5 rounded-full bg-primario" />
                       : null}
                   </span>
                   {label}
                 </span>
                 {!ultimo && (
-                  <span className={`flex-1 h-px mx-2 min-w-[12px] ${i < actual ? 'bg-[#E11D48]' : 'bg-gray-200'}`} />
+                  <span className={`flex-1 h-px mx-2 min-w-[12px] ${i < actual ? 'bg-primario' : 'bg-gray-200'}`} />
                 )}
               </li>
             );
@@ -126,7 +126,7 @@ export default function ProximosPasos({
             <span>{bloqueo.texto}</span>
             {bloqueo.acciones.map(a => (
               <button key={a.etiqueta} type="button" onClick={a.onClick}
-                className="text-[10px] font-bold uppercase tracking-wider text-[#E11D48] hover:underline">
+                className="text-[10px] font-bold uppercase tracking-wider text-primario hover:underline">
                 {a.etiqueta} →
               </button>
             ))}
@@ -146,7 +146,7 @@ export default function ProximosPasos({
             <button
               onClick={atras.onClick}
               title={`Devolver la cotización a «${atras.etiqueta}»`}
-              className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-500 hover:text-[#E11D48] hover:bg-[#E11D48]/5 rounded-lg transition-colors flex items-center gap-1.5"
+              className="px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-gray-500 hover:text-primario hover:bg-primario/5 rounded-lg transition-colors flex items-center gap-1.5"
             >
               <Undo2 className="w-3.5 h-3.5" /> Regresar a {atras.etiqueta}
             </button>
@@ -154,7 +154,7 @@ export default function ProximosPasos({
           {muestraBoton && paso.hacia && (
             <button
               onClick={() => onAvanzar(paso.hacia!)}
-              className="flex-1 md:flex-none justify-center px-4 py-2 bg-[#E11D48] hover:bg-[#BE123C] text-white text-[11px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-2 shadow-xs"
+              className="flex-1 md:flex-none justify-center px-4 py-2 bg-primario hover:bg-primario-hover text-white text-[11px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-2 shadow-xs"
             >
               {paso.hacia === 'ganada' ? <CheckCircle2 className="w-4 h-4" /> : <Send className="w-4 h-4" />}
               {paso.boton}

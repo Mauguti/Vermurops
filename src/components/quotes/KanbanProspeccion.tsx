@@ -13,7 +13,7 @@ const PROSPECT_STAGES = [
 ] as const;
 
 const ORIGEN_BADGES: Record<string, string> = {
-  referido: 'bg-[#E11D48]/10 text-[#BE123C] border-[#E11D48]/30',
+  referido: 'bg-primario/10 text-primario-hover border-primario/30',
   web: 'bg-blue-100 text-blue-700 border-blue-200',
   llamada: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   visita: 'bg-orange-100 text-orange-700 border-orange-200',
@@ -98,7 +98,7 @@ export default function KanbanProspeccion({
                 onDragLeave={handleDragLeave}
                 onDrop={e => handleDrop(e, stage.id)}
                 className={`w-[280px] rounded-xl border flex flex-col min-h-[520px] transition-all
-                  ${isDraggedOver ? 'border-[#E11D48] bg-[#E11D48]/5 ring-2 ring-[#E11D48]/10' : 'border-gray-200 bg-gray-50/50'}
+                  ${isDraggedOver ? 'border-primario bg-primario/5 ring-2 ring-primario/10' : 'border-gray-200 bg-gray-50/50'}
                 `}
               >
                 <div className={`p-3 border-t-4 ${stage.color} rounded-t-xl border-b border-gray-200 flex items-center justify-between`}>
@@ -113,10 +113,10 @@ export default function KanbanProspeccion({
                       draggable
                       onDragStart={e => handleDragStart(e, p.id)}
                       onClick={() => setSelectedProspecto(p)}
-                      className="bg-white p-3 rounded-xl border border-gray-200 hover:border-[#E11D48]/30 shadow-sm cursor-pointer active:cursor-grabbing group space-y-2 hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:-translate-y-[1px] transition-all"
+                      className="bg-white p-3 rounded-xl border border-gray-200 hover:border-primario/30 shadow-sm cursor-pointer active:cursor-grabbing group space-y-2 hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)] hover:-translate-y-[1px] transition-all"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-mono font-bold text-gray-400 group-hover:text-[#E11D48] transition-colors">{p.folio}</span>
+                        <span className="text-[9px] font-mono font-bold text-gray-400 group-hover:text-primario transition-colors">{p.folio}</span>
                         <span className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border ${ORIGEN_BADGES[p.origenLead] || ORIGEN_BADGES.otro}`}>
                           {p.origenLead}
                         </span>

@@ -21,7 +21,6 @@ import Bookings from './components/Bookings';
 import Pickups from './components/Pickups';
 import Shipments from './components/Shipments';
 import Finance from './components/Finance';
-import ClientPortal from './components/ClientPortal';
 import Clients from './components/Clients';
 import Reports from './components/Reports';
 import RatesManagement from './components/RatesManagement';
@@ -48,7 +47,7 @@ const ROLE_LABEL: Record<string, string> = {
 
 // Color del badge por rol (evita la cadena de ternarios en el markup).
 const ROLE_BADGE_STYLE: Record<string, { background: string; color: string }> = {
-  admin:          { background: '#FEE2E2', color: '#B91C1C' },
+  admin:          { background: 'var(--color-primario-suave)', color: 'var(--color-primario)' },
   administracion: { background: '#F0FDF4', color: '#15803D' },
   pricing:        { background: '#EFF6FF', color: '#1D4ED8' },
   operaciones:    { background: '#ECFDF5', color: '#047857' },
@@ -84,7 +83,7 @@ function NotifBadge({ count }: { count: number }) {
   if (count === 0) return null;
   return (
     <span
-      className="absolute -top-[5px] -right-[5px] min-w-[18px] h-[18px] rounded-full bg-[#E11D48] text-white text-[10px] font-black flex items-center justify-center px-[3px] leading-none pointer-events-none"
+      className="absolute -top-[5px] -right-[5px] min-w-[18px] h-[18px] rounded-full bg-primario text-white text-[10px] font-black flex items-center justify-center px-[3px] leading-none pointer-events-none"
       style={{ boxShadow: '0 0 0 2px #0A0A0C' }}
     >
       {count > 9 ? '9+' : count}
@@ -212,7 +211,7 @@ function UserMenu({ onNavigate }: { onNavigate: (view: string) => void }) {
       >
         <div
           className="w-[32px] h-[32px] rounded-full flex items-center justify-center text-[11px] font-black text-white shrink-0"
-          style={{ background: '#E11D48' }}
+          style={{ background: 'var(--color-primario)' }}
         >
           {user.avatar}
         </div>
@@ -250,7 +249,7 @@ function UserMenu({ onNavigate }: { onNavigate: (view: string) => void }) {
             <button
               id="user-menu-logout"
               onClick={() => { setOpen(false); logout(); }}
-              className="w-full flex items-center px-[16px] py-[9px] text-[13px] text-[#E11D48] hover:bg-[#FFF1F2] transition-colors gap-[10px]"
+              className="w-full flex items-center px-[16px] py-[9px] text-[13px] text-primario hover:bg-[#FFF1F2] transition-colors gap-[10px]"
             >
               <LogOut className="w-[15px] h-[15px]" />
               Cerrar sesión
@@ -266,7 +265,6 @@ function UserMenu({ onNavigate }: { onNavigate: (view: string) => void }) {
 function AppShell() {
   const { user, isAllowed } = useAuth();
   const [currentView, setCurrentView] = useState('dashboard');
-  const [showPortal, setShowPortal] = useState(false);
 
   // E9: seed de proveedores a Firestore en cualquier vista (no solo Clientes).
   useProveedores();
@@ -299,10 +297,6 @@ function AppShell() {
       setCurrentView('dashboard');
     }
   };
-
-  if (showPortal) {
-    return <ClientPortal onReturn={() => setShowPortal(false)} />;
-  }
 
   const renderContent = () => {
     if (currentView === 'notifications') {
@@ -337,14 +331,14 @@ function AppShell() {
 
       <div className="flex-1 md:ml-[240px] pb-20 md:pb-0 flex flex-col h-screen overflow-hidden">
         {/* ── Header ── */}
-        <header className="bg-surface-dark border-b border-surface-border h-[60px] flex items-center justify-between px-[32px] shrink-0 z-10 sticky top-0 text-text-inverse">
+        <header className="bg-shell border-b border-shell-border h-[60px] flex items-center justify-between px-[32px] shrink-0 z-10 sticky top-0 text-text-primary">
           <h1 className="text-[15px] font-medium tracking-tight hidden md:block">
             {VIEW_LABELS[currentView] ?? 'VermurOps'}
           </h1>
 
           {/* Mobile logo */}
           <div className="md:hidden flex items-center">
-            <div className="bg-white rounded py-1 px-2 flex items-center justify-center border border-surface-border">
+            <div className="flex items-center justify-center">
               <img
                 src="https://firebasestorage.googleapis.com/v0/b/digsol-academy.firebasestorage.app/o/LOGOTIPO%20(1).png?alt=media&token=702db209-5869-4471-acb6-ac7740e5453b"
                 alt="Vermur Logo"
@@ -355,14 +349,10 @@ function AppShell() {
 
           {/* Right side */}
           <div className="flex items-center space-x-[16px] text-[13px]">
-            {user?.rol === 'admin' && (
-              <button
-                onClick={() => setShowPortal(true)}
-                className="bg-brand text-text-inverse-primary px-[12px] py-[6px] rounded-[6px] font-semibold tracking-tight shadow-sm hover:brightness-110 transition hidden sm:block"
-              >
-                Portal del Cliente
-              </button>
-            )}
+            {/* Bloque 7: «Portal del Cliente» sale del encabezado. Debe ser un
+                ROL de usuario, no un botón que abre la vista del cliente dentro
+                de la sesión de admin; depende de Usuarios y roles y de reglas
+                por rol (ver §6). */}
             {/* Campana de notificaciones */}
             <NotificationsDropdown onNavigate={safeNavigate} />
             <UserMenu onNavigate={safeNavigate} />

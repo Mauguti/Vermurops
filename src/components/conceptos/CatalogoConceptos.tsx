@@ -113,13 +113,13 @@ export default function CatalogoConceptos() {
             value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
             placeholder="Buscar por nombre, id o cuenta contable…"
-            className="w-full pl-8 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-[12px] outline-none focus:border-[#E11D48]"
+            className="w-full pl-8 pr-3 py-2 bg-white border border-gray-200 rounded-lg text-[12px] outline-none focus:border-primario"
           />
         </div>
         <select
           value={categoria}
           onChange={e => setCategoria(e.target.value as CategoriaConcepto | '')}
-          className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-[12px] outline-none focus:border-[#E11D48]"
+          className="px-3 py-2 bg-white border border-gray-200 rounded-lg text-[12px] outline-none focus:border-primario"
         >
           <option value="">Todas las categorías</option>
           {CATEGORIAS.map(c => {
@@ -320,7 +320,7 @@ function DetalleConcepto({
               value={regla}
               onChange={e => setRegla(e.target.value as ReglaIVA)}
               disabled={!puedeEditar}
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-[#E11D48] disabled:text-gray-500"
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-primario disabled:text-gray-500"
             >
               {REGLAS.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
             </select>
@@ -373,24 +373,24 @@ function DetalleConcepto({
             <Campo rotulo="Clave producto SAT" ayuda="Obligatoria para timbrar (CFDI 4.0).">
               <input value={claveProducto} onChange={e => setClaveProducto(e.target.value)}
                 readOnly={!puedeEditar} placeholder="78101800"
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] font-mono outline-none focus:border-[#E11D48] read-only:text-gray-500" />
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] font-mono outline-none focus:border-primario read-only:text-gray-500" />
             </Campo>
             <Campo rotulo="Clave unidad SAT" ayuda="E48 = unidad de servicio, la más común.">
               <input value={claveUnidad} onChange={e => setClaveUnidad(e.target.value)}
                 readOnly={!puedeEditar} placeholder="E48"
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] font-mono outline-none focus:border-[#E11D48] read-only:text-gray-500" />
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] font-mono outline-none focus:border-primario read-only:text-gray-500" />
             </Campo>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <Campo rotulo="Cuenta contable" ayuda="Para la póliza del contador.">
               <input value={cuenta} onChange={e => setCuenta(e.target.value)}
                 readOnly={!puedeEditar}
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] font-mono outline-none focus:border-[#E11D48] read-only:text-gray-500" />
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] font-mono outline-none focus:border-primario read-only:text-gray-500" />
             </Campo>
             <Campo rotulo="Estado" ayuda="Baja lógica: nunca se borra.">
               <label className={`flex items-center gap-2 py-2 ${puedeEditar ? 'cursor-pointer' : ''}`}>
                 <input type="checkbox" checked={activo} disabled={!puedeEditar}
-                  onChange={e => setActivo(e.target.checked)} className="accent-[#E11D48]" />
+                  onChange={e => setActivo(e.target.checked)} className="accent-primario" />
                 <span className="text-[12px] text-gray-600">{activo ? 'Activo' : 'Inactivo'}</span>
               </label>
             </Campo>
@@ -426,7 +426,7 @@ function DetalleConcepto({
                 cuentaContable: cuenta.trim(),
                 activo,
               })}
-              className="px-4 py-2 bg-[#E11D48] hover:bg-[#BE123C] text-white text-[12px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5"
+              className="px-4 py-2 bg-primario hover:bg-primario-hover text-white text-[12px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5"
             >
               <Check className="w-3.5 h-3.5" /> Guardar
             </button>

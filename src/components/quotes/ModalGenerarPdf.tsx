@@ -45,7 +45,7 @@ export default function ModalGenerarPdf({ quote, generando, onGenerar, onCerrar 
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50">
           <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-[#E11D48]" />
+            <FileText className="w-4 h-4 text-primario" />
             <h3 className="text-[14px] font-bold text-[#18181B]">Generar PDF · {nombreArchivoPdf(quote, idioma)}</h3>
           </div>
           <button onClick={onCerrar} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar"><X className="w-4 h-4" /></button>
@@ -56,7 +56,7 @@ export default function ModalGenerarPdf({ quote, generando, onGenerar, onCerrar 
             <label className="block">
               <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Idioma</span>
               <select value={idioma} onChange={e => setIdioma(e.target.value as IdiomaPdf)} disabled={generando || !!listo}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold outline-none focus:border-[#E11D48] bg-white">
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold outline-none focus:border-primario bg-white">
                 <option value="es">Español</option>
                 <option value="en">English</option>
               </select>
@@ -64,7 +64,7 @@ export default function ModalGenerarPdf({ quote, generando, onGenerar, onCerrar 
             <label className="block">
               <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Vigencia</span>
               <input type="date" value={vigencia} onChange={e => setVigencia(e.target.value)} disabled={generando || !!listo}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48]" />
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario" />
               <span className="block text-[9px] text-gray-400 mt-0.5">Sugerida: la tarifa elegida más corta.</span>
             </label>
           </div>
@@ -73,7 +73,7 @@ export default function ModalGenerarPdf({ quote, generando, onGenerar, onCerrar 
             <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Notas para el cliente</span>
             <textarea rows={2} value={notas} onChange={e => setNotas(e.target.value)} disabled={generando || !!listo}
               placeholder="Sujeto a disponibilidad de espacio. No incluye impuestos…"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48] resize-none" />
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario resize-none" />
           </label>
 
           {/* Lo que sale: solo concepto y venta. */}
@@ -112,7 +112,7 @@ export default function ModalGenerarPdf({ quote, generando, onGenerar, onCerrar 
           </button>
           {!listo && (
             <button onClick={generar} disabled={generando || alCliente.length === 0}
-              className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-5 py-2 rounded-lg disabled:opacity-40 flex items-center gap-2">
+              className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-5 py-2 rounded-lg disabled:opacity-40 flex items-center gap-2">
               {generando ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Generando…</> : 'Generar PDF'}
             </button>
           )}

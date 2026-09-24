@@ -86,7 +86,7 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
   const iconSrv = def?.icono || 'HelpCircle';
   const modality = getModality(servicio.tipo, iconSrv);
 
-  const inputCls ='w-full text-xs text-gray-700 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200 rounded-lg px-2 py-1.5 focus:bg-white focus:border-[#E11D48] outline-none transition-all';
+  const inputCls ='w-full text-xs text-gray-700 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200 rounded-lg px-2 py-1.5 focus:bg-white focus:border-primario outline-none transition-all';
 
   const { puertos } = usePuertos();
 
@@ -221,7 +221,7 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
               <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">
                 Tráfico
                 {traficoSugerido && !servicio.trafico && (
-                  <span className="ml-1.5 font-semibold normal-case text-[9px] text-[#E11D48]">
+                  <span className="ml-1.5 font-semibold normal-case text-[9px] text-primario">
                     sugerido por la ruta
                   </span>
                 )}
@@ -276,7 +276,7 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
               type="checkbox"
               checked={!!servicio.generaEmbarquePropio}
               onChange={e => handleFieldChange('generaEmbarquePropio', e.target.checked)}
-              className="mt-[2px] accent-[#E11D48] w-3.5 h-3.5 shrink-0"
+              className="mt-[2px] accent-primario w-3.5 h-3.5 shrink-0"
             />
             <span className="text-[11px] text-gray-400 group-hover:text-gray-600 leading-snug transition-colors">
               Generar un embarque independiente para este servicio
@@ -321,7 +321,7 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
                     <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Peso FCL</label>
                     <div className="flex gap-1">
                       <input type="number" value={servicio.fcl_peso || ''} onChange={e => handleFieldChange('fcl_peso', Number(e.target.value))} className={inputCls} placeholder="0" />
-                      <select value={servicio.fcl_peso_unidad || 'kg'} onChange={e => handleFieldChange('fcl_peso_unidad', e.target.value)} className="text-xs border border-transparent hover:border-gray-200 bg-transparent rounded-lg px-1 focus:bg-white focus:border-[#E11D48] outline-none">
+                      <select value={servicio.fcl_peso_unidad || 'kg'} onChange={e => handleFieldChange('fcl_peso_unidad', e.target.value)} className="text-xs border border-transparent hover:border-gray-200 bg-transparent rounded-lg px-1 focus:bg-white focus:border-primario outline-none">
                         <option value="kg">kg</option><option value="tons">tons</option>
                       </select>
                     </div>
@@ -401,7 +401,7 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
                   <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Peso</label>
                   <div className="flex gap-1">
                     <input type="number" value={servicio.ter_peso || ''} onChange={e => handleFieldChange('ter_peso', Number(e.target.value))} className={inputCls} placeholder="0" />
-                    <select value={servicio.ter_peso_unidad || 'kg'} onChange={e => handleFieldChange('ter_peso_unidad', e.target.value)} className="text-xs border border-transparent hover:border-gray-200 bg-transparent rounded-lg px-1 focus:bg-white focus:border-[#E11D48] outline-none">
+                    <select value={servicio.ter_peso_unidad || 'kg'} onChange={e => handleFieldChange('ter_peso_unidad', e.target.value)} className="text-xs border border-transparent hover:border-gray-200 bg-transparent rounded-lg px-1 focus:bg-white focus:border-primario outline-none">
                       <option value="kg">kg</option><option value="tons">tons</option>
                     </select>
                   </div>
@@ -431,11 +431,11 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
           {!soloDatosOperacion && (
           <div className="border-t border-gray-150 pt-4 mt-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest">
+              <h4 className="text-[10px] font-bold text-primario uppercase tracking-widest">
                 Conceptos de Servicio
               </h4>
               {rolActivo !== 'ventas' && (
-                <button onClick={handleAddConcepto} className="text-[9px] font-bold text-[#E11D48] hover:text-[#9F1239] uppercase tracking-wide flex items-center gap-1 hover:bg-[#E11D48]/5 px-2 py-1 rounded-lg transition-colors">
+                <button onClick={handleAddConcepto} className="text-[9px] font-bold text-primario hover:text-primario-fuerte uppercase tracking-wide flex items-center gap-1 hover:bg-primario/5 px-2 py-1 rounded-lg transition-colors">
                   <Plus className="w-3 h-3" /> Agregar Concepto
                 </button>
               )}
@@ -509,7 +509,7 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
                   {tieneSrvComparativa && rolActivo !== 'ventas' && (
                     <button
                       onClick={openSrvComparativa}
-                      className="flex items-center gap-1 text-[9px] font-bold text-[#E11D48] hover:text-[#BE123C] uppercase tracking-wide hover:bg-[#E11D48]/5 px-2 py-1 rounded-lg transition-colors"
+                      className="flex items-center gap-1 text-[9px] font-bold text-primario hover:text-primario-hover uppercase tracking-wide hover:bg-primario/5 px-2 py-1 rounded-lg transition-colors"
                     >
                       <BarChart2 className="w-3 h-3" />
                       Comparar servicio ({srvCots.length})

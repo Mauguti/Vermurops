@@ -317,7 +317,7 @@ export default function KanbanCotizaciones({
             placeholder="Buscar folio o empresa..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 outline-none focus:border-[#E11D48] focus:ring-1 focus:ring-[#E11D48]/20 shadow-2xs"
+            className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 outline-none focus:border-primario focus:ring-1 focus:ring-primario/20 shadow-2xs"
           />
         </div>
 
@@ -369,7 +369,7 @@ export default function KanbanCotizaciones({
                 setFilterServicio('Todos');
                 setFilterOrigen('Todos');
               }}
-              className="p-2 text-xs font-bold text-[#E11D48] hover:text-[#BE123C] flex items-center hover:bg-red-50 rounded-lg transition-colors"
+              className="p-2 text-xs font-bold text-primario hover:text-primario-hover flex items-center hover:bg-red-50 rounded-lg transition-colors"
             >
               <X className="w-3.5 h-3.5 mr-1" /> Limpiar
             </button>
@@ -407,9 +407,9 @@ export default function KanbanCotizaciones({
                 onDrop={e => handleDrop(e, stage.id as PipelineStageId)}
                 className={`w-[240px] bg-gray-50/50 rounded-xl border flex flex-col min-h-[520px] transition-all duration-200
                   ${isDraggedOver
-                    ? 'bg-[#E11D48]/[0.03] border-dashed border-[#E11D48]/30 ring-2 ring-[#E11D48]/10'
+                    ? 'bg-primario/[0.03] border-dashed border-primario/30 ring-2 ring-primario/10'
                     : 'border-gray-150'}
-                  ${isPricingColumn ? 'ring-1 ring-[#E11D48]/30' : ''}`}
+                  ${isPricingColumn ? 'ring-1 ring-primario/30' : ''}`}
               >
                 {/* Cabecera columna */}
                 <div className={`p-3.5 border-t-4 ${stage.color} rounded-t-xl border-b border-gray-150 flex flex-col justify-between shrink-0`}>
@@ -427,7 +427,7 @@ export default function KanbanCotizaciones({
                     </div>
                   )}
                   {isPricingColumn && (
-                    <span className="mt-1.5 inline-block text-[8px] font-bold uppercase tracking-wider text-[#E11D48] bg-[#E11D48]/5 border border-[#E11D48]/10 px-1.5 py-0.5 rounded w-fit">
+                    <span className="mt-1.5 inline-block text-[8px] font-bold uppercase tracking-wider text-primario bg-primario/5 border border-primario/10 px-1.5 py-0.5 rounded w-fit">
                       Pricing
                     </span>
                   )}
@@ -440,7 +440,7 @@ export default function KanbanCotizaciones({
                   {stage.id === 'solicitud_cliente' && (
                     <button
                       onClick={() => setShowQuickAdd(true)}
-                      className="w-full py-2.5 bg-white border border-dashed border-gray-300 hover:border-[#E11D48] text-gray-500 hover:text-[#E11D48] rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 shadow-2xs hover:shadow-sm"
+                      className="w-full py-2.5 bg-white border border-dashed border-gray-300 hover:border-primario text-gray-500 hover:text-primario rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5 shadow-2xs hover:shadow-sm"
                     >
                       <Plus className="w-3.5 h-3.5" /> Nueva solicitud
                     </button>
@@ -472,11 +472,11 @@ export default function KanbanCotizaciones({
                           draggable="true"
                           onDragStart={e => handleDragStart(e, quote.id)}
                           onClick={() => setSelectedQuote(quote)}
-                          className="bg-white p-3.5 rounded-xl border border-gray-200 hover:border-[#E11D48]/30 shadow-2xs hover:shadow-md cursor-grab active:cursor-grabbing transition-all duration-200 space-y-2.5 group"
+                          className="bg-white p-3.5 rounded-xl border border-gray-200 hover:border-primario/30 shadow-2xs hover:shadow-md cursor-grab active:cursor-grabbing transition-all duration-200 space-y-2.5 group"
                         >
                           {/* Folio + origen */}
                           <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-mono font-bold text-gray-400 group-hover:text-[#E11D48] transition-colors">
+                            <span className="text-[9px] font-mono font-bold text-gray-400 group-hover:text-primario transition-colors">
                               {quote.id}
                             </span>
                             {texto(quote.prospecto?.origen).startsWith('interno') ? (
@@ -497,10 +497,10 @@ export default function KanbanCotizaciones({
 
                           {/* Badge En Proceso con Pricing (Ventas) */}
                           {rolActivo === 'ventas' && ['pricing_solicitando', 'cotizaciones_recibidas', 'consolidada'].includes(quote.etapa) && (
-                            <div className="flex items-center gap-1.5 bg-[#E11D48]/5 border border-[#E11D48]/10 text-[#BE123C] px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider w-fit">
+                            <div className="flex items-center gap-1.5 bg-primario/5 border border-primario/10 text-primario-hover px-2 py-1 rounded-lg text-[9px] font-bold uppercase tracking-wider w-fit">
                               <span className="relative flex h-2 w-2">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E11D48]/60 opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#E11D48]"></span>
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primario/60 opacity-75"></span>
+                                <span className="relative inline-flex rounded-full h-2 w-2 bg-primario"></span>
                               </span>
                               En proceso con Pricing
                             </div>
@@ -521,7 +521,7 @@ export default function KanbanCotizaciones({
                             <div className="flex -space-x-1">
                               {/* Avatar vendedor */}
                               <div
-                                className="w-5 h-5 rounded-full bg-[#E11D48]/10 text-[#E11D48] font-bold text-[8px] flex items-center justify-center ring-1 ring-white"
+                                className="w-5 h-5 rounded-full bg-primario/10 text-primario font-bold text-[8px] flex items-center justify-center ring-1 ring-white"
                                 title={`Ventas: ${quote.vendedorId}`}
                               >
                                 {quote.vendedorId.split(' ').map(n => n[0]).join('')}
@@ -529,7 +529,7 @@ export default function KanbanCotizaciones({
                               {/* Avatar pricing */}
                               {quote.pricingId && (
                                 <div
-                                  className="w-5 h-5 rounded-full bg-[#E11D48]/10 text-[#BE123C] font-bold text-[8px] flex items-center justify-center ring-1 ring-white"
+                                  className="w-5 h-5 rounded-full bg-primario/10 text-primario-hover font-bold text-[8px] flex items-center justify-center ring-1 ring-white"
                                   title={`Pricing: ${quote.pricingId}`}
                                 >
                                   {quote.pricingId.split(' ').map(n => n[0]).join('')}
@@ -586,7 +586,7 @@ export default function KanbanCotizaciones({
                   placeholder="Ej. Comercializadora del Centro"
                   value={qaEmpresa}
                   onChange={e => setQaEmpresa(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#E11D48] shadow-2xs"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-primario shadow-2xs"
                 />
               </div>
 
@@ -597,7 +597,7 @@ export default function KanbanCotizaciones({
                   placeholder="Ej. Ing. Daniel Ortiz"
                   value={qaContacto}
                   onChange={e => setQaContacto(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#E11D48] shadow-2xs"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-primario shadow-2xs"
                 />
               </div>
 
@@ -644,7 +644,7 @@ export default function KanbanCotizaciones({
                   <select
                     value={qaOrigen}
                     onChange={e => setQaOrigen(e.target.value as KanbanQuote['prospecto']['origen'])}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48] bg-white"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario bg-white"
                   >
                     {Object.entries(ORIGENES_PROSPECTO).map(([k, v]) => (
                       <option key={k} value={k}>{v}</option>
@@ -663,7 +663,7 @@ export default function KanbanCotizaciones({
                 <button type="button" onClick={() => setShowQuickAdd(false)} className="px-4 py-2 text-gray-500 hover:text-gray-700">
                   Cancelar
                 </button>
-                <button type="submit" className="px-5 py-2.5 bg-[#E11D48] hover:bg-[#BE123C] text-white rounded-lg shadow-xs transition-colors">
+                <button type="submit" className="px-5 py-2.5 bg-primario hover:bg-primario-hover text-white rounded-lg shadow-xs transition-colors">
                   Crear solicitud
                 </button>
               </div>

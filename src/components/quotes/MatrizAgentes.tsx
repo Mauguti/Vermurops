@@ -137,7 +137,7 @@ export default function MatrizAgentes({
           {editable && abierta && (
             <button
               onClick={onAgregarAgente}
-              className="flex items-center gap-1.5 text-[11px] font-bold text-[#E11D48] hover:bg-[#E11D48]/5 px-2.5 py-1 rounded-lg transition-colors shrink-0"
+              className="flex items-center gap-1.5 text-[11px] font-bold text-primario hover:bg-primario/5 px-2.5 py-1 rounded-lg transition-colors shrink-0"
             >
               <Plus className="w-3.5 h-3.5" /> Agregar proveedor
             </button>
@@ -158,7 +158,7 @@ export default function MatrizAgentes({
                 <select
                   value={servicioActivoId}
                   onChange={e => onCambiarServicio(e.target.value)}
-                  className="text-[11px] font-semibold text-gray-600 capitalize bg-transparent border border-gray-200 rounded-md px-2 py-1 outline-none focus:border-[#E11D48] cursor-pointer"
+                  className="text-[11px] font-semibold text-gray-600 capitalize bg-transparent border border-gray-200 rounded-md px-2 py-1 outline-none focus:border-primario cursor-pointer"
                   title="Esta cotización tiene varios servicios"
                 >
                   {servicios.map(sv => (
@@ -222,7 +222,7 @@ export default function MatrizAgentes({
                         <th key={a.id} className="px-3 py-2 text-center min-w-[120px]">
                           <div className="flex items-center justify-center gap-1">
                             <span className={`text-[11px] font-bold truncate ${
-                              a.id === columnaElegida ? 'text-[#E11D48]' : 'text-gray-700'}`}>
+                              a.id === columnaElegida ? 'text-primario' : 'text-gray-700'}`}>
                               {a.nombre}
                             </span>
                             {editable && (
@@ -280,7 +280,7 @@ export default function MatrizAgentes({
                               type="date"
                               value={a.vigencia ?? ''}
                               onChange={e => onEditarVigencia(a.id, e.target.value || null)}
-                              className="w-full px-1 py-1 text-[11px] text-center border border-transparent hover:border-gray-200 focus:border-[#E11D48] focus:bg-white bg-transparent rounded outline-none"
+                              className="w-full px-1 py-1 text-[11px] text-center border border-transparent hover:border-gray-200 focus:border-primario focus:bg-white bg-transparent rounded outline-none"
                             />
                           ) : (
                             <span className="text-[11px] text-gray-500">{a.vigencia ?? '—'}</span>
@@ -306,7 +306,7 @@ export default function MatrizAgentes({
                               onClick={() => editable && onElegirAgente(a.id)}
                               disabled={!editable}
                               className={`w-full rounded-lg px-1.5 py-1 transition-colors ${
-                                esElegido ? 'ring-2 ring-[#E11D48]/40 bg-[#E11D48]/5' : editable ? 'hover:bg-gray-100' : ''
+                                esElegido ? 'ring-2 ring-primario/40 bg-primario/5' : editable ? 'hover:bg-gray-100' : ''
                               }`}
                               title={editable ? `Elegir a ${a.nombre} para TODAS las filas (el paquete completo)` : undefined}
                             >
@@ -326,7 +326,7 @@ export default function MatrizAgentes({
                                 <span className="block text-[9px] font-bold text-emerald-600 mt-0.5">✓ Menor</span>
                               )}
                               {esElegido && !esMenor && (
-                                <span className="block text-[9px] font-bold text-[#E11D48] mt-0.5">Elegido</span>
+                                <span className="block text-[9px] font-bold text-primario mt-0.5">Elegido</span>
                               )}
                             </button>
                           </td>
@@ -359,7 +359,7 @@ export default function MatrizAgentes({
                   ) : (
                   <button
                     onClick={() => setAgregandoFila(true)}
-                    className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-[#E11D48] hover:bg-[#E11D48]/5 px-2 py-1.5 rounded-lg transition-colors shrink-0"
+                    className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-primario hover:bg-primario/5 px-2 py-1.5 rounded-lg transition-colors shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" /> Agregar concepto
                   </button>
@@ -416,7 +416,7 @@ function Renglon({
           <input
             value={fila.etiqueta}
             onChange={e => onEditarEtiqueta(fila.id, e.target.value)}
-            className="w-full px-2 py-1 text-[12px] font-medium text-gray-800 border border-transparent hover:border-gray-200 focus:border-[#E11D48] focus:bg-white bg-transparent rounded outline-none"
+            className="w-full px-2 py-1 text-[12px] font-medium text-gray-800 border border-transparent hover:border-gray-200 focus:border-primario focus:bg-white bg-transparent rounded outline-none"
           />
         ) : (
           <span className="px-2 font-medium text-gray-800">{fila.etiqueta}</span>
@@ -446,7 +446,7 @@ function Renglon({
         return (
           <td key={a.id} className={`px-2 py-1.5 transition-colors ${
             esExcepcion ? 'bg-amber-50/70 ring-1 ring-inset ring-amber-300'
-            : elegida ? 'bg-[#E11D48]/5'
+            : elegida ? 'bg-primario/5'
             : ''}`}>
             {editable ? (
               <div className="flex items-center gap-0.5">
@@ -456,9 +456,9 @@ function Renglon({
                   disabled={!elegible}
                   className={`shrink-0 w-4 h-4 rounded-full border flex items-center justify-center transition-colors ${
                     elegida
-                      ? 'bg-[#E11D48] border-[#E11D48] text-white'
+                      ? 'bg-primario border-primario text-white'
                       : elegible
-                      ? 'border-gray-300 text-transparent hover:border-[#E11D48]'
+                      ? 'border-gray-300 text-transparent hover:border-primario'
                       : 'border-gray-100 text-transparent cursor-default'}`}
                   title={!elegible ? undefined
                     : elegida ? 'Quitar la elección de esta fila'
@@ -482,7 +482,7 @@ function Renglon({
                     e.target.value === '' ? null : Number(e.target.value),
                     moneda,
                   )}
-                  className="w-full min-w-0 px-1.5 py-1 text-[12px] text-right tabular-nums bg-white border border-gray-150 rounded hover:border-gray-300 focus:border-[#E11D48] focus:ring-1 focus:ring-[#E11D48]/20 outline-none"
+                  className="w-full min-w-0 px-1.5 py-1 text-[12px] text-right tabular-nums bg-white border border-gray-150 rounded hover:border-gray-300 focus:border-primario focus:ring-1 focus:ring-primario/20 outline-none"
                 />
                 {/* La moneda va por celda: el mismo concepto puede llegar en
                     USD de un agente y en MXN de otro (§4.3). */}
@@ -504,7 +504,7 @@ function Renglon({
               </div>
             ) : (
               <span className={`block text-right tabular-nums ${elegida ? 'font-bold text-[#18181B]' : 'text-gray-700'}`}>
-                {elegida && <Check className="inline w-3 h-3 text-[#E11D48] mr-1" />}
+                {elegida && <Check className="inline w-3 h-3 text-primario mr-1" />}
                 {hayValor ? `${money(v!)} ${moneda}` : '—'}
               </span>
             )}

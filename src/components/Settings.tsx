@@ -62,7 +62,7 @@ export default function Settings() {
           <div className="bg-[#18181B] px-[32px] py-[28px] flex items-center gap-[16px]">
             <div
               className="w-[56px] h-[56px] rounded-full flex items-center justify-center text-[18px] font-black text-white shrink-0"
-              style={{ background: '#E11D48' }}
+              style={{ background: 'var(--color-primario)' }}
             >
               {user.avatar}
             </div>

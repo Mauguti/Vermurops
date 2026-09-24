@@ -40,7 +40,7 @@ export default function ModalMotivoPerdida({ titulo, descripcion, onCancelar, on
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-[#E11D48]" />
+            <AlertTriangle className="w-4 h-4 text-primario" />
             <h3 className="text-[14px] font-bold text-[#18181B]">{titulo}</h3>
           </div>
           <button onClick={onCancelar} className="text-gray-400 hover:text-gray-600">
@@ -59,7 +59,7 @@ export default function ModalMotivoPerdida({ titulo, descripcion, onCancelar, on
               value={motivoId}
               autoFocus
               onChange={e => setMotivoId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] bg-white"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario bg-white"
             >
               <option value="">— Selecciona el motivo —</option>
               {MOTIVOS_PERDIDA.map(m => (
@@ -80,7 +80,7 @@ export default function ModalMotivoPerdida({ titulo, descripcion, onCancelar, on
                 placeholder={requiereDetalle
                   ? 'Explica el motivo'
                   : 'Contra quién se perdió, qué precio pedían, qué habría hecho la diferencia…'}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-700 outline-none focus:border-[#E11D48] resize-none"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-700 outline-none focus:border-primario resize-none"
               />
             </div>
           )}
@@ -96,7 +96,7 @@ export default function ModalMotivoPerdida({ titulo, descripcion, onCancelar, on
           <button
             onClick={confirmar}
             disabled={!listo || guardando}
-            className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-5 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-5 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {guardando ? 'Guardando…' : 'Marcar como perdido'}
           </button>

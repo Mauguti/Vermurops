@@ -340,7 +340,7 @@ export default function Shipments() {
               onClick={() => setVista(id)}
               className={`px-4 py-2.5 text-[13px] font-semibold border-b-2 -mb-[1px] transition-colors ${
                 vista === id
-                  ? 'border-[#E11D48] text-[#18181B]'
+                  ? 'border-primario text-[#18181B]'
                   : 'border-transparent text-gray-400 hover:text-gray-600'
               }`}
             >
@@ -372,12 +372,12 @@ export default function Shipments() {
                   <button
                     key={e.id}
                     onClick={() => setSelectedEmbarqueId(e.id)}
-                    className="w-full text-left bg-white border border-gray-200 rounded-lg p-3 hover:border-[#E11D48]/40 hover:shadow-sm transition-all"
+                    className="w-full text-left bg-white border border-gray-200 rounded-lg p-3 hover:border-primario/40 hover:shadow-sm transition-all"
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-mono text-[12px] font-semibold text-gray-900">{e.folio}</span>
                       {e.origen === 'automatico' && e.requiereCaptura && (
-                        <span className="text-[8px] font-bold uppercase tracking-wider bg-[#E11D48]/10 text-[#E11D48] px-1.5 py-0.5 rounded">
+                        <span className="text-[8px] font-bold uppercase tracking-wider bg-primario/10 text-primario px-1.5 py-0.5 rounded">
                           Nuevo
                         </span>
                       )}

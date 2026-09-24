@@ -80,7 +80,7 @@ export default function EvidenciasTarifas({
             </button>
             <button
               onClick={onCargarTarifario}
-              className="flex items-center gap-1.5 text-[11px] font-bold text-[#E11D48] hover:bg-[#E11D48]/5 px-2.5 py-1 rounded-lg transition-colors"
+              className="flex items-center gap-1.5 text-[11px] font-bold text-primario hover:bg-primario/5 px-2.5 py-1 rounded-lg transition-colors"
             >
               <Sparkles className="w-3.5 h-3.5" />
               Cargar tarifario
@@ -129,7 +129,7 @@ export default function EvidenciasTarifas({
                 {admitePrevisualizacion(d.tipo) && (
                   <button
                     onClick={() => setPreview(d)}
-                    className="text-[10px] font-semibold text-gray-500 hover:text-[#E11D48] px-1.5 py-1"
+                    className="text-[10px] font-semibold text-gray-500 hover:text-primario px-1.5 py-1"
                   >
                     Ver
                   </button>

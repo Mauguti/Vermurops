@@ -48,7 +48,7 @@ export const EMBARQUE_COLUMNS = [
       <span className="font-mono font-semibold text-gray-900">
         {info.getValue()}
         {info.row.original.tipo === 'master' && (
-          <span className="ml-1.5 text-[8px] font-extrabold text-[#E11D48] bg-[#E11D48]/5 px-1 rounded">MASTER</span>
+          <span className="ml-1.5 text-[8px] font-extrabold text-primario bg-primario/5 px-1 rounded">MASTER</span>
         )}
       </span>
     ),

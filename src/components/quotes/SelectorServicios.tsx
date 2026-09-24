@@ -110,11 +110,11 @@ export default function SelectorServicios({ servicios, seleccionados, onToggle }
                     type="button"
                     onClick={() => onToggle(srv.id)}
                     className={`w-full flex items-start gap-2.5 px-3 py-2 text-left transition-colors ${
-                      activo ? 'bg-[#E11D48]/5' : 'hover:bg-gray-50'
+                      activo ? 'bg-primario/5' : 'hover:bg-gray-50'
                     }`}
                   >
                     <span className={`mt-[1px] w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                      activo ? 'bg-[#E11D48] border-[#E11D48]' : 'border-gray-300 bg-white'
+                      activo ? 'bg-primario border-primario' : 'border-gray-300 bg-white'
                     }`}>
                       {activo && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                     </span>
@@ -148,7 +148,7 @@ export default function SelectorServicios({ servicios, seleccionados, onToggle }
               {nombresSeleccionados.length} seleccionado{nombresSeleccionados.length !== 1 ? 's' : ''}:
             </span>
             {nombresSeleccionados.map(n => (
-              <span key={n} className="text-[10px] font-semibold text-[#E11D48] bg-[#E11D48]/10 px-1.5 py-0.5 rounded">
+              <span key={n} className="text-[10px] font-semibold text-primario bg-primario/10 px-1.5 py-0.5 rounded">
                 {n}
               </span>
             ))}

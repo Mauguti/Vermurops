@@ -363,7 +363,7 @@ export default function Finance() {
                        <div className="flex justify-end">
                          <button
                            onClick={() => setNuevaOCAbierta(true)}
-                           className="inline-flex items-center gap-1.5 bg-[#E11D48] hover:bg-[#BE123C] text-white text-[12px] font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors shadow-sm"
+                           className="inline-flex items-center gap-1.5 bg-primario hover:bg-primario-hover text-white text-[12px] font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors shadow-sm"
                          >
                            <Plus className="w-3.5 h-3.5" /> Gasto de oficina
                          </button>
@@ -592,7 +592,7 @@ function TarjetaKPI({
       {cargando ? (
         <p className="text-[24px] font-semibold text-text-muted tabular-nums">…</p>
       ) : monedas.length === 0 ? (
-        <p className={`text-[24px] font-semibold tabular-nums ${acento ? 'text-[#E11D48]' : 'text-text-primary'}`}>
+        <p className={`text-[24px] font-semibold tabular-nums ${acento ? 'text-primario' : 'text-text-primary'}`}>
           $0.00
         </p>
       ) : (
@@ -601,7 +601,7 @@ function TarjetaKPI({
             <p
               key={m}
               className={`text-[20px] font-semibold tabular-nums leading-tight ${
-                acento ? 'text-[#E11D48]' : 'text-text-primary'}`}
+                acento ? 'text-primario' : 'text-text-primary'}`}
             >
               ${money(montos[m])}{' '}
               <span className="text-[12px] text-text-muted font-normal">{m}</span>

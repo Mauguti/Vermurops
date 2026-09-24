@@ -297,9 +297,9 @@ export default function SpreadsheetTable<T>({
                       {canSort && (
                         <span className="shrink-0 w-3 h-3 text-gray-300">
                           {sorted === 'asc' ? (
-                            <ArrowUp className="w-3 h-3 text-[#E11D48]" />
+                            <ArrowUp className="w-3 h-3 text-primario" />
                           ) : sorted === 'desc' ? (
-                            <ArrowDown className="w-3 h-3 text-[#E11D48]" />
+                            <ArrowDown className="w-3 h-3 text-primario" />
                           ) : (
                             <ChevronsUpDown className="w-3 h-3" />
                           )}
@@ -314,8 +314,8 @@ export default function SpreadsheetTable<T>({
                         onClick={e => e.stopPropagation()}
                         className={`
                           absolute right-0 top-0 h-full w-1 cursor-col-resize
-                          group-hover/th:bg-[#E11D48]/30
-                          ${header.column.getIsResizing() ? 'bg-[#E11D48]' : ''}
+                          group-hover/th:bg-primario/30
+                          ${header.column.getIsResizing() ? 'bg-primario' : ''}
                         `}
                       />
                     )}
@@ -345,7 +345,7 @@ export default function SpreadsheetTable<T>({
               onClick={onRowClick ? () => onRowClick(row.original) : undefined}
               className={`
                 border-b border-gray-100 transition-colors
-                ${onRowClick ? 'cursor-pointer hover:bg-[#E11D48]/5' : 'hover:bg-gray-50/60'}
+                ${onRowClick ? 'cursor-pointer hover:bg-primario/5' : 'hover:bg-gray-50/60'}
               `}
             >
               {row.getVisibleCells().map(cell => {

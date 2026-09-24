@@ -187,7 +187,7 @@ export default function FichaFactura({ invoice, onClose }: FichaFacturaProps) {
             {activeTab === 'pdf' && (
               <div className="bg-white w-full max-w-[800px] min-h-[1056px] shadow-lg border border-gray-200 p-[48px] relative">
                 {/* Cabecera Factura Mock */}
-                <div className="flex justify-between items-start mb-[40px] border-b-[2px] border-[#E11D48] pb-[20px]">
+                <div className="flex justify-between items-start mb-[40px] border-b-[2px] border-primario pb-[20px]">
                   <div>
                     <h1 className="text-[28px] font-black tracking-tight text-[#18181B] leading-none mb-[8px]">VERMUR</h1>
                     <p className="text-[12px] font-bold text-gray-500 tracking-[0.1em] uppercase">Logistics SA de CV</p>
@@ -195,7 +195,7 @@ export default function FichaFactura({ invoice, onClose }: FichaFacturaProps) {
                     <p className="text-[11px] text-gray-500">601 - General de Ley Personas Morales</p>
                   </div>
                   <div className="text-right">
-                    <h2 className="text-[20px] font-bold text-[#E11D48] uppercase tracking-wider mb-[4px]">Factura</h2>
+                    <h2 className="text-[20px] font-bold text-primario uppercase tracking-wider mb-[4px]">Factura</h2>
                     <p className="text-[16px] font-medium text-gray-800">{invoice.id}</p>
                     <div className="mt-[12px] bg-gray-50 p-[12px] rounded border border-gray-200 text-left w-[240px]">
                       <p className="text-[10px] font-bold text-gray-400 uppercase">Folio Fiscal</p>
@@ -257,7 +257,7 @@ export default function FichaFactura({ invoice, onClose }: FichaFacturaProps) {
                     </div>
                     <div className="flex justify-between py-[8px] border-t-2 border-gray-800 mt-[4px]">
                       <span className="text-[14px] font-bold text-gray-800 uppercase">Total</span>
-                      <span className="text-[14px] font-bold text-[#E11D48] tabular-nums">${invoice.total.toLocaleString()} {invoice.currency}</span>
+                      <span className="text-[14px] font-bold text-primario tabular-nums">${invoice.total.toLocaleString()} {invoice.currency}</span>
                     </div>
                   </div>
                 </div>

@@ -612,7 +612,7 @@ export default function FichaEmbarque({
                       if ('error' in r) { setAvisoOC({ mensaje: r.error, tipo: 'error' }); return; }
                       guardar({ ...embarque, ...r, updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') });
                     }}
-                    className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs bg-white disabled:bg-gray-50"
+                    className="w-full px-3 py-2 border border-gray-200 focus:border-primario rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs bg-white disabled:bg-gray-50"
                     title={embarque.cierres?.operativo ? 'Con el cierre operativo hecho, la carga está entregada.' : ETAPAS_EMBARQUE.find(x => x.id === estadoDe(embarque))?.descripcion}
                   >
                     {ETAPAS_EMBARQUE.map(et => <option key={et.id} value={et.id}>{et.label}</option>)}
@@ -630,7 +630,7 @@ export default function FichaEmbarque({
                       responsableOperativo: e.target.value || null,
                       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
                     })}
-                    className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs bg-white"
+                    className="w-full px-3 py-2 border border-gray-200 focus:border-primario rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs bg-white"
                   >
                     <option value="">— Sin asignar —</option>
                     {usuariosPorRol('operaciones').map(u => (
@@ -648,7 +648,7 @@ export default function FichaEmbarque({
                     type="text"
                     value={numGuia}
                     onChange={e => setNumGuia(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
+                    className="w-full px-3 py-2 border border-gray-200 focus:border-primario rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
                   />
                 </div>
 
@@ -658,7 +658,7 @@ export default function FichaEmbarque({
                     type="text"
                     value={numRes}
                     onChange={e => setNumRes(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
+                    className="w-full px-3 py-2 border border-gray-200 focus:border-primario rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
                   />
                 </div>
 
@@ -668,7 +668,7 @@ export default function FichaEmbarque({
                     type="text"
                     value={refCli}
                     onChange={e => setRefCli(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
+                    className="w-full px-3 py-2 border border-gray-200 focus:border-primario rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
                   />
                 </div>
 
@@ -678,7 +678,7 @@ export default function FichaEmbarque({
                     type="number"
                     value={valDec}
                     onChange={e => setValDec(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
+                    className="w-full px-3 py-2 border border-gray-200 focus:border-primario rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
                   />
                 </div>
               </div>
@@ -692,7 +692,7 @@ export default function FichaEmbarque({
                     value={nombreEmb}
                     onChange={e => setNombreEmb(e.target.value)}
                     placeholder="Ej. VLIA-24-020 / BOL 9016543"
-                    className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs font-mono"
+                    className="w-full px-3 py-2 border border-gray-200 focus:border-primario rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs font-mono"
                   />
                 </div>
                 <div>
@@ -702,7 +702,7 @@ export default function FichaEmbarque({
                     value={tipoEntregaVal}
                     onChange={e => setTipoEntregaVal(e.target.value)}
                     placeholder="Ej. Entrega Exprés"
-                    className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
+                    className="w-full px-3 py-2 border border-gray-200 focus:border-primario rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
                   />
                 </div>
                 <div>
@@ -712,7 +712,7 @@ export default function FichaEmbarque({
                     value={lugarReal}
                     onChange={e => setLugarReal(e.target.value)}
                     placeholder="Ej. Querétaro"
-                    className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
+                    className="w-full px-3 py-2 border border-gray-200 focus:border-primario rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
                   />
                 </div>
                 <div>
@@ -722,7 +722,7 @@ export default function FichaEmbarque({
                     value={realizadoPorVal}
                     onChange={e => setRealizadoPorVal(e.target.value)}
                     placeholder="Ej. Angel Luna"
-                    className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
+                    className="w-full px-3 py-2 border border-gray-200 focus:border-primario rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
                   />
                 </div>
               </div>
@@ -733,14 +733,14 @@ export default function FichaEmbarque({
                   value={desc}
                   onChange={e => setDesc(e.target.value)}
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
+                  className="w-full px-3 py-2 border border-gray-200 focus:border-primario rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
                 />
               </div>
 
               <div className="flex justify-end pt-2 border-t border-gray-100">
                 <button
                   onClick={handleSaveGeneral}
-                  className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
+                  className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
                 >
                   <Save className="w-4 h-4" /> Guardar Cambios
                 </button>
@@ -760,32 +760,32 @@ export default function FichaEmbarque({
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">ETD (Salida)</label>
-                      <input type="date" value={salida} onChange={e => setSalida(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-[#E11D48]" />
+                      <input type="date" value={salida} onChange={e => setSalida(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
                     </div>
                     <div>
                       <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">ETA (Arribo)</label>
-                      <input type="date" value={arribo} onChange={e => setArribo(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-[#E11D48]" />
+                      <input type="date" value={arribo} onChange={e => setArribo(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
                     </div>
                   </div>
 
                   <div>
                     <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Límite de Documentación</label>
-                    <input type="date" value={limDoc} onChange={e => setLimDoc(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-[#E11D48]" />
+                    <input type="date" value={limDoc} onChange={e => setLimDoc(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
                   </div>
 
                   <div>
                     <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Orden General (Aduana)</label>
-                    <input type="date" value={ordenGen} onChange={e => setOrdenGen(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-[#E11D48]" />
+                    <input type="date" value={ordenGen} onChange={e => setOrdenGen(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Libre de Demoras</label>
-                      <input type="date" value={libDem} onChange={e => setLibDem(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-[#E11D48]" />
+                      <input type="date" value={libDem} onChange={e => setLibDem(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
                     </div>
                     <div>
                       <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Libre Almacenaje</label>
-                      <input type="date" value={libAlm} onChange={e => setLibAlm(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-[#E11D48]" />
+                      <input type="date" value={libAlm} onChange={e => setLibAlm(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
                     </div>
                   </div>
                 </div>
@@ -854,7 +854,7 @@ export default function FichaEmbarque({
                     className={`text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors shadow-sm shrink-0 ml-4 ${
                       embarque.enTransito
                         ? 'bg-gray-100 hover:bg-gray-200 text-gray-600'
-                        : 'bg-[#E11D48] hover:bg-[#BE123C] text-white'
+                        : 'bg-primario hover:bg-primario-hover text-white'
                     }`}
                   >
                     {embarque.enTransito ? 'Quitar En Tránsito' : 'Poner En Tránsito'}
@@ -908,20 +908,20 @@ export default function FichaEmbarque({
 
             {embarque.tipo === 'master' ? (
               <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-[#E11D48]/5 border border-[#E11D48]/10 rounded-xl">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-primario/5 border border-primario/10 rounded-xl">
                   <div>
-                    <span className="text-xs font-bold text-[#BE123C] flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-primario-hover flex items-center gap-1.5">
                       <Layers className="w-4 h-4" />
                       Embarque Master Consolidado (MBL)
                     </span>
-                    <span className="block text-[10px] text-[#E11D48] font-semibold leading-tight mt-1">
+                    <span className="block text-[10px] text-primario font-semibold leading-tight mt-1">
                       Este embarque agrupa múltiples guías/cargas hijas (House BL) bajo un solo Bill of Lading maestro.
                     </span>
                   </div>
 
                   <button
                     onClick={handleCrearHijo}
-                    className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-[10px] font-bold uppercase tracking-wider px-3.5 py-2 rounded-lg shadow-sm transition-colors flex items-center gap-1 shrink-0"
+                    className="bg-primario hover:bg-primario-hover text-white text-[10px] font-bold uppercase tracking-wider px-3.5 py-2 rounded-lg shadow-sm transition-colors flex items-center gap-1 shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" /> Crear HBL Hijo
                   </button>
@@ -940,11 +940,11 @@ export default function FichaEmbarque({
                         <div
                           key={h.id}
                           onClick={() => onSelectEmbarqueById(h.id)}
-                          className="p-4 border border-gray-200 hover:border-[#E11D48]/30 rounded-xl cursor-pointer hover:bg-[#E11D48]/5 transition-all flex flex-col justify-between"
+                          className="p-4 border border-gray-200 hover:border-primario/30 rounded-xl cursor-pointer hover:bg-primario/5 transition-all flex flex-col justify-between"
                         >
                           <div className="flex justify-between items-start">
                             <div>
-                              <span className="text-xs font-bold text-gray-800 hover:text-[#E11D48]">
+                              <span className="text-xs font-bold text-gray-800 hover:text-primario">
                                 {h.folio}
                               </span>
                               <span className="block text-[9px] text-gray-400 font-bold uppercase mt-0.5">
@@ -986,14 +986,14 @@ export default function FichaEmbarque({
                   <div className="p-4 border border-gray-150 rounded-xl flex items-center justify-between bg-white shadow-2xs">
                     <div>
                       <span className="text-[10px] font-bold text-gray-400 uppercase">Embarque Master Asociado</span>
-                      <span className="block text-xs font-bold text-[#BE123C] hover:underline cursor-pointer mt-1" onClick={() => onSelectEmbarqueById(master.id)}>
+                      <span className="block text-xs font-bold text-primario-hover hover:underline cursor-pointer mt-1" onClick={() => onSelectEmbarqueById(master.id)}>
                         {master.folio} — MBL: {master.numeroGuia}
                       </span>
                     </div>
 
                     <button
                       onClick={() => onSelectEmbarqueById(master.id)}
-                      className="text-[#E11D48] hover:text-[#9F1239] text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
+                      className="text-primario hover:text-primario-fuerte text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
                     >
                       Ver Master <ArrowRight className="w-3.5 h-3.5" />
                     </button>
@@ -1066,7 +1066,7 @@ export default function FichaEmbarque({
                         type="number"
                         value={cargo.monto}
                         onChange={e => handleEditarMontoCargo(cargo.id, Number(e.target.value))}
-                        className="w-[110px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-[#E11D48] focus:bg-white bg-transparent rounded outline-none text-[12px] font-semibold"
+                        className="w-[110px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-primario focus:bg-white bg-transparent rounded outline-none text-[12px] font-semibold"
                       />
                     ) : undefined,
                     acciones: (
@@ -1074,7 +1074,7 @@ export default function FichaEmbarque({
                         {cargo.ordenCompraId ? (
                           <EnlaceEntidad tipo="ordenCompra" id={cargo.ordenCompraId} title="Ya generó una orden de compra">OC</EnlaceEntidad>
                         ) : puedeSolicitarPago && conversion.puede ? (
-                          <button onClick={() => handleGenerarOC(cargo.id)} className="text-[11px] font-semibold text-[#E11D48] hover:underline whitespace-nowrap">
+                          <button onClick={() => handleGenerarOC(cargo.id)} className="text-[11px] font-semibold text-primario hover:underline whitespace-nowrap">
                             Solicitar pago
                           </button>
                         ) : null}
@@ -1150,7 +1150,7 @@ export default function FichaEmbarque({
                       value={newCargoConcept}
                       onChange={e => setNewCargoConcept(e.target.value)}
                       placeholder="Ej. Flete Terrestre Laredo-México"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold outline-none focus:border-[#E11D48]"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold outline-none focus:border-primario"
                     />
                   </div>
 
@@ -1159,7 +1159,7 @@ export default function FichaEmbarque({
                     <select
                       value={newCargoTipo}
                       onChange={e => setNewCargoTipo(e.target.value as any)}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 bg-white outline-none focus:border-[#E11D48]"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 bg-white outline-none focus:border-primario"
                     >
                       <option value="gasto">Gasto (Costo de compra)</option>
                       <option value="ingreso">Ingreso (Monto facturado a cobrar)</option>
@@ -1174,7 +1174,7 @@ export default function FichaEmbarque({
                       <select
                         value={newCargoProveedor}
                         onChange={e => setNewCargoProveedor(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white outline-none focus:border-[#E11D48]"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white outline-none focus:border-primario"
                       >
                         <option value="">Sin definir todavía</option>
                         {proveedores.map(p => (
@@ -1196,7 +1196,7 @@ export default function FichaEmbarque({
                         type="number" required
                         value={newCargoMonto}
                         onChange={e => setNewCargoMonto(Number(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold outline-none focus:border-[#E11D48]"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold outline-none focus:border-primario"
                       />
                     </div>
                     <div>
@@ -1204,7 +1204,7 @@ export default function FichaEmbarque({
                       <select
                         value={newCargoMoneda}
                         onChange={e => setNewCargoMoneda(e.target.value as any)}
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white outline-none focus:border-[#E11D48]"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 bg-white outline-none focus:border-primario"
                       >
                         <option value="USD">USD</option>
                         <option value="MXN">MXN</option>
@@ -1215,7 +1215,7 @@ export default function FichaEmbarque({
                   <div className="sm:col-span-2 flex justify-end">
                     <button
                       type="submit"
-                      className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded-lg flex items-center gap-1 shadow-sm transition-colors"
+                      className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded-lg flex items-center gap-1 shadow-sm transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" /> Agregar Cargo
                     </button>
@@ -1405,7 +1405,7 @@ export default function FichaEmbarque({
                     const typeStyle = EVENT_TYPES[evt.tipo] || EVENT_TYPES.info;
                     return (
                       <div key={evt.id} className="relative">
-                        <div className="absolute -left-[27px] top-1.5 w-3 h-3 rounded-full bg-white border-2 border-[#E11D48] ring-4 ring-white shadow-sm" />
+                        <div className="absolute -left-[27px] top-1.5 w-3 h-3 rounded-full bg-white border-2 border-primario ring-4 ring-white shadow-sm" />
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-baseline gap-2">
                             <h4 className="text-xs font-bold text-[#18181B]">
@@ -1443,7 +1443,7 @@ export default function FichaEmbarque({
                     value={newEventTitulo}
                     onChange={e => setNewEventTitulo(e.target.value)}
                     placeholder="Ej. Carga ingresada al almacén"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold outline-none focus:border-[#E11D48]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold outline-none focus:border-primario"
                   />
                 </div>
 
@@ -1452,7 +1452,7 @@ export default function FichaEmbarque({
                   <select
                     value={newEventTipo}
                     onChange={e => setNewEventTipo(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 bg-white outline-none focus:border-[#E11D48]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 bg-white outline-none focus:border-primario"
                   >
                     <option value="info">General (Información)</option>
                     <option value="aduana">Despacho Aduanal</option>
@@ -1468,14 +1468,14 @@ export default function FichaEmbarque({
                     onChange={e => setNewEventDesc(e.target.value)}
                     rows={3}
                     placeholder="Ej. Maniobras concluidas ante aduana."
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold outline-none focus:border-[#E11D48]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold outline-none focus:border-primario"
                   />
                 </div>
 
                 <div className="flex justify-end">
                   <button
                     type="submit"
-                    className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded-lg flex items-center gap-1 shadow-sm transition-colors"
+                    className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded-lg flex items-center gap-1 shadow-sm transition-colors"
                   >
                     <GitCommit className="w-4 h-4" /> Registrar Evento
                   </button>

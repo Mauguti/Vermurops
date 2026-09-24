@@ -174,9 +174,9 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moned
             ? 'ring-2 ring-red-200 border-red-300 bg-red-50/30'
             : 'ring-2 ring-green-200 border-green-400 bg-green-50/30'
           : isActive
-            ? 'border-[#E11D48]/60 ring-2 ring-[#E11D48]/30 bg-gray-50/50'
+            ? 'border-primario/60 ring-2 ring-primario/30 bg-gray-50/50'
             : isDragActive
-              ? 'border-dashed border-[#E11D48]/30 bg-[#E11D48]/5'
+              ? 'border-dashed border-primario/30 bg-primario/5'
               : 'border-gray-200 hover:border-gray-300 bg-gray-50/50'
       }`}
       onClick={onActivate}
@@ -199,7 +199,7 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moned
           {tieneComparativa && rolActivo !== 'ventas' && (
             <button
               onClick={openComparativa}
-              className="flex items-center gap-1 text-[9px] font-bold text-[#E11D48] hover:text-[#BE123C] uppercase tracking-wide hover:bg-[#E11D48]/5 px-2 py-1 rounded-lg transition-colors"
+              className="flex items-center gap-1 text-[9px] font-bold text-primario hover:text-primario-hover uppercase tracking-wide hover:bg-primario/5 px-2 py-1 rounded-lg transition-colors"
             >
               <BarChart2 className="w-3 h-3" />
               Comparar ({concepto.tarifas.length})
@@ -272,12 +272,12 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moned
             return oficiales.map((t, i) => (
               <span key={t.id}>
                 {i > 0 && <span className="text-gray-300 mx-1">+</span>}
-                <span className="font-bold text-[#BE123C]">{t.proveedor}</span>
+                <span className="font-bold text-primario-hover">{t.proveedor}</span>
               </span>
             ));
           })()}
         </div>
-        <div className="font-black text-[#9F1239] tabular-nums bg-[#E11D48]/5 px-2 py-0.5 rounded">
+        <div className="font-black text-primario-fuerte tabular-nums bg-primario/5 px-2 py-0.5 rounded">
           ${costoOficial.toLocaleString()} {getTarifasOficiales(concepto)[0]?.moneda || 'USD'}
         </div>
       </div>
@@ -301,22 +301,22 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moned
       {/* Add subconcepto */}
       {rolActivo !== 'ventas' && (
         <div className="flex gap-2 items-center pl-4 mt-2">
-          <input type="text" placeholder="Nuevo subconcepto..." value={newSubNombre} onChange={e => setNewSubNombre(e.target.value)} className="flex-1 text-[10px] border border-gray-200 rounded px-2 py-1 outline-none focus:border-[#E11D48]" />
-          <input type="number" placeholder="Costo" value={newSubCosto} onChange={e => setNewSubCosto(e.target.value)} className="w-20 text-[10px] border border-gray-200 rounded px-2 py-1 outline-none focus:border-[#E11D48]" />
-          <button onClick={handleAddSub} className="text-[10px] bg-white border border-gray-200 hover:border-[#E11D48] hover:text-[#E11D48] px-2 py-1 rounded font-bold text-gray-600 transition-colors">Añadir</button>
+          <input type="text" placeholder="Nuevo subconcepto..." value={newSubNombre} onChange={e => setNewSubNombre(e.target.value)} className="flex-1 text-[10px] border border-gray-200 rounded px-2 py-1 outline-none focus:border-primario" />
+          <input type="number" placeholder="Costo" value={newSubCosto} onChange={e => setNewSubCosto(e.target.value)} className="w-20 text-[10px] border border-gray-200 rounded px-2 py-1 outline-none focus:border-primario" />
+          <button onClick={handleAddSub} className="text-[10px] bg-white border border-gray-200 hover:border-primario hover:text-primario px-2 py-1 rounded font-bold text-gray-600 transition-colors">Añadir</button>
         </div>
       )}
 
       {/* Financieros */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#E11D48]/5 p-2.5 rounded border border-[#E11D48]/10 mt-3 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-primario/5 p-2.5 rounded border border-primario/10 mt-3 shadow-sm">
         <div className="text-[10px] text-gray-500 font-semibold uppercase flex flex-col">
           <span>Costo Total Concepto:</span>
           <span className="text-xs font-bold text-gray-700">${costoTotalConcepto.toLocaleString()}</span>
         </div>
 
         {rolActivo !== 'ventas' ? (
-          <div className="flex items-center gap-2 border-l border-[#E11D48]/30 pl-3">
-            <span className="text-[10px] text-[#E11D48] font-bold uppercase">Profit: $</span>
+          <div className="flex items-center gap-2 border-l border-primario/30 pl-3">
+            <span className="text-[10px] text-primario font-bold uppercase">Profit: $</span>
             <input
               type="number"
               value={concepto.profit === 0 && !concepto.profit ? '' : concepto.profit}
@@ -325,22 +325,22 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moned
                 const { venta, margen } = calcLinea(costoTotalConcepto, newProfit);
                 onUpdate({ ...concepto, profit: newProfit, costo: costoTotalConcepto, venta, margen });
               }}
-              className="w-20 text-xs font-bold text-[#BE123C] border border-[#E11D48]/30 focus:border-[#E11D48]/60 rounded px-1.5 py-1 outline-none text-right shadow-sm"
+              className="w-20 text-xs font-bold text-primario-hover border border-primario/30 focus:border-primario/60 rounded px-1.5 py-1 outline-none text-right shadow-sm"
               placeholder="0"
             />
           </div>
         ) : (
-          <div className="text-[10px] text-gray-500 font-semibold uppercase flex flex-col text-right border-l border-[#E11D48]/30 pl-3">
+          <div className="text-[10px] text-gray-500 font-semibold uppercase flex flex-col text-right border-l border-primario/30 pl-3">
             <span>Margen:</span>
             <span className="text-xs font-bold text-gray-700">{margenRealPct.toFixed(1)}%</span>
           </div>
         )}
 
-        <div className="text-right border-l border-[#E11D48]/30 pl-3">
+        <div className="text-right border-l border-primario/30 pl-3">
           <span className="text-[10px] text-gray-500 font-semibold uppercase">Venta:</span>
-          <p className="text-sm font-black text-[#9F1239] tabular-nums">${precioVenta.toLocaleString()}</p>
+          <p className="text-sm font-black text-primario-fuerte tabular-nums">${precioVenta.toLocaleString()}</p>
           {rolActivo !== 'ventas' && (
-            <p className="text-[9px] text-[#E11D48]/70 font-bold mt-0.5">{margenRealPct.toFixed(1)}% Margen</p>
+            <p className="text-[9px] text-primario/70 font-bold mt-0.5">{margenRealPct.toFixed(1)}% Margen</p>
           )}
         </div>
       </div>

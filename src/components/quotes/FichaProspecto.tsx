@@ -131,7 +131,7 @@ export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUp
           </>
         }
         subtitulo={prospecto.valorEstimado ? (
-          <p className="font-black text-[#E11D48] tabular-nums">
+          <p className="font-black text-primario tabular-nums">
             Valor estimado: ${prospecto.valorEstimado.toLocaleString()} USD
           </p>
         ) : undefined}
@@ -178,7 +178,7 @@ export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUp
 
           {/* Datos del Prospecto */}
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-4">
-            <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-2">
+            <h4 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-2">
               Datos del Prospecto
             </h4>
             
@@ -273,13 +273,13 @@ export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUp
 
           {/* Notas */}
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-3">
-            <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-2">
+            <h4 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-2">
               Notas
             </h4>
             <textarea
               value={prospecto.notas || ''}
               onChange={e => onUpdate({ ...prospecto, notas: e.target.value })}
-              className="w-full h-24 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 outline-none focus:border-[#E11D48] resize-none"
+              className="w-full h-24 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-700 outline-none focus:border-primario resize-none"
               placeholder="Notas adicionales..."
             />
           </div>
@@ -290,7 +290,7 @@ export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUp
         {pestana === 'actividad' && (
         <div className="space-y-8 max-w-4xl">
           <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-5">
-            <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-2">
+            <h4 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-2">
               Actividades
             </h4>
 
@@ -319,7 +319,7 @@ export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUp
                 value={newActivityDesc}
                 onChange={e => setNewActivityDesc(e.target.value)}
                 placeholder="Descripción de la actividad..."
-                className="w-full h-16 p-2 bg-white border border-gray-200 rounded text-xs outline-none focus:border-[#E11D48] resize-none text-gray-700"
+                className="w-full h-16 p-2 bg-white border border-gray-200 rounded text-xs outline-none focus:border-primario resize-none text-gray-700"
               />
               <div className="flex justify-end">
                 <button 

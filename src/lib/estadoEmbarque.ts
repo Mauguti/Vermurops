@@ -35,7 +35,7 @@ export const ETAPAS_EMBARQUE: {
 }[] = [
   { id: 'nuevo',       label: 'Nuevo',       descripcion: 'Llegó de una cotización ganada y le falta captura operativa.', badge: 'bg-gray-100 text-gray-700 border-gray-200' },
   { id: 'cargado',     label: 'Cargado',     descripcion: 'Con guía o reservación; la carga todavía no sale.',           badge: 'bg-sky-50 text-sky-700 border-sky-200' },
-  { id: 'en_transito', label: 'En tránsito', descripcion: 'La carga salió y va en camino.',                               badge: 'bg-[#E11D48]/5 text-[#BE123C] border-[#E11D48]/20' },
+  { id: 'en_transito', label: 'En tránsito', descripcion: 'La carga salió y va en camino.',                               badge: 'bg-primario/5 text-primario-hover border-primario/20' },
   { id: 'en_destino',  label: 'En destino',  descripcion: 'Llegó: en puerto, aeropuerto o aduana de destino.',           badge: 'bg-amber-50 text-amber-800 border-amber-300' },
   { id: 'entregado',   label: 'Entregado',   descripcion: 'La carga se entregó (cierre operativo).',                     badge: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
 ];

@@ -150,7 +150,7 @@ export default function RevisionDocumentoClasificado({
             <select
               value={tipo ?? ''}
               onChange={e => setTipo(e.target.value || null)}
-              className={`w-full px-3 py-2 text-[13px] bg-white border rounded-md focus:outline-none focus:border-[#E11D48] ${
+              className={`w-full px-3 py-2 text-[13px] bg-white border rounded-md focus:outline-none focus:border-primario ${
                 tipo ? 'border-gray-200' : 'border-amber-400'
               }`}
             >
@@ -170,7 +170,7 @@ export default function RevisionDocumentoClasificado({
               type="text"
               value={nombre}
               onChange={e => setNombre(e.target.value)}
-              className="w-full px-3 py-2 text-[13px] bg-white border border-gray-200 rounded-md focus:outline-none focus:border-[#E11D48]"
+              className="w-full px-3 py-2 text-[13px] bg-white border border-gray-200 rounded-md focus:outline-none focus:border-primario"
               placeholder="Nombre con el que se guardará"
             />
             <p className="text-[10px] text-gray-400 mt-1">
@@ -243,7 +243,7 @@ export default function RevisionDocumentoClasificado({
                           className={`shrink-0 text-[11px] font-bold px-2.5 py-1.5 rounded-md border transition-colors ${
                             adoptado
                               ? 'border-emerald-300 bg-emerald-100 text-emerald-800'
-                              : 'border-gray-200 text-gray-500 hover:border-[#E11D48] hover:text-[#E11D48]'
+                              : 'border-gray-200 text-gray-500 hover:border-primario hover:text-primario'
                           }`}
                         >
                           {adoptado ? <span className="flex items-center gap-1"><Check className="w-3 h-3" /> Usar</span> : 'Usar en la ficha'}
@@ -286,7 +286,7 @@ export default function RevisionDocumentoClasificado({
                 adoptados,
                 estado: veredicto.estadoResultante,
               })}
-              className="flex items-center gap-2 bg-[#E11D48] text-white px-4 py-2 rounded-md text-[12px] font-bold hover:bg-[#BE123C] disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 bg-primario text-white px-4 py-2 rounded-md text-[12px] font-bold hover:bg-primario-hover disabled:opacity-50 transition-colors"
             >
               {guardando && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               Guardar documento
@@ -305,7 +305,7 @@ export function EnlaceArchivo({ url, nombre }: { url: string; nombre: string }) 
       href={url}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-[#E11D48] truncate"
+      className="inline-flex items-center gap-1 text-[11px] text-gray-500 hover:text-primario truncate"
       title={nombre}
     >
       <ExternalLink className="w-3 h-3 shrink-0" />

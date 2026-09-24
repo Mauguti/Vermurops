@@ -112,7 +112,7 @@ export default function DocumentosEmbarque({
                 value={tipoEsperado}
                 onChange={e => setTipoEsperado(e.target.value)}
                 disabled={procesando}
-                className="w-full text-xs font-bold text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-[#E11D48]"
+                className="w-full text-xs font-bold text-gray-700 bg-gray-50 border border-gray-200 rounded-lg p-2.5 outline-none focus:border-primario"
               >
                 <option value="">— Que lo detecte el clasificador —</option>
                 {TIPOS_DOC_OPERATIVOS.map(t => <option key={t.tipo} value={t.tipo}>{t.etiqueta}</option>)}
@@ -132,20 +132,20 @@ export default function DocumentosEmbarque({
                 onClick={() => !procesando && fileInputRef.current?.click()}
                 className={`w-full py-6 px-4 border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all
                   ${procesando ? 'border-gray-200 bg-gray-50 cursor-wait'
-                    : dragActive ? 'border-[#E11D48] bg-[#E11D48]/[0.02]'
+                    : dragActive ? 'border-primario bg-primario/[0.02]'
                     : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50/50'}`}
               >
                 {procesando ? (
                   <>
-                    <Loader2 className="w-8 h-8 mb-2 text-[#E11D48] animate-spin" />
+                    <Loader2 className="w-8 h-8 mb-2 text-primario animate-spin" />
                     <p className="text-xs font-bold text-gray-600">Subiendo y clasificando…</p>
                     <p className="text-[10px] text-gray-400 mt-1">Puede tardar hasta un minuto con PDFs escaneados.</p>
                   </>
                 ) : (
                   <>
-                    <UploadCloud className={`w-8 h-8 mb-2 ${dragActive ? 'text-[#E11D48]' : 'text-gray-400'}`} />
+                    <UploadCloud className={`w-8 h-8 mb-2 ${dragActive ? 'text-primario' : 'text-gray-400'}`} />
                     <p className="text-xs font-bold text-gray-600 text-center">
-                      Arrastra el archivo aquí, o <span className="text-[#E11D48] hover:underline">explora</span>
+                      Arrastra el archivo aquí, o <span className="text-primario hover:underline">explora</span>
                     </p>
                     <p className="text-[10px] text-gray-400 mt-1 text-center">PDF, imagen, Excel o Word · máx. 10 MB</p>
                   </>

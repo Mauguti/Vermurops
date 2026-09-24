@@ -569,7 +569,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                     <textarea
                       rows={2} value={notasValidacion} onChange={e => setNotasValidacion(e.target.value)}
                       placeholder={checklistCompleto ? 'Notas (opcional)' : 'Con el checklist incompleto, las notas son obligatorias: qué falta y por qué se valida igual.'}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-[#E11D48] bg-white"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-primario bg-white"
                     />
                     <button
                       type="button"
@@ -585,7 +585,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                           setNotasValidacion('');
                         } finally { setValidando(false); }
                       }}
-                      className="px-4 py-2 bg-[#E11D48] hover:bg-[#BE123C] disabled:opacity-40 disabled:cursor-not-allowed text-white text-[11px] font-bold uppercase tracking-wider rounded-lg"
+                      className="px-4 py-2 bg-primario hover:bg-primario-hover disabled:opacity-40 disabled:cursor-not-allowed text-white text-[11px] font-bold uppercase tracking-wider rounded-lg"
                     >
                       {validando ? 'Validando…' : estadoExp === 'heredado_magaya' ? 'Validar formalmente' : 'Validar expediente'}
                     </button>

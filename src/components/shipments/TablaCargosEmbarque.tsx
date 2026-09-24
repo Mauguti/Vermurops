@@ -106,7 +106,7 @@ function GrupoCard({
               </span>
             )}
             {grupo.editado && (
-              <span className="text-[8px] font-bold uppercase tracking-wider bg-[#E11D48]/10 text-[#E11D48] px-1.5 py-0.5 rounded shrink-0">
+              <span className="text-[8px] font-bold uppercase tracking-wider bg-primario/10 text-primario px-1.5 py-0.5 rounded shrink-0">
                 Corregido
               </span>
             )}
@@ -200,7 +200,7 @@ function GrupoCard({
 
 // ─── Un renglón ───────────────────────────────────────────────────────────────
 
-const inputNum = 'w-[110px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-[#E11D48] focus:bg-white bg-transparent rounded outline-none text-[12px] font-semibold';
+const inputNum = 'w-[110px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-primario focus:bg-white bg-transparent rounded outline-none text-[12px] font-semibold';
 
 function Renglon({
   cargo, editable, nombreProveedor, onEditarMonto, onRestaurar, onQuitar, onGenerarOC,
@@ -301,7 +301,7 @@ function Renglon({
         ) : onGenerarOC && conversion.puede ? (
           <button
             onClick={() => onGenerarOC(cargo.id)}
-            className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#E11D48] hover:underline"
+            className="inline-flex items-center gap-1 text-[11px] font-semibold text-primario hover:underline"
           >
             <Receipt className="w-3 h-3" /> Solicitar pago
           </button>

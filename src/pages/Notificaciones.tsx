@@ -128,7 +128,7 @@ export function NotifCard({
       <div className="flex items-start gap-[12px]">
         {/* Icon */}
         <div className="w-[34px] h-[34px] rounded-full bg-[#FEE2E2] flex items-center justify-center shrink-0 mt-[1px]">
-          <ArrowRight className="w-[15px] h-[15px] text-[#E11D48]" />
+          <ArrowRight className="w-[15px] h-[15px] text-primario" />
         </div>
 
         {/* Content */}

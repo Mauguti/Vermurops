@@ -780,7 +780,7 @@ export default function Quotes() {
   if (quotesLoading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="w-8 h-8 border-4 border-[#E11D48] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-primario border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -875,7 +875,7 @@ export default function Quotes() {
                               value={busqueda}
                               onChange={e => setBusqueda(e.target.value)}
                               placeholder={viewMode === 'prospeccion' ? 'Buscar prospecto...' : 'Buscar cotización...'}
-                              className="w-full pl-[36px] pr-8 bg-white border border-gray-200 rounded-lg p-2 text-[13px] focus:outline-none focus:border-[#E11D48] focus:ring-1 focus:ring-[#E11D48] text-gray-700 shadow-sm"
+                              className="w-full pl-[36px] pr-8 bg-white border border-gray-200 rounded-lg p-2 text-[13px] focus:outline-none focus:border-primario focus:ring-1 focus:ring-primario text-gray-700 shadow-sm"
                             />
                             {busqueda && (
                               <button
@@ -893,7 +893,7 @@ export default function Quotes() {
                               onClick={() => setFiltrosAbiertos(v => !v)}
                               className={`flex items-center text-[13px] font-bold rounded-lg px-3 py-2 border transition-colors shadow-sm ${
                                 filtroEtapa
-                                  ? 'bg-[#E11D48]/10 border-[#E11D48]/30 text-[#E11D48]'
+                                  ? 'bg-primario/10 border-primario/30 text-primario'
                                   : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                               }`}
                             >
@@ -910,7 +910,7 @@ export default function Quotes() {
                                   <button
                                     onClick={() => { setFiltroEtapa(''); setFiltrosAbiertos(false); }}
                                     className={`w-full text-left px-2 py-1.5 rounded text-[12px] transition-colors ${
-                                      filtroEtapa === '' ? 'bg-[#E11D48]/10 text-[#E11D48] font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                                      filtroEtapa === '' ? 'bg-primario/10 text-primario font-semibold' : 'text-gray-600 hover:bg-gray-50'
                                     }`}
                                   >
                                     Todas
@@ -920,7 +920,7 @@ export default function Quotes() {
                                       key={e.id}
                                       onClick={() => { setFiltroEtapa(e.id); setFiltrosAbiertos(false); }}
                                       className={`w-full text-left px-2 py-1.5 rounded text-[12px] transition-colors ${
-                                        filtroEtapa === e.id ? 'bg-[#E11D48]/10 text-[#E11D48] font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                                        filtroEtapa === e.id ? 'bg-primario/10 text-primario font-semibold' : 'text-gray-600 hover:bg-gray-50'
                                       }`}
                                     >
                                       {e.label}
@@ -940,7 +940,7 @@ export default function Quotes() {
                         {viewMode === 'prospeccion' && puedeCrearLead && (
                           <button
                             onClick={() => setShowProspectForm(true)}
-                            className="bg-[#E11D48] text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#BE123C] transition-colors shadow-sm flex items-center gap-2"
+                            className="bg-primario text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-primario-hover transition-colors shadow-sm flex items-center gap-2"
                           >
                             <Plus className="w-4 h-4" /> Nuevo prospecto
                           </button>
@@ -948,7 +948,7 @@ export default function Quotes() {
                         {viewMode === 'kanban' && puedeSolicitar && (
                           <button
                             onClick={abrirFormulario}
-                            className="bg-[#E11D48] text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#BE123C] transition-colors shadow-sm flex items-center gap-2"
+                            className="bg-primario text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-primario-hover transition-colors shadow-sm flex items-center gap-2"
                           >
                             <Plus className="w-4 h-4" />
                             {puedeCrear ? 'Nueva cotización' : 'Solicitar cotización'}
@@ -961,7 +961,7 @@ export default function Quotes() {
                   {viewMode === 'pricing' && puedeCrear && (
                     <button
                       onClick={abrirFormulario}
-                      className="bg-[#E11D48] text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-[#BE123C] transition-colors shadow-sm flex items-center gap-2"
+                      className="bg-primario text-white px-4 py-2 rounded-lg text-[13px] font-bold hover:bg-primario-hover transition-colors shadow-sm flex items-center gap-2"
                     >
                       <Plus className="w-4 h-4" /> Nueva cotización
                     </button>
@@ -973,13 +973,13 @@ export default function Quotes() {
                     title={chatOpen ? 'Cerrar conversaciones' : 'Abrir conversaciones'}
                     className={`relative p-2 rounded-lg border transition-all shadow-sm ${
                       chatOpen
-                        ? 'bg-[#E11D48]/10 border-[#E11D48]/30 text-[#E11D48]'
+                        ? 'bg-primario/10 border-primario/30 text-primario'
                         : 'bg-white border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                     }`}
                   >
                     <MessageSquare className="w-4 h-4" />
                     {chatUnreadCount > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 bg-[#E11D48] text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center leading-none">
+                      <span className="absolute -top-1.5 -right-1.5 bg-primario text-white text-[9px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center leading-none">
                         {chatUnreadCount}
                       </span>
                     )}
@@ -1033,7 +1033,7 @@ export default function Quotes() {
 
           <div className="p-8 space-y-6">
             <div className="space-y-4">
-              <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-1.5">
+              <h4 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-1.5">
                 Datos del Prospecto
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1044,7 +1044,7 @@ export default function Quotes() {
                     placeholder="Ej. Alfa Corporativo S.A."
                     value={formProspectoEmpresa}
                     onChange={e => setFormProspectoEmpresa(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario"
                   />
                 </div>
                 <div>
@@ -1054,7 +1054,7 @@ export default function Quotes() {
                     placeholder="Ej. Roberto Jiménez"
                     value={formProspectoContacto}
                     onChange={e => setFormProspectoContacto(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario"
                   />
                 </div>
                 <div>
@@ -1064,7 +1064,7 @@ export default function Quotes() {
                     placeholder="Ej. 555-123-4567"
                     value={formProspectoTel}
                     onChange={e => setFormProspectoTel(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario"
                   />
                 </div>
                 <div>
@@ -1074,7 +1074,7 @@ export default function Quotes() {
                     placeholder="Ej. roberto@alfa.com"
                     value={formProspectoEmail}
                     onChange={e => setFormProspectoEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario"
                   />
                 </div>
               </div>
@@ -1093,7 +1093,7 @@ export default function Quotes() {
               type="button"
               onClick={handleCreateProspecto}
               disabled={guardandoProspecto}
-              className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-xs transition-colors disabled:opacity-60"
+              className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-xs transition-colors disabled:opacity-60"
             >
               {guardandoProspecto ? 'Guardando…' : 'Guardar Prospecto'}
             </button>
@@ -1114,7 +1114,7 @@ export default function Quotes() {
             
             {/* Sección 1: Prospecto */}
             <div className="space-y-4">
-              <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-1.5">
+              <h4 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-1.5">
                 Datos del Prospecto / Cliente
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1127,7 +1127,7 @@ export default function Quotes() {
                   <select
                     value={formProspectoOrigenId}
                     onChange={e => aplicarSeleccionEmpresa(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] bg-white"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario bg-white"
                   >
                     <option value="">— Selecciona o captura —</option>
                     {prospectos.length > 0 && (
@@ -1157,7 +1157,7 @@ export default function Quotes() {
                       placeholder="Ej. Alfa Corporativo S.A."
                       value={formEmpresa}
                       onChange={e => setFormEmpresa(e.target.value)}
-                      className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
+                      className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario"
                     />
                   )}
                 </div>
@@ -1168,7 +1168,7 @@ export default function Quotes() {
                     placeholder="Ej. Roberto Jiménez"
                     value={formContacto}
                     onChange={e => setFormContacto(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario"
                   />
                 </div>
                 <div>
@@ -1176,7 +1176,7 @@ export default function Quotes() {
                   <select
                     value={formTrafico}
                     onChange={e => setFormTrafico(e.target.value as typeof formTrafico)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] bg-white"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario bg-white"
                   >
                     <option value="">— Definir después —</option>
                     <option value="importacion">Importación</option>
@@ -1188,7 +1188,7 @@ export default function Quotes() {
                   <select
                     value={formOrigen}
                     onChange={e => setFormOrigen(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none focus:border-[#E11D48] bg-white cursor-pointer"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-bold text-gray-700 outline-none focus:border-primario bg-white cursor-pointer"
                   >
                     {Object.entries(ORIGENES_PROSPECTO).map(([k, v]) => (
                       <option key={k} value={k}>{v}</option>
@@ -1202,7 +1202,7 @@ export default function Quotes() {
                     placeholder="55 4321 0987"
                     value={formTelefono}
                     onChange={e => setFormTelefono(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario"
                   />
                 </div>
                 <div>
@@ -1212,7 +1212,7 @@ export default function Quotes() {
                     placeholder="rjimenez@alfacorp.mx"
                     value={formEmail}
                     onChange={e => setFormEmail(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario"
                   />
                 </div>
                 <div>
@@ -1223,7 +1223,7 @@ export default function Quotes() {
                   <select
                     value={vendedorEfectivo}
                     onChange={e => setFormVendedor(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] bg-white cursor-pointer"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario bg-white cursor-pointer"
                   >
                     <option value={user?.nombre ?? ''}>{user?.nombre ?? 'Yo'} (yo)</option>
                   </select>
@@ -1238,7 +1238,7 @@ export default function Quotes() {
                 que no aplican no se muestran. */}
             <div className="space-y-3">
               <div className="border-b border-gray-100 pb-2">
-                <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest mb-2">
+                <h4 className="text-[10px] font-bold text-primario uppercase tracking-widest mb-2">
                   Qué se mueve *
                 </h4>
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -1251,8 +1251,8 @@ export default function Quotes() {
                         onClick={() => cambiarModalidad(m)}
                         className={`text-[11px] font-bold px-3.5 py-1.5 rounded-full border transition-colors ${
                           activa
-                            ? 'bg-[#E11D48] border-[#E11D48] text-white'
-                            : 'border-gray-200 text-gray-600 hover:border-[#E11D48] hover:text-[#E11D48]'
+                            ? 'bg-primario border-primario text-white'
+                            : 'border-gray-200 text-gray-600 hover:border-primario hover:text-primario'
                         }`}
                       >
                         {ETIQUETA_MODALIDAD[m]}
@@ -1290,7 +1290,7 @@ export default function Quotes() {
               <button
                 type="button"
                 onClick={() => handleCreateQuote('pricing_solicitando')}
-                className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-xs transition-colors"
+                className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-xs transition-colors"
               >
                 Crear y cotizar
               </button>
@@ -1306,7 +1306,7 @@ export default function Quotes() {
                 <button
                   type="button"
                   onClick={() => handleCreateQuote('solicitado_pricing')}
-                  className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-xs transition-colors"
+                  className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-5 py-2.5 rounded-lg shadow-xs transition-colors"
                 >
                   Enviar a Pricing
                 </button>
@@ -1443,7 +1443,7 @@ export default function Quotes() {
                     </div>
                     <div className="p-6 space-y-4">
                       <p className="text-xs text-gray-500">Sube un archivo CSV con tus cotizaciones. Descarga la plantilla de muestra para ver el formato.</p>
-                      <button onClick={handleDownloadTemplateQuotes} className="w-full py-2 px-4 border border-[#E11D48] text-[#E11D48] bg-[#E11D48]/5 hover:bg-[#E11D48]/10 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2">
+                      <button onClick={handleDownloadTemplateQuotes} className="w-full py-2 px-4 border border-primario text-primario bg-primario/5 hover:bg-primario/10 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2">
                         <Download className="w-4 h-4" /> Descargar plantilla de muestra
                       </button>
                       <div className="border-2 border-dashed border-gray-200 rounded-xl p-8 flex flex-col items-center justify-center bg-gray-50">
@@ -1498,11 +1498,11 @@ function ViewButton({
     <button
       onClick={onClick}
       className={`relative pb-3 text-[14px] font-medium transition-colors flex items-center gap-2
-        ${active ? 'text-[#E11D48] border-b-2 border-[#E11D48] bg-transparent' : 'text-[#71717A] border-b-2 border-transparent hover:text-[#18181B]'}`}
+        ${active ? 'text-primario border-b-2 border-primario bg-transparent' : 'text-[#71717A] border-b-2 border-transparent hover:text-[#18181B]'}`}
     >
       {label}
       {badge !== undefined && (
-        <span className="flex items-center justify-center w-[18px] h-[18px] bg-[#E11D48] text-white text-[10px] font-bold rounded-full">
+        <span className="flex items-center justify-center w-[18px] h-[18px] bg-primario text-white text-[10px] font-bold rounded-full">
           {badge}
         </span>
       )}

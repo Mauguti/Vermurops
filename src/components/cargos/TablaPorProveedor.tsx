@@ -148,7 +148,7 @@ export default function TablaPorProveedor({
                     <tr
                       key={r.clave}
                       onClick={() => onClickRenglon?.(r)}
-                      className={`group transition-colors ${activa ? 'bg-[#E11D48]/[0.04] ring-1 ring-inset ring-[#E11D48]/25' : 'hover:bg-gray-50/60'} ${onClickRenglon ? 'cursor-pointer' : ''}`}
+                      className={`group transition-colors ${activa ? 'bg-primario/[0.04] ring-1 ring-inset ring-primario/25' : 'hover:bg-gray-50/60'} ${onClickRenglon ? 'cursor-pointer' : ''}`}
                     >
                       <td className="px-3 py-1.5 text-gray-700">
                         {r.concepto}

@@ -52,7 +52,7 @@ export default function ResumenFinancieroInline({
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden sticky bottom-0">
       <div className="px-4 py-2.5 bg-gray-50/60 border-b border-gray-100 flex items-center gap-2">
-        <TrendingUp className="w-3.5 h-3.5 text-[#E11D48]" />
+        <TrendingUp className="w-3.5 h-3.5 text-primario" />
         <h4 className="text-[10px] font-bold text-[#18181B] uppercase tracking-widest">
           Resumen de la operación
         </h4>

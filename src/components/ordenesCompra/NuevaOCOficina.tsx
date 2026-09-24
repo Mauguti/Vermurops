@@ -115,7 +115,7 @@ export default function NuevaOCOficina({
         <div className="flex items-start justify-between border-b border-gray-100 pb-3 mb-4">
           <div>
             <h3 className="text-sm font-bold text-[#18181B] uppercase tracking-wider flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-[#E11D48]" /> Gasto de oficina
+              <Building2 className="w-4 h-4 text-primario" /> Gasto de oficina
             </h3>
             <p className="text-[11px] text-gray-400 mt-0.5">
               Luz, nómina, servicios, insumos: lo que no cuelga de un embarque.
@@ -131,7 +131,7 @@ export default function NuevaOCOficina({
             <select
               value={proveedorId}
               onChange={e => setProveedorId(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-[#E11D48]"
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-primario"
             >
               <option value="">Elige un proveedor…</option>
               {proveedores.map(p => (
@@ -146,7 +146,7 @@ export default function NuevaOCOficina({
             <select
               value={conceptoId}
               onChange={e => setConceptoId(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-[#E11D48]"
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-primario"
             >
               <option value="">Elige un concepto…</option>
               {conceptos.map(c => (
@@ -163,7 +163,7 @@ export default function NuevaOCOficina({
                   value={monto}
                   onChange={e => setMonto(e.target.value)}
                   placeholder="0.00"
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] tabular-nums outline-none focus:border-[#E11D48]"
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] tabular-nums outline-none focus:border-primario"
                 />
               </Campo>
             </div>
@@ -171,7 +171,7 @@ export default function NuevaOCOficina({
               <select
                 value={moneda}
                 onChange={e => setMoneda(e.target.value as 'MXN' | 'USD')}
-                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-[#E11D48]"
+                className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-primario"
               >
                 <option value="MXN">MXN</option>
                 <option value="USD">USD</option>
@@ -184,7 +184,7 @@ export default function NuevaOCOficina({
               type="date"
               value={fechaRequerida}
               onChange={e => setFechaRequerida(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-[#E11D48]"
+              className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-primario"
             />
           </Campo>
 
@@ -193,7 +193,7 @@ export default function NuevaOCOficina({
               value={descripcion}
               onChange={e => setDescripcion(e.target.value)}
               placeholder="Recibo CFE agosto, nómina segunda quincena…"
-              className="w-full h-16 p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-[#E11D48] resize-none"
+              className="w-full h-16 p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-primario resize-none"
             />
           </Campo>
 
@@ -202,7 +202,7 @@ export default function NuevaOCOficina({
               type="checkbox"
               checked={urgente}
               onChange={e => setUrgente(e.target.checked)}
-              className="accent-[#E11D48]"
+              className="accent-primario"
             />
             <span className="text-[12px] text-gray-600">Marcar como urgente</span>
           </label>
@@ -224,7 +224,7 @@ export default function NuevaOCOficina({
             <button
               onClick={enviar}
               disabled={faltantes.length > 0}
-              className="px-4 py-2 bg-[#E11D48] hover:bg-[#BE123C] disabled:opacity-40 disabled:hover:bg-[#E11D48] text-white text-[12px] font-bold uppercase tracking-wider rounded-lg transition-colors"
+              className="px-4 py-2 bg-primario hover:bg-primario-hover disabled:opacity-40 disabled:hover:bg-primario text-white text-[12px] font-bold uppercase tracking-wider rounded-lg transition-colors"
             >
               Solicitar pago
             </button>

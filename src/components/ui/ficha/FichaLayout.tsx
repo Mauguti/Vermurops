@@ -97,7 +97,7 @@ export type TonoBadge = 'exito' | 'peligro' | 'activo' | 'espera' | 'neutro';
 const TONO: Record<TonoBadge, string> = {
   exito:   'bg-green-100 text-green-800',
   peligro: 'bg-red-100 text-red-800',
-  activo:  'bg-[#E11D48]/10 text-[#E11D48]',
+  activo:  'bg-primario/10 text-primario',
   espera:  'bg-amber-50 text-amber-700 border border-amber-100',
   neutro:  'bg-gray-100 text-gray-600',
 };
@@ -139,7 +139,7 @@ export function FichaTabs<T extends string>({
           onClick={() => onCambiar(tab.id)}
           className={`px-6 py-3.5 text-center text-[10px] font-bold uppercase tracking-wider border-b-2 transition-all duration-200 whitespace-nowrap
             ${activa === tab.id
-              ? 'border-[#E11D48] text-[#E11D48] bg-[#E11D48]/[0.02]'
+              ? 'border-primario text-primario bg-primario/[0.02]'
               : 'border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50/50'}`}
         >
           {tab.label}

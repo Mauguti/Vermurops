@@ -23,7 +23,7 @@ export function EnlaceEntidad({
     <button
       onClick={() => irA({ tipo, id })}
       title={title ?? `Abrir ${id}`}
-      className="inline-flex items-center gap-1 font-mono text-[12px] font-semibold text-[#E11D48] hover:underline"
+      className="inline-flex items-center gap-1 font-mono text-[12px] font-semibold text-primario hover:underline"
     >
       {children ?? id}
       <ArrowUpRight className="w-3 h-3 shrink-0" />

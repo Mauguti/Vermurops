@@ -43,7 +43,7 @@ function Boton({ children, cargando, ...props }: React.ButtonHTMLAttributes<HTML
       {...props}
       disabled={cargando || props.disabled}
       className="w-full py-[12px] rounded-[8px] text-[14px] font-semibold text-white tracking-tight transition-all"
-      style={{ background: cargando ? '#F43F5E' : '#E11D48', opacity: cargando ? 0.85 : 1 }}
+      style={{ background: cargando ? 'var(--color-primario-claro)' : 'var(--color-primario)', opacity: cargando ? 0.85 : 1 }}
     >
       {children}
     </button>
@@ -101,7 +101,7 @@ export function SolicitarRecuperacion({ correoInicial = '', onVolver }: { correo
               value={email} onChange={e => { setEmail(e.target.value); setError(''); }}
             />
           </div>
-          {error && <p className="text-[12px] font-medium text-[#E11D48] text-center -mt-[4px]">{error}</p>}
+          {error && <p className="text-[12px] font-medium text-peligro text-center -mt-[4px]">{error}</p>}
           <Boton id="rec-submit" type="submit" cargando={cargando}>{cargando ? 'Enviando…' : 'Enviar enlace'}</Boton>
           <button type="button" onClick={onVolver}
             className="w-full py-[10px] rounded-[8px] text-[13px] font-medium text-[#52525B] transition-colors hover:bg-[#F4F4F5]"
@@ -157,7 +157,7 @@ export function RestablecerContrasena({ oobCode, onTerminado }: { oobCode: strin
       <h2 className="text-[18px] font-bold text-[#18181B] tracking-tight mb-[6px]">Contraseña nueva</h2>
       {errorEnlace ? (
         <div className="space-y-[18px]">
-          <p className="text-[13px] font-medium text-[#E11D48]">{errorEnlace}</p>
+          <p className="text-[13px] font-medium text-peligro">{errorEnlace}</p>
           <Boton type="button" onClick={() => onTerminado('')}>Ir al inicio de sesión</Boton>
         </div>
       ) : listo ? (
@@ -187,7 +187,7 @@ export function RestablecerContrasena({ oobCode, onTerminado }: { oobCode: strin
             <input id="rec-p2" type={ver ? 'text' : 'password'} required autoComplete="new-password"
               className={INP} style={BORDE} value={p2} onChange={e => { setP2(e.target.value); setError(''); }} />
           </div>
-          {error && <p className="text-[12px] font-medium text-[#E11D48] text-center -mt-[4px]">{error}</p>}
+          {error && <p className="text-[12px] font-medium text-peligro text-center -mt-[4px]">{error}</p>}
           <Boton id="rec-confirmar" type="submit" cargando={cargando}>{cargando ? 'Guardando…' : 'Guardar contraseña'}</Boton>
         </form>
       )}

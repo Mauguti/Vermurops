@@ -32,7 +32,7 @@ interface EmbarquesListProps {
   onCrearEmbarque: () => void;
 }
 
-const SELECT = 'bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-gray-700 outline-none focus:border-[#E11D48]';
+const SELECT = 'bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-gray-700 outline-none focus:border-primario';
 
 export default function EmbarquesList({ embarques, onSelectEmbarque, onCrearEmbarque }: EmbarquesListProps) {
   const { user } = useAuth();
@@ -128,7 +128,7 @@ export default function EmbarquesList({ embarques, onSelectEmbarque, onCrearEmba
             </button>
             <button
               onClick={onCrearEmbarque}
-              className="bg-[#E11D48] hover:bg-[#BE123C] text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 shadow-xs"
+              className="bg-primario hover:bg-primario-hover text-white px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2 shadow-xs"
             >
               <Plus className="w-4 h-4" /> Nuevo Embarque
             </button>
@@ -142,7 +142,7 @@ export default function EmbarquesList({ embarques, onSelectEmbarque, onCrearEmba
             <button
               onClick={() => set('responsable', soloMios ? '' : miCorreo)}
               className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider flex items-center gap-1.5 border transition-colors
-                ${soloMios ? 'bg-[#E11D48] text-white border-[#E11D48]' : 'bg-white text-gray-600 border-gray-200 hover:border-[#E11D48] hover:text-[#E11D48]'}`}
+                ${soloMios ? 'bg-primario text-white border-primario' : 'bg-white text-gray-600 border-gray-200 hover:border-primario hover:text-primario'}`}
             >
               <UserCheck className="w-3.5 h-3.5" /> Solo los míos
             </button>
@@ -191,7 +191,7 @@ export default function EmbarquesList({ embarques, onSelectEmbarque, onCrearEmba
           {activos > 0 && (
             <button
               onClick={() => setFiltros(FILTROS_VACIOS)}
-              className="text-[11px] font-bold text-gray-400 hover:text-[#E11D48] flex items-center gap-1 px-2"
+              className="text-[11px] font-bold text-gray-400 hover:text-primario flex items-center gap-1 px-2"
             >
               <X className="w-3 h-3" /> Limpiar
             </button>
@@ -208,7 +208,7 @@ export default function EmbarquesList({ embarques, onSelectEmbarque, onCrearEmba
             placeholder="Buscar por folio, BL, PO, cliente, consignatario…"
             value={filtros.busqueda}
             onChange={e => set('busqueda', e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
+            className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 focus:border-primario rounded-lg text-xs font-semibold text-gray-700 outline-none shadow-2xs"
           />
         </div>
         <div className="flex items-center gap-2">
