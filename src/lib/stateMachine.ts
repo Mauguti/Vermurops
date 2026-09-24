@@ -14,6 +14,20 @@
 
 import { KanbanQuote, PipelineStageId } from '../components/quotes/QuotesData';
 import { razonSinCliente } from './frenoCliente';
+import { razonExpediente } from './frenoExpediente';
+import type { ClienteVermur } from '../components/clientes/ClientesData';
+
+/**
+ * Contexto opcional de una transición (Bloque 2b): el cliente vinculado,
+ * para el freno del expediente. Si quien pregunta no lo pasa, la máquina
+ * solo revisa lo que sabe (el clienteId); los puntos que ESCRIBEN exigen el
+ * expediente por su cuenta con `exigirExpediente`.
+ */
+export interface ContextoTransicion {
+  cliente?: ClienteVermur | null;
+  justificacion?: string;
+  rol?: Rol;
+}
 import type { UserRole } from '../auth/users';
 import { evaluarProntitud, resumenFaltantes, serviciosSinLineas } from './prontitudCotizacion';
 
@@ -37,7 +51,7 @@ interface TransitionDef {
    * Validación de negocio opcional.
    * Devuelve null si todo está bien, o un string con el mensaje de error.
    */
-  validar?: (quote: KanbanQuote) => string | null;
+  validar?: (quote: KanbanQuote, ctx?: ContextoTransicion) => string | null;
 }
 
 // ─── Mapa de transiciones ──────────────────────────────────────────────────────
@@ -181,7 +195,8 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
       hacia: 'ganada',
       roles: ['ventas', 'pricing', 'admin'],
       // Bloque 2a: sin cliente vinculado no se gana. Sin salto para nadie.
-      validar: razonSinCliente,
+      validar: (q, ctx) => razonSinCliente(q)
+        ?? (ctx && 'cliente' in ctx ? razonExpediente(q, { cliente: ctx.cliente, rol: ctx.rol, justificacion: ctx.justificacion, saltoPrevio: q.saltoExpediente }) : null),
     },
     {
       hacia: 'perdida',
@@ -203,7 +218,8 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
       hacia: 'ganada',
       roles: ['ventas', 'pricing', 'admin'],
       // Bloque 2a: sin cliente vinculado no se gana. Sin salto para nadie.
-      validar: razonSinCliente,
+      validar: (q, ctx) => razonSinCliente(q)
+        ?? (ctx && 'cliente' in ctx ? razonExpediente(q, { cliente: ctx.cliente, rol: ctx.rol, justificacion: ctx.justificacion, saltoPrevio: q.saltoExpediente }) : null),
     },
     {
       hacia: 'perdida',
@@ -242,6 +258,7 @@ export function puedeTransicionarA(
   hacia: PipelineStageId,
   rol: Rol,
   quote: KanbanQuote,
+  ctx?: ContextoTransicion,
 ): TransicionResult {
   const salidas = TRANSITIONS[desde] ?? [];
   const def = salidas.find(t => t.hacia === hacia);
@@ -255,7 +272,7 @@ export function puedeTransicionarA(
   }
 
   if (def.validar) {
-    const msg = def.validar(quote);
+    const msg = def.validar(quote, { ...ctx, rol });
     if (msg !== null) return { ok: false, razon: msg };
   }
 
@@ -271,10 +288,11 @@ export function transicionesDisponibles(
   desde: PipelineStageId,
   rol: Rol,
   quote: KanbanQuote,
+  ctx?: ContextoTransicion,
 ): PipelineStageId[] {
   const salidas = TRANSITIONS[desde] ?? [];
   return salidas
-    .filter(def => puedeTransicionarA(desde, def.hacia, rol, quote).ok)
+    .filter(def => puedeTransicionarA(desde, def.hacia, rol, quote, ctx).ok)
     .map(def => def.hacia);
 }
 
@@ -300,11 +318,12 @@ export function salidasPara(
   desde: PipelineStageId,
   rol: Rol,
   quote: KanbanQuote,
+  ctx?: ContextoTransicion,
 ): { hacia: PipelineStageId; ok: boolean; razon: string | null }[] {
   return (TRANSITIONS[desde] ?? [])
     .filter(def => def.roles.includes(rol))
     .map(def => {
-      const r = puedeTransicionarA(desde, def.hacia, rol, quote);
+      const r = puedeTransicionarA(desde, def.hacia, rol, quote, ctx);
       return { hacia: def.hacia, ok: r.ok, razon: r.ok ? null : (r.razon ?? null) };
     });
 }

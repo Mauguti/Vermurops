@@ -37,6 +37,7 @@ import { planearEmbarquesDeGanada } from './planEmbarquesGanada';
 import { reservarFoliosMultiSerie } from './folioService';
 import { sanitizarParaFirestore } from './sanitizarFirestore';
 import { exigirClienteVinculado } from './frenoCliente';
+import type { SaltoExpediente } from './frenoExpediente';
 
 export interface ParametrosGeneracion {
   /** La cotización YA con los campos de «ganada» aplicados. */
@@ -48,6 +49,8 @@ export interface ParametrosGeneracion {
   generadoPor: string;
   /** Inyectable para pruebas. */
   ahora?: string;
+  /** Salto de expediente ya autorizado por admin (Bloque 2b): se registra en cada embarque. */
+  salto?: SaltoExpediente | null;
 }
 
 export interface ResultadoGeneracion {
@@ -136,6 +139,8 @@ export async function crearEmbarquesDeCotizacionGanada(
         // todos duplicaría la carga en la multimodal, igual que los cargos.
         serviciosGrupo: (p.quote.servicios ?? []).filter(s => grupo.servicioIds.includes(s.id)),
       }));
+      // Bloque 2b: el salto autorizado por admin queda en CADA embarque, para siempre.
+      if (p.salto) embarques[embarques.length - 1].saltoExpediente = p.salto;
     });
 
     // ── Escrituras ──────────────────────────────────────────────────────────

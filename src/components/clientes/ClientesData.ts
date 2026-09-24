@@ -121,6 +121,12 @@ export interface ClienteVermur {
   estado?: string | null;
   codigoPostal?: string | null;
   validadoFiscalmente?: boolean;
+  /**
+   * Validación formal del expediente (Bloque 2b, 25-sep-2026): quién y
+   * cuándo. Los importados de Magaya cuentan como validados de origen sin
+   * este campo (lib/frenoExpediente.ts). Aditivo.
+   */
+  expedienteValidado?: { por: string; fecha: string; notas?: string } | null;
   tuvoTransacciones?: boolean;
   duplicadoEnMagaya?: boolean;
   origenDatos?: 'manual' | 'magaya';

@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { estadoValidacion, etiquetaValidacion } from '../../lib/frenoExpediente';
 import { ClienteVermur, DocsAlta, ContratoCliente, PagareCliente } from './ClientesData';
 import { validarRFC } from '../../lib/validadores';
 import { ChevronRight, Loader2, Check, Upload, AlertTriangle } from 'lucide-react';
@@ -114,7 +115,10 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
    * Administración. Los demás roles consultan: el fieldset deshabilita todos
    * los campos de una vez y las barras de guardar no se montan.
    */
-  const { puede } = useAuth();
+  const { puede, user } = useAuth();
+  const [notasValidacion, setNotasValidacion] = useState('');
+  const [validando, setValidando] = useState(false);
+  const estadoExp = estadoValidacion(cliente);
   const soloConsulta = !puede('cliente.alta');
 
   // U-4 · Lo que este cliente tiene abierto, enlazado desde su propia ficha.
@@ -133,6 +137,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
     || e.entidadesRef?.clienteCobrar?.id === cliente.id);
   const [tab, setTab] = useState<TabId>('informacion');
   const [draft, setDraft] = useState<ClienteVermur>(() => withDefaults(cliente));
+  const checklistCompleto = Object.values(draft.docsAlta).every(Boolean);
   const [saving, setSaving] = useState(false);
   // Feedback inline de formato del RFC (solo en pestaña Información).
   const [rfcError, setRfcError] = useState('');
@@ -291,12 +296,15 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
             <BadgeEstado tono={cliente.statusOperativo === 'ACTIVO' ? 'exito' : 'neutro'}>
               {cliente.statusOperativo}
             </BadgeEstado>
+            <BadgeEstado tono={estadoExp === 'sin_validar' ? 'espera' : 'exito'} title={etiquetaValidacion(cliente)}>
+              {estadoExp === 'validado' ? 'Expediente validado' : estadoExp === 'heredado_magaya' ? 'Validado · heredado de Magaya' : 'Expediente sin validar'}
+            </BadgeEstado>
             {cliente.validadoFiscalmente !== true && (
               <BadgeEstado
                 tono="espera"
                 title="Sin validación fiscal no se debe operar un embarque de este cliente."
               >
-                Sin validar
+                Sin validación fiscal
               </BadgeEstado>
             )}
           </>
@@ -543,6 +551,47 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                   <p className="text-[12px] text-red-700">{errorExpediente}</p>
                 </div>
               )}
+
+              {/* ── Validación del expediente (Bloque 2b) ─────────────────
+                  Los de Magaya cuentan como validados de origen y se leen así;
+                  Administración puede validarlos formalmente. Los creados en
+                  VermurOps pasan por aquí: checklist completo, o notas. */}
+              <div className={`mb-5 rounded-xl border px-4 py-3 ${estadoExp === 'sin_validar' ? 'border-amber-200 bg-amber-50/60' : 'border-emerald-200 bg-emerald-50/60'}`}>
+                <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500">Validación del expediente</p>
+                <p className={`text-[12px] font-semibold mt-1 ${estadoExp === 'sin_validar' ? 'text-amber-800' : 'text-emerald-800'}`}>
+                  {etiquetaValidacion(cliente)}
+                  {estadoExp === 'validado' && cliente.expedienteValidado?.notas && (
+                    <span className="block font-normal text-gray-600 mt-0.5">{cliente.expedienteValidado.notas}</span>
+                  )}
+                </p>
+                {!soloConsulta && estadoExp !== 'validado' && (
+                  <div className="mt-2 space-y-2">
+                    <textarea
+                      rows={2} value={notasValidacion} onChange={e => setNotasValidacion(e.target.value)}
+                      placeholder={checklistCompleto ? 'Notas (opcional)' : 'Con el checklist incompleto, las notas son obligatorias: qué falta y por qué se valida igual.'}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-[#E11D48] bg-white"
+                    />
+                    <button
+                      type="button"
+                      disabled={validando || (!checklistCompleto && !notasValidacion.trim())}
+                      onClick={async () => {
+                        setValidando(true);
+                        try {
+                          await onUpdate(cliente.id, { expedienteValidado: {
+                            por: user?.nombre ?? user?.email ?? '',
+                            fecha: new Date().toISOString(),
+                            ...(notasValidacion.trim() ? { notas: notasValidacion.trim() } : {}),
+                          } });
+                          setNotasValidacion('');
+                        } finally { setValidando(false); }
+                      }}
+                      className="px-4 py-2 bg-[#E11D48] hover:bg-[#BE123C] disabled:opacity-40 disabled:cursor-not-allowed text-white text-[11px] font-bold uppercase tracking-wider rounded-lg"
+                    >
+                      {validando ? 'Validando…' : estadoExp === 'heredado_magaya' ? 'Validar formalmente' : 'Validar expediente'}
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <p className={LABEL}>Documentos de alta (KYC)</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">

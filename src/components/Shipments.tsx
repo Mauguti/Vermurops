@@ -9,6 +9,9 @@ import CotizacionesGanadas from './shipments/CotizacionesGanadas';
 import { agruparPorEstado, estadoDe, ETAPAS_EMBARQUE } from '../lib/estadoEmbarque';
 import { crearEmbarquesDeCotizacionGanada } from '../lib/crearEmbarquesGanada';
 import { razonSinCliente } from '../lib/frenoCliente';
+import { exigirExpediente, textoSalto, type SaltoExpediente } from '../lib/frenoExpediente';
+import { anotarBitacora } from '../hooks/anotarBitacora';
+import type { UserRole } from '../auth/users';
 import { mapearCotizacionAEmbarque } from '../lib/cotizacionAEmbarque';
 import { construirEmbarqueDesdeCotizacion } from '../lib/generacionEmbarque';
 import { EMBARQUE_AUTOMATICO_DISPONIBLE } from '../config/banderas';
@@ -192,6 +195,19 @@ export default function Shipments() {
     // Bloque 2a: el freno también aquí, que es la ruta que corre hoy.
     const sinCliente = razonSinCliente(quote);
     if (sinCliente) { setToast({ mensaje: sinCliente, tipo: 'error' }); return; }
+    // Bloque 2b: el expediente. Un salto que admin ya registró en la
+    // cotización se hereda; sin él, Operaciones no puede abrir.
+    let salto: SaltoExpediente | null = null;
+    try {
+      salto = exigirExpediente(quote, {
+        cliente: clientes.find(c => c.id === quote.clienteId) ?? null,
+        rol: user?.rol as UserRole | undefined,
+        saltoPrevio: quote.saltoExpediente,
+      });
+    } catch (err) {
+      setToast({ mensaje: err instanceof Error ? err.message : String(err), tipo: 'error' });
+      return;
+    }
     setCreando(true);
 
     /*
@@ -228,7 +244,12 @@ export default function Shipments() {
           // hereda los productos de TODOS sus servicios.
           serviciosGrupo: quote.servicios ?? [],
         });
+        if (salto) nuevo.saltoExpediente = salto;
         await guardarEmbarque(nuevo);
+        if (salto) {
+          await anotarBitacora(nuevo.id, 'otro', 'Expediente sin validar: salto autorizado',
+            { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' }, textoSalto(salto));
+        }
 
         /*
          * ── El enlace de vuelta (9-sep-2026) ──────────────────────────────

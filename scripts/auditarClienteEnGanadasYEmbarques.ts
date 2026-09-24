@@ -28,6 +28,7 @@ import type { EmbarqueCompleto as Embarque } from '../src/components/shipments/E
 /** El embarque NO tiene clienteId: refiere al cliente por entidadesRef.clienteCobrar (§4.12). */
 const clienteDe = (e: Embarque): string | null => e.entidadesRef?.clienteCobrar?.id ?? null;
 import { estadoChecklist, type TipoDocExpediente } from '../src/lib/clasificacionDocumentos';
+import { estadoValidacion } from '../src/lib/frenoExpediente';
 
 const TIPOS_EXPEDIENTE: TipoDocExpediente[] = [
   'acta_constitutiva', 'poder_notarial', 'identificacion_oficial',
@@ -68,7 +69,21 @@ async function main() {
   const ganadas = cotizaciones.filter(q => q.etapa === 'ganada');
   const ganadasSinCliente = ganadas.filter(q => !q.clienteId);
   console.log(`1 · Cotizaciones ganadas: ${ganadas.length} · sin clienteId: ${ganadasSinCliente.length}`);
-  ganadasSinCliente.forEach(q => console.log(`   · ${q.__id} — ${q.prospecto?.empresa ?? '(sin empresa)'} — embarques: ${(q.embarqueIds ?? []).join(', ') || 'ninguno'}`));
+  // El formulario de solicitud no guardaba clienteId hasta el 25-sep-2026:
+  // se separan las que tienen huella del formulario (createdAt con hora y
+  // origen del lead del formulario) de la semilla inicial y del resto.
+  const SEMILLA = new Set(Array.from({ length: 8 }, (_, i) => `COT-2026-000${i + 1}`));
+  const origenDe = (q: KanbanQuote & { __id: string }): string => {
+    if (SEMILLA.has(q.__id)) return 'semilla inicial';
+    if (q.prospectoId) return 'formulario (desde prospecto)';
+    if (q.prospecto?.origen === 'interno_pricing') return 'formulario (Pricing directo)';
+    if (q.createdAt) return 'formulario';
+    return 'otro / desconocido';
+  };
+  const porOrigen = new Map<string, number>();
+  ganadasSinCliente.forEach(q => porOrigen.set(origenDe(q), (porOrigen.get(origenDe(q)) ?? 0) + 1));
+  [...porOrigen.entries()].forEach(([o, n]) => console.log(`   ${o}: ${n}`));
+  ganadasSinCliente.forEach(q => console.log(`   · ${q.__id} — ${q.prospecto?.empresa ?? '(sin empresa)'} — ${origenDe(q)} — creada ${q.createdAt ?? '?'} — embarques: ${(q.embarqueIds ?? []).join(', ') || 'ninguno'}`));
 
   // 2 · embarques sin clienteId
   const sinCliente = embarques.filter(e => !clienteDe(e));
@@ -102,6 +117,11 @@ async function main() {
   expedienteIncompleto.forEach(x => console.log(`      · ${x}`));
 
   // Contexto: cuántos clientes en total pasarían/no pasarían
+  const magaya = clientes.filter(c => estadoValidacion(c) === 'heredado_magaya').length;
+  const validados = clientes.filter(c => estadoValidacion(c) === 'validado').length;
+  const sinValidar = clientes.filter(c => estadoValidacion(c) === 'sin_validar');
+  console.log(`\n4 · Regla del Bloque 2b: heredados de Magaya ${magaya} · validados ${validados} · SIN VALIDAR ${sinValidar.length}`);
+  sinValidar.forEach(c => console.log(`   · ${c.__id} — ${c.nombre} — alta ${c.fechaAlta ?? '?'} — origenDatos ${c.origenDatos ?? '(ausente)'}`));
   const clientesSinRfc = clientes.filter(c => !c.rfc?.trim()).length;
   const clientesSinValidacion = clientes.filter(c => c.validadoFiscalmente !== true).length;
   console.log(`\nContexto clientes/: sin RFC ${clientesSinRfc} · sin validadoFiscalmente ${clientesSinValidacion} · de ${clientes.length}\n`);
