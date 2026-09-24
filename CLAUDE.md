@@ -27,7 +27,7 @@ puertos). Cuentas: `ventas@vermur.com`, `pricing@vermur.com`,
 contraseña `123456`. Los datos de ejemplo (COT-2026-0001…0008) los siembra
 la app sola al entrar por primera vez. Ctrl+C apaga todo. Si el trabajo
 está en un worktree, correrlo DESDE el worktree: sirve ese checkout.
-**Identidad:** rojo `#E11D48`, dark `#1F2937`
+**Identidad:** morado `#4B2A8C` (acento de la interfaz), rojo `#DC2626` SOLO para peligro
 
 **El equipo de Vermur ya está usando la plataforma en producción.** Cualquier cambio que se
 deploye lo ven ellos.
@@ -846,6 +846,34 @@ quedan; «Marcar perdida» sigue en el pie.
 **La campanita ya no trae notificaciones de ejemplo.** Eran cuatro
 `notif-mock-*` de cotizaciones de demostración que todo Vermur veía en
 producción. Queda vacía hasta que las de rol persistan (§6).
+
+## 4.20 La paleta: el acento es morado, el rojo es peligro (Bloque 7, 25-sep-2026)
+
+El rojo `#E11D48` estaba en TODO —540 ocurrencias en 71 archivos, casi
+siempre hex pegado— y la aplicación se leía como si todo fuera una alerta.
+
+**El color vive en tokens de `@theme` (`src/index.css`); el próximo cambio
+es una línea.** `--color-primario: #4B2A8C`, el morado que la marca ya usaba
+en la landing y en el badge de rol. Contraste 10.45:1 sobre blanco y blanco
+sobre él: AA y AAA en texto normal. `--color-brand` se conserva como alias
+porque hay clases `bg-brand` repartidas.
+  - Acento (botones principales, pestaña activa, pasos de la barra, enlaces,
+    item activo del menú, badges de estado, focos): `primario`.
+  - **Rojo `--color-peligro` SOLO para**: errores, campos inválidos, frenos
+    (cliente sin vincular, expediente sin validar), toasts de error y
+    acciones destructivas (Marcar perdida, borrar). Nada más.
+  - Armazón: menú lateral y encabezado en blanco (`--color-shell`), texto e
+    iconos negros, item activo en morado, separados del contenido por un
+    borde. El logo ya no lleva la caja blanca que lo resaltaba sobre el
+    fondo oscuro. El login conserva su fondo oscuro.
+  - El badge de rol «admin» era rojo y se confundía con peligro: pasa a
+    morado.
+
+**NO se tocan el PDF de la cotización ni la plantilla de n8n**: son
+documentos de cara al cliente con la identidad de Vermur.
+
+«Portal del Cliente» sale del encabezado, y con él su estado y su ruta, que
+quedaban inalcanzables. Vuelve como ROL cuando exista Usuarios y roles.
 
 ## 5. Estado de los módulos
 

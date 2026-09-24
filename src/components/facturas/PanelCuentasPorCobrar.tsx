@@ -111,7 +111,7 @@ export default function PanelCuentasPorCobrar({ facturas, cobros, puedeCobrar, o
             value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
             placeholder="Factura, cliente o embarque…"
-            className="w-full pl-8 pr-3 py-2 bg-white border border-gray-200 focus:border-[#E11D48] rounded-lg text-xs outline-none"
+            className="w-full pl-8 pr-3 py-2 bg-white border border-gray-200 focus:border-primario rounded-lg text-xs outline-none"
           />
         </div>
       </div>
@@ -240,7 +240,7 @@ function GrupoCliente({ grupo, abierto, onToggle, puedeCobrar, onCobrar }: {
                     {i.estado !== 'cobrado' && (
                       <button
                         onClick={() => onCobrar(i)}
-                        className="text-[10px] font-bold uppercase tracking-wider text-[#E11D48] hover:underline whitespace-nowrap"
+                        className="text-[10px] font-bold uppercase tracking-wider text-primario hover:underline whitespace-nowrap"
                       >
                         Registrar cobro
                       </button>
@@ -304,24 +304,24 @@ function ModalCobro({ item, hoy, onCancelar, onConfirmar }: {
             <label className="block">
               <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Monto ({f.moneda})</span>
               <input type="number" min={0} step="0.01" value={monto} onChange={e => setMonto(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48] tabular-nums" />
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario tabular-nums" />
             </label>
             <label className="block">
               <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Fecha</span>
               <input type="date" value={fechaCobro} onChange={e => setFechaCobro(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48]" />
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario" />
             </label>
             <label className="block">
               <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Banco de Vermur</span>
               <select value={banco} onChange={e => setBanco(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48] bg-white">
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario bg-white">
                 {BANCOS_VERMUR.map(b => <option key={b.id} value={b.nombre}>{b.nombre}</option>)}
               </select>
             </label>
             <label className="block">
               <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Referencia</span>
               <input value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="Ref. bancaria"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48] font-mono" />
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario font-mono" />
             </label>
           </div>
           {parcial && !problema && (
@@ -336,7 +336,7 @@ function ModalCobro({ item, hoy, onCancelar, onConfirmar }: {
         <div className="px-5 py-4 bg-gray-50/50 border-t border-gray-150 flex justify-end gap-2">
           <button onClick={onCancelar} className="text-xs font-bold text-gray-500 hover:text-gray-700 uppercase tracking-wider px-4 py-2">Cancelar</button>
           <button onClick={confirmar} disabled={!!problema || guardando}
-            className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-5 py-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
+            className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-5 py-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
             {guardando ? 'Guardando…' : 'Registrar cobro'}
           </button>
         </div>

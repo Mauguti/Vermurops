@@ -828,7 +828,7 @@ export default function FichaCotizacion({
               <button
                 type="button"
                 onClick={() => setCargaExpandida(abierto ? null : d.id)}
-                className="text-[10px] font-bold text-[#E11D48] hover:text-[#BE123C]"
+                className="text-[10px] font-bold text-primario hover:text-primario-hover"
               >
                 {abierto ? 'Ocultar detalle' : 'Ver detalle'}
               </button>
@@ -1279,7 +1279,7 @@ export default function FichaCotizacion({
     prontitud.lista &&
     ['consolidada', 'enviada_cliente', 'negociacion', 'ganada'].includes(quote.etapa);
 
-  const inputCls ='w-full text-sm text-gray-700 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200 rounded-lg px-2.5 py-1.5 focus:bg-white focus:border-[#E11D48] outline-none transition-all';
+  const inputCls ='w-full text-sm text-gray-700 bg-transparent hover:bg-gray-50 border border-transparent hover:border-gray-200 rounded-lg px-2.5 py-1.5 focus:bg-white focus:border-primario outline-none transition-all';
   // Estilo atenuado/solo-lectura para campos del prospecto cuando hay cliente vinculado.
   const inputReadonlyCls = 'w-full text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 outline-none cursor-not-allowed';
 
@@ -1310,7 +1310,7 @@ export default function FichaCotizacion({
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mt-6">
         <div className="bg-gray-50 border-b border-gray-100 px-4 py-3 flex items-center justify-between">
           <h4 className="text-[10px] font-bold text-[#18181B] uppercase tracking-widest flex items-center gap-1.5">
-            <BarChart2 className="w-4 h-4 text-[#E11D48]" /> Desglose del Consolidado
+            <BarChart2 className="w-4 h-4 text-primario" /> Desglose del Consolidado
           </h4>
         </div>
 
@@ -1344,8 +1344,8 @@ export default function FichaCotizacion({
                       </>
                     )}
                     <div className="w-24">
-                      <p className="text-[9px] text-[#E11D48]/60 font-bold uppercase">Venta</p>
-                      <p className="font-black text-[#9F1239] tabular-nums">${linea.venta.toLocaleString()} {prov.moneda}</p>
+                      <p className="text-[9px] text-primario/60 font-bold uppercase">Venta</p>
+                      <p className="font-black text-primario-fuerte tabular-nums">${linea.venta.toLocaleString()} {prov.moneda}</p>
                     </div>
                   </div>
                 </div>
@@ -1375,8 +1375,8 @@ export default function FichaCotizacion({
                       </>
                     )}
                     <div className="w-24">
-                      <p className="text-[9px] text-[#E11D48]/60 font-bold uppercase">Venta</p>
-                      <p className="font-black text-[#9F1239] tabular-nums">${(tram.costo * (1 + tram.margenPct / 100)).toLocaleString()} {tram.moneda}</p>
+                      <p className="text-[9px] text-primario/60 font-bold uppercase">Venta</p>
+                      <p className="font-black text-primario-fuerte tabular-nums">${(tram.costo * (1 + tram.margenPct / 100)).toLocaleString()} {tram.moneda}</p>
                     </div>
                   </div>
                 </div>
@@ -1391,8 +1391,8 @@ export default function FichaCotizacion({
                 {textoBaseDelTotal(quote)}
               </p>
             </div>
-            <p className="text-2xl font-black text-[#E11D48] tabular-nums">
-              ${totalConsolidado.toLocaleString()} <span className="text-sm font-bold text-[#E11D48]/70">{quote.moneda}</span>
+            <p className="text-2xl font-black text-primario tabular-nums">
+              ${totalConsolidado.toLocaleString()} <span className="text-sm font-bold text-primario/70">{quote.moneda}</span>
             </p>
           </div>
         </div>
@@ -1424,7 +1424,7 @@ export default function FichaCotizacion({
             <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wide border
               ${rolActivo === 'pricing'
                 ? 'bg-[#1F2937]/5 text-[#1F2937] border-[#1F2937]/20'
-                : 'bg-[#E11D48]/5 text-[#E11D48] border-[#E11D48]/20'}`}
+                : 'bg-primario/5 text-primario border-primario/20'}`}
             >
               Vista: {rolActivo === 'pricing' ? 'Pricing'
                 : rolActivo === 'admin' ? 'Admin'
@@ -1435,7 +1435,7 @@ export default function FichaCotizacion({
           </>
         }
         subtitulo={totalEncabezado ? (
-          <p className="font-black text-[#E11D48] tabular-nums">
+          <p className="font-black text-primario tabular-nums">
             Total: {totalEncabezado}
           </p>
         ) : undefined}
@@ -1468,7 +1468,7 @@ export default function FichaCotizacion({
           <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">PDF generados</span>
           {[...(quote.pdfs ?? [])].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 5).map(p => (
             <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer"
-              className="text-[11px] font-mono font-semibold text-[#E11D48] hover:underline"
+              className="text-[11px] font-mono font-semibold text-primario hover:underline"
               title={`${p.generadoPor.nombre} · ${p.fecha.slice(0, 16).replace('T', ' ')}`}>
               {p.nombreArchivo}
             </a>
@@ -1568,7 +1568,7 @@ export default function FichaCotizacion({
                   const linea = lineasPlanas.find(l => l.id === lineaId);
                   if (!linea) return {};
                   const editable = rolActivo !== 'ventas' && !bloqueada && !r.compartido;
-                  const input = 'w-[90px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-[#E11D48] focus:bg-white bg-transparent rounded outline-none text-[12px]';
+                  const input = 'w-[90px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-primario focus:bg-white bg-transparent rounded outline-none text-[12px]';
                   return {
                     costo: editable && !linea.costoDerivado ? (
                       <input type="number" value={linea.costoCapturado ? linea.costo : ''} placeholder="—"
@@ -1581,7 +1581,7 @@ export default function FichaCotizacion({
                         onChange={e => handleEditarLineaPlana(linea.id, 'profit', Number(e.target.value))} className={input} />
                     ) : undefined,
                     acciones: rolActivo !== 'ventas' && !bloqueada && linea.conceptoLocalId ? (
-                      <button onClick={e => { e.stopPropagation(); handleCompararProveedor(linea.id); }} className="text-[11px] font-semibold text-[#E11D48] hover:underline whitespace-nowrap">
+                      <button onClick={e => { e.stopPropagation(); handleCompararProveedor(linea.id); }} className="text-[11px] font-semibold text-primario hover:underline whitespace-nowrap">
                         Comparar
                       </button>
                     ) : undefined,
@@ -1624,7 +1624,7 @@ export default function FichaCotizacion({
                   <select
                     value={newServicioTipo}
                     onChange={(e) => setNewServicioTipo(e.target.value as TipoServicio)}
-                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#E11D48]"
+                    className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-primario"
                   >
                     <option value="maritimo">Flete Marítimo</option>
                     <option value="aereo">Flete Aéreo</option>
@@ -1633,7 +1633,7 @@ export default function FichaCotizacion({
                   </select>
                   <button
                     onClick={handleAddServicio}
-                    className="px-4 py-2 bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase rounded-lg transition-colors"
+                    className="px-4 py-2 bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase rounded-lg transition-colors"
                   >
                     Agregar
                   </button>
@@ -1704,7 +1704,7 @@ export default function FichaCotizacion({
                   <span className="flex items-center gap-2 text-[13px] font-bold text-[#18181B]">
                     Catálogo de tarifas
                     {activeConceptoData && (
-                      <span className="text-[10px] font-semibold text-[#E11D48] uppercase tracking-wider">
+                      <span className="text-[10px] font-semibold text-primario uppercase tracking-wider">
                         → {activeConceptoData.concepto.nombre}
                       </span>
                     )}
@@ -1777,9 +1777,9 @@ export default function FichaCotizacion({
         {/* FC-3: DragOverlay — tarjeta flotante siguiendo el cursor */}
         <DragOverlay dropAnimation={null}>
           {activeDrag && (
-            <div className="rounded-lg border border-[#E11D48]/30 bg-white p-2.5 text-[10px] shadow-xl w-[320px] pointer-events-none">
+            <div className="rounded-lg border border-primario/30 bg-white p-2.5 text-[10px] shadow-xl w-[320px] pointer-events-none">
               <div className="font-bold text-gray-800 truncate">{activeDrag.provNombre}</div>
-              <div className="font-black text-[#9F1239] tabular-nums mt-1">
+              <div className="font-black text-primario-fuerte tabular-nums mt-1">
                 {fmtPrecio(activeDrag.tarifa)}
               </div>
               <p className="text-[9px] text-gray-400 mt-0.5">Suelta sobre un concepto para aplicar</p>
@@ -1876,7 +1876,7 @@ export default function FichaCotizacion({
 
             {/* ── Columna izquierda: Prospecto / Cliente ── */}
             <div className="space-y-4">
-              <h3 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-2 flex items-center gap-1.5">
+              <h3 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-2 flex items-center gap-1.5">
                 <User className="w-4 h-4" /> Prospecto / Cliente
               </h3>
 
@@ -1921,7 +1921,7 @@ export default function FichaCotizacion({
                 const resultados = buscarClientes(clientes, q);
                 return (
                   <div className="relative">
-                    <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg focus-within:border-[#E11D48]">
+                    <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg focus-within:border-primario">
                       <Link2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                       <Search className="w-3.5 h-3.5 text-gray-300 shrink-0" />
                       <input
@@ -2011,7 +2011,7 @@ export default function FichaCotizacion({
             <div className="space-y-6">
 
             <div className="space-y-3">
-              <h3 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-2 flex items-center gap-1.5">
+              <h3 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-2 flex items-center gap-1.5">
                 <User className="w-4 h-4" /> Responsables
               </h3>
               <div className="grid grid-cols-2 gap-3">
@@ -2045,7 +2045,7 @@ export default function FichaCotizacion({
               Lo que antes vivía en el modal «Datos del embarque», editable
               en línea y sobre la carga tipada. Sin modal. */}
           <div className="space-y-4">
-            <h3 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-2 flex items-center gap-1.5">
+            <h3 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-2 flex items-center gap-1.5">
               <Building2 className="w-3.5 h-3.5" /> Operación
               {!puedeEditarOperacion(rolActivo, quote.etapa, bloqueada) && (
                 <span className="ml-auto normal-case tracking-normal font-semibold text-gray-400">solo lectura</span>
@@ -2080,25 +2080,25 @@ export default function FichaCotizacion({
                 placeholder="¿Qué hay que hacer?"
                 value={newActivityTitle}
                 onChange={e => setNewActivityTitle(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48] shadow-xs"
+                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-primario shadow-xs"
               />
               <textarea
                 placeholder="Descripción detallada..."
                 value={newActivityDesc}
                 onChange={e => setNewActivityDesc(e.target.value)}
                 rows={2}
-                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48] shadow-xs resize-none"
+                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-primario shadow-xs resize-none"
               />
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Fecha límite</label>
                   <input type="date" value={newActivityDate} onChange={e => setNewActivityDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48]" />
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-primario" />
                 </div>
                 <div>
                   <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Tipo</label>
                   <select value={newActivityType} onChange={e => setNewActivityType(e.target.value as QuoteActivity['tipo'])}
-                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48]">
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-primario">
                     <option value="tarea">Tarea</option>
                     <option value="llamada">Llamada</option>
                     <option value="correo">Correo</option>
@@ -2107,7 +2107,7 @@ export default function FichaCotizacion({
               </div>
               <div className="flex justify-end">
                 <button type="submit"
-                  className="px-4 py-2 bg-[#E11D48] hover:bg-[#BE123C] text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center shadow-xs">
+                  className="px-4 py-2 bg-primario hover:bg-primario-hover text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center shadow-xs">
                   <Plus className="w-3.5 h-3.5 mr-1" /> Registrar
                 </button>
               </div>
@@ -2129,7 +2129,7 @@ export default function FichaCotizacion({
                           type="checkbox"
                           checked={act.estado === 'hecha'}
                           onChange={() => handleToggleActivity(act.id)}
-                          className="w-4 h-4 text-[#E11D48] border-gray-300 rounded mt-0.5 cursor-pointer"
+                          className="w-4 h-4 text-primario border-gray-300 rounded mt-0.5 cursor-pointer"
                         />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
@@ -2174,7 +2174,7 @@ export default function FichaCotizacion({
                 value={newNoteText}
                 onChange={e => setNewNoteText(e.target.value)}
                 rows={3}
-                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48] shadow-xs resize-none"
+                className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-xs outline-none focus:border-primario shadow-xs resize-none"
               />
               <div className="flex justify-end">
                 <button type="submit"
@@ -2207,10 +2207,10 @@ export default function FichaCotizacion({
                   .map((item, idx) => (
                     <div key={idx} className="relative">
                       <div className={`absolute -left-[31px] top-1.5 w-3.5 h-3.5 rounded-full border-2 bg-white flex items-center justify-center
-                        ${item.type === 'etapa' ? 'border-[#4B2A8C]' : 'border-[#E11D48]'}`}>
+                        ${item.type === 'etapa' ? 'border-[#4B2A8C]' : 'border-primario'}`}>
                         {item.type === 'etapa'
                           ? <Clock className="w-1.5 h-1.5 text-[#4B2A8C]" />
-                          : <MessageSquare className="w-1.5 h-1.5 text-[#E11D48]" />}
+                          : <MessageSquare className="w-1.5 h-1.5 text-primario" />}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -2261,7 +2261,7 @@ export default function FichaCotizacion({
                                   placeholder="Escribe una respuesta..."
                                   rows={1}
                                   autoFocus
-                                  className="flex-1 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48] resize-none"
+                                  className="flex-1 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario resize-none"
                                 />
                                 <div className="flex flex-col gap-1">
                                   <button type="submit" className="px-2 py-1 bg-[#4B2A8C] text-white text-[10px] rounded hover:bg-[#3d2277] transition-colors font-bold">Enviar</button>
@@ -2271,7 +2271,7 @@ export default function FichaCotizacion({
                             ) : (
                               <button
                                 onClick={() => setReplyingTo(item.id || null)}
-                                className="mt-2 ml-4 text-[10px] font-bold text-[#E11D48] hover:text-[#BE123C] uppercase tracking-wider"
+                                className="mt-2 ml-4 text-[10px] font-bold text-primario hover:text-primario-hover uppercase tracking-wider"
                               >
                                 Responder
                               </button>
@@ -2300,7 +2300,7 @@ export default function FichaCotizacion({
                   return (
                     <div key={msg.id} className={`flex flex-col ${isVentas ? 'items-end' : 'items-start'}`}>
                       <div className={`max-w-[80%] rounded-xl px-4 py-2 ${
-                        isVentas ? 'bg-[#E11D48] text-white rounded-br-none' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
+                        isVentas ? 'bg-primario text-white rounded-br-none' : 'bg-white border border-gray-200 text-gray-800 rounded-bl-none'
                       }`}>
                         <div className="flex justify-between items-baseline gap-4 mb-1">
                           <span className={`text-[10px] font-bold ${isVentas ? 'text-rose-100' : 'text-[#4B2A8C]'}`}>{msg.autorNombre}</span>
@@ -2372,9 +2372,9 @@ export default function FichaCotizacion({
                 placeholder="Escribe un mensaje..."
                 value={newChatMessage}
                 onChange={e => setNewChatMessage(e.target.value)}
-                className="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:border-[#E11D48] shadow-sm"
+                className="flex-1 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-xs outline-none focus:border-primario shadow-sm"
               />
-              <button type="submit" className="p-2.5 bg-[#E11D48] text-white rounded-xl hover:bg-[#BE123C] transition-colors shadow-sm flex items-center justify-center shrink-0">
+              <button type="submit" className="p-2.5 bg-primario text-white rounded-xl hover:bg-primario-hover transition-colors shadow-sm flex items-center justify-center shrink-0">
                 <Send className="w-4 h-4 ml-0.5" />
               </button>
             </form>
@@ -2440,14 +2440,14 @@ export default function FichaCotizacion({
             <textarea
               autoFocus rows={3} value={justificacionSalto} onChange={e => setJustificacionSalto(e.target.value)}
               placeholder="Ej. Cliente recurrente desde 2019; Administración completa el expediente esta semana."
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#E11D48]"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-primario"
             />
             <div className="flex justify-end gap-2">
               <button onClick={() => setModalSalto(false)} className="px-3 py-2 text-[12px] font-semibold text-gray-500 hover:bg-gray-50 rounded-lg">Cancelar</button>
               <button
                 disabled={!justificacionSalto.trim()}
                 onClick={() => { setModalSalto(false); avanzarA('ganada', justificacionSalto); }}
-                className="px-4 py-2 bg-[#E11D48] hover:bg-[#BE123C] disabled:opacity-40 disabled:cursor-not-allowed text-white text-[12px] font-bold uppercase tracking-wider rounded-lg"
+                className="px-4 py-2 bg-primario hover:bg-primario-hover disabled:opacity-40 disabled:cursor-not-allowed text-white text-[12px] font-bold uppercase tracking-wider rounded-lg"
               >
                 Marcar ganada con justificación
               </button>

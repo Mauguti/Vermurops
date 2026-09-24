@@ -97,7 +97,7 @@ export default function TarjetaModalidad({
           {editable && onDatosEmbarque && (
             <button
               onClick={onDatosEmbarque}
-              className="text-[10px] font-semibold text-gray-400 hover:text-[#E11D48] px-2 py-1 rounded transition-colors"
+              className="text-[10px] font-semibold text-gray-400 hover:text-primario px-2 py-1 rounded transition-colors"
               title="Ruta, tráfico e información que el embarque necesita"
             >
               Datos del embarque
@@ -161,7 +161,7 @@ export default function TarjetaModalidad({
                       {editable && (
                         <button
                           onClick={onAgregarLinea}
-                          className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-[#E11D48] hover:bg-[#E11D48]/5 px-2.5 py-1.5 rounded-lg transition-colors"
+                          className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-primario hover:bg-primario/5 px-2.5 py-1.5 rounded-lg transition-colors"
                         >
                           <Plus className="w-3.5 h-3.5" /> Agregar el primero
                         </button>
@@ -191,7 +191,7 @@ export default function TarjetaModalidad({
             <div className="px-3 py-2 border-t border-gray-100">
               <button
                 onClick={onAgregarLinea}
-                className="flex items-center gap-1.5 text-[11px] font-bold text-[#E11D48] hover:bg-[#E11D48]/5 px-2 py-1.5 rounded-lg transition-colors"
+                className="flex items-center gap-1.5 text-[11px] font-bold text-primario hover:bg-primario/5 px-2 py-1.5 rounded-lg transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" /> Agregar concepto
               </button>
@@ -205,7 +205,7 @@ export default function TarjetaModalidad({
 
 // ─── Un renglón ───────────────────────────────────────────────────────────────
 
-const inputNum = 'w-[90px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-[#E11D48] focus:bg-white bg-transparent rounded outline-none text-[12px]';
+const inputNum = 'w-[90px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-primario focus:bg-white bg-transparent rounded outline-none text-[12px]';
 
 interface RenglonProps {
   linea: LineaPlana;
@@ -254,8 +254,8 @@ function Renglon({
       onClick={() => { if (aceptaTarifas) onComparar(linea.id); }}
       title={aceptaTarifas && !activa ? 'Clic para ver sus tarifas en el panel' : undefined}
       className={`group transition-colors ${
-        isOver ? 'bg-[#E11D48]/5 ring-1 ring-inset ring-[#E11D48]/30'
-        : activa ? 'bg-[#E11D48]/[0.04] ring-1 ring-inset ring-[#E11D48]/25'
+        isOver ? 'bg-primario/5 ring-1 ring-inset ring-primario/30'
+        : activa ? 'bg-primario/[0.04] ring-1 ring-inset ring-primario/25'
         : 'hover:bg-gray-50/60'} ${aceptaTarifas ? 'cursor-pointer' : ''}`}>
       {/* El concepto se ELIGE del catálogo, nunca se teclea. Sin conceptoId el
           panel de tarifas no puede hacer match, y dos renglones escritos
@@ -275,7 +275,7 @@ function Renglon({
           </span>
         )}
         {activa && (
-          <span className="block px-2 text-[9px] font-bold text-[#E11D48] uppercase tracking-wider">
+          <span className="block px-2 text-[9px] font-bold text-primario uppercase tracking-wider">
             Tarifas del panel →
           </span>
         )}
@@ -289,7 +289,7 @@ function Renglon({
           aceptaTarifas ? (
             <button
               onClick={() => onComparar(linea.id)}
-              className="text-gray-600 hover:text-[#E11D48] hover:underline text-left"
+              className="text-gray-600 hover:text-primario hover:underline text-left"
               title="Ver o cambiar sus tarifas en el panel"
             >
               {linea.proveedorNombre}
@@ -300,7 +300,7 @@ function Renglon({
         ) : aceptaTarifas ? (
           <button
             onClick={() => onComparar(linea.id)}
-            className="text-[11px] font-semibold text-[#E11D48] hover:underline"
+            className="text-[11px] font-semibold text-primario hover:underline"
           >
             Elegir proveedor
           </button>

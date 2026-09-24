@@ -58,7 +58,7 @@ export function FormProveedorFicha({ onGuardar, onCancelar, servicioTipo, provee
   };
 
   const labelCls = 'block text-[9px] font-bold text-gray-400 uppercase mb-1';
-  const inputCls = 'w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-[#E11D48]/60 bg-white';
+  const inputCls = 'w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario/60 bg-white';
 
   const availableProviders = proveedores.filter(p => p.activo && (!p.modalidades?.length || p.modalidades.includes(servicioTipo as any)));
 
@@ -85,8 +85,8 @@ export function FormProveedorFicha({ onGuardar, onCancelar, servicioTipo, provee
 
   return (
     <>
-    <form onSubmit={handleSubmit} className="bg-[#E11D48]/5 border border-[#E11D48]/10 rounded-xl p-3.5 space-y-3 mt-2">
-      <h6 className="text-[9px] font-bold text-[#BE123C] uppercase tracking-widest">
+    <form onSubmit={handleSubmit} className="bg-primario/5 border border-primario/10 rounded-xl p-3.5 space-y-3 mt-2">
+      <h6 className="text-[9px] font-bold text-primario-hover uppercase tracking-widest">
         Nueva cotización de proveedor
       </h6>
 
@@ -148,7 +148,7 @@ export function FormProveedorFicha({ onGuardar, onCancelar, servicioTipo, provee
           type="file"
           accept=".pdf,.jpg,.jpeg,.png"
           onChange={e => setFile(e.target.files?.[0] || null)}
-          className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#E11D48]/10 file:text-[#BE123C] hover:file:bg-[#E11D48]/20 focus:outline-none transition-all"
+          className="w-full text-xs text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-primario/10 file:text-primario-hover hover:file:bg-primario/20 focus:outline-none transition-all"
         />
         {file && <p className="text-[10px] text-gray-400 mt-1">Seleccionado: {file.name}</p>}
       </div>
@@ -159,7 +159,7 @@ export function FormProveedorFicha({ onGuardar, onCancelar, servicioTipo, provee
           Cancelar
         </button>
         <button type="submit" disabled={uploading}
-          className="px-4 py-1.5 bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50">
+          className="px-4 py-1.5 bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase rounded-lg transition-colors flex items-center gap-1 disabled:opacity-50">
           {uploading ? (
             <span className="flex items-center gap-1"><Clock className="w-3 h-3 animate-spin" /> Subiendo...</span>
           ) : (

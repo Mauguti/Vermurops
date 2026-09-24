@@ -39,7 +39,7 @@ export function SelectorVersiones({ opciones, numeroVisto, onElegir }: {
         className={`px-2 py-1.5 border rounded-lg text-xs font-semibold outline-none bg-white
           ${numeroVisto !== null
             ? 'border-amber-300 text-amber-800 bg-amber-50'
-            : 'border-gray-200 text-gray-700 focus:border-[#E11D48]'}`}
+            : 'border-gray-200 text-gray-700 focus:border-primario'}`}
       >
         {opciones.map(o => (
           <option key={o.numero} value={o.numero}>{o.etiqueta}</option>
@@ -55,7 +55,7 @@ export function BotonNuevaVersion({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       className="px-3 py-1.5 border border-gray-200 bg-white hover:bg-gray-50 text-[#18181B] text-[10px] font-bold uppercase tracking-wider rounded-lg flex items-center gap-1.5"
     >
-      <History className="w-3.5 h-3.5 text-[#E11D48]" /> Nueva versión
+      <History className="w-3.5 h-3.5 text-primario" /> Nueva versión
     </button>
   );
 }
@@ -158,7 +158,7 @@ export function ModalMotivoVersion({ titulo, descripcion, accion, onCancelar, on
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50">
           <div className="flex items-center gap-2">
-            <History className="w-4 h-4 text-[#E11D48]" />
+            <History className="w-4 h-4 text-primario" />
             <h3 className="text-[14px] font-bold text-[#18181B]">{titulo}</h3>
           </div>
           <button onClick={onCancelar} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar">
@@ -178,7 +178,7 @@ export function ModalMotivoVersion({ titulo, descripcion, accion, onCancelar, on
               value={motivo}
               onChange={e => setMotivo(e.target.value)}
               placeholder="El cliente pidió otra naviera, bajó el flete, cambió el volumen…"
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-700 outline-none focus:border-[#E11D48] resize-none"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-700 outline-none focus:border-primario resize-none"
             />
           </div>
           {error && (
@@ -196,7 +196,7 @@ export function ModalMotivoVersion({ titulo, descripcion, accion, onCancelar, on
           <button
             onClick={confirmar}
             disabled={!listo || guardando}
-            className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-xs font-bold uppercase tracking-wider px-5 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-5 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {guardando ? 'Guardando…' : accion}
           </button>

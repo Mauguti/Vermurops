@@ -11,8 +11,35 @@
   --color-vermur-navy: #1A1A2E;
 
   
-  --color-brand: #E11D48;
-  --color-brand-hover: #BE123C;
+  /* ── El acento de la interfaz (Bloque 7, 25-sep-2026) ──────────────────
+     Era el rojo #E11D48 en TODO —540 veces, en 71 archivos— y la aplicación
+     se leía como si todo fuera una alerta. El acento pasa al morado que la
+     marca ya usaba en la landing y en el badge de rol: 10.45:1 sobre blanco
+     y blanco sobre él, AA y AAA en texto normal.
+
+     El próximo cambio de color es esta línea. `brand` se conserva como
+     alias porque hay clases `bg-brand` repartidas; apunta al mismo token. */
+  --color-primario: #4B2A8C;
+  --color-primario-hover: #3B2170;
+  --color-primario-fuerte: #2E1957;
+  --color-primario-claro: #6B47B8;
+  --color-primario-suave: #F4F1FA;
+
+  --color-brand: var(--color-primario);
+  --color-brand-hover: var(--color-primario-hover);
+
+  /* ── Rojo: SOLO peligro ────────────────────────────────────────────────
+     Errores, campos inválidos, frenos (cliente sin vincular, expediente sin
+     validar), toasts de error y acciones destructivas. Nada más. */
+  --color-peligro: #DC2626;
+  --color-peligro-hover: #B91C1C;
+  --color-peligro-suave: #FEF2F2;
+
+  /* El armazón —menú lateral y encabezado— en blanco; se separa del
+     contenido por un borde, no por color. */
+  --color-shell: #FFFFFF;
+  --color-shell-border: #ECECEF;
+
   
   --color-surface-dark: #0A0A0C;
   --color-surface-elevated: #141417;

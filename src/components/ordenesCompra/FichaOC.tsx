@@ -183,7 +183,7 @@ export default function FichaOC({
           </>
         }
         subtitulo={
-          <p className="font-black text-[#E11D48] tabular-nums">
+          <p className="font-black text-primario tabular-nums">
             ${money(oc.monto)} <span className="text-sm font-medium text-gray-400">{oc.moneda}</span>
           </p>
         }
@@ -471,7 +471,7 @@ export default function FichaOC({
 
           {/* ── Qué se paga y a quién ─────────────────────────────────── */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
-            <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-2">
+            <h4 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-2">
               Qué se paga
             </h4>
             <div className="grid grid-cols-2 gap-4">
@@ -493,7 +493,7 @@ export default function FichaOC({
 
           {/* ── Papeles: la factura del proveedor y el comprobante ─────── */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
-            <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-2">
+            <h4 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-2">
               Documentos
             </h4>
 
@@ -518,7 +518,7 @@ export default function FichaOC({
 
           {/* ── Historial: quién movió qué y cuándo ────────────────────── */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-3">
-            <h4 className="text-[10px] font-bold text-[#E11D48] uppercase tracking-widest border-b border-gray-100 pb-2">
+            <h4 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-2">
               Historial
             </h4>
             {(oc.historialEstados ?? []).length === 0 ? (
@@ -529,7 +529,7 @@ export default function FichaOC({
               <div className="space-y-2.5 pl-2 border-l-2 border-gray-100 ml-1">
                 {oc.historialEstados.map((h, i) => (
                   <div key={`${h.estado}-${i}`} className="relative pl-4">
-                    <div className="absolute -left-[7px] top-1.5 w-2.5 h-2.5 rounded-full bg-[#E11D48]/30 border-2 border-white" />
+                    <div className="absolute -left-[7px] top-1.5 w-2.5 h-2.5 rounded-full bg-primario/30 border-2 border-white" />
                     <p className="text-[12px] text-gray-700 font-medium">
                       {ESTADOS_OC_MAP[h.estado]?.label ?? h.estado}
                     </p>
@@ -558,7 +558,7 @@ export default function FichaOC({
                 onChange={e => setMotivo(e.target.value)}
                 onBlur={() => onActualizar({ motivoRechazo: motivo.trim() || null })}
                 placeholder="Duplicada, monto incorrecto, falta la factura…"
-                className="w-full h-16 p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-[#E11D48] resize-none"
+                className="w-full h-16 p-2.5 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-primario resize-none"
               />
             </div>
           )}
@@ -656,7 +656,7 @@ function Campo({
         onBlur={onGuardar}
         readOnly={soloLectura}
         placeholder="Referencia o liga del documento"
-        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-[#E11D48] read-only:text-gray-500"
+        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-primario read-only:text-gray-500"
       />
       <p className="text-[10px] text-gray-400 mt-1">{ayuda}</p>
     </div>

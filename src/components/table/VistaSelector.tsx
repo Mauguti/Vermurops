@@ -105,7 +105,7 @@ export default function VistaSelector({
       {vistaActiva && esMia && (
         <button
           onClick={handleSobreescribir}
-          className="p-1.5 text-gray-400 hover:text-[#E11D48] hover:bg-[#E11D48]/5 rounded transition-colors"
+          className="p-1.5 text-gray-400 hover:text-primario hover:bg-primario/5 rounded transition-colors"
           title="Sobreescribir vista actual"
         >
           <Save className="w-3.5 h-3.5" />
@@ -121,12 +121,12 @@ export default function VistaSelector({
             onChange={e => setSaveNombre(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleGuardar(); if (e.key === 'Escape') setShowSaveInput(false); }}
             placeholder="Nombre de la vista..."
-            className="px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-[#E11D48] w-36"
+            className="px-2 py-1 text-xs border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-primario w-36"
           />
           <button
             onClick={handleGuardar}
             disabled={!saveNombre.trim()}
-            className="px-2 py-1 text-xs font-medium text-white bg-[#E11D48] rounded hover:bg-[#E11D48] disabled:opacity-40 transition-colors"
+            className="px-2 py-1 text-xs font-medium text-white bg-primario rounded hover:bg-primario disabled:opacity-40 transition-colors"
           >
             Guardar
           </button>
@@ -148,7 +148,7 @@ export default function VistaSelector({
             {/* Vista por defecto del módulo */}
             <button
               onClick={() => { onSeleccionar(null); setOpen(false); }}
-              className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${vistaActivaId === null ? 'bg-[#E11D48]/5 text-[#BE123C] font-medium' : 'text-gray-700'}`}
+              className={`w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2 ${vistaActivaId === null ? 'bg-primario/5 text-primario-hover font-medium' : 'text-gray-700'}`}
             >
               <span className="flex-1">{labelDefault}</span>
             </button>
@@ -165,12 +165,12 @@ export default function VistaSelector({
               return (
                 <div
                   key={v.id}
-                  className={`group flex items-center gap-1 px-3 py-2 text-xs hover:bg-gray-50 ${activa ? 'bg-[#E11D48]/5' : ''}`}
+                  className={`group flex items-center gap-1 px-3 py-2 text-xs hover:bg-gray-50 ${activa ? 'bg-primario/5' : ''}`}
                 >
                   {/* Nombre + autor */}
                   <button
                     onClick={() => { onSeleccionar(v.id); setOpen(false); }}
-                    className={`flex-1 text-left truncate ${activa ? 'text-[#BE123C] font-medium' : 'text-gray-700'}`}
+                    className={`flex-1 text-left truncate ${activa ? 'text-primario-hover font-medium' : 'text-gray-700'}`}
                   >
                     {v.nombre}
                     {!esCreador && v.compartida && (

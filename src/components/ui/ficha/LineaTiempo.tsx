@@ -55,7 +55,7 @@ export default function LineaTiempo({
             <>
               <div className={`w-full h-1.5 rounded-full ${
                 enRojo ? 'bg-red-400'
-                : hecho || esActual ? 'bg-[#E11D48]'
+                : hecho || esActual ? 'bg-primario'
                 : 'bg-gray-200'}`} />
               <span className={`mt-1.5 text-[10px] text-center leading-tight truncate w-full ${
                 esActual ? 'font-bold text-[#18181B]' : 'text-gray-400'}`}>

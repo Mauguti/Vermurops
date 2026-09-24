@@ -189,12 +189,12 @@ export default function ConceptoSelector({
           ? `flex items-center gap-1 text-[12px] w-full text-left px-2 py-1 rounded border transition-colors ${
               selectedNombre
                 ? 'font-medium text-gray-800 bg-transparent border-transparent hover:border-gray-200 hover:bg-white'
-                : 'text-gray-400 bg-transparent border-dashed border-gray-300 hover:border-[#E11D48] hover:text-[#E11D48]'
+                : 'text-gray-400 bg-transparent border-dashed border-gray-300 hover:border-primario hover:text-primario'
             }`
           : `flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-md border transition-colors max-w-[260px] ${
           selectedNombre
-            ? 'text-[#18181B] bg-white border-gray-200 hover:border-[#E11D48]/60 hover:bg-[#E11D48]/5'
-            : 'text-gray-400 bg-gray-50 border-dashed border-gray-300 hover:border-[#E11D48]/60 hover:text-[#E11D48]'
+            ? 'text-[#18181B] bg-white border-gray-200 hover:border-primario/60 hover:bg-primario/5'
+            : 'text-gray-400 bg-gray-50 border-dashed border-gray-300 hover:border-primario/60 hover:text-primario'
         }`}
       >
         <span className="truncate">
@@ -221,7 +221,7 @@ export default function ConceptoSelector({
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Buscar concepto..."
-                className="w-full pl-7 pr-7 py-1.5 border border-gray-200 rounded-md text-[11px] outline-none focus:border-[#E11D48]/60 bg-white"
+                className="w-full pl-7 pr-7 py-1.5 border border-gray-200 rounded-md text-[11px] outline-none focus:border-primario/60 bg-white"
               />
               {search && (
                 <button
@@ -261,8 +261,8 @@ export default function ConceptoSelector({
                       onSelect(c.id, c.nombre);
                       setOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-[#E11D48]/5 transition-colors border-b border-gray-50 ${
-                      selectedNombre === c.nombre ? 'bg-[#E11D48]/5' : ''
+                    className={`w-full text-left px-3 py-1.5 flex items-center gap-2 hover:bg-primario/5 transition-colors border-b border-gray-50 ${
+                      selectedNombre === c.nombre ? 'bg-primario/5' : ''
                     }`}
                   >
                     <div className="flex-1 min-w-0">
@@ -298,7 +298,7 @@ export default function ConceptoSelector({
               <button
                 type="button"
                 onClick={() => { onCrearNuevo(); setOpen(false); }}
-                className="flex items-center gap-1.5 text-[10px] font-bold text-[#E11D48] hover:text-[#9F1239] transition-colors"
+                className="flex items-center gap-1.5 text-[10px] font-bold text-primario hover:text-primario-fuerte transition-colors"
               >
                 <Plus className="w-3 h-3" />
                 Crear nuevo concepto...

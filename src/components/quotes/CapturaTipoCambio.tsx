@@ -70,7 +70,7 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
         onClick={() => setAbierto(v => !v)}
         className={`inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-lg border transition-colors ${
           definido
-            ? 'border-gray-200 bg-white text-gray-600 hover:border-[#E11D48]/40'
+            ? 'border-gray-200 bg-white text-gray-600 hover:border-primario/40'
             : 'border-dashed border-amber-300 bg-amber-50/60 text-amber-700 hover:border-amber-400'
         }`}
       >
@@ -105,7 +105,7 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
                   value={valor}
                   onChange={e => setValor(e.target.value)}
                   placeholder="18.5000"
-                  className="w-full px-2 py-1.5 text-[12px] tabular-nums border border-gray-200 rounded-lg outline-none focus:border-[#E11D48]"
+                  className="w-full px-2 py-1.5 text-[12px] tabular-nums border border-gray-200 rounded-lg outline-none focus:border-primario"
                 />
               </div>
               <div>
@@ -113,7 +113,7 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
                 <select
                   value={fuente}
                   onChange={e => setFuente(e.target.value as FuenteTipoCambio)}
-                  className="w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg outline-none focus:border-[#E11D48] bg-white"
+                  className="w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg outline-none focus:border-primario bg-white"
                 >
                   {(Object.keys(ETIQUETA_FUENTE) as FuenteTipoCambio[])
                     .filter(f => f !== 'pricing_rate')
@@ -132,7 +132,7 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
                   <select
                     value={baseFuente}
                     onChange={e => setBaseFuente(e.target.value as ReglaPricingRate['baseFuente'])}
-                    className="w-full px-2 py-1.5 text-[11px] border border-gray-200 rounded-lg outline-none focus:border-[#E11D48] bg-white"
+                    className="w-full px-2 py-1.5 text-[11px] border border-gray-200 rounded-lg outline-none focus:border-primario bg-white"
                   >
                     {FUENTES_BASE.map(f => <option key={f} value={f}>{ETIQUETA_FUENTE[f]}</option>)}
                   </select>
@@ -144,7 +144,7 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
                     value={tasaBase}
                     onChange={e => setTasaBase(e.target.value)}
                     placeholder="20.00"
-                    className="w-full px-2 py-1.5 text-[11px] tabular-nums border border-gray-200 rounded-lg outline-none focus:border-[#E11D48]"
+                    className="w-full px-2 py-1.5 text-[11px] tabular-nums border border-gray-200 rounded-lg outline-none focus:border-primario"
                   />
                 </div>
               </div>
@@ -154,7 +154,7 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
                   <select
                     value={colchonTipo}
                     onChange={e => setColchonTipo(e.target.value as 'monto' | 'porcentaje')}
-                    className="w-full px-2 py-1.5 text-[11px] border border-gray-200 rounded-lg outline-none focus:border-[#E11D48] bg-white"
+                    className="w-full px-2 py-1.5 text-[11px] border border-gray-200 rounded-lg outline-none focus:border-primario bg-white"
                   >
                     <option value="monto">Pesos</option>
                     <option value="porcentaje">Porcentaje</option>
@@ -167,7 +167,7 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
                     value={colchon}
                     onChange={e => setColchon(e.target.value)}
                     placeholder={colchonTipo === 'monto' ? '0.50' : '2.5'}
-                    className="w-full px-2 py-1.5 text-[11px] tabular-nums border border-gray-200 rounded-lg outline-none focus:border-[#E11D48]"
+                    className="w-full px-2 py-1.5 text-[11px] tabular-nums border border-gray-200 rounded-lg outline-none focus:border-primario"
                   />
                 </div>
               </div>
@@ -194,7 +194,7 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
             )}
             <button
               onClick={guardar}
-              className="flex items-center gap-1 bg-[#E11D48] text-white text-[11px] font-bold px-3 py-1.5 rounded-lg hover:bg-[#BE123C] transition-colors"
+              className="flex items-center gap-1 bg-primario text-white text-[11px] font-bold px-3 py-1.5 rounded-lg hover:bg-primario-hover transition-colors"
             >
               <Check className="w-3 h-3" /> Aplicar
             </button>

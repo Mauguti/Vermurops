@@ -36,7 +36,7 @@ interface Props {
 }
 
 const LBL = 'block text-[9px] font-bold text-gray-400 uppercase mb-1.5';
-const INP = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48]';
+const INP = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario';
 const SEL = INP + ' bg-white cursor-pointer';
 
 export default function OperacionServicio({
@@ -128,7 +128,7 @@ export default function OperacionServicio({
           checked={!!servicio.generaEmbarquePropio}
           disabled={!editable}
           onChange={e => set({ generaEmbarquePropio: e.target.checked })}
-          className="mt-0.5 accent-[#E11D48]"
+          className="mt-0.5 accent-primario"
         />
         <span className="text-[11px] text-gray-600">
           <span className="font-semibold text-gray-700">Se opera como embarque aparte.</span>{' '}

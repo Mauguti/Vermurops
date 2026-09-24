@@ -195,7 +195,7 @@ function CotizacionRow({ quote, progreso, dias, tarifasCount, bloque, onAbrir, o
             {/* Asignado */}
             {quote.pricingId ? (
               <span className="flex items-center gap-1 shrink-0">
-                <span className="w-4 h-4 rounded-full bg-[#E11D48]/10 text-[#BE123C] font-bold text-[7px] flex items-center justify-center">
+                <span className="w-4 h-4 rounded-full bg-primario/10 text-primario-hover font-bold text-[7px] flex items-center justify-center">
                   {quote.pricingId.split(' ').map(n => n[0]).join('')}
                 </span>
                 <span className="text-gray-400 truncate max-w-[80px]">{quote.pricingId}</span>
@@ -221,7 +221,7 @@ function CotizacionRow({ quote, progreso, dias, tarifasCount, bloque, onAbrir, o
           {bloque === 'esperando' && (
             <button
               onClick={e => { e.stopPropagation(); onAbrir(); }}
-              className="text-[9px] font-bold text-[#E11D48] hover:text-[#9F1239] border border-[#E11D48]/30 hover:border-[#E11D48]/60 px-3 py-1.5 rounded transition-colors whitespace-nowrap"
+              className="text-[9px] font-bold text-primario hover:text-primario-fuerte border border-primario/30 hover:border-primario/60 px-3 py-1.5 rounded transition-colors whitespace-nowrap"
             >
               Abrir
             </button>
@@ -374,8 +374,8 @@ export default function BandejaPricing({
   if (totalEquipo === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-[#E11D48]/5 border border-[#E11D48]/10 flex items-center justify-center mb-4">
-          <Inbox className="w-8 h-8 text-[#E11D48]/60" />
+        <div className="w-16 h-16 rounded-2xl bg-primario/5 border border-primario/10 flex items-center justify-center mb-4">
+          <Inbox className="w-8 h-8 text-primario/60" />
         </div>
         <h3 className="text-base font-bold text-[#18181B] mb-1">Bandeja vacía</h3>
         <p className="text-sm text-gray-400 max-w-xs">
@@ -404,9 +404,9 @@ export default function BandejaPricing({
           <p className="text-[9px] font-bold text-green-500 uppercase tracking-widest">Listas para consolidar</p>
           <p className="text-2xl font-black text-green-700 tabular-nums mt-0.5">{clasificacion.listasConsolidar.length}</p>
         </div>
-        <div className="rounded-xl border border-[#E11D48]/30 bg-[#E11D48]/5 px-4 py-3">
-          <p className="text-[9px] font-bold text-[#E11D48]/60 uppercase tracking-widest">Mías / del equipo</p>
-          <p className="text-2xl font-black text-[#BE123C] tabular-nums mt-0.5">
+        <div className="rounded-xl border border-primario/30 bg-primario/5 px-4 py-3">
+          <p className="text-[9px] font-bold text-primario/60 uppercase tracking-widest">Mías / del equipo</p>
+          <p className="text-2xl font-black text-primario-hover tabular-nums mt-0.5">
             {totalMias} <span className="text-base font-bold text-gray-300">/ {totalEquipo}</span>
           </p>
         </div>
@@ -421,7 +421,7 @@ export default function BandejaPricing({
               onClick={() => setFiltro(f)}
               className={`text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors ${
                 filtro === f
-                  ? 'bg-[#E11D48] text-white'
+                  ? 'bg-primario text-white'
                   : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
               }`}
             >

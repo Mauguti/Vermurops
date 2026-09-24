@@ -109,7 +109,7 @@ export default function CargarTarifario({
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-[#E11D48]" />
+            <Sparkles className="w-4 h-4 text-primario" />
             <h3 className="text-[14px] font-bold text-[#18181B]">Cargar tarifario</h3>
           </div>
           <button onClick={onCerrar} className="text-gray-400 hover:text-gray-600">
@@ -158,10 +158,10 @@ export default function CargarTarifario({
             <button
               onClick={() => inputRef.current?.click()}
               disabled={!listoParaSubir || subiendo}
-              className="w-full py-8 border-2 border-dashed border-gray-200 hover:border-[#E11D48]/50 hover:bg-[#E11D48]/5 rounded-xl transition-all flex flex-col items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full py-8 border-2 border-dashed border-gray-200 hover:border-primario/50 hover:bg-primario/5 rounded-xl transition-all flex flex-col items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {subiendo
-                ? <Loader2 className="w-6 h-6 text-[#E11D48] animate-spin" />
+                ? <Loader2 className="w-6 h-6 text-primario animate-spin" />
                 : <Upload className="w-6 h-6 text-gray-400" />}
               <span className="text-[12px] font-semibold text-gray-600">
                 {subiendo ? 'Procesando…' : 'Elegir archivo'}
@@ -177,12 +177,12 @@ export default function CargarTarifario({
                 value={texto}
                 onChange={e => setTexto(e.target.value)}
                 placeholder="Pega aquí el correo con las tarifas…"
-                className="w-full px-3 py-2 text-[12px] border border-gray-200 rounded-lg outline-none focus:border-[#E11D48] resize-none"
+                className="w-full px-3 py-2 text-[12px] border border-gray-200 rounded-lg outline-none focus:border-primario resize-none"
               />
               <button
                 onClick={procesarTexto}
                 disabled={!texto.trim() || !listoParaSubir || subiendo}
-                className="w-full flex items-center justify-center gap-2 bg-[#E11D48] hover:bg-[#BE123C] text-white text-[12px] font-bold uppercase tracking-wider py-2.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full flex items-center justify-center gap-2 bg-primario hover:bg-primario-hover text-white text-[12px] font-bold uppercase tracking-wider py-2.5 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {subiendo
                   ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

@@ -84,7 +84,7 @@ export default function ConciliacionFacturaProveedor({
               className="w-full py-4 px-4 border-2 border-dashed border-gray-200 hover:border-gray-300 hover:bg-gray-50/50 rounded-xl flex items-center justify-center gap-2 text-xs font-bold text-gray-600 disabled:cursor-wait"
             >
               {procesando
-                ? <><Loader2 className="w-4 h-4 animate-spin text-[#E11D48]" /> Subiendo y clasificando…</>
+                ? <><Loader2 className="w-4 h-4 animate-spin text-primario" /> Subiendo y clasificando…</>
                 : <><UploadCloud className="w-4 h-4 text-gray-400" /> Elegir la factura (PDF o imagen)</>}
             </button>
             {error && <p className="mt-2 text-xs font-semibold text-red-600 flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" />{error}</p>}
@@ -111,7 +111,7 @@ export default function ConciliacionFacturaProveedor({
                       {' · '}{suyos.length} cargo{suyos.length !== 1 ? 's' : ''} facturado{suyos.length !== 1 ? 's' : ''}
                     </p>
                   </div>
-                  {d.url && <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-[#E11D48] hover:underline">ver</a>}
+                  {d.url && <a href={d.url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold text-primario hover:underline">ver</a>}
                 </div>
               );
             })}
@@ -250,7 +250,7 @@ function ModalConciliar({ subida, embarque, ordenes, nombreProveedor, autor, onC
             <label className="block min-w-[260px]">
               <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">¿De qué proveedor es?</span>
               <select value={proveedorId} onChange={e => cambiarProveedor(e.target.value)}
-                className={`w-full px-3 py-2 text-[12px] bg-white border rounded-md outline-none focus:border-[#E11D48] ${proveedorId ? 'border-gray-200' : 'border-amber-400'}`}>
+                className={`w-full px-3 py-2 text-[12px] bg-white border rounded-md outline-none focus:border-primario ${proveedorId ? 'border-gray-200' : 'border-amber-400'}`}>
                 <option value="">— Elige el proveedor —</option>
                 {proveedoresPendientes.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
               </select>
@@ -288,7 +288,7 @@ function ModalConciliar({ subida, embarque, ordenes, nombreProveedor, autor, onC
                             </td>
                             <td className="px-2 py-1.5 w-[220px]">
                               <select value={e?.cargoId ?? ''} disabled={modo === 'completa'} onChange={ev => asignar(cf.id, ev.target.value || null)}
-                                className={`w-full px-2 py-1 text-[11px] bg-white border rounded-md outline-none focus:border-[#E11D48] ${e?.cargoId ? (e.motivo === 'monto_y_nombre' ? 'border-emerald-300' : 'border-amber-300') : 'border-gray-200'}`}>
+                                className={`w-full px-2 py-1 text-[11px] bg-white border rounded-md outline-none focus:border-primario ${e?.cargoId ? (e.motivo === 'monto_y_nombre' ? 'border-emerald-300' : 'border-amber-300') : 'border-gray-200'}`}>
                                 <option value="">— sin cargo —</option>
                                 {pendientes.map(g => <option key={g.id} value={g.id}>{g.concepto} · {g.moneda} {money(g.monto)}</option>)}
                               </select>
@@ -350,7 +350,7 @@ function ModalConciliar({ subida, embarque, ordenes, nombreProveedor, autor, onC
         <div className="px-5 py-3 border-t border-gray-150 bg-gray-50/50 flex justify-end gap-2 shrink-0">
           <button onClick={onCancelar} className="text-[12px] px-3 py-2 text-gray-500 hover:text-gray-700">Cancelar</button>
           <button onClick={confirmar} disabled={!proveedorId || guardando}
-            className="flex items-center gap-2 bg-[#E11D48] text-white px-4 py-2 rounded-md text-[12px] font-bold hover:bg-[#BE123C] disabled:opacity-50">
+            className="flex items-center gap-2 bg-primario text-white px-4 py-2 rounded-md text-[12px] font-bold hover:bg-primario-hover disabled:opacity-50">
             {guardando ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Guardando…</> : 'Confirmar conciliación'}
           </button>
         </div>

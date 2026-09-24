@@ -108,7 +108,7 @@ export default function CapturaManualConcepto({ conceptoNombre, onGuardar, onCre
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1 text-[9px] font-bold text-gray-400 hover:text-[#E11D48] uppercase tracking-wide transition-colors"
+        className="flex items-center gap-1 text-[9px] font-bold text-gray-400 hover:text-primario uppercase tracking-wide transition-colors"
       >
         <Plus className="w-3 h-3" />
         Agregar cotización manual
@@ -139,7 +139,7 @@ export default function CapturaManualConcepto({ conceptoNombre, onGuardar, onCre
           <input
             type="number"
             step="0.01"
-            className="w-full text-[11px] border border-gray-200 rounded px-2 py-1 bg-white focus:border-[#E11D48] outline-none"
+            className="w-full text-[11px] border border-gray-200 rounded px-2 py-1 bg-white focus:border-primario outline-none"
             value={monto}
             onChange={e => setMonto(e.target.value)}
             placeholder="0.00"
@@ -148,7 +148,7 @@ export default function CapturaManualConcepto({ conceptoNombre, onGuardar, onCre
         <div className="w-[70px]">
           <label className="block text-[9px] text-gray-400 font-bold uppercase mb-0.5">Moneda</label>
           <select
-            className="w-full text-[11px] border border-gray-200 rounded px-2 py-1 bg-white focus:border-[#E11D48] outline-none"
+            className="w-full text-[11px] border border-gray-200 rounded px-2 py-1 bg-white focus:border-primario outline-none"
             value={moneda}
             onChange={e => setMoneda(e.target.value as 'USD' | 'MXN')}
           >
@@ -159,7 +159,7 @@ export default function CapturaManualConcepto({ conceptoNombre, onGuardar, onCre
         <button
           onClick={handleSave}
           disabled={saving || !proveedorId || !monto}
-          className="flex items-center gap-1 text-[10px] font-bold text-white bg-[#E11D48] hover:bg-[#BE123C] disabled:opacity-40 px-3 py-1 rounded transition-colors"
+          className="flex items-center gap-1 text-[10px] font-bold text-white bg-primario hover:bg-primario-hover disabled:opacity-40 px-3 py-1 rounded transition-colors"
         >
           {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
           Agregar
@@ -179,7 +179,7 @@ export default function CapturaManualConcepto({ conceptoNombre, onGuardar, onCre
             type="checkbox"
             checked={guardarSpot}
             onChange={e => setGuardarSpot(e.target.checked)}
-            className="bg-[#E11D48]"
+            className="bg-primario"
           />
           Guardar como tarifa spot para futuras cotizaciones
         </label>

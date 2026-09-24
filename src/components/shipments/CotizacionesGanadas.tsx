@@ -88,7 +88,7 @@ export default function CotizacionesGanadas({
             quedaron sin él: ábrelas para generarlo.
           </p>
         </div>
-        <span className="text-[11px] font-bold text-[#E11D48] bg-[#E11D48]/10 px-2 py-0.5 rounded-full">
+        <span className="text-[11px] font-bold text-primario bg-primario/10 px-2 py-0.5 rounded-full">
           {pendientes.length}
         </span>
       </div>
@@ -132,7 +132,7 @@ export default function CotizacionesGanadas({
                       onChange={e => setSeries(prev => ({ ...prev, [q.id]: e.target.value }))}
                       disabled={!puedeGenerar}
                       aria-label={`Serie del embarque de ${q.id}`}
-                      className="px-2 py-1 text-[11px] font-semibold bg-white border border-gray-200 rounded-md outline-none focus:border-[#E11D48]"
+                      className="px-2 py-1 text-[11px] font-semibold bg-white border border-gray-200 rounded-md outline-none focus:border-primario"
                     >
                       {SERIES_ELEGIBLES.map(s => <option key={s} value={s}>{ETIQUETA_SERIE[s] ?? s}</option>)}
                     </select>
@@ -144,7 +144,7 @@ export default function CotizacionesGanadas({
                     <button
                       onClick={() => onAbrirEmbarque(q, serieDe(q))}
                       disabled={!puedeGenerar || !q.clienteId}
-                      className="inline-flex items-center gap-1.5 bg-[#E11D48] text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg hover:bg-[#BE123C] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="inline-flex items-center gap-1.5 bg-primario text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg hover:bg-primario-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       title={!q.clienteId ? 'Esta cotización no tiene cliente vinculado' : puedeGenerar ? undefined : 'Solo Operaciones puede abrir embarques'}
                     >
                       Abrir embarque <ArrowRight className="w-3 h-3" />

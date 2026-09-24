@@ -82,7 +82,7 @@ export default function RutaEmbarque({
                   value={ruta.origen.puertoCarga || ''}
                   onChange={e => handleOrigenChange('puertoCarga', e.target.value)}
                   placeholder="Ej. Shanghai (CNSHA), CHN"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] shadow-2xs"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs"
                 />
               )}
             </div>
@@ -111,7 +111,7 @@ export default function RutaEmbarque({
                   value={ruta.origen.transportista || ''}
                   onChange={e => handleOrigenChange('transportista', e.target.value)}
                   placeholder="Ej. Maersk Line / Lufthansa Cargo"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] shadow-2xs"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs"
                 />
               )}
             </div>
@@ -127,7 +127,7 @@ export default function RutaEmbarque({
                     value={ruta.origen.buque || ''}
                     onChange={e => handleOrigenChange('buque', e.target.value)}
                     placeholder="Ej. Maersk Mc-Kinney"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] shadow-2xs"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs"
                   />
                 )}
               </div>
@@ -142,7 +142,7 @@ export default function RutaEmbarque({
                     value={ruta.origen.bandera || ''}
                     onChange={e => handleOrigenChange('bandera', e.target.value)}
                     placeholder="Ej. Dinamarca"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] shadow-2xs"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs"
                   />
                 )}
               </div>
@@ -158,7 +158,7 @@ export default function RutaEmbarque({
                   value={ruta.origen.viaje || ''}
                   onChange={e => handleOrigenChange('viaje', e.target.value)}
                   placeholder="Ej. 2604E / Vuelo LH8221 / Weekly Truck"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] shadow-2xs font-mono"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs font-mono"
                 />
               )}
             </div>
@@ -181,7 +181,7 @@ export default function RutaEmbarque({
                     value={ruta.origen.tipoServicio || ''}
                     onChange={e => handleOrigenChange('tipoServicio', e.target.value)}
                     placeholder="Ej. Puerto a Puerto"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] shadow-2xs"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs"
                   />
                 )}
               </div>
@@ -195,7 +195,7 @@ export default function RutaEmbarque({
                     value={ruta.origen.modoTransportacion || ''}
                     onChange={e => handleOrigenChange('modoTransportacion', e.target.value)}
                     placeholder="Ej. Road, Other"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] shadow-2xs"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs"
                   />
                 )}
               </div>
@@ -209,7 +209,7 @@ export default function RutaEmbarque({
                     value={ruta.origen.numeroVehiculo || ''}
                     onChange={e => handleOrigenChange('numeroVehiculo', e.target.value)}
                     placeholder="Ej. 283901"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] shadow-2xs font-mono"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs font-mono"
                   />
                 )}
               </div>
@@ -223,7 +223,7 @@ export default function RutaEmbarque({
                     value={ruta.origen.nombreChofer || ''}
                     onChange={e => handleOrigenChange('nombreChofer', e.target.value)}
                     placeholder="Ej. JOSE"
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] shadow-2xs"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs"
                   />
                 )}
               </div>
@@ -252,7 +252,7 @@ export default function RutaEmbarque({
                   value={ruta.destino.puertoDescarga || ''}
                   onChange={e => handleDestinoChange('puertoDescarga', e.target.value)}
                   placeholder="Ej. Manzanillo (MXZLO), MEX"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] shadow-2xs"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs"
                 />
               )}
             </div>
@@ -267,7 +267,7 @@ export default function RutaEmbarque({
                   value={ruta.destino.transportistaEntrega || ''}
                   onChange={e => handleDestinoChange('transportistaEntrega', e.target.value)}
                   placeholder="Ej. Transportes Transmex S.A."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] shadow-2xs"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs"
                 />
               )}
             </div>
@@ -282,7 +282,7 @@ export default function RutaEmbarque({
                   value={ruta.destino.lugarEntrega || ''}
                   onChange={e => handleDestinoChange('lugarEntrega', e.target.value)}
                   placeholder="Ej. Almacén Central Alfa Toluca"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-[#E11D48] shadow-2xs"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs"
                 />
               )}
             </div>
@@ -294,7 +294,7 @@ export default function RutaEmbarque({
       {/* Aduana Integrada */}
       <div className="bg-white p-6 rounded-xl border border-gray-150 shadow-2xs space-y-4">
         <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-          <Landmark className="w-4 h-4 text-[#E11D48]" />
+          <Landmark className="w-4 h-4 text-primario" />
           <h3 className="text-xs font-bold text-[#18181B] uppercase tracking-wider">
             Control de Aduana y Despacho
           </h3>
@@ -313,7 +313,7 @@ export default function RutaEmbarque({
                 value={ruta.aduana.pedimento || ''}
                 onChange={e => handleAduanaChange('pedimento', e.target.value)}
                 placeholder="Ej. 26-47-3849-6012489"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono font-semibold text-gray-700 outline-none focus:border-[#E11D48] shadow-2xs"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs"
               />
             )}
             <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wide">
@@ -324,7 +324,7 @@ export default function RutaEmbarque({
           <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-xl">
             <div className="space-y-0.5">
               <span className="text-xs font-bold text-gray-700 flex items-center gap-1">
-                <ShieldCheck className="w-4 h-4 text-[#E11D48]" />
+                <ShieldCheck className="w-4 h-4 text-primario" />
                 Transacción Dirigida (AES)
               </span>
               <span className="block text-[10px] text-gray-400 font-semibold leading-tight">
@@ -337,7 +337,7 @@ export default function RutaEmbarque({
               disabled={isReadOnly}
               onClick={() => handleAduanaChange('aes', !ruta.aduana.aes)}
               className={`w-11 h-6 rounded-full transition-colors relative flex items-center shrink-0 ${isReadOnly ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
-                ${ruta.aduana.aes ? 'bg-[#E11D48]' : 'bg-gray-200'}`}
+                ${ruta.aduana.aes ? 'bg-primario' : 'bg-gray-200'}`}
             >
               <span className={`w-4 h-4 bg-white rounded-full transition-transform shadow-sm absolute ${ruta.aduana.aes ? 'translate-x-6' : 'translate-x-1'}`} />
             </button>

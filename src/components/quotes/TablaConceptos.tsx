@@ -125,7 +125,7 @@ export default function TablaConceptos({
               <button
                 key={s.id}
                 onClick={() => onDatosEmbarque(s.id)}
-                className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-400 hover:text-[#E11D48] px-2 py-1 rounded border border-gray-150 transition-colors"
+                className="inline-flex items-center gap-1 text-[10px] font-semibold text-gray-400 hover:text-primario px-2 py-1 rounded border border-gray-150 transition-colors"
                 title={`Ruta, tráfico y carga de ${s.etiqueta}: se editan en Información`}
               >
                 <Settings2 className="w-3 h-3" /> {s.etiqueta}
@@ -134,7 +134,7 @@ export default function TablaConceptos({
             {onAgregarServicio && (
               <button
                 onClick={onAgregarServicio}
-                className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-gray-400 hover:text-[#E11D48] px-2 py-1 rounded border border-dashed border-gray-200 transition-colors"
+                className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-gray-400 hover:text-primario px-2 py-1 rounded border border-dashed border-gray-200 transition-colors"
                 title="Agregar un servicio a esta cotización"
               >
                 <Plus className="w-3 h-3" /> Servicio
@@ -185,7 +185,7 @@ export default function TablaConceptos({
                     <select
                       value={borradorServicioId}
                       onChange={e => setBorradorServicioId(e.target.value)}
-                      className="px-2 py-1 bg-amber-50 border border-amber-200 rounded text-[11px] font-semibold text-gray-700 outline-none focus:border-[#E11D48] cursor-pointer"
+                      className="px-2 py-1 bg-amber-50 border border-amber-200 rounded text-[11px] font-semibold text-gray-700 outline-none focus:border-primario cursor-pointer"
                     >
                       {servicios.map(s => <option key={s.id} value={s.id}>{s.etiqueta}</option>)}
                     </select>
@@ -224,7 +224,7 @@ export default function TablaConceptos({
                     accion={editable && servicios[0] ? (
                       <button
                         onClick={abrirBorrador}
-                        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#E11D48] hover:bg-[#E11D48]/5 px-2.5 py-1.5 rounded-lg transition-colors"
+                        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-primario hover:bg-primario/5 px-2.5 py-1.5 rounded-lg transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" /> Agregar el primero
                       </button>
@@ -255,7 +255,7 @@ export default function TablaConceptos({
               columna «Servicio» del renglón fresco es donde se elige. */}
           <button
             onClick={abrirBorrador}
-            className="flex items-center gap-1.5 text-[11px] font-bold text-[#E11D48] hover:bg-[#E11D48]/5 px-2 py-1.5 rounded-lg transition-colors"
+            className="flex items-center gap-1.5 text-[11px] font-bold text-primario hover:bg-primario/5 px-2 py-1.5 rounded-lg transition-colors"
           >
             <Plus className="w-3.5 h-3.5" /> Agregar concepto
           </button>
@@ -294,7 +294,7 @@ function FilaTotal({ moneda, variasMonedas, costo, profit, venta, conAcciones }:
 
 // ─── Un renglón ───────────────────────────────────────────────────────────────
 
-const inputNum = 'w-[90px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-[#E11D48] focus:bg-white bg-transparent rounded outline-none text-[12px]';
+const inputNum = 'w-[90px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-primario focus:bg-white bg-transparent rounded outline-none text-[12px]';
 
 interface RenglonProps {
   linea: LineaPlana;
@@ -354,8 +354,8 @@ function Renglon({
       onClick={() => { if (aceptaTarifas) onComparar(linea.id); }}
       title={aceptaTarifas && !activa ? 'Clic para ver sus tarifas en el panel' : undefined}
       className={`group transition-colors ${
-        isOver ? 'bg-[#E11D48]/5 ring-1 ring-inset ring-[#E11D48]/30'
-        : activa ? 'bg-[#E11D48]/[0.04] ring-1 ring-inset ring-[#E11D48]/25'
+        isOver ? 'bg-primario/5 ring-1 ring-inset ring-primario/30'
+        : activa ? 'bg-primario/[0.04] ring-1 ring-inset ring-primario/25'
         : 'hover:bg-gray-50/60'} ${aceptaTarifas ? 'cursor-pointer' : ''}`}>
 
       <td className="px-3 py-1.5" onClick={e => servicioElegible && e.stopPropagation()}>
@@ -363,7 +363,7 @@ function Renglon({
           <select
             value={linea.servicioId}
             onChange={e => onCambiarServicio(linea.id, e.target.value)}
-            className="px-2 py-1 bg-amber-50 border border-amber-200 rounded text-[11px] font-semibold text-gray-700 outline-none focus:border-[#E11D48] cursor-pointer"
+            className="px-2 py-1 bg-amber-50 border border-amber-200 rounded text-[11px] font-semibold text-gray-700 outline-none focus:border-primario cursor-pointer"
             title="Elige el servicio antes de trabajar la línea: después queda fijo."
           >
             {servicios.map(s => <option key={s.id} value={s.id}>{s.etiqueta}</option>)}
@@ -388,7 +388,7 @@ function Renglon({
           </span>
         )}
         {activa && (
-          <span className="block px-2 text-[9px] font-bold text-[#E11D48] uppercase tracking-wider">
+          <span className="block px-2 text-[9px] font-bold text-primario uppercase tracking-wider">
             Tarifas del panel →
           </span>
         )}
@@ -399,7 +399,7 @@ function Renglon({
           aceptaTarifas ? (
             <button
               onClick={() => onComparar(linea.id)}
-              className="text-gray-600 hover:text-[#E11D48] hover:underline text-left"
+              className="text-gray-600 hover:text-primario hover:underline text-left"
               title="Ver o cambiar sus tarifas en el panel"
             >
               {linea.proveedorNombre}
@@ -410,7 +410,7 @@ function Renglon({
         ) : aceptaTarifas ? (
           <button
             onClick={() => onComparar(linea.id)}
-            className="text-[11px] font-semibold text-[#E11D48] hover:underline"
+            className="text-[11px] font-semibold text-primario hover:underline"
           >
             Elegir proveedor
           </button>

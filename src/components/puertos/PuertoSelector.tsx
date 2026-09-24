@@ -130,7 +130,7 @@ export default function PuertoSelector({
       <button
         type="button"
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between gap-1 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-left outline-none focus:border-[#E11D48] hover:border-gray-300 transition-colors"
+        className="w-full flex items-center justify-between gap-1 px-2 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs text-left outline-none focus:border-primario hover:border-gray-300 transition-colors"
       >
         <span className={`truncate ${valor ? 'text-gray-700' : 'text-gray-400'}`}>
           {valor || placeholder}
@@ -163,7 +163,7 @@ export default function PuertoSelector({
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Buscar puerto, código o país…"
-                className="w-full pl-6 pr-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-[11px] outline-none focus:border-[#E11D48]"
+                className="w-full pl-6 pr-2 py-1.5 bg-gray-50 border border-gray-200 rounded text-[11px] outline-none focus:border-primario"
               />
             </div>
           </div>
@@ -174,7 +174,7 @@ export default function PuertoSelector({
                 key={p.id}
                 type="button"
                 onClick={() => { onChange(p.nombre, p.id); setOpen(false); }}
-                className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-left hover:bg-[#E11D48]/5 transition-colors"
+                className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-left hover:bg-primario/5 transition-colors"
               >
                 <span className="flex items-center gap-1.5 min-w-0">
                   <Anchor className="w-3 h-3 text-gray-300 shrink-0" />

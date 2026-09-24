@@ -43,7 +43,7 @@ export default function RightChatPanel({ quotes, onSelectQuote, user, isOpen, on
       <div className="px-5 py-4 border-b border-gray-200 bg-white shrink-0">
         <div className="flex items-center justify-between">
           <h3 className="text-[14px] font-bold text-[#18181B] flex items-center gap-2">
-            <MessageSquare className="w-4 h-4 text-[#E11D48]" />
+            <MessageSquare className="w-4 h-4 text-primario" />
             Conversaciones
           </h3>
           <button
@@ -68,16 +68,16 @@ export default function RightChatPanel({ quotes, onSelectQuote, user, isOpen, on
             <div 
               key={quote.id}
               onClick={() => onSelectQuote(quote)}
-              className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm hover:border-[#E11D48] hover:shadow transition-all cursor-pointer group relative"
+              className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm hover:border-primario hover:shadow transition-all cursor-pointer group relative"
             >
               {unreadCount > 0 && (
-                <div className="absolute -top-2 -right-2 bg-[#E11D48] text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-sm">
+                <div className="absolute -top-2 -right-2 bg-primario text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-sm">
                   {unreadCount}
                 </div>
               )}
               <div className="flex justify-between items-start mb-1.5">
                 <div>
-                  <span className="text-[10px] font-bold text-[#E11D48] tracking-wider uppercase block mb-0.5">{quote.folio}</span>
+                  <span className="text-[10px] font-bold text-primario tracking-wider uppercase block mb-0.5">{quote.folio}</span>
                   <h4 className="text-[12px] font-bold text-[#18181B] truncate max-w-[180px]" title={quote.empresa}>
                     {quote.empresa}
                   </h4>

@@ -120,7 +120,7 @@ function ProveedorCard({
           : cp.candidata
           ? 'bg-white border-dashed border-gray-300'
           : esSugerida
-          ? 'bg-white border-[#E11D48] border-2 shadow-sm'
+          ? 'bg-white border-primario border-2 shadow-sm'
           : 'bg-white border-card-border'
       } ${atenuada ? 'opacity-70' : ''}`}
     >
@@ -133,7 +133,7 @@ function ProveedorCard({
             <span className="text-[14px] font-bold text-[#1F2937] truncate">{cp.proveedor}</span>
 
             {esSugerida && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#E11D48]/10 text-[#E11D48] text-[10px] font-bold">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primario/10 text-primario text-[10px] font-bold">
                 <TrendingDown className="w-3 h-3" /> Sugerida · más barata
               </span>
             )}

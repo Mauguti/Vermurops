@@ -102,7 +102,7 @@ export default function LoginPage({ onLoginSuccess, onBack, onOlvideContrasena, 
                 setEmail(e.target.value);
                 setError('');
               }}
-              onFocus={(e) => (e.target.style.borderColor = '#E11D48')}
+              onFocus={(e) => (e.target.style.borderColor = 'var(--color-primario)')}
               onBlur={(e) => (e.target.style.borderColor = '#E4E4E7')}
             />
           </div>
@@ -132,7 +132,7 @@ export default function LoginPage({ onLoginSuccess, onBack, onOlvideContrasena, 
                   setPassword(e.target.value);
                   setError('');
                 }}
-                onFocus={(e) => (e.target.style.borderColor = '#E11D48')}
+                onFocus={(e) => (e.target.style.borderColor = 'var(--color-primario)')}
                 onBlur={(e) => (e.target.style.borderColor = '#E4E4E7')}
               />
               <button
@@ -156,7 +156,7 @@ export default function LoginPage({ onLoginSuccess, onBack, onOlvideContrasena, 
               <button
                 type="button"
                 onClick={() => onOlvideContrasena(email)}
-                className="text-[12px] font-medium text-[#71717A] hover:text-[#E11D48] transition-colors"
+                className="text-[12px] font-medium text-[#71717A] hover:text-primario transition-colors"
               >
                 ¿Olvidaste tu contraseña?
               </button>
@@ -165,7 +165,7 @@ export default function LoginPage({ onLoginSuccess, onBack, onOlvideContrasena, 
 
           {/* Error message */}
           {error && (
-            <p className="text-[12px] font-medium text-[#E11D48] text-center -mt-[4px]">
+            <p className="text-[12px] font-medium text-peligro text-center -mt-[4px]">
               {error}
             </p>
           )}
@@ -177,7 +177,7 @@ export default function LoginPage({ onLoginSuccess, onBack, onOlvideContrasena, 
             disabled={loading}
             className="w-full py-[12px] rounded-[8px] text-[14px] font-semibold text-white tracking-tight transition-all"
             style={{
-              background: loading ? '#F43F5E' : '#E11D48',
+              background: loading ? 'var(--color-primario-claro)' : 'var(--color-primario)',
               opacity: loading ? 0.85 : 1,
             }}
           >

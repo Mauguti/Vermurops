@@ -232,7 +232,7 @@ export default function RevisionTarifasExtraidas({
                       type="number"
                       value={l.monto || ''}
                       onChange={e => actualizar(l.lineaId, { monto: Number(e.target.value) })}
-                      className="w-[110px] px-2 py-1 text-[12px] text-right tabular-nums border border-gray-200 rounded outline-none focus:border-[#E11D48]"
+                      className="w-[110px] px-2 py-1 text-[12px] text-right tabular-nums border border-gray-200 rounded outline-none focus:border-primario"
                     />
 
                     {/* Confirmación explícita: un 1,200 que era MXN cargado
@@ -327,7 +327,7 @@ export default function RevisionTarifasExtraidas({
               finally { setGuardando(false); }
             }}
             disabled={!estado.puedeGuardar || guardando}
-            className="bg-[#E11D48] hover:bg-[#BE123C] text-white text-[11px] font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="bg-primario hover:bg-primario-hover text-white text-[11px] font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {guardando ? 'Guardando…' : `Guardar ${resumen.guardables} tarifa${resumen.guardables !== 1 ? 's' : ''}`}
           </button>
