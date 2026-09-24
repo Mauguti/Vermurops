@@ -24,6 +24,7 @@ import { consolidarPorProveedor, desdeCargos, estadoDelProveedor } from '../../l
 import { usePreferenciasUsuario } from '../../hooks/usePreferenciasUsuario';
 import { clienteDelEmbarque } from '../../lib/entidadesEmbarque';
 import { editarMontoCargo, restaurarMontoCargo, desviacionDelEmbarque, desviacionDe } from '../../lib/cargosEditables';
+import { margenDelEmbarque, TEXTO_SIN_COMPARAR, type ContextoMargen } from '../../lib/margenRealConcepto';
 import { construirOCDesdeCargo, marcarCargoConOrden, puedeConvertirse } from '../../lib/ocDesdeCargo';
 import { generateFolioEmbarque, parseFolioNumero } from '../../lib/folioService';
 import { FichaHeader, FichaTabs, BadgeEstado } from '../ui/ficha/FichaLayout';
@@ -416,6 +417,21 @@ export default function FichaEmbarque({
   // §4.3 — totales por moneda, con fallback para embarques anteriores a E-2.
   const totales = totalesDe(embarque.cargos);
   const monedasActivas = monedasConMovimiento(embarque.cargos.detalles ?? []);
+
+  /*
+   * El resumen financiero corre con la MISMA regla que cada concepto de la
+   * pestaña Cargos: el gasto es el costo real —lo facturado o lo pagado—, no
+   * lo que se cotizó. Si cada uno sumara por su lado, la ficha tendría dos
+   * utilidades distintas del mismo embarque y ninguna forma de saber cuál
+   * creer.
+   */
+  const ctxMargen: ContextoMargen = {
+    ordenes: new Map(ocDelEmbarque.map(o => [o.id, o])),
+    cargos: embarque.cargos.detalles ?? [],
+  };
+  const margenEmbarque = new Map(
+    margenDelEmbarque(embarque.cargos.detalles ?? [], ctxMargen).map(f => [f.moneda, f]),
+  );
 
   const hijos = allEmbarques.filter(e => e.masterId === embarque.id);
   const master = allEmbarques.find(e => e.id === embarque.masterId);
@@ -1030,6 +1046,15 @@ export default function FichaEmbarque({
               /* A-3 · Cargos por concepto, editables por Operaciones. */
               <TablaCargosEmbarque
                 detalles={embarque.cargos.detalles || []}
+                /*
+                 * De las órdenes sale el costo REAL de cada concepto: lo que
+                 * el proveedor facturó y lo que se le pagó.
+                 *
+                 * No se pasa tipo de cambio porque el embarque no guarda uno.
+                 * Sin él, un costo en otra moneda no se compara en vez de
+                 * convertirse con una tasa inventada (§4.3).
+                 */
+                ordenes={ocDelEmbarque}
                 editable={puedeEditarCargos}
                 nombreProveedor={nombreProveedor}
                 onEditarMonto={handleEditarMontoCargo}
@@ -1251,15 +1276,28 @@ export default function FichaEmbarque({
                           <div className="flex justify-between font-semibold">
                             <span className="text-gray-400">Gastos:</span>
                             <span className="font-mono text-rose-500">
-                              ${totales[m].gastos.toLocaleString()} {m}
+                              ${(margenEmbarque.get(m)?.costo ?? totales[m].gastos).toLocaleString()} {m}
                             </span>
                           </div>
+                          {(margenEmbarque.get(m)?.excedente ?? 0) > 0 && (
+                            <div className="flex justify-between font-semibold">
+                              <span className="text-gray-400">Excedente sobre lo cotizado:</span>
+                              <span className="font-mono text-peligro">
+                                +${(margenEmbarque.get(m)!.excedente).toLocaleString()} {m}
+                              </span>
+                            </div>
+                          )}
                           <div className="flex justify-between items-baseline border-t border-gray-200 pt-2">
                             <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Utilidad</span>
                             <span className="text-base font-black text-gray-800 font-mono tracking-tight">
-                              ${totales[m].ganancia.toLocaleString()} {m}
+                              ${(margenEmbarque.get(m)?.profit ?? totales[m].ganancia).toLocaleString()} {m}
                             </span>
                           </div>
+                          {(margenEmbarque.get(m)?.avisos ?? []).map(a => (
+                            <p key={a} className="text-[9px] text-amber-700 leading-snug">
+                              {TEXTO_SIN_COMPARAR[a]}
+                            </p>
+                          ))}
                         </div>
                       ))}
                     </div>
