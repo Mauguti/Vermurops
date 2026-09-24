@@ -1,4 +1,7 @@
 import React, { useState, useCallback } from 'react';
+import {
+  filtrarProveedores, conteoPorPestana, PESTANAS_PROVEEDOR, type PestanaProveedor,
+} from '../lib/filtrarProveedores';
 import { contiene, texto } from '../lib/texto';
 import { Search, Phone, Mail, Plane, Ship, Truck, FileText, Database, Loader2 } from 'lucide-react';
 import { useClientes } from '../hooks/useClientes';
@@ -65,6 +68,8 @@ export default function Clients() {
   const [showModal, setShowModal] = useState(false);
 
   const [providerSearchTerm, setProviderSearchTerm] = useState('');
+  // Bloque 5: las pestañas de proveedores nunca estuvieron conectadas.
+  const [pestanaProveedor, setPestanaProveedor] = useState<PestanaProveedor>('todos');
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
 
   // U-4 · Alguien enlazó a un cliente o a un proveedor desde otro módulo.
@@ -121,15 +126,14 @@ export default function Clients() {
       (c.comercial ?? '').toLowerCase().includes(q);
   });
 
-  const filteredProviders = proveedores.filter(p => {
-    const cp = contactoPrincipal(p);
-    const q = providerSearchTerm.toLowerCase();
-    return contiene(p.nombre, q) ||
-      (p.rfc ?? p.numeroEntidadMagaya ?? '').toLowerCase().includes(q) ||
-      (cp?.nombre ?? '').toLowerCase().includes(q);
+  const filteredProviders = filtrarProveedores(proveedores, {
+    pestana: pestanaProveedor,
+    busqueda: providerSearchTerm,
   });
 
-  const providerTabs = ['Todos', 'Navieras', 'Aerolíneas', 'Transportistas', 'Aduanales'];
+  /* Las pestañas son los TIPOS que el dato tiene (§4.5). «Navieras» y
+     «Aerolíneas» no existen como tipo y daban siempre cero. */
+  const conteoProveedores = conteoPorPestana(proveedores, { busqueda: providerSearchTerm });
 
   const getTransportIcon = (type: string) => {
     switch (type) {
@@ -321,16 +325,19 @@ export default function Clients() {
         <>
           <div className="border-b border-divider mb-[24px]">
             <nav className="-mb-px flex space-x-[32px]">
-              {providerTabs.map((tab) => (
+              {PESTANAS_PROVEEDOR.map(({ id, label }) => (
                 <button
-                  key={tab}
+                  key={id}
+                  onClick={() => setPestanaProveedor(id)}
+                  aria-pressed={pestanaProveedor === id}
                   className={`pb-[12px] px-[4px] text-[14px] font-medium transition-colors border-b-[2px] ${
-                    tab === 'Todos'
+                    pestanaProveedor === id
                       ? 'border-brand text-text-primary'
                       : 'border-transparent text-text-muted hover:text-text-secondary hover:border-text-muted'
                   }`}
                 >
-                  {tab}
+                  {label}
+                  <span className="ml-[6px] text-[12px] text-text-muted tabular-nums">{conteoProveedores[id]}</span>
                 </button>
               ))}
             </nav>
