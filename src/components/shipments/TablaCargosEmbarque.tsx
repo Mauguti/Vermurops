@@ -124,7 +124,7 @@ function GrupoCard({
           {grupo.monedasActivas.map(m => (
             <div key={m} className="text-right">
               <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                Margen {m}
+                Profit {m}
               </p>
               <p className={`text-[13px] font-bold tabular-nums ${
                 grupo.porMoneda[m].ganancia < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
@@ -282,7 +282,19 @@ function Renglon({
             )}
           </span>
         ) : (
-          <span className="text-gray-300">—</span>
+          /*
+           * Sin corrección, el costo cotizado ES el monto de la línea: nació
+           * de la cotización y nadie lo ha movido. Pintarlo en gris en vez de
+           * «—» es la diferencia entre una columna que informa y una que
+           * parece rota. El tachado y la desviación se reservan para cuando sí
+           * hubo corrección: sin ella no hay nada que tachar.
+           */
+          <span
+            className="text-gray-400"
+            title="Nadie ha corregido este importe: sigue siendo el que se cotizó."
+          >
+            ${money(original)}
+          </span>
         )}
       </td>
 
