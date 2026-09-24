@@ -24,7 +24,8 @@ import type { UserRole } from '../auth/users';
 import {
   LINEA_TIEMPO_VENTAS, lineaTiempoColapsada, type EtapaVisible,
 } from './visibilidadCotizacion';
-import { rolesQuePueden } from './stateMachine';
+import { rolesQuePueden, salidasPara, type ContextoTransicion } from './stateMachine';
+import type { KanbanQuote } from '../components/quotes/QuotesData';
 
 // ─── La línea de etapas ───────────────────────────────────────────────────────
 
@@ -176,3 +177,39 @@ export function proximoPaso(
     terminal: false,
   };
 }
+
+// ─── Regresar una etapa ───────────────────────────────────────────────────────
+
+/**
+ * La transición «hacia atrás» de esta etapa: devolver la cotización al paso
+ * anterior. Bloque 6 (25-sep-2026): era lo ÚNICO que solo se podía hacer
+ * desde el selector de «Etapa del Pipeline» de Información, así que sube a
+ * la franja antes de quitarlo.
+ *
+ * Se deriva, no se declara: es la salida que el rol tiene disponible y que
+ * no es ni el avance natural, ni ganada, ni perdida. Así no hay una segunda
+ * tabla que se desincronice de la máquina de estados.
+ */
+export function pasoAtras(
+  etapa: PipelineStageId,
+  rol: UserRole,
+  quote: KanbanQuote,
+  ctx?: ContextoTransicion,
+): { hacia: PipelineStageId; etiqueta: string } | null {
+  const adelante = new Set<string>([...(HACIA_ADELANTE[etapa] ?? []), 'ganada', 'perdida']);
+  const atras = salidasPara(etapa, rol as never, quote, ctx)
+    .filter(s => s.ok && !adelante.has(s.hacia));
+  if (atras.length === 0) return null;
+  return { hacia: atras[0].hacia, etiqueta: ETIQUETA_ETAPA[atras[0].hacia] ?? atras[0].hacia };
+}
+
+/** Nombres cortos para el botón de regreso. */
+const ETIQUETA_ETAPA: Partial<Record<PipelineStageId, string>> = {
+  solicitud_cliente: 'Solicitud del cliente',
+  solicitado_pricing: 'Solicitado a Pricing',
+  pricing_solicitando: 'Pricing — solicitando',
+  cotizaciones_recibidas: 'Cotizaciones recibidas',
+  consolidada: 'Consolidada',
+  enviada_cliente: 'Enviada al cliente',
+  negociacion: 'En negociación',
+};

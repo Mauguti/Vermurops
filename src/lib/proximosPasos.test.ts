@@ -9,7 +9,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  lineaDeEtapas, indiceEnLinea, proximoPaso, aQuienLeToca,
+  lineaDeEtapas, indiceEnLinea, proximoPaso, aQuienLeToca, pasoAtras,
   LINEA_TIEMPO_INTERNA, HACIA_ADELANTE, ACCION_DE_AVANCE,
 } from './proximosPasos';
 import { LINEA_TIEMPO_VENTAS } from './visibilidadCotizacion';
@@ -141,5 +141,51 @@ describe('aQuienLeToca', () => {
   });
   it('null para una transición que no existe', () => {
     expect(aQuienLeToca('ganada', 'solicitud_cliente')).toBeNull();
+  });
+});
+
+// ─── Bloque 6 · regresar una etapa ───────────────────────────────────────────
+// Era lo único que solo se podía hacer desde el selector de «Etapa del
+// Pipeline»; sube a la franja antes de quitarlo.
+describe('pasoAtras', () => {
+  const casos: [PipelineStageId, Rol, PipelineStageId][] = [
+    ['solicitado_pricing', 'ventas', 'solicitud_cliente'],
+    ['pricing_solicitando', 'pricing', 'solicitado_pricing'],
+    ['cotizaciones_recibidas', 'pricing', 'pricing_solicitando'],
+    ['consolidada', 'pricing', 'cotizaciones_recibidas'],
+    ['enviada_cliente', 'ventas', 'consolidada'],
+    ['negociacion', 'ventas', 'enviada_cliente'],
+  ];
+  it.each(casos)('desde %s, %s puede regresar a %s', (desde, rol, esperada) => {
+    expect(pasoAtras(desde, rol as never, cotizacion(desde))?.hacia).toBe(esperada);
+  });
+
+  it('admin puede regresar desde todas ellas', () => {
+    casos.forEach(([desde, , esperada]) => {
+      expect(pasoAtras(desde, 'admin' as never, cotizacion(desde))?.hacia).toBe(esperada);
+    });
+  });
+
+  it('el rol que no es dueño de esa vuelta no la ve', () => {
+    // Regresar de «enviada al cliente» a «consolidada» es de Ventas/Admin.
+    expect(pasoAtras('enviada_cliente', 'pricing' as never, cotizacion('enviada_cliente'))).toBeNull();
+  });
+
+  it('no hay vuelta desde la primera etapa ni desde las terminales', () => {
+    expect(pasoAtras('solicitud_cliente', 'ventas' as never, cotizacion('solicitud_cliente'))).toBeNull();
+    expect(pasoAtras('ganada', 'admin' as never, cotizacion('ganada'))).toBeNull();
+    expect(pasoAtras('perdida', 'admin' as never, cotizacion('perdida'))).toBeNull();
+  });
+
+  it('trae una etiqueta legible, no el id', () => {
+    expect(pasoAtras('negociacion', 'ventas' as never, cotizacion('negociacion'))?.etiqueta).toBe('Enviada al cliente');
+  });
+
+  it('nunca ofrece ganada ni perdida como «regresar»', () => {
+    casos.forEach(([desde, rol]) => {
+      const atras = pasoAtras(desde, rol as never, cotizacion(desde))?.hacia;
+      expect(atras).not.toBe('ganada');
+      expect(atras).not.toBe('perdida');
+    });
   });
 });
