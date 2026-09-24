@@ -9,7 +9,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { puedeTransicionarA, transicionesDisponibles } from './stateMachine';
+import { puedeTransicionarA, transicionesDisponibles, salidasPara } from './stateMachine';
+import { RAZON_SIN_CLIENTE } from './frenoCliente';
 import { KanbanQuote, ServicioSolicitado, CotizacionProveedor } from '../components/quotes/QuotesData';
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────────
@@ -51,9 +52,12 @@ function makeServicio(opts: {
 function makeQuote(opts: {
   etapa?: KanbanQuote['etapa'];
   servicios?: ServicioSolicitado[];
+  /** null = sin cliente vinculado (Bloque 2a). Default: con cliente. */
+  clienteId?: string | null;
 } = {}): KanbanQuote {
   return {
     id: 'COT-TEST-0001',
+    clienteId: opts.clienteId === undefined ? 'CLI-TEST' : opts.clienteId,
     etapa: opts.etapa ?? 'solicitud_cliente',
     prospecto: { empresa: 'Test S.A.', contacto: 'Test', telefono: '', email: '', origen: 'otro' },
     vendedorId: 'ventas',
@@ -455,3 +459,30 @@ describe('H. consolidar lee ambas rutas de la dualidad (§6)', () => {
   });
 });
 
+
+// ─── Bloque 2a · el freno «sin cliente vinculado» ────────────────────────────
+describe('Bloque 2a · sin cliente vinculado no se gana', () => {
+  it('desde enviada_cliente y negociacion, ningún rol puede marcar ganada sin clienteId', () => {
+    for (const etapa of ['enviada_cliente', 'negociacion'] as const) {
+      for (const rol of ['ventas', 'pricing', 'admin'] as const) {
+        const r = puedeTransicionarA(etapa, 'ganada', rol, makeQuote({ etapa, clienteId: null }));
+        expect(r.ok, `${etapa} · ${rol}`).toBe(false);
+        expect(r.razon).toBe(RAZON_SIN_CLIENTE);
+      }
+    }
+  });
+  it('con clienteId, ganada sigue disponible', () => {
+    expect(puedeTransicionarA('negociacion', 'ganada', 'ventas', makeQuote({ etapa: 'negociacion' })).ok).toBe(true);
+  });
+  it('perdida no se frena por el cliente', () => {
+    expect(puedeTransicionarA('negociacion', 'perdida', 'ventas', makeQuote({ etapa: 'negociacion', clienteId: null })).ok).toBe(true);
+  });
+  it('salidasPara enseña la transición vetada con su razón, en vez de esconderla', () => {
+    const salidas = salidasPara('negociacion', 'ventas', makeQuote({ etapa: 'negociacion', clienteId: null }));
+    const ganada = salidas.find(s => s.hacia === 'ganada');
+    expect(ganada).toEqual({ hacia: 'ganada', ok: false, razon: RAZON_SIN_CLIENTE });
+    expect(salidas.find(s => s.hacia === 'perdida')?.ok).toBe(true);
+    // Operaciones no tiene salidas: no aparecen
+    expect(salidasPara('negociacion', 'operaciones', makeQuote({ etapa: 'negociacion' }))).toEqual([]);
+  });
+});

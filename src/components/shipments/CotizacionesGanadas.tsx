@@ -138,11 +138,14 @@ export default function CotizacionesGanadas({
                     </select>
                   </td>
                   <td className="px-4 py-2.5 text-right">
+                    {!q.clienteId && (
+                      <span className="block mb-1 text-[10px] font-semibold text-amber-700">Sin cliente vinculado: vincúlalo en la cotización</span>
+                    )}
                     <button
                       onClick={() => onAbrirEmbarque(q, serieDe(q))}
-                      disabled={!puedeGenerar}
+                      disabled={!puedeGenerar || !q.clienteId}
                       className="inline-flex items-center gap-1.5 bg-[#E11D48] text-white text-[11px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg hover:bg-[#BE123C] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                      title={puedeGenerar ? undefined : 'Solo Operaciones puede abrir embarques'}
+                      title={!q.clienteId ? 'Esta cotización no tiene cliente vinculado' : puedeGenerar ? undefined : 'Solo Operaciones puede abrir embarques'}
                     >
                       Abrir embarque <ArrowRight className="w-3 h-3" />
                     </button>

@@ -8,6 +8,7 @@ import { useClientes } from '../hooks/useClientes';
 import CotizacionesGanadas from './shipments/CotizacionesGanadas';
 import { agruparPorEstado, estadoDe, ETAPAS_EMBARQUE } from '../lib/estadoEmbarque';
 import { crearEmbarquesDeCotizacionGanada } from '../lib/crearEmbarquesGanada';
+import { razonSinCliente } from '../lib/frenoCliente';
 import { mapearCotizacionAEmbarque } from '../lib/cotizacionAEmbarque';
 import { construirEmbarqueDesdeCotizacion } from '../lib/generacionEmbarque';
 import { EMBARQUE_AUTOMATICO_DISPONIBLE } from '../config/banderas';
@@ -188,6 +189,9 @@ export default function Shipments() {
    */
   const abrirEmbarqueDesdeCotizacion = async (quote: typeof quotes[number], serie: string) => {
     if (creando) return;
+    // Bloque 2a: el freno también aquí, que es la ruta que corre hoy.
+    const sinCliente = razonSinCliente(quote);
+    if (sinCliente) { setToast({ mensaje: sinCliente, tipo: 'error' }); return; }
     setCreando(true);
 
     /*

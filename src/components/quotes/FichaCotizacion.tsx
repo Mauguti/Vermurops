@@ -18,7 +18,8 @@ import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
 import { useServicios, renderIcon } from '../../config/serviciosStore';
 import { useClientes } from '../../hooks/useClientes';
 import { calcLinea } from '../../lib/cotizacionCalculator';
-import { puedeTransicionarA, transicionesDisponibles, type Rol } from '../../lib/stateMachine';
+import { puedeTransicionarA, transicionesDisponibles, salidasPara, rolesQuePueden, type Rol } from '../../lib/stateMachine';
+import { razonSinCliente, RAZON_SIN_CLIENTE_CORTA, esRazonSinCliente } from '../../lib/frenoCliente';
 import { useTarifas } from '../../hooks/useTarifas';
 import { useConceptos } from '../../hooks/useConceptos';
 import OperacionServicio from './OperacionServicio';
@@ -1175,6 +1176,32 @@ export default function FichaCotizacion({
   /** «Marcar ganada» como botón secundario obedece la misma condición. */
   const puedeMarcarGanada = disponibles.includes('ganada') && prontitud.lista;
 
+  /**
+   * Bloque 2a · el freno «sin cliente vinculado», con camino.
+   * Se muestra en cuanto el rol podría ganar desde esta etapa y la cotización
+   * no tiene cliente: no importa si el botón principal es «negociar».
+   */
+  const puedeGanarDesdeAqui = !viendoVersion && rolesQuePueden(quote.etapa, 'ganada').includes(rolActivo);
+  const razonCliente = puedeGanarDesdeAqui ? razonSinCliente(quote) : null;
+  const irAVincularCliente = () => {
+    setActiveTab('info');
+    setShowLossReasonForm(false);
+    setTimeout(() => {
+      const el = document.getElementById('vincular-cliente-input');
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el?.focus();
+    }, 50);
+  };
+  /*
+   * «Pedir alta a Administración» queda FUERA (25-sep-2026): la campanita
+   * solo persiste notificaciones con destinatarioId (un uid) y las reglas
+   * solo dejan leer las propias; las de rol viven en memoria del navegador
+   * que las crea. Avisar a un área exige campos o reglas nuevas. Ver §6.
+   */
+  const bloqueoCliente = razonCliente
+    ? { texto: razonCliente, acciones: [{ etiqueta: 'Vincular cliente', onClick: irAVincularCliente }] }
+    : undefined;
+
   /** Avanza de etapa. Ganada pide confirmación: de ahí nace el embarque. */
   const avanzarA = (hacia: PipelineStageId) => {
     if (hacia === 'ganada') {
@@ -1440,6 +1467,7 @@ export default function FichaCotizacion({
         ganadaSecundaria={puedeMarcarGanada && advanceTarget !== 'ganada'}
         onMarcarGanada={() => avanzarA('ganada')}
         soloLectura={viendoVersion}
+        bloqueo={bloqueoCliente}
       />
 
       <FichaTabs
@@ -1770,10 +1798,21 @@ export default function FichaCotizacion({
                 }}
                 className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 outline-none focus:border-[#E11D48] shadow-xs"
               >
-                {/* Siempre muestra la etapa actual + solo las transiciones permitidas */}
-                {PIPELINE_STAGES
-                  .filter(s => s.id === quote.etapa || disponibles.includes(s.id))
-                  .map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                {/* La etapa actual + las salidas del rol. Una que la cotización
+                    no cumple se ve deshabilitada con la razón (Bloque 2a), en
+                    vez de esconderse en silencio. */}
+                {(() => {
+                  const salidas = salidasPara(quote.etapa, rolActivo, quote);
+                  const etiqueta = (id: PipelineStageId) => PIPELINE_STAGES.find(s => s.id === id)?.label ?? id;
+                  return [
+                    <option key={quote.etapa} value={quote.etapa}>{etiqueta(quote.etapa)}</option>,
+                    ...salidas.map(s => (
+                      <option key={s.hacia} value={s.hacia} disabled={!s.ok} title={s.razon ?? undefined}>
+                        {etiqueta(s.hacia)}{!s.ok ? ` — ${esRazonSinCliente(s.razon) ? RAZON_SIN_CLIENTE_CORTA : (s.razon ?? 'no disponible').slice(0, 70)}` : ''}
+                      </option>
+                    )),
+                  ];
+                })()}
               </select>
 
               {quote.etapa === 'perdida' && quote.motivoPerdida && (
@@ -1852,6 +1891,7 @@ export default function FichaCotizacion({
                       <Link2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
                       <Search className="w-3.5 h-3.5 text-gray-300 shrink-0" />
                       <input
+                        id="vincular-cliente-input"
                         type="text"
                         value={clienteQuery}
                         onChange={e => setClienteQuery(e.target.value)}

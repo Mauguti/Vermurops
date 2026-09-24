@@ -44,11 +44,17 @@ interface Props {
   onMarcarGanada: () => void;
   /** Viendo una versión pasada: se informa, no se actúa. */
   soloLectura?: boolean;
+  /**
+   * Un veto de la máquina de estados CON camino (Bloque 2a): «sin cliente
+   * vinculado» y los botones que llevan a resolverlo. Se pinta arriba de
+   * los faltantes y aunque el botón principal no sea «ganada».
+   */
+  bloqueo?: { texto: string; acciones: { etiqueta: string; onClick: () => void }[] };
 }
 
 export default function ProximosPasos({
   rol, etapa, paso, prontitud, puedeAvanzar, porque,
-  onAvanzar, ganadaSecundaria, onMarcarGanada, soloLectura = false,
+  onAvanzar, ganadaSecundaria, onMarcarGanada, soloLectura = false, bloqueo,
 }: Props) {
   const linea = lineaDeEtapas(rol);
   const actual = indiceEnLinea(linea, etapa);
@@ -108,8 +114,22 @@ export default function ProximosPasos({
           {paso.leTocaA && !ganadaSecundaria && <span className="text-gray-400"> · le toca a {paso.leTocaA}</span>}
         </p>
 
+        {/* ── Un veto con camino: qué frena y a dónde ir ── */}
+        {bloqueo && !soloLectura && (
+          <p className="text-[11px] text-red-700 flex flex-wrap items-center gap-x-2 gap-y-1">
+            <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+            <span>{bloqueo.texto}</span>
+            {bloqueo.acciones.map(a => (
+              <button key={a.etiqueta} type="button" onClick={a.onClick}
+                className="text-[10px] font-bold uppercase tracking-wider text-[#E11D48] hover:underline">
+                {a.etiqueta} →
+              </button>
+            ))}
+          </p>
+        )}
+
         {/* ── En vez del botón, lo que falta ── */}
-        {muestraFaltantes && (
+        {muestraFaltantes && !bloqueo && (
           <LineaFaltantes prontitud={prontitud} porque={porque} accion={paso.boton ?? ''} />
         )}
       </div>

@@ -36,6 +36,7 @@ import { construirEmbarqueDesdeCotizacion } from './generacionEmbarque';
 import { planearEmbarquesDeGanada } from './planEmbarquesGanada';
 import { reservarFoliosMultiSerie } from './folioService';
 import { sanitizarParaFirestore } from './sanitizarFirestore';
+import { exigirClienteVinculado } from './frenoCliente';
 
 export interface ParametrosGeneracion {
   /** La cotización YA con los campos de «ganada» aplicados. */
@@ -73,6 +74,8 @@ export async function crearEmbarquesDeCotizacionGanada(
   const ahora = p.ahora ?? new Date().toISOString();
   const refCotizacion = doc(db, 'cotizaciones', p.quote.id);
 
+  // Bloque 2a: sin cliente vinculado no nace embarque, venga por donde venga.
+  exigirClienteVinculado(p.quote);
   const plan = planearEmbarquesDeGanada(p.quote, p.catalogoServicios, { cliente: p.cliente });
 
   return runTransaction(db, async (tx) => {
