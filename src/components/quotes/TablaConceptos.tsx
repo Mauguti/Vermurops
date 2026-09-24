@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
-import { Plus, Trash2, ChevronUp, ChevronDown, Lock, Settings2 } from 'lucide-react';
+import { Plus, Trash2, ChevronUp, ChevronDown, Lock, Settings2, X } from 'lucide-react';
 import type { LineaPlana } from '../../lib/lineasCotizacion';
 import { compararConTarget } from '../../lib/lineasCotizacion';
 import {
@@ -52,8 +52,16 @@ interface Props {
   onElegirConcepto: (lineaId: string, conceptoId: string, nombre: string) => void;
   onQuitarLinea: (lineaId: string) => void;
   onMoverLinea: (lineaId: string, direccion: 'arriba' | 'abajo') => void;
-  /** Agrega una línea al servicio indicado. */
-  onAgregarLinea: (servicioId: string) => void;
+  /**
+   * Agrega una línea al servicio indicado, YA con su concepto del catálogo.
+   *
+   * Bloque 0 (24-sep-2026): antes la línea nacía vacía al pulsar «Agregar
+   * concepto» y el autoguardado la escribía en Firestore en ese instante.
+   * Quien abandonaba el renglón dejaba un concepto sin nombre que bloqueaba
+   * «Marcar ganada». Ahora el renglón es un BORRADOR local de la tabla y la
+   * línea existe solo cuando se eligió el concepto.
+   */
+  onAgregarLinea: (servicioId: string, conceptoId: string, nombre: string) => void;
   onCompararProveedor: (lineaId: string) => void;
   /** Mueve una línea FRESCA a otro servicio. La lib se niega si ya está fija. */
   onCambiarServicio: (lineaId: string, servicioId: string) => void;
@@ -77,6 +85,14 @@ export default function TablaConceptos({
   onAgregarLinea, onCompararProveedor, onCambiarServicio, onDatosEmbarque,
   onAgregarServicio,
 }: Props) {
+  /** Servicio del renglón borrador; null = no hay borrador. */
+  const [borradorServicioId, setBorradorServicioId] = useState<string | null>(null);
+  const abrirBorrador = () => { if (servicios[0]) setBorradorServicioId(servicios[0].id); };
+  const confirmarBorrador = (conceptoId: string, nombre: string) => {
+    if (!borradorServicioId) return;
+    onAgregarLinea(borradorServicioId, conceptoId, nombre);
+    setBorradorServicioId(null);
+  };
   const ordenadas = [...lineas].sort((a, b) => a.orden - b.orden);
 
   /*
@@ -162,7 +178,43 @@ export default function TablaConceptos({
               />
             ))}
 
-            {ordenadas.length === 0 && (
+            {borradorServicioId && editable && (
+              <tr className="bg-amber-50/40">
+                <td className="px-3 py-1.5">
+                  {servicios.length > 1 ? (
+                    <select
+                      value={borradorServicioId}
+                      onChange={e => setBorradorServicioId(e.target.value)}
+                      className="px-2 py-1 bg-amber-50 border border-amber-200 rounded text-[11px] font-semibold text-gray-700 outline-none focus:border-[#E11D48] cursor-pointer"
+                    >
+                      {servicios.map(s => <option key={s.id} value={s.id}>{s.etiqueta}</option>)}
+                    </select>
+                  ) : (
+                    <span className="text-[11px] text-gray-500 font-medium">{servicios[0]?.etiqueta}</span>
+                  )}
+                </td>
+                <td className="px-3 py-1.5">
+                  <ConceptoSelector
+                    compacto
+                    autoAbrir
+                    selectedNombre={null}
+                    conceptos={conceptosActivos}
+                    onSelect={confirmarBorrador}
+                    onCrearNuevo={onCrearConcepto}
+                  />
+                </td>
+                <td colSpan={5} className="px-3 py-1.5 text-[10px] text-amber-700">
+                  Elige el concepto del catálogo: la línea se crea al elegirlo.
+                </td>
+                <td className="px-2 py-1.5 text-right">
+                  <button onClick={() => setBorradorServicioId(null)} className="p-1 text-gray-300 hover:text-red-500" title="Cancelar">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </td>
+              </tr>
+            )}
+
+            {ordenadas.length === 0 && !borradorServicioId && (
               <tr>
                 <td colSpan={editable ? 8 : 7}>
                   <EstadoVacio
@@ -171,7 +223,7 @@ export default function TablaConceptos({
                     detalle="Cada renglón es un concepto del catálogo con su proveedor, costo y profit. El total de la operación se arma de aquí."
                     accion={editable && servicios[0] ? (
                       <button
-                        onClick={() => onAgregarLinea(servicios[0].id)}
+                        onClick={abrirBorrador}
                         className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#E11D48] hover:bg-[#E11D48]/5 px-2.5 py-1.5 rounded-lg transition-colors"
                       >
                         <Plus className="w-3.5 h-3.5" /> Agregar el primero
@@ -197,12 +249,12 @@ export default function TablaConceptos({
         </table>
       </div>
 
-      {editable && servicios.length > 0 && (
+      {editable && servicios.length > 0 && !borradorServicioId && (
         <div className="px-3 py-2 border-t border-gray-100">
           {/* Con un servicio, directo. Con varios, nace en el primero y la
               columna «Servicio» del renglón fresco es donde se elige. */}
           <button
-            onClick={() => onAgregarLinea(servicios[0].id)}
+            onClick={abrirBorrador}
             className="flex items-center gap-1.5 text-[11px] font-bold text-[#E11D48] hover:bg-[#E11D48]/5 px-2 py-1.5 rounded-lg transition-colors"
           >
             <Plus className="w-3.5 h-3.5" /> Agregar concepto

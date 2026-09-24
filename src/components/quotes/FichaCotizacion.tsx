@@ -822,9 +822,11 @@ export default function FichaCotizacion({
    * concepto» como texto invitaba a dejarlo así, que es como aparecen los
    * duplicados.
    */
-  const handleAgregarLineaPlana = (servicioId: string) => {
-    if (!servicioId) return;
-    onUpdateQuote(agregarLinea(quote, { servicioId, concepto: '' }));
+  const handleAgregarLineaPlana = (servicioId: string, conceptoId: string, nombre: string) => {
+    // Bloque 0 (24-sep-2026): nunca una línea vacía. La tabla trae el
+    // concepto ya elegido; sin él, no hay nada que guardar.
+    if (!servicioId || !conceptoId) return;
+    onUpdateQuote(agregarLinea(quote, { servicioId, concepto: nombre, conceptoId }));
   };
 
   /** C.4 · Cambia el servicio de una línea fresca. La lib se niega si ya está fija. */
@@ -933,8 +935,14 @@ export default function FichaCotizacion({
       const plantilla = servicio?.tipo === 'terrestre' ? 'terrestre'
         : servicio?.fcl_contenedor ? 'FCL' : 'default';
       let actualizada = quote;
+      // Con `conceptoId` cuando el catálogo tiene ese nombre: una línea sin
+      // concepto del catálogo no hace match de tarifas y bloquea «ganada».
+      const norm = (t: string) => t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
       CONCEPTOS_POR_PLANTILLA[plantilla].forEach(cp => {
-        actualizada = agregarLinea(actualizada, { servicioId, concepto: cp.etiqueta });
+        const delCatalogo = conceptosActivos.find(c => norm(c.nombre) === norm(cp.etiqueta));
+        actualizada = agregarLinea(actualizada, {
+          servicioId, concepto: cp.etiqueta, ...(delCatalogo ? { conceptoId: delCatalogo.id } : {}),
+        });
       });
       onUpdateQuote(actualizada);
     }
@@ -1571,8 +1579,9 @@ export default function FichaCotizacion({
                 onQuitarAgente={handleQuitarAgente}
                 onQuitarFila={(filaId) => onUpdateQuote(quitarLinea(quote, filaId))}
                 onAgregarAgente={() => setModalAgente(matrizActiva.servicioId)}
-                onAgregarFila={() => onUpdateQuote(
-                  agregarLinea(quote, { servicioId: matrizActiva.servicioId, concepto: '' }))}
+                conceptosActivos={conceptosActivos}
+                onAgregarFila={(conceptoId, nombre) => onUpdateQuote(
+                  agregarLinea(quote, { servicioId: matrizActiva.servicioId, concepto: nombre, conceptoId }))}
               />
             )}
 

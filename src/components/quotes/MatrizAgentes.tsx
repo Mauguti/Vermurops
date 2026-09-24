@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, ChevronUp, ChevronDown, AlertTriangle, Check, Coins } from 'lucide-react';
+import { Plus, Trash2, ChevronUp, ChevronDown, AlertTriangle, Check, Coins, X } from 'lucide-react';
+import ConceptoSelector from '../conceptos/ConceptoSelector';
+import type { ConceptoVermur } from '../conceptos/ConceptosData';
 import type {
   MatrizComparativa, AgenteColumna, FilaMatriz,
 } from '../../lib/matrizComparativa';
@@ -68,7 +70,13 @@ export interface MatrizAgentesProps {
   onQuitarAgente: (agenteId: string) => void;
   onQuitarFila: (filaId: string) => void;
   onAgregarAgente: () => void;
-  onAgregarFila: () => void;
+  /** Catálogo para el renglón borrador de «Agregar concepto». */
+  conceptosActivos: ConceptoVermur[];
+  /**
+   * La fila nueva nace YA con concepto del catálogo (Bloque 0, 24-sep-2026):
+   * antes nacía vacía y el autoguardado la escribía en ese instante.
+   */
+  onAgregarFila: (conceptoId: string, nombre: string) => void;
 }
 
 export default function MatrizAgentes({
@@ -76,8 +84,9 @@ export default function MatrizAgentes({
   totalesComparables, comparacion, tipoCambio, onEditarMoneda,
   editable, seleccion, dominante, menoresPorFila, resumen,
   onElegirCelda, onElegirAgente, onEditarCelda, onEditarVigencia, onEditarEtiqueta,
-  onQuitarAgente, onQuitarFila, onAgregarAgente, onAgregarFila,
+  onQuitarAgente, onQuitarFila, onAgregarAgente, onAgregarFila, conceptosActivos,
 }: MatrizAgentesProps) {
+  const [agregandoFila, setAgregandoFila] = useState(false);
   const [abierta, setAbierta] = useState(true);
 
   const { agentes, filas } = matriz;
@@ -331,12 +340,30 @@ export default function MatrizAgentes({
 
               {editable && (
                 <div className="flex items-center justify-between gap-3 px-3 py-2 border-t border-gray-100">
+                  {agregandoFila ? (
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-64">
+                        <ConceptoSelector
+                          compacto
+                          autoAbrir
+                          selectedNombre={null}
+                          conceptos={conceptosActivos}
+                          onSelect={(conceptoId, nombre) => { onAgregarFila(conceptoId, nombre); setAgregandoFila(false); }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-amber-700 truncate">La fila se crea al elegir el concepto.</span>
+                      <button onClick={() => setAgregandoFila(false)} className="p-1 text-gray-300 hover:text-red-500" title="Cancelar">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ) : (
                   <button
-                    onClick={onAgregarFila}
+                    onClick={() => setAgregandoFila(true)}
                     className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-[#E11D48] hover:bg-[#E11D48]/5 px-2 py-1.5 rounded-lg transition-colors shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5" /> Agregar concepto
                   </button>
+                  )}
 
                   {/* «Cargar en líneas» ya no existe: ELEGIR ES CARGAR. El
                       resumen dice qué quedó elegido y qué falta. */}

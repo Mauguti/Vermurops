@@ -54,6 +54,11 @@ interface ConceptoSelectorProps {
    * y el buscador son los mismos — lo que cambia es el disparador.
    */
   compacto?: boolean;
+  /**
+   * Abre la lista al montar. Para el renglón borrador de la tabla: quien
+   * pulsó «Agregar concepto» quiere elegirlo, no ver un botón más.
+   */
+  autoAbrir?: boolean;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -65,8 +70,9 @@ export default function ConceptoSelector({
   onCrearNuevo,
   readOnly,
   compacto,
+  autoAbrir,
 }: ConceptoSelectorProps) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!!autoAbrir);
   const [search, setSearch] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
