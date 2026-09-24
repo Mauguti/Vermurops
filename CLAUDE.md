@@ -693,6 +693,34 @@ principal a la derecha y, si no se puede avanzar, en una línea qué falta.
 16 px. Los formularios que quieren estar centrados lo dicen ellos
 (`max-w-3xl mx-auto` en Información).
 
+**Bloque 0 (24-sep-2026): ninguna línea nace vacía.** «Agregar concepto» en
+la tabla y en la comparativa abría una línea sin nombre que el autoguardado
+escribía al instante; abandonarla dejaba un «(sin nombre)» que bloquea
+«Marcar ganada». Ahora el renglón es un borrador local del componente y la
+línea existe solo al elegir el concepto del catálogo (`autoAbrir` en
+`ConceptoSelector`). Las vacías que ya existan en producción las lista
+`scripts/auditarServiciosPorCotizacion.ts`; borrarlas es decisión de Mau.
+
+**Fase A (24-sep-2026): la operación se edita en Información, sin modal.**
+El modal «Datos del embarque» editaba los campos legacy E4 y no leía la
+carga tipada que captura la solicitud: lo que Ventas capturó no se podía
+corregir en ninguna parte. Ahora Información tiene la sección «Operación»
+(`components/quotes/OperacionServicio.tsx`, lógica en
+`lib/operacionServicio.ts`): tráfico, ubicación, aduanas, embarque propio,
+el MISMO `FormCargaServicio` de la solicitud editando `servicio.carga`
+(ruta con puertos, incoterm, carga por modalidad, descripción y detalle de
+mercancía), y `notasOperativas` (campo nuevo, texto libre).
+  - Legacy: se lee con `cargaDesdeLegacy`; lo que la carga tipada no
+    representa (`fcl_reqs`, food grade, FTL/LTL, medidas…) se enseña como
+    «Del registro anterior», sin editor. Nada se reescribe hasta editar.
+  - Quién edita (`puedeEditarOperacion`): Ventas en `solicitud_cliente`;
+    Pricing y Admin hasta que se congele. Los demás leen.
+  - Toda edición después de «A Pricing» deja UNA entrada en Historial /
+    Notas («Datos de la operación modificados: se cambió la carga y la
+    ruta»), acumulando las del mismo autor en diez minutos.
+  - Los requeridos de Ventas no se editan en la ficha: ya son líneas.
+  - En Servicios queda «Lo que pidió el cliente» en lectura.
+
 **Errores del generador de PDF.** El proxy (`functions/src/comun/proxyN8n.ts`)
 nombra al agente según el flujo —«el generador de PDF» o «el clasificador»—
 y guarda hasta 4,000 caracteres de la respuesta de n8n con url, status y
