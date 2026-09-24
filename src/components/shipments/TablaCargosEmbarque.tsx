@@ -4,6 +4,11 @@ import type { CargoDetalle, MonedaCargo } from './EmbarquesData';
 import {
   agruparCargos, desviacionDe, montoOriginal, GrupoCargos,
 } from '../../lib/cargosEditables';
+import {
+  margenDelConcepto, estadoMenosFirme, TEXTO_SIN_COMPARAR,
+  type ContextoMargen, type DesfaseOC, type EstadoCosto, type MargenMoneda,
+  type OCParaMargen,
+} from '../../lib/margenRealConcepto';
 import { puedeConvertirse } from '../../lib/ocDesdeCargo';
 import { EnlaceEntidad } from '../ui/ficha/EnlaceEntidad';
 
@@ -36,6 +41,14 @@ import { EnlaceEntidad } from '../ui/ficha/EnlaceEntidad';
 
 interface Props {
   detalles: CargoDetalle[];
+  /**
+   * Las órdenes de compra del embarque. De ellas sale el costo REAL: lo que
+   * el proveedor facturó y lo que se le pagó. Sin ellas, todo concepto se lee
+   * como estimado, que es la verdad cuando no hay pagos.
+   */
+  ordenes?: OCParaMargen[];
+  /** MXN por USD. Ausente = no se compara entre monedas (§4.3). */
+  tipoCambio?: number | null;
   /** Solo Operaciones corrige costos. Los demás leen. */
   editable: boolean;
   /** Resuelve el nombre del proveedor. Devuelve '' si no lo conoce. */
@@ -56,9 +69,15 @@ const money = (n: number) =>
 const signo = (n: number) => `${n > 0 ? '+' : ''}${money(n)}`;
 
 export default function TablaCargosEmbarque({
-  detalles, editable, nombreProveedor, onEditarMonto, onRestaurar, onQuitar, onGenerarOC,
+  detalles, ordenes = [], tipoCambio, editable, nombreProveedor,
+  onEditarMonto, onRestaurar, onQuitar, onGenerarOC,
 }: Props) {
   const grupos = agruparCargos(detalles);
+  const ctx: ContextoMargen = {
+    ordenes: new Map(ordenes.map(o => [o.id, o])),
+    cargos: detalles,
+    tipoCambio,
+  };
 
   if (grupos.length === 0) {
     return (
@@ -77,6 +96,7 @@ export default function TablaCargosEmbarque({
         <GrupoCard
           key={g.clave}
           grupo={g}
+          ctx={ctx}
           editable={editable}
           nombreProveedor={nombreProveedor}
           onEditarMonto={onEditarMonto}
@@ -92,8 +112,13 @@ export default function TablaCargosEmbarque({
 // ─── Una tarjeta por concepto ─────────────────────────────────────────────────
 
 function GrupoCard({
-  grupo, editable, nombreProveedor, onEditarMonto, onRestaurar, onQuitar, onGenerarOC,
-}: { grupo: GrupoCargos } & Omit<Props, 'detalles'>) {
+  grupo, ctx, editable, nombreProveedor, onEditarMonto, onRestaurar, onQuitar, onGenerarOC,
+}: { grupo: GrupoCargos; ctx: ContextoMargen } & Omit<Props, 'detalles' | 'ordenes' | 'tipoCambio'>) {
+  const filas = margenDelConcepto(grupo, ctx);
+  const porMoneda = new Map<string, MargenMoneda>(filas.map(f => [f.moneda, f]));
+  const estado = estadoMenosFirme(filas.map(f => f.estado));
+  const desfases = new Map(filas.flatMap(f => f.desfases.map(d => [d.cargoId, d] as const)));
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/60 gap-4">
@@ -110,6 +135,7 @@ function GrupoCard({
                 Corregido
               </span>
             )}
+            <BadgeEstado estado={estado} />
           </div>
           {grupo.mezclaMonedas && (
             <p className="text-[10px] text-amber-700 flex items-center gap-1 mt-0.5">
@@ -121,14 +147,15 @@ function GrupoCard({
 
         {/* Un bloque por moneda. §4.3: los totales nunca se mezclan. */}
         <div className="flex items-center gap-4 shrink-0">
-          {grupo.monedasActivas.map(m => (
-            <div key={m} className="text-right">
+          {filas.map(f => (
+            <div key={f.moneda} className="text-right">
               <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                Profit {m}
+                Profit {f.moneda}
               </p>
+              {/* El MISMO número que el renglón de total: uno solo por concepto. */}
               <p className={`text-[13px] font-bold tabular-nums ${
-                grupo.porMoneda[m].ganancia < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                ${money(grupo.porMoneda[m].ganancia)}
+                f.profit < 0 ? 'text-peligro' : 'text-emerald-600'}`}>
+                ${money(f.profit)}
               </p>
             </div>
           ))}
@@ -160,35 +187,66 @@ function GrupoCard({
                 onRestaurar={onRestaurar}
                 onQuitar={onQuitar}
                 onGenerarOC={onGenerarOC}
+                desfase={desfases.get(c.id)}
               />
             ))}
           </tbody>
           <tfoot>
-            {grupo.monedasActivas.map(m => (
-              <tr key={m} className="border-t border-gray-200 bg-gray-50/60 font-bold">
-                <td className="px-3 py-2 text-[11px] text-gray-500 uppercase tracking-wider" colSpan={3}>
-                  Total {m}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums text-gray-700">
-                  <span className="text-emerald-600">${money(grupo.porMoneda[m].ingresos)}</span>
-                  {' − '}
-                  <span className="text-rose-600">${money(grupo.porMoneda[m].gastos)}</span>
-                </td>
-                <td className="px-3 py-2 font-mono text-gray-500">{m}</td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {grupo.desviacionGasto[m] !== 0 ? (
-                    <span
-                      className={grupo.desviacionGasto[m] > 0 ? 'text-rose-600' : 'text-emerald-600'}
-                      title="Cuánto se desvió el costo respecto a lo cotizado."
-                    >
-                      {signo(grupo.desviacionGasto[m])}
+            {/*
+              El renglón de total con las columnas de Pricing: Costo · Profit ·
+              Venta · Margen, los mismos nombres y el mismo orden que en la
+              ficha de cotización. La diferencia es que aquí el costo es el
+              REAL —lo facturado o lo pagado— y por eso dice en qué estado
+              está: un estimado y un pagado no se leen igual.
+
+              Va a todo el ancho en vez de repartirse entre las columnas de
+              arriba porque no coinciden: el renglón de la tabla es el CARGO, y
+              la venta y el costo de un concepto viven en renglones distintos.
+            */}
+            {filas.map(f => (
+              <tr key={f.moneda} className="border-t border-gray-200 bg-gray-50/60">
+                <td className="px-3 py-2" colSpan={editable ? 8 : 7}>
+                  <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                    <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider mr-auto">
+                      Total {f.moneda}
                     </span>
-                  ) : (
-                    <span className="text-gray-300">—</span>
-                  )}
+
+                    <Cifra
+                      etiqueta="Costo"
+                      valor={`$${money(f.costo)}`}
+                      nota={ETIQUETA_ESTADO[f.estado]}
+                      title={`Cotizado $${money(f.cotizado)}. ${EXPLICA_ESTADO[f.estado]}`}
+                    />
+                    {f.excedente > 0 && (
+                      <span
+                        className="text-[11px] font-bold text-peligro bg-peligro-suave border border-peligro/20 px-2 py-0.5 rounded"
+                        title={`Se cotizó $${money(f.cotizado)} y el costo real es $${money(f.costo)}.`}
+                      >
+                        Excedente +${money(f.excedente)}
+                      </span>
+                    )}
+                    <Cifra
+                      etiqueta="Profit"
+                      valor={`$${money(f.profit)}`}
+                      tono={f.profit < 0 ? 'peligro' : 'bien'}
+                    />
+                    <Cifra etiqueta="Venta" valor={`$${money(f.venta)}`} />
+                    <Cifra
+                      etiqueta="Margen"
+                      valor={f.margen === null ? '—' : `${(f.margen * 100).toFixed(1)}%`}
+                      tono={f.margen !== null && f.margen < 0 ? 'peligro' : undefined}
+                      title={f.margen === null ? 'Sin venta en esta moneda no hay porcentaje que calcular.' : undefined}
+                    />
+                  </div>
+
+                  {/* Por qué el costo no se pudo comparar contra lo cotizado. */}
+                  {f.avisos.map(a => (
+                    <p key={a} className="text-[10px] text-amber-700 flex items-center gap-1 mt-1.5">
+                      <AlertTriangle className="w-3 h-3 shrink-0" />
+                      {TEXTO_SIN_COMPARAR[a]}
+                    </p>
+                  ))}
                 </td>
-                <td />
-                {editable && <td />}
               </tr>
             ))}
           </tfoot>
@@ -203,8 +261,8 @@ function GrupoCard({
 const inputNum = 'w-[110px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-primario focus:bg-white bg-transparent rounded outline-none text-[12px] font-semibold';
 
 function Renglon({
-  cargo, editable, nombreProveedor, onEditarMonto, onRestaurar, onQuitar, onGenerarOC,
-}: { cargo: CargoDetalle } & Omit<Props, 'detalles'>) {
+  cargo, desfase, editable, nombreProveedor, onEditarMonto, onRestaurar, onQuitar, onGenerarOC,
+}: { cargo: CargoDetalle; desfase?: DesfaseOC } & Omit<Props, 'detalles' | 'ordenes' | 'tipoCambio'>) {
   const desviacion = desviacionDe(cargo);
   const original = montoOriginal(cargo);
   const fueEditado = cargo.montoHeredado !== undefined;
@@ -303,13 +361,29 @@ function Renglon({
           alguien copie datos que el sistema ya tiene. */}
       <td className="px-3 py-1.5">
         {cargo.ordenCompraId ? (
-          <EnlaceEntidad
-            tipo="ordenCompra"
-            id={cargo.ordenCompraId}
-            title="Ya generó una orden de compra"
-          >
-            Orden generada
-          </EnlaceEntidad>
+          <span className="inline-flex flex-col items-start gap-0.5">
+            <EnlaceEntidad
+              tipo="ordenCompra"
+              id={cargo.ordenCompraId}
+              title="Ya generó una orden de compra"
+            >
+              Orden generada
+            </EnlaceEntidad>
+            {/*
+              La orden se emite copiando el cargo y después nadie la vuelve a
+              tocar. Si los dos números difieren es porque alguien corrigió el
+              cargo DESPUÉS de pedir el pago; decirlo evita que el importe de
+              la orden parezca un error de captura.
+            */}
+            {desfase && (
+              <span
+                className="text-[9px] text-amber-700"
+                title="El cargo se corrigió después de generar la orden. Lo que se pague es lo que dice la orden."
+              >
+                La OC se generó por ${money(desfase.oc)}, el cargo dice ${money(desfase.cargo)}
+              </span>
+            )}
+          </span>
         ) : onGenerarOC && conversion.puede ? (
           <button
             onClick={() => onGenerarOC(cargo.id)}
@@ -357,3 +431,61 @@ function Renglon({
 }
 
 export type { MonedaCargo };
+
+// ─── Piezas ───────────────────────────────────────────────────────────────────
+
+const ETIQUETA_ESTADO: Record<EstadoCosto, string> = {
+  estimado: 'estimado',
+  facturado: 'facturado',
+  pagado: 'pagado',
+};
+
+const EXPLICA_ESTADO: Record<EstadoCosto, string> = {
+  estimado: 'Todavía no hay factura ni pago: el costo es el que se cotizó.',
+  facturado: 'El proveedor ya facturó o el costo se corrigió; falta pagarlo.',
+  pagado: 'Ya salió el dinero: es el monto de la orden de compra.',
+};
+
+const TONO_ESTADO: Record<EstadoCosto, string> = {
+  estimado: 'bg-gray-100 text-gray-500',
+  facturado: 'bg-amber-50 text-amber-700 border border-amber-100',
+  pagado: 'bg-emerald-50 text-emerald-700 border border-emerald-100',
+};
+
+/**
+ * Qué tan firme es el costo del concepto.
+ *
+ * Es el MENOS firme de sus gastos: con un concepto estimado entre dos pagados,
+ * el margen todavía se puede mover y el badge tiene que decirlo.
+ */
+function BadgeEstado({ estado }: { estado: EstadoCosto }) {
+  return (
+    <span
+      className={`text-[8px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ${TONO_ESTADO[estado]}`}
+      title={EXPLICA_ESTADO[estado]}
+    >
+      {ETIQUETA_ESTADO[estado]}
+    </span>
+  );
+}
+
+function Cifra({ etiqueta, valor, nota, tono, title }: {
+  etiqueta: string;
+  valor: string;
+  nota?: string;
+  tono?: 'peligro' | 'bien';
+  title?: string;
+}) {
+  return (
+    <span className="text-right" title={title}>
+      <span className="block text-[9px] font-bold text-gray-400 uppercase tracking-wider">
+        {etiqueta}
+      </span>
+      <span className={`block text-[12px] font-bold tabular-nums ${
+        tono === 'peligro' ? 'text-peligro' : tono === 'bien' ? 'text-emerald-600' : 'text-gray-700'}`}>
+        {valor}
+        {nota && <span className="ml-1 text-[9px] font-semibold text-gray-400 uppercase">{nota}</span>}
+      </span>
+    </span>
+  );
+}
