@@ -1089,8 +1089,28 @@ valida con `puedeTransicionarA` y muestra la razón cuando la tarjeta ya se
 arrastró; las columnas a las que no se puede mover deberían verse
 inalcanzables antes. Anotado 25-sep-2026.
 
-**🔴 Las cuentas de prueba tienen rol en el mapa de las Functions, sin
-guardia de entorno.** `src/auth/AuthContext.tsx` mete `admin@vermur.com`,
+**🔴 CRÍTICO — El registro público de Firebase Auth está ABIERTO.**
+Verificado el 25-sep-2026 contra producción con la API key del bundle:
+`accounts:signUp` creó una cuenta (se borró en el acto con
+`accounts:delete`). Cualquiera que lea el bundle puede registrarse, y como
+las reglas de Firestore solo piden `request.auth != null`, esa cuenta lee y
+escribe TODA la base. Se cierra en la consola: Authentication → Sign-in
+method → Correo/contraseña, y desactivar el registro de usuarios; o
+restringir por dominio. **Mientras siga abierto, las reglas por rol de
+Usuarios y roles son urgentes, no deseables.** Repetir la prueba después:
+
+```bash
+curl -s -X POST "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=<API_KEY>" \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"prueba@example.com","password":"Prueba-123!","returnSecureToken":true}'
+```
+Cerrado responde `ADMIN_ONLY_OPERATION`; abierto devuelve un `idToken`.
+
+**~~Las cuentas de prueba tienen rol en el mapa de las Functions~~ — CERRADO
+el 25-sep-2026 (Bloque 8).** Se quitaron del mapa de producción de
+`functions/comun/auth.ts`; un correo fuera del mapa cae al fallback de menor
+alcance, que no tiene ninguna capacidad de flujo. Queda como referencia de
+qué buscar: `src/auth/AuthContext.tsx` mete `admin@vermur.com`,
 `pricing@vermur.com`, etc. SOLO cuando `USANDO_EMULADORES`, y lo explica:
 «en producción, si estas cuentas existieran, caen al fallback de menor
 alcance». `functions/src/comun/auth.ts` las tiene en el mapa **sin esa
