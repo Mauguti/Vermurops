@@ -68,6 +68,7 @@ import {
 } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import ProximosPasos from './ProximosPasos';
+import { buscarClientes } from '../../lib/buscarClientes';
 import { proximoPaso } from '../../lib/proximosPasos';
 import {
   elegirCelda, elegirColumna, derivarSeleccion, agenteDominante,
@@ -1840,12 +1841,10 @@ export default function FichaCotizacion({
                 }
 
                 // Sin vínculo: buscador por nombre / RFC sobre useClientes().
-                const q = clienteQuery.trim().toLowerCase();
-                const resultados = q
-                  ? clientes
-                      .filter(c => c.nombre.toLowerCase().includes(q) || c.rfc.toLowerCase().includes(q))
-                      .slice(0, 6)
-                  : [];
+                // Bloque 3 (25-sep-2026): el filtro inline tronaba con clientes
+                // sin `rfc` (los 817 de Magaya). Ver lib/buscarClientes.ts.
+                const q = clienteQuery.trim();
+                const resultados = buscarClientes(clientes, q);
                 return (
                   <div className="relative">
                     <div className="flex items-center gap-2 px-3 py-2 border border-gray-200 rounded-lg focus-within:border-[#E11D48]">
