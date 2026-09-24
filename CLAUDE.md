@@ -749,6 +749,24 @@ de 7,883 bytes con una línea ilegible. Diagnóstico, reproducción con
 Gotenberg local y el JSON corregido en `docs/n8n/`. **Los flujos de n8n se
 versionan ahí**; el que manda es el de n8n.vermur.mx y lo importa Mau.
 
+## 4.17 Restablecer contraseña (24-sep-2026)
+
+«¿Olvidaste tu contraseña?» en el login → pantalla que pide el correo y
+dispara `sendPasswordResetEmail` (`components/RecuperarContrasena.tsx`,
+mensajes en `lib/recuperarContrasena.ts`, nunca un código crudo). El correo
+es el de Firebase por defecto; `auth.languageCode = 'es'` lo manda en
+español. La URL de regreso es el origen de la página (producción está
+autorizada por Hosting); si Firebase la rechazara, se reintenta sin ella.
+  - El enlace del correo lo atiende la página de Firebase (en español) por
+    defecto. Si en la consola se apunta la URL de acción de la plantilla a
+    la app, `?mode=resetPassword&oobCode=…` abre la pantalla propia:
+    verifica el código (vencido / ya usado, en español), pide la
+    contraseña nueva y regresa al login con el correo precargado.
+  - El éxito es neutro («si ese correo tiene cuenta…»): Firebase puede
+    tener activa la protección contra enumeración de correos.
+  - Contra emuladores, el «correo» se lee en
+    `GET 127.0.0.1:9099/emulator/v1/projects/vermur-logistics-app/oobCodes`.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

@@ -15,6 +15,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig)
 export const auth = getAuth(app)
+// Los correos de Auth (restablecer contraseña) y la página que los atiende
+// salen en español. Sin esto, Firebase manda el correo en inglés.
+auth.languageCode = 'es'
 export const storage = getStorage(app)
 export const db = getFirestore(app)
 

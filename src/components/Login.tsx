@@ -6,10 +6,16 @@ import { auth } from '../firebase';
 interface LoginPageProps {
   onLoginSuccess: () => void;
   onBack?: () => void;
+  /** «¿Olvidaste tu contraseña?» — recibe el correo tecleado, si hay. */
+  onOlvideContrasena?: (correo: string) => void;
+  /** Correo con el que llenar el campo (p. ej. tras restablecerla). */
+  correoInicial?: string;
+  /** Aviso arriba del formulario (p. ej. «tu contraseña cambió»). */
+  aviso?: string;
 }
 
-export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
-  const [email, setEmail] = useState('');
+export default function LoginPage({ onLoginSuccess, onBack, onOlvideContrasena, correoInicial = '', aviso }: LoginPageProps) {
+  const [email, setEmail] = useState(correoInicial);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -65,6 +71,10 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
             Accede a tu plataforma operativa
           </p>
         </div>
+
+        {aviso && (
+          <p className="mb-[16px] text-[12px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-[8px] px-3 py-2 text-center">{aviso}</p>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-[18px]">
@@ -140,6 +150,18 @@ export default function LoginPage({ onLoginSuccess, onBack }: LoginPageProps) {
               </button>
             </div>
           </div>
+
+          {onOlvideContrasena && (
+            <div className="-mt-[8px] text-right">
+              <button
+                type="button"
+                onClick={() => onOlvideContrasena(email)}
+                className="text-[12px] font-medium text-[#71717A] hover:text-[#E11D48] transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+          )}
 
           {/* Error message */}
           {error && (
