@@ -23,28 +23,64 @@ import { verificarUsuario, exigirCapacidad, ErrorAuth } from './auth.js';
 /** La IA sobre un PDF escaneado puede tardar. Más allá, algo se atoró. */
 const TIMEOUT_MS = 120_000;
 
+/** Cómo se llama el agente para quien está trabajando. */
+function nombreDelAgente(flujo: string): string {
+  return flujo === 'pdf-cotizacion' ? 'El generador de PDF' : 'El clasificador';
+}
+
 /**
  * Traduce el estado HTTP del agente a algo accionable. Un «error 404» no le
  * dice nada a quien está trabajando: necesita saber si se arregla solo, si
  * hay que avisarle a alguien, o si el documento es el que está mal.
+ *
+ * El nombre cambia con el flujo (23-sep-2026): a quien está cotizando, «el
+ * clasificador no está disponible» le suena a otra pantalla. Y el 404 de
+ * n8n tiene una causa concreta —el flujo no está activado— que se dice.
  */
-function mensajeDeError(status: number): string {
+function mensajeDeError(status: number, flujo: string): string {
+  const agente = nombreDelAgente(flujo);
+  const esPdf = flujo === 'pdf-cotizacion';
   if (status === 404) {
-    return 'El clasificador no está disponible. Avisa a sistemas.';
+    return `${agente} no está publicado: el flujo de n8n no está activo. Avisa a sistemas.`;
   }
   if (status === 401 || status === 403) {
-    return 'El clasificador rechazó la conexión. Avisa a sistemas: la credencial no está bien configurada.';
+    return `${agente} rechazó la conexión. Avisa a sistemas: la credencial no está bien configurada.`;
   }
   if (status === 413) {
-    return 'El documento es demasiado grande para el clasificador.';
+    return esPdf
+      ? 'La cotización es demasiado grande para el generador de PDF.'
+      : 'El documento es demasiado grande para el clasificador.';
   }
   if (status === 429) {
-    return 'El clasificador está saturado. Espera un momento y vuelve a intentarlo.';
+    return `${agente} está saturado. Espera un momento y vuelve a intentarlo.`;
   }
   if (status >= 500) {
-    return 'El clasificador falló al procesar el documento. Si se repite, avisa a sistemas.';
+    return esPdf
+      ? 'El generador de PDF falló al armar el documento. Vuelve a intentarlo; si se repite, avisa a sistemas.'
+      : 'El clasificador falló al procesar el documento. Si se repite, avisa a sistemas.';
   }
-  return `El clasificador respondió con error ${status}.`;
+  return `${agente} respondió con error ${status}.`;
+}
+
+/**
+ * Hasta cuánto de la respuesta de n8n se guarda en el log cuando falla.
+ * Un fallo de n8n trae la causa en el cuerpo («The workflow must be
+ * active…», el stack de un nodo); 500 caracteres cortaban justo ahí.
+ */
+const MAX_LOG_RESPUESTA = 4000;
+
+/** Todo lo que hace falta para depurar un fallo del agente sin volver a reproducirlo. */
+function registrarFalloN8n(mensaje: string, flujo: string, url: string, respuesta: globalThis.Response, texto: string): void {
+  logger.error(mensaje, {
+    flujo,
+    url,
+    status: respuesta.status,
+    statusText: respuesta.statusText,
+    contentType: respuesta.headers.get('content-type'),
+    bytes: texto.length,
+    truncado: texto.length > MAX_LOG_RESPUESTA,
+    texto: texto.slice(0, MAX_LOG_RESPUESTA),
+  });
 }
 
 export interface DestinoProxy {
@@ -130,10 +166,8 @@ export async function manejarProxyN8n(
     if (destino.respuesta === 'binario') {
       if (!respuesta.ok) {
         const texto = await respuesta.text();
-        logger.error('n8n respondió con error', {
-          flujo: destino.flujo, status: respuesta.status, texto: texto.slice(0, 500),
-        });
-        res.status(502).json({ ok: false, error: mensajeDeError(respuesta.status) });
+        registrarFalloN8n('n8n respondió con error', destino.flujo, destino.url, respuesta, texto);
+        res.status(502).json({ ok: false, error: mensajeDeError(respuesta.status, destino.flujo) });
         return;
       }
       const cuerpo = Buffer.from(await respuesta.arrayBuffer());
@@ -141,10 +175,12 @@ export async function manejarProxyN8n(
       // Un PDF que llega como JSON de error se vería como archivo corrupto:
       // se rechaza aquí, donde todavía se puede decir qué pasó.
       if (tipo.includes('application/json') || cuerpo.length === 0) {
-        logger.error('n8n devolvió JSON o vacío donde se esperaba un archivo', {
-          flujo: destino.flujo, tipo, texto: cuerpo.toString('utf8').slice(0, 500),
+        registrarFalloN8n('n8n devolvió JSON o vacío donde se esperaba un archivo',
+          destino.flujo, destino.url, respuesta, cuerpo.toString('utf8'));
+        res.status(502).json({
+          ok: false,
+          error: `${nombreDelAgente(destino.flujo)} respondió sin el archivo. Avisa a sistemas: el flujo de n8n devolvió datos en vez del PDF.`,
         });
-        res.status(502).json({ ok: false, error: 'El generador no devolvió el archivo.' });
         return;
       }
       res.status(200).set('Content-Type', tipo).send(cuerpo);
@@ -154,10 +190,8 @@ export async function manejarProxyN8n(
     const texto = await respuesta.text();
 
     if (!respuesta.ok) {
-      logger.error('n8n respondió con error', {
-        flujo: destino.flujo, status: respuesta.status, texto: texto.slice(0, 500),
-      });
-      res.status(502).json({ ok: false, error: mensajeDeError(respuesta.status) });
+      registrarFalloN8n('n8n respondió con error', destino.flujo, destino.url, respuesta, texto);
+      res.status(502).json({ ok: false, error: mensajeDeError(respuesta.status, destino.flujo) });
       return;
     }
 
@@ -166,21 +200,23 @@ export async function manejarProxyN8n(
     try {
       res.status(200).json(JSON.parse(texto));
     } catch {
-      logger.error('n8n devolvió algo que no es JSON', {
-        flujo: destino.flujo, texto: texto.slice(0, 500),
-      });
+      registrarFalloN8n('n8n devolvió algo que no es JSON', destino.flujo, destino.url, respuesta, texto);
       res.status(502).json({ ok: false, error: 'El clasificador devolvió una respuesta ilegible.' });
     }
   } catch (err) {
     const abortado = (err as Error)?.name === 'AbortError';
-    logger.error('Fallo al llamar al clasificador', {
-      flujo: destino.flujo, err: String(err), abortado,
+    const agente = nombreDelAgente(destino.flujo);
+    logger.error('Fallo al llamar al agente de n8n', {
+      flujo: destino.flujo, url: destino.url, err: String(err),
+      causa: String((err as { cause?: unknown })?.cause ?? ''), abortado,
     });
     res.status(abortado ? 504 : 502).json({
       ok: false,
       error: abortado
-        ? 'El clasificador tardó demasiado. El documento puede ser muy grande o estar escaneado.'
-        : 'No se pudo contactar al clasificador.',
+        ? (destino.flujo === 'pdf-cotizacion'
+          ? 'El generador de PDF tardó demasiado. Vuelve a intentarlo; si se repite, avisa a sistemas.'
+          : 'El clasificador tardó demasiado. El documento puede ser muy grande o estar escaneado.')
+        : `No se pudo contactar a${agente === 'El clasificador' ? 'l clasificador' : 'l generador de PDF'}. Avisa a sistemas.`,
     });
   } finally {
     clearTimeout(reloj);

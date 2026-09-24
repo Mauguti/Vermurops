@@ -272,3 +272,15 @@ export function transicionesDisponibles(
     .filter(def => puedeTransicionarA(desde, def.hacia, rol, quote).ok)
     .map(def => def.hacia);
 }
+
+/**
+ * Quién puede ejecutar una transición, sin mirar la cotización.
+ *
+ * Es para DECIRLO, no para permitirlo: la franja de próximos pasos avisa «le
+ * toca a Pricing» cuando el rol que mira la ficha no es el que avanza. Para
+ * permitir sigue mandando `puedeTransicionarA`, que además valida el negocio.
+ */
+export function rolesQuePueden(desde: PipelineStageId, hacia: PipelineStageId): Rol[] {
+  const def = (TRANSITIONS[desde] ?? []).find(t => t.hacia === hacia);
+  return def ? [...def.roles] : [];
+}

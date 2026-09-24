@@ -667,6 +667,38 @@ advertencia en el embarque, no bloqueo. La bandera automática sigue apagada.
 regla sin call site). Ahora se captura en la ficha de la OC, panel de
 fondeo, solo con `ordenCompra.autorizar`.
 
+## 4.16 Próximos pasos y ancho de página (feedback del cliente, 23-sep-2026)
+
+**La franja de «próximos pasos»** va arriba de las pestañas de la cotización
+(`components/quotes/ProximosPasos.tsx`, lógica en `lib/proximosPasos.ts`):
+las etapas en línea con la actual resaltada, «Siguiente: …», el botón
+principal a la derecha y, si no se puede avanzar, en una línea qué falta.
+  - Las etapas visibles dependen del rol: Ventas sus cinco pasos
+    (`LINEA_TIEMPO_VENTAS`), los demás las ocho internas
+    (`LINEA_TIEMPO_INTERNA`).
+  - El botón es la transición hacia adelante que la máquina de estados le
+    dio a ESE rol (`HACIA_ADELANTE` + `transicionesDisponibles`). Si le toca
+    a otra área, se dice: «le toca a Ventas». Si le toca a quien mira pero
+    la máquina vetó por negocio, se explica qué falta —nunca «le toca a
+    Pricing» a Pricing (`esDeEsteRol` vs `disponible`).
+  - **El botón principal es siempre rojo de marca.** Los colores por etapa
+    (azul, cian, violeta…) se retiraron; «Marcar ganada» como secundario va
+    en verde contorneado.
+  - El footer se quedó con lo secundario: PDF, perdida y el guardado
+    automático. La línea del tiempo de Ventas en Información se retiró: la
+    franja la reemplaza.
+
+**Sin tope de ancho.** `App.tsx` ya no envuelve el contenido en
+`max-w-[1100px]`: desktop ~1 cm de aire lateral (`md:px-[40px]`), móvil
+16 px. Los formularios que quieren estar centrados lo dicen ellos
+(`max-w-3xl mx-auto` en Información).
+
+**Errores del generador de PDF.** El proxy (`functions/src/comun/proxyN8n.ts`)
+nombra al agente según el flujo —«el generador de PDF» o «el clasificador»—
+y guarda hasta 4,000 caracteres de la respuesta de n8n con url, status y
+content-type. El 404 de n8n significa **flujo no activado** y el mensaje lo
+dice; fue la causa del 502 del 24-sep (`generar-pdf-cotizacion` inactivo).
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

@@ -372,10 +372,11 @@ function AppShell() {
         <AvisosEscritura />
 
         {/* ── Content ── */}
-        <main className="flex-1 overflow-y-auto p-[24px] md:p-[32px]">
-          <div className="max-w-[1100px] mx-auto">
-            {renderContent()}
-          </div>
+        {/* Sin tope de ancho (23-sep-2026): el cliente veía medio monitor
+            muerto a los lados de las tablas. En desktop queda ~1 cm de aire
+            lateral; en móvil se conserva el padding chico para que respire. */}
+        <main className="flex-1 overflow-y-auto p-[16px] md:px-[40px] md:py-[24px]">
+          {renderContent()}
         </main>
       </div>
     </div>

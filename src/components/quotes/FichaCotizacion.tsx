@@ -57,14 +57,15 @@ import { useDocumentosTarifario } from '../../hooks/useDocumentosTarifario';
 import { totalesComparables } from '../../lib/matrizComparativa';
 import { compararColumnas, type MonedaCotizacion } from '../../lib/monedaComparativa';
 import {
-  evaluarProntitud, faltantesPorLinea, resumenFaltantes, textoFaltantesLinea,
+  evaluarProntitud,
 } from '../../lib/prontitudCotizacion';
 import TablaConceptos, { ServicioDeLaTabla } from './TablaConceptos';
 import {
   FichaLayout, FichaHeader, FichaTabs, FichaFooter, BadgeEstado,
 } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
-import LineaTiempo from '../ui/ficha/LineaTiempo';
+import ProximosPasos from './ProximosPasos';
+import { proximoPaso } from '../../lib/proximosPasos';
 import {
   elegirCelda, elegirColumna, derivarSeleccion, agenteDominante,
   menorPorFila, resumenSeleccion,
@@ -100,18 +101,8 @@ interface FichaCotizacionProps {
   rolActivo: Rol;
 }
 
-// ─── Forward-advance config (Pre-TA: footer fix) ─────────────────────────────
-// Para cada etapa, lista las transiciones "hacia adelante" en orden de prioridad.
-// La primera que esté en `disponibles` se convierte en el botón primario.
-const FORWARD_TARGETS: Partial<Record<PipelineStageId, PipelineStageId[]>> = {
-  solicitud_cliente:      ['solicitado_pricing'],
-  solicitado_pricing:     ['pricing_solicitando'],
-  pricing_solicitando:    ['cotizaciones_recibidas'],
-  cotizaciones_recibidas: ['consolidada'],
-  consolidada:            ['enviada_cliente'],
-  enviada_cliente:        ['negociacion'],
-  negociacion:            ['ganada'],
-};
+// La tabla de avance (qué sigue desde cada etapa, cómo se llama el botón)
+// vive en lib/proximosPasos.ts: la franja de arriba y la ficha leen la misma.
 
 /**
  * ¿Existe ya el generador de PDF?
@@ -126,16 +117,6 @@ const FORWARD_TARGETS: Partial<Record<PipelineStageId, PipelineStageId[]>> = {
  * el generador de n8n (lib/pdfCotizacion.ts, hooks/usePdfCotizacion.ts).
  */
 const PDF_DISPONIBLE = true;
-
-const ADVANCE_CONFIG: Partial<Record<PipelineStageId, { label: string; cls: string }>> = {
-  solicitado_pricing:     { label: 'Enviar a Pricing',        cls: 'bg-[#4B2A8C] hover:bg-[#3d2277]' },
-  pricing_solicitando:    { label: 'Iniciar cotización',      cls: 'bg-[#E11D48] hover:bg-[#BE123C]' },
-  cotizaciones_recibidas: { label: 'Cotizaciones recibidas',  cls: 'bg-violet-600 hover:bg-violet-700' },
-  consolidada:            { label: 'Consolidar cotización',   cls: 'bg-cyan-600 hover:bg-cyan-700' },
-  enviada_cliente:        { label: 'Enviar al cliente',       cls: 'bg-blue-600 hover:bg-blue-700' },
-  negociacion:            { label: 'Iniciar negociación',     cls: 'bg-rose-600 hover:bg-rose-700' },
-  ganada:                 { label: 'Marcar ganada',           cls: 'bg-green-600 hover:bg-green-700' },
-};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Componente principal: FichaCotizacion (pantalla completa)
@@ -1119,9 +1100,13 @@ export default function FichaCotizacion({
   /** Etapas a las que el rol activo puede transicionar desde la etapa actual. */
   const disponibles = transicionesDisponibles(quote.etapa, rolActivo, quote);
 
-  /** Pre-TA: botón primario de avance (primera transición forward disponible). */
-  const advanceTarget = (FORWARD_TARGETS[quote.etapa] ?? []).find(t => disponibles.includes(t)) ?? null;
-  const advanceCfg = advanceTarget ? ADVANCE_CONFIG[advanceTarget] ?? null : null;
+  /**
+   * El siguiente paso (23-sep-2026). La franja de arriba lo pinta y ofrece el
+   * botón. `advanceTarget` es la transición hacia adelante que ESTE rol tiene
+   * disponible; null cuando le toca a otra área.
+   */
+  const paso = proximoPaso(quote.etapa, rolActivo, disponibles);
+  const advanceTarget = paso.esDeEsteRol ? paso.hacia : null;
 
   /**
    * Matriz de botones (BC-2).
@@ -1143,10 +1128,29 @@ export default function FichaCotizacion({
   };
 
   const condicionAvance = advanceTarget ? CONDICION_AVANCE[advanceTarget] : undefined;
-  const puedeAvanzar = condicionAvance ? condicionAvance.ok : true;
+  const puedeAvanzar = paso.disponible && (condicionAvance ? condicionAvance.ok : true);
+  /**
+   * Por qué no: primero lo que la matriz de botones declara; si la máquina de
+   * estados vetó por otra razón (un servicio sin líneas, p. ej.), su mensaje.
+   */
+  const porqueNoAvanza = condicionAvance?.porque
+    || (advanceTarget && !paso.disponible
+      ? (puedeTransicionarA(quote.etapa, advanceTarget, rolActivo, quote).razon ?? '')
+      : '');
 
   /** «Marcar ganada» como botón secundario obedece la misma condición. */
   const puedeMarcarGanada = disponibles.includes('ganada') && prontitud.lista;
+
+  /** Avanza de etapa. Ganada pide confirmación: de ahí nace el embarque. */
+  const avanzarA = (hacia: PipelineStageId) => {
+    if (hacia === 'ganada') {
+      if (confirm(`¿Marcar ${quote.id} como GANADA?\n\nSe generará el embarque en automático con los conceptos a cobrar y a pagar, y la cotización quedará congelada.`)) {
+        handleStageChange('ganada');
+      }
+      return;
+    }
+    handleStageChange(hacia);
+  };
 
   /**
    * El PDF es solo de Pricing y Admin —lleva los costos implícitos en los
@@ -1388,6 +1392,21 @@ export default function FichaCotizacion({
           )}
         </div>
       )}
+
+      {/* Próximos pasos (23-sep-2026): las etapas, la acción que sigue y qué
+          falta, arriba de las pestañas. El footer se queda con lo secundario. */}
+      <ProximosPasos
+        rol={rolActivo}
+        etapa={quote.etapa}
+        paso={paso}
+        prontitud={prontitud}
+        puedeAvanzar={puedeAvanzar}
+        porque={porqueNoAvanza}
+        onAvanzar={avanzarA}
+        ganadaSecundaria={puedeMarcarGanada && advanceTarget !== 'ganada'}
+        onMarcarGanada={() => avanzarA('ganada')}
+        soloLectura={viendoVersion}
+      />
 
       <FichaTabs
         pestanas={TABS.map(t => ({ id: t.id, label: t.label }))}
@@ -1678,16 +1697,6 @@ export default function FichaCotizacion({
         {/* ────────────── Tab: Información ────────────── */}
         {activeTab === 'info' && lineaTiempoColapsada(rolActivo) && (
           <div className="mb-6 space-y-4">
-            {/* Línea del tiempo de Ventas: cinco pasos. Las tres etapas
-                internas de Pricing se colapsan en «En pricing» — a Ventas le
-                importa que está con Pricing, no en cuál paso interno va. */}
-            <LineaTiempo
-              titulo="Avance de la cotización"
-              pasos={LINEA_TIEMPO_VENTAS.map(p => ({ id: p.id, label: p.label }))}
-              indiceActual={indicePasoVentas(quote.etapa)}
-              fallido={quote.etapa === 'perdida'}
-            />
-
             {/* Margen de la OPERACIÓN, sin desglose. Es lo único de rentabilidad
                 que Ventas necesita: «que vean la coti y el margen. Eso es todo». */}
             {visible.margenGeneral && totalConsolidado > 0 && (
@@ -2242,54 +2251,8 @@ export default function FichaCotizacion({
       {!viendoVersion && (
       <FichaFooter>
 
-        {/* ── Primario: avanzar etapa (dinámico según etapa + rol) ── */}
-        {advanceCfg && advanceTarget && puedeAvanzar && (
-          <button
-            onClick={() => {
-              if (advanceTarget === 'ganada') {
-                if (confirm(`¿Marcar ${quote.id} como GANADA?\n\nSe generará el embarque en automático con los conceptos a cobrar y a pagar, y la cotización quedará congelada.`)) {
-                  handleStageChange('ganada');
-                }
-              } else {
-                handleStageChange(advanceTarget);
-              }
-            }}
-            className={`w-full max-w-3xl mx-auto px-4 py-3 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2 shadow-xs ${advanceCfg.cls}`}
-          >
-            {advanceTarget === 'ganada'
-              ? <CheckCircle2 className="w-4 h-4" />
-              : <Send className="w-4 h-4" />}
-            {advanceCfg.label}
-          </button>
-        )}
-
-        {/* En lugar del botón, qué falta. La diferencia entre «no puedo
-            avanzar» y «no sé por qué no puedo avanzar». */}
-        {advanceCfg && !puedeAvanzar && (
-          <BloqueFaltantes
-            prontitud={prontitud}
-            porque={condicionAvance?.porque ?? ''}
-            accion={advanceCfg.label}
-          />
-        )}
-
-        {/* ── Ganada (cuando disponible pero NO es el botón primario) ──
-            Exige la cotización completa: de esta transición nace el embarque
-            heredando los cargos. Si falta un costo, el embarque nace mal y
-            nadie se entera hasta pagarle al proveedor. */}
-        {puedeMarcarGanada && advanceTarget !== 'ganada' && (
-          <button
-            onClick={() => {
-              if (confirm(`¿Marcar ${quote.id} como GANADA?\n\nSe generará el embarque en automático con los conceptos a cobrar y a pagar, y la cotización quedará congelada.`)) {
-                handleStageChange('ganada');
-              }
-            }}
-            className="w-full max-w-3xl mx-auto px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2 shadow-xs"
-          >
-            <CheckCircle2 className="w-4 h-4" /> Marcar ganada
-          </button>
-        )}
-
+        {/* La acción principal, «Marcar ganada» y lo que falta subieron a la
+            franja de próximos pasos (23-sep-2026). Aquí queda lo secundario. */}
         {/* ── Secundarios: PDF + Perdida ── */}
         <div className="flex gap-3 max-w-3xl mx-auto w-full">
           {/* Solo Pricing y Admin: un PDF lleva los costos implícitos en los
@@ -2447,56 +2410,5 @@ export default function FichaCotizacion({
 
       <Toast mensaje={toastLocal} tipo="exito" onClose={() => setToastLocal(null)} />
     </FichaLayout>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Bloque que ocupa el lugar del botón ausente.
-//
-// Esconder un botón que no aplica resuelve la mitad del problema; la otra
-// mitad es que el usuario sepa por qué. Sin esto, «no aplica» se convierte en
-// «no sé por qué no puedo avanzar», que genera el mismo estrés.
-// ─────────────────────────────────────────────────────────────────────────────
-function BloqueFaltantes({
-  prontitud, porque, accion,
-}: {
-  prontitud: ReturnType<typeof evaluarProntitud>;
-  porque: string;
-  accion: string;
-}) {
-  const grupos = faltantesPorLinea(prontitud);
-  const resumen = resumenFaltantes(prontitud);
-
-  return (
-    <div className="w-full max-w-3xl mx-auto rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
-      <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
-        {resumen || porque || `Falta información para «${accion}»`}
-      </p>
-
-      {porque && grupos.length === 0 && (
-        <p className="text-[12px] text-amber-700 mt-1">{porque}</p>
-      )}
-
-      {grupos.length > 0 && (
-        <ul className="mt-2 space-y-1">
-          {grupos.slice(0, 6).map(g => (
-            <li key={g.lineaId} className="text-[12px] text-amber-800 flex items-baseline gap-1.5">
-              <span className="text-amber-400">·</span>
-              <span className="font-medium">{g.concepto}</span>
-              <span className="text-amber-600">— {textoFaltantesLinea(g.tipos)}</span>
-            </li>
-          ))}
-          {grupos.length > 6 && (
-            <li className="text-[11px] text-amber-600 pl-3">
-              y {grupos.length - 6} concepto{grupos.length - 6 !== 1 ? 's' : ''} más
-            </li>
-          )}
-        </ul>
-      )}
-
-      <p className="text-[10px] text-amber-600 mt-2">
-        «{accion}» aparecerá cuando esté completo.
-      </p>
-    </div>
   );
 }

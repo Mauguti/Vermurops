@@ -31,6 +31,19 @@ import { idUnico } from '../lib/idUnico';
 const URL_CLASIFICADOR =
   'https://us-central1-vermur-logistics-app.cloudfunctions.net/clasificarDocumento';
 
+/**
+ * Cuando la respuesta no trae el JSON del proxy —Cloud Run caído, timeout de
+ * la plataforma, HTML de error— el estado es lo único que hay. Que al menos
+ * distinga «el generador no está» de «no tienes permiso».
+ */
+function mensajeSinCuerpo(status: number): string {
+  if (status === 401 || status === 403) return 'Tu sesión no tiene permiso para generar el PDF.';
+  if (status === 502 || status === 503 || status === 504) {
+    return 'El generador de PDF no está disponible en este momento. Vuelve a intentarlo en unos minutos; si sigue igual, avisa a sistemas.';
+  }
+  return `El generador de PDF respondió con error ${status}.`;
+}
+
 export function usePdfCotizacion() {
   const { user } = useAuth();
   const [generando, setGenerando] = useState(false);
@@ -64,7 +77,7 @@ export function usePdfCotizacion() {
 
       if (!res.ok) {
         const cuerpo = await res.json().catch(() => null) as { error?: string } | null;
-        throw new Error(cuerpo?.error ?? `El generador respondió con error ${res.status}.`);
+        throw new Error(cuerpo?.error ?? mensajeSinCuerpo(res.status));
       }
       const blob = await res.blob();
       if (blob.size === 0) throw new Error('El generador devolvió un archivo vacío.');
