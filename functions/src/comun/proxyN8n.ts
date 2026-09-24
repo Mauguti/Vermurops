@@ -170,8 +170,17 @@ export async function manejarProxyN8n(
         res.status(502).json({ ok: false, error: mensajeDeError(respuesta.status, destino.flujo) });
         return;
       }
+      // Binario de punta a punta: arrayBuffer → Buffer → send(Buffer). Nunca
+      // pasa por text(): decodificar y recodificar un PDF lo corrompe.
       const cuerpo = Buffer.from(await respuesta.arrayBuffer());
       const tipo = respuesta.headers.get('content-type') ?? 'application/octet-stream';
+      // Artefacto para depurar sin adivinar (24-sep-2026): qué entregó n8n,
+      // tal cual, antes de tocarlo. Un PDF válido empieza con «%PDF-».
+      logger.info('n8n devolvió un archivo', {
+        flujo: destino.flujo, status: respuesta.status, contentType: tipo, bytes: cuerpo.length,
+        primerosBytes: cuerpo.subarray(0, 8).toString('latin1'),
+        primerosBytesHex: cuerpo.subarray(0, 8).toString('hex'),
+      });
       // Un PDF que llega como JSON de error se vería como archivo corrupto:
       // se rechaza aquí, donde todavía se puede decir qué pasó.
       if (tipo.includes('application/json') || cuerpo.length === 0) {
@@ -183,7 +192,16 @@ export async function manejarProxyN8n(
         });
         return;
       }
-      res.status(200).set('Content-Type', tipo).send(cuerpo);
+      if (destino.flujo === 'pdf-cotizacion' && cuerpo.subarray(0, 5).toString('latin1') !== '%PDF-') {
+        registrarFalloN8n('n8n devolvió un archivo que no es PDF', destino.flujo, destino.url, respuesta,
+          cuerpo.subarray(0, 4000).toString('latin1'));
+        res.status(502).json({
+          ok: false,
+          error: 'El generador devolvió un archivo que no es un PDF. Avisa a sistemas: el flujo de n8n está entregando otra cosa.',
+        });
+        return;
+      }
+      res.status(200).set('Content-Type', tipo).set('Content-Length', String(cuerpo.length)).send(cuerpo);
       return;
     }
 

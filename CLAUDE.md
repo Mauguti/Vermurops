@@ -13,7 +13,20 @@ Plataforma web que reemplaza **Magaya** (software de logística internacional y 
 **Stack:** React + Vite + TypeScript + Firebase (Auth, Firestore, Hosting, Functions)
 **Proyecto Firebase:** `vermur-logistics-app` (plan Blaze)
 **Producción:** https://vermur-logistics-app.web.app
-**Local:** `npm run dev` → localhost:3000
+**Local contra producción:** `npm run dev` → localhost:3000 (escribe en la base real, ver §6)
+**Local contra emuladores (validar sin tocar producción):**
+
+```bash
+./scripts/dev-emuladores.sh
+```
+
+Levanta Auth + Firestore + Storage, siembra las cuentas y sirve la app en
+**http://localhost:3100**. Siempre arranca limpio (apaga lo que haya en los
+puertos). Cuentas: `ventas@vermur.com`, `pricing@vermur.com`,
+`operaciones@vermur.com`, `administracion@vermur.com`, `admin@vermur.com`;
+contraseña `123456`. Los datos de ejemplo (COT-2026-0001…0008) los siembra
+la app sola al entrar por primera vez. Ctrl+C apaga todo. Si el trabajo
+está en un worktree, correrlo DESDE el worktree: sirve ese checkout.
 **Identidad:** rojo `#E11D48`, dark `#1F2937`
 
 **El equipo de Vermur ya está usando la plataforma en producción.** Cualquier cambio que se
@@ -726,6 +739,15 @@ nombra al agente según el flujo —«el generador de PDF» o «el clasificador�
 y guarda hasta 4,000 caracteres de la respuesta de n8n con url, status y
 content-type. El 404 de n8n significa **flujo no activado** y el mensaje lo
 dice; fue la causa del 502 del 24-sep (`generar-pdf-cotizacion` inactivo).
+El binario va de punta a punta sin pasar por `text()`; el proxy registra
+los primeros bytes de lo que n8n entregó y rechaza con 502 lo que no
+empiece con `%PDF-`.
+
+**El PDF «roto» (24-sep-2026) era el flujo de n8n, no el proxy.** El nodo
+«HTML a archivo» decodificaba el HTML como base64: 14 bytes de basura, PDF
+de 7,883 bytes con una línea ilegible. Diagnóstico, reproducción con
+Gotenberg local y el JSON corregido en `docs/n8n/`. **Los flujos de n8n se
+versionan ahí**; el que manda es el de n8n.vermur.mx y lo importa Mau.
 
 ## 5. Estado de los módulos
 
