@@ -2,6 +2,43 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    /*
+     * ── Quién es del equipo (Bloque 9, 25-sep-2026) ──────────────────────
+     * Parche mientras el rol no viaja en el token. Hasta hoy bastaba con
+     * estar autenticado, y el registro público estuvo ABIERTO: cualquiera
+     * que leyera la API key del bundle podía crearse una cuenta y leer y
+     * escribir toda la base. El registro ya se cerró; esto asegura que, si
+     * volviera a abrirse o alguien creara una cuenta por otra vía, no
+     * alcance ni un documento.
+     *
+     * Es una LISTA DE CORREOS a propósito: el rol no está en el token
+     * todavía. Cuando Usuarios y roles ponga los claims, esta función se
+     * sustituye por permisos por rol (paso 3) y la lista desaparece.
+     *
+     * ⚠️ Una cuenta recién invitada que no esté aquí NO puede entrar: la
+     * pantalla de Usuarios avisa, y el correo se agrega en el mismo cambio.
+     *
+     * Las cuentas de prueba del emulador NO van aquí: se inyectan al
+     * generar las reglas del emulador (scripts/reglasEmulador.sh), para no
+     * dejar en producción correos que alguien pueda crear después.
+     */
+    function esDelEquipo() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() in [
+          // EQUIPO:INICIO — generado también para el emulador; no reordenar a mano
+          'itzel.laurean@vermur.com',
+          'nohema.sosa@vermur.com',
+          'julio.gutierrez@vermur.com',
+          'angel.luna@vermur.com',
+          'gabriela.huerta@vermur.com',
+          'luis.renteria@vermur.com',
+          'info@digsol.com'
+          // EQUIPO:FIN
+        ];
+    }
+
+
     // ── Denegar todo lo que no esté explícitamente permitido ──────────────
     match /{document=**} {
       allow read, write: if false;
@@ -12,9 +49,9 @@ service cloud.firestore {
     // Eliminar está prohibido: una cotización perdida se marca como 'perdida',
     // nunca se borra del historial.
     match /cotizaciones/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -22,8 +59,8 @@ service cloud.firestore {
     // Fotos INMUTABLES: se crean al hacer «Nueva versión» y nunca se editan
     // ni se borran. Restaurar una vieja crea otra nueva; no la reescribe.
     match /cotizaciones/{id}/versiones/{numero} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
       allow update, delete: if false;
     }
 
@@ -31,9 +68,9 @@ service cloud.firestore {
     // Antes vivían solo en memoria: se perdían al recargar. Mismo patrón que
     // cotizaciones — un lead perdido se marca, no se borra del historial.
     match /prospectos/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -41,8 +78,8 @@ service cloud.firestore {
     // generateFolio() hace runTransaction: necesita leer Y escribir.
     // Solo usuarios autenticados pueden tocar el contador.
     match /contadores/{id} {
-      allow read:   if request.auth != null;
-      allow write:  if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow write:  if esDelEquipo();
     }
     // NOTA: la siembra de consecutivos (contadores/embarques_VLIM, etc.) se
     // restringe a Admin en la capa de datos (useContadoresSerie exige
@@ -53,9 +90,9 @@ service cloud.firestore {
     // Cualquier usuario autenticado puede leer y crear/actualizar.
     // Eliminar está prohibido: un cliente inactivo se marca statusOperativo='INACTIVO'.
     match /clientes/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -63,9 +100,9 @@ service cloud.firestore {
     // Cualquier usuario autenticado puede leer y crear/actualizar.
     // Eliminar está prohibido: un proveedor inactivo se marca activo=false.
     match /proveedores/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -73,9 +110,9 @@ service cloud.firestore {
     // Catálogo de conceptos/servicios (105 registros de Magaya).
     // Baja lógica: un concepto inactivo se marca activo=false.
     match /conceptos/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -83,9 +120,9 @@ service cloud.firestore {
     // Catálogo de términos/condiciones de pago (25 registros).
     // Baja lógica: un término inactivo se marca activo=false.
     match /terminosPago/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -93,9 +130,9 @@ service cloud.firestore {
     // Catálogo de puertos marítimos. Mismo patrón que proveedores.
     // Baja lógica: un puerto inactivo se marca activo=false.
     match /puertos/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -104,9 +141,9 @@ service cloud.firestore {
     // Baja lógica: una tarifa inactiva se marca activo=false.
     // Queries del listener acotado usan: activo + fechaFin.
     match /tarifas/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -115,10 +152,10 @@ service cloud.firestore {
     // sistemas de adjuntos. Eliminar está prohibido — borrar la evidencia de
     // dónde salió un costo deja la tarifa sin respaldo.
     match /documentosTarifario/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo()
                     && request.resource.data.subidoPor == request.auth.uid;
-      allow update: if request.auth != null;
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -131,10 +168,10 @@ service cloud.firestore {
     // La capacidad 'tarifario.cargar' (Pricing) se exige en la capa de datos,
     // no aquí: las reglas todavía no distinguen roles — ver §6 del CLAUDE.md.
     match /importacionesTarifas/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo()
                     && request.resource.data.creadoPor == request.auth.uid;
-      allow update: if request.auth != null;
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -143,9 +180,9 @@ service cloud.firestore {
     // Eliminar está prohibido: un embarque cancelado se marca en sus cierres,
     // nunca se borra — es el respaldo de lo que se cobró y se pagó.
     match /embarques/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -153,9 +190,9 @@ service cloud.firestore {
     // Cualquier usuario autenticado puede leer y crear/actualizar.
     // Eliminar está prohibido: una OC cancelada se marca activo=false.
     match /ordenesCompra/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -165,9 +202,9 @@ service cloud.firestore {
     // activo=false, nunca se borra — es evidencia de que entró dinero,
     // igual que un comprobante de pago.
     match /depositosCliente/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -177,16 +214,16 @@ service cloud.firestore {
     // dejaría las líneas del embarque apuntando a un documento fantasma.
     // Una factura mal capturada se cancela; un cobro se anula.
     match /facturas/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
     match /cobros/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null;
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -198,16 +235,16 @@ service cloud.firestore {
     // Un documento por uid: cómo ver los cargos, y lo que venga. Solo el
     // dueño lee y escribe el suyo.
     match /preferenciasUsuario/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read, write: if esDelEquipo() && request.auth.uid == uid;
     }
 
     match /vistasUsuario/{id} {
-      allow read:   if request.auth != null;
-      allow create: if request.auth != null
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo()
                     && request.resource.data.usuarioId == request.auth.uid;
-      allow update: if request.auth != null
+      allow update: if esDelEquipo()
                     && resource.data.usuarioId == request.auth.uid;
-      allow delete: if request.auth != null
+      allow delete: if esDelEquipo()
                     && resource.data.usuarioId == request.auth.uid;
     }
 
@@ -219,10 +256,10 @@ service cloud.firestore {
     //   que genera notificación para otro usuario).
     // Actualización: solo el propio destinatario puede marcarla leída.
     match /notificaciones/{id} {
-      allow read:   if request.auth != null
+      allow read:   if esDelEquipo()
                     && resource.data.destinatarioId == request.auth.uid;
-      allow create: if request.auth != null;
-      allow update: if request.auth != null
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo()
                     && resource.data.destinatarioId == request.auth.uid;
       allow delete: if false;
     }

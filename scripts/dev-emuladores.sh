@@ -31,7 +31,7 @@ if [[ -n "$(lsof -ti:$PUERTOS 2>/dev/null)" ]]; then
 fi
 
 # ── 2 · Levantar ────────────────────────────────────────────────────────────
-npx firebase emulators:start --only auth,firestore,storage > .noche/reportes/emu-dev.log 2>&1 &
+./scripts/reglasEmulador.sh >/dev/null && npx firebase emulators:start --config firebase.emulador.json --only auth,firestore,storage > .noche/reportes/emu-dev.log 2>&1 &
 EMU=$!
 VITE_USAR_EMULADORES=1 npx vite --port "$PUERTO" --strictPort > .noche/reportes/dev-emu.log 2>&1 &
 DEV=$!

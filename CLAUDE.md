@@ -875,6 +875,36 @@ documentos de cara al cliente con la identidad de Vermur.
 «Portal del Cliente» sale del encabezado, y con él su estado y su ruta, que
 quedaban inalcanzables. Vuelve como ROL cuando exista Usuarios y roles.
 
+## 4.21 Parche de reglas: solo el equipo (Bloque 9, 26-sep-2026)
+
+Mientras el rol no viaja en el token, el acceso pasa de «cualquier
+autenticado» a «un correo del equipo». Una función `esDelEquipo()` en
+`firestore.rules` (57 condiciones) y en `storage.rules` (8), no la lista
+repetida. Storage importa especialmente: ahí vive el expediente KYC con
+actas y RFC.
+  - **No condiciona a `email_verified`**: las seis cuentas del equipo lo
+    tienen en false y quedarían fuera.
+  - Se compara en minúsculas (`.lower()`), para que una sesión con el
+    correo capitalizado no se quede afuera.
+  - **Las cuentas de prueba NO están en las reglas de producción.** El
+    recorrido las necesita, así que `scripts/reglasEmulador.sh` DERIVA
+    `firestore.emulador.rules` y `storage.emulador.rules` de las de
+    producción, inyectando las cinco cuentas entre los marcadores
+    EQUIPO:INICIO / EQUIPO:FIN; los emuladores arrancan con
+    `firebase.emulador.json`. Una sola fuente de verdad: mantener dos
+    archivos a mano los deja divergir, y el recorrido pasaría con unas
+    reglas mientras producción corre con otras. Los derivados están en
+    .gitignore.
+  - `npm run test:reglas` levanta emuladores efímeros en 8085/9195 —para no
+    chocar con los del recorrido— y corre 13 tests contra las reglas de
+    PRODUCCIÓN: el equipo lee y escribe; un autenticado fuera de la lista
+    no toca nada, ni una cuenta de prueba; sin sesión, nada; y lo que el
+    parche no cambia (no se borran cotizaciones, una notificación solo la
+    lee su destinatario).
+  - **Una cuenta recién invitada que no esté en la lista no entra.** Hasta
+    que existan los claims, invitar a alguien implica agregar su correo
+    aquí y desplegar las reglas.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
@@ -1089,15 +1119,13 @@ valida con `puedeTransicionarA` y muestra la razón cuando la tarjeta ya se
 arrastró; las columnas a las que no se puede mover deberían verse
 inalcanzables antes. Anotado 25-sep-2026.
 
-**🔴 CRÍTICO — El registro público de Firebase Auth está ABIERTO.**
-Verificado el 25-sep-2026 contra producción con la API key del bundle:
-`accounts:signUp` creó una cuenta (se borró en el acto con
-`accounts:delete`). Cualquiera que lea el bundle puede registrarse, y como
-las reglas de Firestore solo piden `request.auth != null`, esa cuenta lee y
-escribe TODA la base. Se cierra en la consola: Authentication → Sign-in
-method → Correo/contraseña, y desactivar el registro de usuarios; o
-restringir por dominio. **Mientras siga abierto, las reglas por rol de
-Usuarios y roles son urgentes, no deseables.** Repetir la prueba después:
+**~~El registro público de Firebase Auth está ABIERTO~~ — CERRADO el
+26-sep-2026.** Mau desactivó «Enable create (sign-up)» en la consola;
+verificado contra producción con la API key del bundle: `accounts:signUp`
+responde `ADMIN_ONLY_OPERATION` y no crea nada. Estuvo abierto al menos
+hasta el 25-sep, con reglas que solo pedían `request.auth != null`: durante
+ese tiempo, cualquiera que leyera el bundle podía registrarse y leer y
+escribir toda la base. Comprobarlo de nuevo cuando se toque Auth:
 
 ```bash
 curl -s -X POST "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=<API_KEY>" \
@@ -1105,6 +1133,21 @@ curl -s -X POST "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=<
   -d '{"email":"prueba@example.com","password":"Prueba-123!","returnSecureToken":true}'
 ```
 Cerrado responde `ADMIN_ONLY_OPERATION`; abierto devuelve un `idToken`.
+
+**🔴 CRÍTICO — Hay tres cuentas de PRUEBA en el Auth de producción.**
+`admin@vermur.com`, `pricing@vermur.com` y `ventas@vermur.com` existen en
+producción (inventario del 26-sep-2026 con `firebase auth:export`). Son las
+del emulador, donde su contraseña es `123456`. Hasta el Bloque 8,
+`admin@vermur.com` tenía rol **admin** en el mapa de las Functions. El
+parche de reglas del Bloque 9 las deja fuera de Firestore y Storage, pero
+**hay que borrarlas o deshabilitarlas en la consola**: mientras existan,
+son credenciales válidas del proyecto. Las cinco cuentas de prueba viven
+solo en emuladores (`scripts/sembrarEmuladores.sh`); en producción no
+deberían existir.
+
+**El equipo tiene `email_verified` en false.** Las seis cuentas reales.
+Por eso el parche del Bloque 9 identifica por correo y **no** condiciona a
+`email_verified`: hacerlo dejaría fuera a todo el equipo.
 
 **~~Las cuentas de prueba tienen rol en el mapa de las Functions~~ — CERRADO
 el 25-sep-2026 (Bloque 8).** Se quitaron del mapa de producción de
@@ -1152,8 +1195,9 @@ importacionesTarifas borradores de la carga con IA · respuesta cruda de n8n
 **Storage:** `tarifarios/{año}/{mes}/` — los documentos de los que salen las
 tarifas. Máximo 10 MB, sin sobrescribir ni borrar.
 
-**Cloud Functions** (`functions/`, us-central1): `extraerTarifas` es el proxy
-hacia n8n. Estructurada para varias — Gestión de Usuarios reutilizará
+**Cloud Functions** (`functions/`, us-central1, **Node 22**,
+firebase-functions 7 / firebase-admin 14 desde el 26-sep-2026):
+`extraerTarifas` es el proxy hacia n8n. Estructurada para varias — Gestión de Usuarios reutilizará
 `comun/auth.ts`.
 
 **Convenciones:**

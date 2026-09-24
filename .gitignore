@@ -24,3 +24,6 @@ ui-debug.log
 # Credenciales de Firebase Admin (cualquier nombre que descargue la consola)
 *firebase-adminsdk*.json
 *serviceAccount*.json
+
+# Reglas derivadas para emuladores (scripts/reglasEmulador.sh)
+*.emulador.rules

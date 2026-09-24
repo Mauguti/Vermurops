@@ -16,7 +16,7 @@ PUERTO=3100
 esperar() { local i=0; until curl -s -o /dev/null --max-time 2 "$1"; do sleep 2; i=$((i+2)); [[ $i -ge $2 ]] && { echo "✗ $3 no respondió"; exit 1; }; done; echo "✓ $3"; }
 
 if ! curl -s -o /dev/null --max-time 2 http://127.0.0.1:8080; then
-  npx firebase emulators:start --only auth,firestore,storage > .noche/reportes/emu-e2e.log 2>&1 &
+  ./scripts/reglasEmulador.sh >/dev/null && npx firebase emulators:start --config firebase.emulador.json --only auth,firestore,storage > .noche/reportes/emu-e2e.log 2>&1 &
   EMU=$!
 fi
 if ! curl -s -o /dev/null --max-time 2 "http://localhost:$PUERTO"; then
