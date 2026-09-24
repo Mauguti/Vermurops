@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { compararTexto } from '../lib/texto';
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, setDoc, updateDoc, getDocsFromServer } from 'firebase/firestore';
 import { evaluarSeed } from '../lib/seedGuard';
@@ -81,7 +82,8 @@ export function useProveedores() {
         });
 
         // Alfabético por razón social.
-        data.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+        // Bloque 4: un documento sin `nombre` tiraba la app entera al cargar.
+        data.sort((a, b) => compararTexto(a.nombre, b.nombre));
 
         setProveedores(data);
         setLoading(false);

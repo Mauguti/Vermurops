@@ -139,7 +139,9 @@ export interface ProveedorVermur {
 
 /** Devuelve el contacto marcado como principal, o el primero del array. */
 export function contactoPrincipal(p: ProveedorVermur): ContactoProveedor | undefined {
-  return p.contactos.find(c => c.principal) ?? p.contactos[0];
+  // Bloque 4: un proveedor sin arreglo de contactos (edición a mano) tiraba Altas.
+  const contactos = p.contactos ?? [];
+  return contactos.find(c => c.principal) ?? contactos[0];
 }
 
 // ─── Seed ─────────────────────────────────────────────────────────────────────

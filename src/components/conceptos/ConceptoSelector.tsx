@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { normalizarTexto } from '../../lib/texto';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Search, X, Plus } from 'lucide-react';
 import type { ConceptoVermur, CategoriaConcepto } from './ConceptosData';
@@ -32,8 +33,8 @@ const CATEGORIA_ORDER: CategoriaConcepto[] = [
 
 // ─── Normalización para búsqueda ─────────────────────────────────────────────
 
-const norm = (s: string) =>
-  s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+// Bloque 4: tolera campos ausentes (nombre, código, país, rfc).
+const norm = normalizarTexto;
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

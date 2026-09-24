@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { compararTexto, normalizarTexto } from '../../lib/texto';
 import { Search, X, Check, ChevronDown, Building2 } from 'lucide-react';
 import type { ClienteVermur } from './ClientesData';
 
@@ -25,8 +26,8 @@ interface Props {
   disabled?: boolean;
 }
 
-const norm = (s: string) =>
-  s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+// Bloque 4: tolera campos ausentes (nombre, código, país, rfc).
+const norm = normalizarTexto;
 
 export default function SelectorCliente({
   clientes, valorId, onSelect, nombreLibreActual, onNombreLibre,
@@ -53,7 +54,7 @@ export default function SelectorCliente({
     const q = norm(busqueda);
     return clientes
       .filter(c => !q || norm(c.nombre).includes(q) || norm(c.rfc ?? '').includes(q) || norm(c.comercial ?? '').includes(q))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+      .sort((a, b) => compararTexto(a.nombre, b.nombre))
       .slice(0, 40);
   }, [clientes, busqueda]);
 

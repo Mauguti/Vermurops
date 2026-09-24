@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { contiene, texto } from '../../lib/texto';
 import { alDiaConVersion } from '../../lib/versionesCotizacion';
 import {
   Search, Plus, X, Plane, Ship, Truck, ShieldCheck, Calendar, ArrowRight, HelpCircle,
@@ -91,9 +92,9 @@ export default function KanbanCotizaciones({
 
   const filteredQuotes = quotes.filter(q => {
     const matchSearch =
-      q.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.prospecto.empresa.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.prospecto.contacto.toLowerCase().includes(searchTerm.toLowerCase());
+      contiene(q.id, searchTerm) ||
+      contiene(q.prospecto?.empresa, searchTerm) ||
+      contiene(q.prospecto?.contacto, searchTerm);
 
     const matchVendedor = filterVendedor === 'Todos' || q.vendedorId === filterVendedor;
     const matchServicio =
@@ -478,7 +479,7 @@ export default function KanbanCotizaciones({
                             <span className="text-[9px] font-mono font-bold text-gray-400 group-hover:text-[#E11D48] transition-colors">
                               {quote.id}
                             </span>
-                            {quote.prospecto.origen.startsWith('interno') ? (
+                            {texto(quote.prospecto?.origen).startsWith('interno') ? (
                               <span className="text-[8px] font-bold bg-[#4B2A8C]/5 text-[#4B2A8C] border border-[#4B2A8C]/15 px-1.5 py-0.5 rounded uppercase tracking-wider">
                                 Interna ({quote.prospecto.origen === 'interno_ventas' ? 'Ventas' : 'Pricing'})
                               </span>
