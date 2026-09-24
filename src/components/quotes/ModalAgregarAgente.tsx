@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { normalizarTexto, compararTexto } from '../../lib/texto';
 import { X, Search, Plus, Building2 } from 'lucide-react';
 import type { ProveedorVermur } from '../proveedores/ProveedoresData';
 
@@ -33,8 +34,8 @@ interface Props {
   onAltaRapida?: () => void;
 }
 
-const norm = (s: string) =>
-  s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+// Bloque 4: tolera proveedores sin nombre o sin rfc.
+const norm = normalizarTexto;
 
 export default function ModalAgregarAgente({
   proveedores, yaEnMatriz, modalidadRelevante, onCerrar, onAgregar, onAltaRapida,
@@ -52,7 +53,7 @@ export default function ModalAgregarAgente({
       .sort((a, b) => {
         const ra = modalidadRelevante && a.modalidades?.includes(modalidadRelevante as never) ? 0 : 1;
         const rb = modalidadRelevante && b.modalidades?.includes(modalidadRelevante as never) ? 0 : 1;
-        return ra !== rb ? ra - rb : a.nombre.localeCompare(b.nombre, 'es');
+        return ra !== rb ? ra - rb : compararTexto(a.nombre, b.nombre);
       })
       .slice(0, 40);
   }, [proveedores, busqueda, yaEsta, modalidadRelevante]);

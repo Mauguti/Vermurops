@@ -18,9 +18,7 @@ export interface ClienteBuscable {
   rfc?: string | null;
 }
 
-/** Minúsculas y sin acentos: «plasticos» encuentra «Plásticos». */
-const normalizar = (t: string | null | undefined): string =>
-  (t ?? '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+import { normalizarTexto as normalizar } from './texto';
 
 /**
  * Clientes cuyo nombre o RFC contiene la consulta. Tolera campos ausentes o

@@ -6,6 +6,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { antesDeLaComa } from '../../lib/texto';
 import { alDiaConVersion } from '../../lib/versionesCotizacion';
 import {
   Plane, Ship, Truck, ShieldCheck, Check, Clock,
@@ -169,9 +170,9 @@ function CotizacionRow({ quote, progreso, dias, tarifasCount, bloque, onAbrir, o
             {/* Ruta */}
             {ruta && (
               <span className="flex items-center gap-0.5 truncate max-w-[160px]">
-                {ruta.origen.split(',')[0]}
+                {antesDeLaComa(ruta.origen)}
                 <ChevronRight className="w-2.5 h-2.5 text-gray-300 shrink-0" />
-                {ruta.destino.split(',')[0]}
+                {antesDeLaComa(ruta.destino)}
               </span>
             )}
 

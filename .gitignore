@@ -20,3 +20,7 @@ serviceAccountKey.json
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+
+# Credenciales de Firebase Admin (cualquier nombre que descargue la consola)
+*firebase-adminsdk*.json
+*serviceAccount*.json

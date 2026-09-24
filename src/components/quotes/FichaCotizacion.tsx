@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
+import { antesDeLaComa } from '../../lib/texto';
 import {
   X, User, FileText, Plus, Trash2, CheckCircle2, AlertTriangle,
   MessageSquare, Clock, Send, BarChart2, Building2, Search, Link2,
@@ -763,7 +764,7 @@ export default function FichaCotizacion({
       if (!carga) return [];
       const etiqueta = serviciosDeLaTabla.find(x => x.id === srv.id)?.etiqueta ?? srv.tipo;
       const ruta = srv.ruta?.origen && srv.ruta.origen !== 'Por definir'
-        ? `${srv.ruta.origen.split(',')[0]} → ${srv.ruta.destino.split(',')[0]}`
+        ? `${antesDeLaComa(srv.ruta.origen)} → ${antesDeLaComa(srv.ruta.destino)}`
         : null;
       return [{ id: srv.id, etiqueta, resumen: resumenCarga(carga), ruta,
         requeridos: srv.conceptosRequeridos?.length ?? 0 }];

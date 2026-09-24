@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { contiene, texto } from '../lib/texto';
 import { Search, Phone, Mail, Plane, Ship, Truck, FileText, Database, Loader2 } from 'lucide-react';
 import { useClientes } from '../hooks/useClientes';
 import { useProveedores } from '../hooks/useProveedores';
@@ -113,7 +114,7 @@ export default function Clients() {
     if (!showInactivos && c.statusOperativo !== 'ACTIVO') return false;
     const q = searchTerm.toLowerCase();
     if (!q) return true;
-    return c.nombre.toLowerCase().includes(q) ||
+    return contiene(c.nombre, q) ||
       (c.rfc ?? '').toLowerCase().includes(q) ||
       (c.representante ?? '').toLowerCase().includes(q) ||
       (c.idSemantico ?? '').toLowerCase().includes(q) ||
@@ -123,7 +124,7 @@ export default function Clients() {
   const filteredProviders = proveedores.filter(p => {
     const cp = contactoPrincipal(p);
     const q = providerSearchTerm.toLowerCase();
-    return p.nombre.toLowerCase().includes(q) ||
+    return contiene(p.nombre, q) ||
       (p.rfc ?? p.numeroEntidadMagaya ?? '').toLowerCase().includes(q) ||
       (cp?.nombre ?? '').toLowerCase().includes(q);
   });
@@ -391,7 +392,7 @@ export default function Clients() {
                   {cp && (
                   <div className="flex items-start text-[13px]">
                     <div className="w-[32px] h-[32px] bg-white border border-card-border rounded-full flex items-center justify-center font-bold text-brand mr-3 shrink-0">
-                      {cp.nombre.charAt(0)}
+                      {texto(cp.nombre).charAt(0)}
                     </div>
                     <div>
                       <p className="font-medium text-text-primary leading-tight">{cp.nombre}</p>

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { compararTexto, normalizarTexto } from '../../lib/texto';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Search, Anchor, PenLine } from 'lucide-react';
 import type { PuertoVermur, TipoPunto } from './PuertosData';
@@ -37,8 +38,8 @@ interface Props {
   tipo?: TipoPunto;
 }
 
-const norm = (s: string) =>
-  s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+// Bloque 4: tolera campos ausentes (nombre, código, país, rfc).
+const norm = normalizarTexto;
 
 export default function PuertoSelector({
   puertos, valor, puertoId, onChange, readOnly, placeholder = 'Elegir puerto…', tipo,
@@ -97,7 +98,7 @@ export default function PuertoSelector({
       return [...activos].sort((a, b) => {
         const aMx = a.codigoPais === 'MEX' ? 0 : 1;
         const bMx = b.codigoPais === 'MEX' ? 0 : 1;
-        return aMx - bMx || a.nombre.localeCompare(b.nombre, 'es');
+        return aMx - bMx || compararTexto(a.nombre, b.nombre);
       });
     }
     const rango = (p: PuertoVermur) => {
@@ -109,7 +110,7 @@ export default function PuertoSelector({
     };
     return activos
       .filter(p => rango(p) < 3)
-      .sort((a, b) => rango(a) - rango(b) || a.nombre.localeCompare(b.nombre, 'es'));
+      .sort((a, b) => rango(a) - rango(b) || compararTexto(a.nombre, b.nombre));
   }, [puertos, search, tipo]);
 
   const elegido = puertoId ? puertos.find(p => p.id === puertoId) : null;

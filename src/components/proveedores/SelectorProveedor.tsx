@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
+import { compararTexto, normalizarTexto } from '../../lib/texto';
 import { Search, ChevronDown, X, Building2, Check } from 'lucide-react';
 import type { ProveedorVermur, Modalidad } from './ProveedoresData';
 
@@ -39,8 +40,8 @@ interface Props {
   disabled?: boolean;
 }
 
-const norm = (s: string) =>
-  s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+// Bloque 4: tolera campos ausentes (nombre, código, país, rfc).
+const norm = normalizarTexto;
 
 const ETIQUETA_MODALIDAD: Record<string, string> = {
   maritimo: 'Marítimo', aereo: 'Aéreo', terrestre: 'Terrestre', aduanal: 'Aduanal',
@@ -73,7 +74,7 @@ export default function SelectorProveedor({
     const base = proveedores
       .filter(p => p.activo && !excluidos.has(p.id))
       .filter(p => !q || norm(p.nombre).includes(q) || norm(p.rfc ?? '').includes(q))
-      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+      .sort((a, b) => compararTexto(a.nombre, b.nombre));
 
     if (!modalidadRelevante) return { relevantes: [] as ProveedorVermur[], resto: base };
 

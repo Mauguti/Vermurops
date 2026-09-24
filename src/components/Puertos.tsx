@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { contiene } from '../lib/texto';
 import { Plus, Search, Pencil, Anchor } from 'lucide-react';
 import { usePuertos } from '../hooks/usePuertos';
 import { PuertoVermur, TipoPunto, ETIQUETA_TIPO_PUNTO, tipoDePunto } from './puertos/PuertosData';
@@ -31,12 +32,8 @@ export default function Puertos() {
     if (filterTipo) list = list.filter(p => tipoDePunto(p) === filterTipo);
     if (filterPais) list = list.filter(p => p.pais === filterPais);
     if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(p =>
-        p.nombre.toLowerCase().includes(q) ||
-        p.codigo.toLowerCase().includes(q) ||
-        p.pais.toLowerCase().includes(q)
-      );
+      const q = search.trim();
+      list = list.filter(p => contiene(p.nombre, q) || contiene(p.codigo, q) || contiene(p.pais, q));
     }
     return list;
   }, [puertos, search, filterTipo, filterPais, showInactivos]);
