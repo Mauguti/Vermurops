@@ -74,7 +74,10 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
   solicitud_cliente: [
     {
       hacia: 'solicitado_pricing',
-      roles: ['ventas', 'admin'],
+      // 1b · 'pricing' incluido: los clientes de oficina y los agentes de
+      // carga no tienen vendedor asignado por definición, así que su
+      // solicitud nace y avanza sin pasar por Ventas.
+      roles: ['ventas', 'pricing', 'admin'],
       validar: q =>
         q.servicios.length === 0
           ? 'Agrega al menos un servicio antes de enviar a Pricing.'
@@ -95,7 +98,9 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
     {
       // Devolver: Ventas retira la solicitud para corregir
       hacia: 'solicitud_cliente',
-      roles: ['ventas', 'admin'],
+      // 1b · regresar es parte de trabajar la cotización, y no saltea ningún
+      // freno: los de cliente y expediente viven en las transiciones a ganada.
+      roles: ['ventas', 'pricing', 'admin'],
     },
     {
       hacia: 'perdida',
@@ -169,7 +174,15 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
   consolidada: [
     {
       hacia: 'enviada_cliente',
-      roles: ['ventas', 'admin'],
+      /*
+       * 1b · Antes solo 'ventas'. En la práctica eso significaba «solo la
+       * persona de Ventas», y dejaba trabada una categoría entera: los
+       * clientes de oficina y los agentes de carga no tienen vendedor
+       * asignado. También trababa la cotización cuando el vendedor estaba de
+       * vacaciones. El modelo de equipos viene después; esto es el arreglo
+       * inmediato. Los frenos de cliente vinculado y expediente no cambian.
+       */
+      roles: ['ventas', 'pricing', 'admin'],
     },
     {
       // Recotizar: Pricing corrige la consolidación
@@ -186,7 +199,8 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
   enviada_cliente: [
     {
       hacia: 'negociacion',
-      roles: ['ventas', 'admin'],
+      // 1b · misma razón que enviar: sin vendedor asignado, nadie más podía.
+      roles: ['ventas', 'pricing', 'admin'],
     },
     {
       // 'pricing' incluido por §4.1: Pricing abre cotizaciones directas de
@@ -205,7 +219,8 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
     {
       // Devolver: reenviar propuesta corregida (Luis: enviada → cotizada)
       hacia: 'consolidada',
-      roles: ['ventas', 'admin'],
+      // 1b · regresar de «enviada al cliente» a consolidada.
+      roles: ['ventas', 'pricing', 'admin'],
     },
   ],
 
@@ -228,7 +243,8 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
     {
       // Devolver: reenviar propuesta corregida
       hacia: 'enviada_cliente',
-      roles: ['ventas', 'admin'],
+      // 1b · reenviar después de negociar.
+      roles: ['ventas', 'pricing', 'admin'],
     },
   ],
 

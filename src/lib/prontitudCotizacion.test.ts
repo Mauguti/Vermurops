@@ -89,11 +89,25 @@ describe('qué bloquea que esté lista', () => {
     expect(p.faltantes.map(f => f.tipo)).toContain('sin_proveedor');
   });
 
-  it('un concepto sin costo capturado', () => {
-    const sinMonto = concepto({ id: 'c3', nombre: 'Seguro', conceptoId: 'CON-003', profit: 100 });
-    const p = evaluarProntitud(quote([sinMonto]));
-    expect(p.lista).toBe(false);
-    expect(p.faltantes.map(f => f.tipo)).toContain('sin_monto');
+  it('1a · una línea de pura venta NO bloquea, y se avisa', () => {
+    // El caso de producción: «Documentation», venta 50, sin costo y sin
+    // proveedor. Es un concepto que Vermur cobra y no le paga a nadie.
+    const soloVenta = concepto({ id: 'c3', nombre: 'Documentation', conceptoId: 'CON-003', profit: 50 });
+    const p = evaluarProntitud(quote([soloVenta]));
+    expect(p.lista).toBe(true);
+    expect(p.faltantes).toHaveLength(0);
+    expect(p.avisos.map(a => a.tipo)).toEqual(['venta_sin_costo']);
+  });
+
+  it('1a · un proveedor sin costo capturado SÍ bloquea', () => {
+    // Lo que `sin_monto` siempre protegió: un costo que se quedó a medias
+    // hace nacer el embarque mal y nadie se entera hasta pagarle al proveedor.
+    const aMedias = concepto({
+      id: 'c3b', nombre: 'Seguro', conceptoId: 'CON-003', profit: 100,
+      tarifas: [tarifa({ id: 't3b', monto: 0, proveedorId: 'PRV-3' })],
+    });
+    const p = evaluarProntitud(quote([aMedias]));
+    expect(p.faltantes.map(f => f.tipo)).not.toContain('sin_proveedor');
   });
 
   it('un concepto SIN conceptoId del catálogo también bloquea', () => {
@@ -121,10 +135,13 @@ describe('qué bloquea que esté lista', () => {
 describe('a una línea le puede faltar más de una cosa', () => {
   const pelado = concepto({ id: 'c6', nombre: 'Gestoría' });
 
-  it('acumula los tres faltantes', () => {
+  it('una línea sin nada acumula concepto y monto', () => {
+    // Ya no acumula `sin_proveedor`: sin costo, no hay a quién pagarle, así
+    // que exigir proveedor era pedir un dato que no significa nada (1a).
     const p = evaluarProntitud(quote([pelado]));
     const tipos = p.faltantes.map(f => f.tipo);
-    expect(tipos).toEqual(expect.arrayContaining(['sin_concepto', 'sin_proveedor', 'sin_monto']));
+    expect(tipos).toEqual(expect.arrayContaining(['sin_concepto', 'sin_monto']));
+    expect(tipos).not.toContain('sin_proveedor');
   });
 
   it('el resumen cuenta CONCEPTOS, no faltantes', () => {
@@ -142,7 +159,7 @@ describe('a una línea le puede faltar más de una cosa', () => {
     const grupos = faltantesPorLinea(evaluarProntitud(quote([pelado])));
     expect(grupos).toHaveLength(1);
     expect(grupos[0].concepto).toBe('Gestoría');
-    expect(grupos[0].tipos).toHaveLength(3);
+    expect(grupos[0].tipos).toHaveLength(2);
   });
 });
 
