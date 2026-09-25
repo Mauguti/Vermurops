@@ -4,6 +4,19 @@ dist/
 .env
 .env.local
 *.log
+
+# Secretos de las Cloud Functions.
+#
+# `firebase emulators:start` lee el valor de cada `defineSecret` de este
+# archivo cuando existe, para no tener que pegarlo a mano en cada arranque.
+# Es un token de PRODUCCIÓN —n8n lo valida como X-Vermur-Token—, así que un
+# `git add -A` distraído lo publicaría en el repo.
+#
+# Estuvo sin cubrir hasta el 25-sep-2026: el archivo aparecía como `??` en
+# `git status`. El patrón es amplio a propósito, para que el próximo secreto
+# que alguien ponga con esta convención nazca protegido.
+*.secret.local
+.secret.local
 .DS_Store
 
 # Caché local del CLI de Firebase (se regenera en cada deploy).
