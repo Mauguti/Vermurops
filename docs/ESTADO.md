@@ -180,6 +180,52 @@ Lo publicado hoy, antes de este corte:
 |---|---|---|
 | **Las URLs de Storage son públicas para quien tenga el enlace** | **sin empezar** | Los documentos se guardan con `getDownloadURL()` ([useDocumentosEmbarque.ts:52](../src/hooks/useDocumentosEmbarque.ts)), que devuelve una URL con `?alt=media&token=…`. Esa URL abre el archivo **sin sesión y sin pasar por las reglas**. Hoy solo viven dentro de la app, pero en cuanto alguien pegue una en un correo o un WhatsApp, el documento queda accesible de forma permanente hasta que se revoque el token. Implica que cualquier marca de «visible para el cliente» es una convención de la interfaz, no un control de acceso. Se cierra con URLs firmadas con vencimiento, generadas por una Function |
 
+### Para Vermur — anotado el 25-sep-2026
+
+**Los 27 conceptos del catálogo con `reglaIVA: 'revisar'`.** Mientras
+sigan así, el impuesto de esas líneas sale «Sin determinar» en la cotización
+(Bloque 3) y hay que capturarlo a mano una por una. Administración tiene que
+cerrarlos: es catálogo, no código.
+
+**Corrección:** en el corte anterior dije «18». Son **27**. El conteo
+viejo salió de un `grep` sobre `"reglaIVA":"revisar"` sin espacios, que solo
+encontró las líneas compactas de `conceptos.json` y se saltó las que están
+formateadas. El número real sale de leer el JSON.
+
+| Id | Concepto | Categoría |
+|---|---|---|
+| `CON-019` | Agent Profit Share | financiero |
+| `CON-020` | Agent Profit Share - Expense | financiero |
+| `CON-022` | All In Destination Expenses | otros |
+| `CON-024` | All In Origin Expenses | otros |
+| `CON-029` | Consulting And Forwarding Fees | otros |
+| `CON-033` | Container Repair | otros |
+| `CON-038` | Courier Fee | otros |
+| `CON-043` | Demurrages | demoras |
+| `CON-044` | Discount | financiero |
+| `CON-061` | Labels | otros |
+| `CON-065` | Notas | otros |
+| `CON-067` | Opening Balance Expense | financiero |
+| `CON-068` | Opening Balance Income | financiero |
+| `CON-069` | Other Charges | otros |
+| `CON-073` | Other Charges 4 | otros |
+| `CON-078` | Overweight Surcharge For International Freight | flete |
+| `CON-081` | Pat - Other Charges | otros |
+| `CON-089` | Retencion Isr | financiero |
+| `CON-090` | Retencion Isr Resico | financiero |
+| `CON-091` | Retencion Iva | financiero |
+| `CON-092` | Sales Comission | otros |
+| `CON-095` | Shipping And Handling Fee | maniobras |
+| `CON-099` | Transfer Fee | financiero |
+| `CON-102` | Warehouse | almacenaje |
+| `CON-103` | Warehouse Pallet In | almacenaje |
+| `CON-104` | Warehouse Pallet Out | almacenaje |
+| `CON-105` | Wrapping | otros |
+
+**Captura pendiente del Bloque 4.** El reordenamiento de la ficha de
+cotización se publicó sin captura: el script de Playwright se colgó dos veces
+contra los emuladores. Mau lo valida en el canal de preview.
+
 ### Esperando a Vermur
 
 | Pendiente | Estado |
