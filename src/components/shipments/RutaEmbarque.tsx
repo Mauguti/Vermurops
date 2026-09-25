@@ -1,9 +1,12 @@
 import React from 'react';
-import { MapPin, Navigation, Landmark, ShieldCheck } from 'lucide-react';
+import { MapPin, Navigation, Landmark } from 'lucide-react';
 import { EmbarqueRuta, EntidadesRef } from './EmbarquesData';
 import type { ClienteVermur } from '../clientes/ClientesData';
 import type { ProveedorVermur } from '../proveedores/ProveedoresData';
 import { CampoEntidad } from './EntidadesEmbarque';
+import {
+  pedimentosDe, renglonesPedimento, guardarPedimentos,
+} from '../../lib/pedimentosEmbarque';
 
 interface RutaEmbarqueProps {
   ruta: EmbarqueRuta;
@@ -43,16 +46,6 @@ export default function RutaEmbarque({
       ...ruta,
       destino: {
         ...ruta.destino,
-        [key]: value
-      }
-    });
-  };
-
-  const handleAduanaChange = (key: keyof EmbarqueRuta['aduana'], value: any) => {
-    onChangeRuta({
-      ...ruta,
-      aduana: {
-        ...ruta.aduana,
         [key]: value
       }
     });
@@ -300,48 +293,52 @@ export default function RutaEmbarque({
           </h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-          <div className="space-y-1.5">
-            <label className="block text-[9px] font-bold text-gray-400 uppercase">
-              Número de Pedimento
-            </label>
-            {isReadOnly ? (
-              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono font-semibold text-gray-700">{ruta.aduana.pedimento || '—'}</div>
+        {/*
+          Bloque 6 · Varios pedimentos, al menos dos renglones.
+
+          Un embarque puede despacharse en partes —una rectificación, un
+          complementario, dos contenedores del mismo BL— y cada parte tiene su
+          número. Un solo campo no comunicaba que se podía capturar otro.
+
+          Se quitó «Transacción Dirigida (AES)»: es de Estados Unidos, la
+          arrastró Magaya y no aplica a la operación de Vermur. El dato de los
+          embarques que ya lo traen no se borra; solo deja de pedirse.
+        */}
+        <div className="space-y-2">
+          <label className="block text-[9px] font-bold text-gray-400 uppercase">
+            Números de Pedimento
+          </label>
+
+          {isReadOnly ? (
+            pedimentosDe(ruta.aduana).length === 0 ? (
+              <div className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono text-gray-400">—</div>
             ) : (
+              pedimentosDe(ruta.aduana).map((p, i) => (
+                <div key={i} className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs font-mono font-semibold text-gray-700">
+                  {p}
+                </div>
+              ))
+            )
+          ) : (
+            renglonesPedimento(ruta.aduana).map((valor, i) => (
               <input
+                key={i}
                 type="text"
-                value={ruta.aduana.pedimento || ''}
-                onChange={e => handleAduanaChange('pedimento', e.target.value)}
-                placeholder="Ej. 26-47-3849-6012489"
+                value={valor}
+                onChange={e => {
+                  const todos = renglonesPedimento(ruta.aduana);
+                  todos[i] = e.target.value;
+                  onChangeRuta({ ...ruta, aduana: guardarPedimentos(ruta.aduana, todos) });
+                }}
+                placeholder={i === 0 ? 'Ej. 26-47-3849-6012489' : 'Otro pedimento (opcional)'}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono font-semibold text-gray-700 outline-none focus:border-primario shadow-2xs"
               />
-            )}
-            <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wide">
-              Formato SAT mexicano: AA-AD-PATENTE-AÑOXXXXXX
-            </p>
-          </div>
+            ))
+          )}
 
-          <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-xl">
-            <div className="space-y-0.5">
-              <span className="text-xs font-bold text-gray-700 flex items-center gap-1">
-                <ShieldCheck className="w-4 h-4 text-primario" />
-                Transacción Dirigida (AES)
-              </span>
-              <span className="block text-[10px] text-gray-400 font-semibold leading-tight">
-                Habilitar si requiere Automated Export System (EE.UU.)
-              </span>
-            </div>
-            
-            <button
-              type="button"
-              disabled={isReadOnly}
-              onClick={() => handleAduanaChange('aes', !ruta.aduana.aes)}
-              className={`w-11 h-6 rounded-full transition-colors relative flex items-center shrink-0 ${isReadOnly ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
-                ${ruta.aduana.aes ? 'bg-primario' : 'bg-gray-200'}`}
-            >
-              <span className={`w-4 h-4 bg-white rounded-full transition-transform shadow-sm absolute ${ruta.aduana.aes ? 'translate-x-6' : 'translate-x-1'}`} />
-            </button>
-          </div>
+          <p className="text-[8px] text-gray-400 font-bold uppercase tracking-wide">
+            Formato SAT mexicano: AA-AD-PATENTE-AÑOXXXXXX
+          </p>
         </div>
       </div>
     </div>

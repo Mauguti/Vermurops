@@ -27,7 +27,12 @@ const CAMPOS: { key: keyof EmbarqueEntidades; label: string; icon: React.ReactNo
   { key: 'agenteAduanal', label: 'Agente Aduanal (Customs Broker)', icon: <Landmark className="w-4 h-4 text-gray-400" />, desc: 'Responsable del despacho aduanero' },
   { key: 'agenteCarga', label: 'Agente de Carga (Freight Forwarder)', icon: <Anchor className="w-4 h-4 text-gray-400" />, desc: 'Coordinador del flete internacional' },
   { key: 'agenteDestino', label: 'Agente de Destino', icon: <Users className="w-4 h-4 text-gray-400" />, desc: 'Corresponsal receptor en destino' },
-  { key: 'importador', label: 'Importador de Registro', icon: <Shield className="w-4 h-4 text-gray-400" />, desc: 'Titular de la importación ante SAT' },
+  /*
+   * Bloque 6 · «Importador de Registro» se retiró de la interfaz: el
+   * consignatario ES el importador, y pedir el mismo dato dos veces invita a
+   * que se capturen distintos. El campo del modelo se conserva para no
+   * reescribir los embarques que ya lo traen.
+   */
   { key: 'clienteCobrar', label: 'Cliente a Cobrar (Billing Party)', icon: <Building2 className="w-4 h-4 text-gray-400" />, desc: 'Entidad comercial a la que se factura' },
 ];
 

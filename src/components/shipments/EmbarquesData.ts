@@ -59,8 +59,21 @@ export interface EmbarqueRuta {
     lugarEntrega: string;
   };
   aduana: {
+    /**
+     * @deprecated Bloque 6 · La transacción dirigida (AES) es de Estados
+     * Unidos: la arrastró Magaya y no aplica a la operación de Vermur. Se
+     * retiró de la interfaz. El campo se conserva para no reescribir los
+     * embarques que ya lo traen.
+     */
     aes: boolean;
+    /**
+     * @deprecated Bloque 6 · Usar `pedimentos`. Se sigue leyendo como primer
+     * elemento y escribiendo con el primero, porque la plantilla del pedimento
+     * todavía lo lee. Ver `lib/pedimentosEmbarque`.
+     */
     pedimento: string;
+    /** Bloque 6 · Varios: rectificaciones, complementarios, dos contenedores. */
+    pedimentos?: string[];
   };
 }
 
