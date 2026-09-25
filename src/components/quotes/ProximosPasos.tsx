@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, Check, CheckCircle2, Send, Undo2, X } from 'lucide-react';
+import { AlertTriangle, Check, CheckCircle2, Info, Send, Undo2, X } from 'lucide-react';
 import type { PipelineStageId } from './QuotesData';
 import type { UserRole } from '../../auth/users';
 import {
@@ -7,6 +7,7 @@ import {
 } from '../../lib/proximosPasos';
 import {
   faltantesPorLinea, resumenFaltantes, textoFaltantesLinea, type Prontitud,
+  TEXTO_AVISO,
 } from '../../lib/prontitudCotizacion';
 
 /**
@@ -137,6 +138,11 @@ export default function ProximosPasos({
         {muestraFaltantes && !bloqueo && (
           <LineaFaltantes prontitud={prontitud} porque={porque} accion={paso.boton ?? ''} />
         )}
+
+        {/* 1a · Informativo, nunca freno: una línea que se cobra sin costo
+            detrás puede ser correcta —Vermur cobra y no le paga a nadie— o
+            un costo que se quedó sin capturar. Se dice; no se detiene. */}
+        <LineaAvisos prontitud={prontitud} />
       </div>
 
       {/* ── La acción que sigue ── */}
@@ -195,6 +201,32 @@ function LineaFaltantes({ prontitud, porque, accion }: { prontitud: Prontitud; p
       <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" />
       <span className="truncate">{texto}</span>
       <span className="text-amber-600 shrink-0 hidden xl:inline">· «{accion}» aparecerá cuando esté completo</span>
+    </p>
+  );
+}
+
+/**
+ * Los informativos. Nunca sustituyen al botón ni lo esconden: se leen debajo.
+ */
+function LineaAvisos({ prontitud }: { prontitud: Prontitud }) {
+  if (prontitud.avisos.length === 0) return null;
+
+  const detalle = prontitud.avisos.map(a => `${a.concepto}: ${TEXTO_AVISO[a.tipo]}`);
+  const visibles = prontitud.avisos.slice(0, 3).map(a => a.concepto).join(' · ');
+  const resto = prontitud.avisos.length - 3;
+  const cuantos = prontitud.avisos.length === 1
+    ? '1 concepto se cobra sin costo detrás'
+    : `${prontitud.avisos.length} conceptos se cobran sin costo detrás`;
+
+  return (
+    <p
+      className="text-[11px] text-gray-500 flex items-center gap-1.5 min-w-0"
+      title={`${detalle.join('\n')}\n\nPuede ser correcto: un concepto que se cobra y no se le paga a nadie. Si no lo es, falta capturar el costo.`}
+    >
+      <Info className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+      <span className="truncate">
+        {cuantos}: {visibles}{resto > 0 ? ` · y ${resto} más` : ''}
+      </span>
     </p>
   );
 }

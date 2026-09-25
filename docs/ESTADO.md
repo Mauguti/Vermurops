@@ -174,6 +174,12 @@ Lo publicado hoy, antes de este corte:
 | Base limpia para el arranque real | **plan por aprobar** | Inventario de qué se borra y qué se conserva, en qué número queda cada consecutivo, y **respaldo antes del primer borrado**. Ni un `delete` sin tu aprobación por escrito |
 | No hay entorno de desarrollo: localhost escribe en producción | **decisión de Mau** | Los emuladores por opt-in ya cubren el día a día; el proyecto de staging cuesta plan Blaze aparte |
 
+### Seguridad — anotado el 24-sep-2026, fuera del sprint
+
+| Pendiente | Estado | Qué lo destraba |
+|---|---|---|
+| **Las URLs de Storage son públicas para quien tenga el enlace** | **sin empezar** | Los documentos se guardan con `getDownloadURL()` ([useDocumentosEmbarque.ts:52](../src/hooks/useDocumentosEmbarque.ts)), que devuelve una URL con `?alt=media&token=…`. Esa URL abre el archivo **sin sesión y sin pasar por las reglas**. Hoy solo viven dentro de la app, pero en cuanto alguien pegue una en un correo o un WhatsApp, el documento queda accesible de forma permanente hasta que se revoque el token. Implica que cualquier marca de «visible para el cliente» es una convención de la interfaz, no un control de acceso. Se cierra con URLs firmadas con vencimiento, generadas por una Function |
+
 ### Esperando a Vermur
 
 | Pendiente | Estado |

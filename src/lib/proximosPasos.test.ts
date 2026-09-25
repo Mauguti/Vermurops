@@ -96,12 +96,14 @@ describe('proximoPaso', () => {
     expect(p.leTocaA).toBeNull();
   });
 
-  it('Pricing en consolidada NO envía al cliente: le toca a Ventas (§4.1)', () => {
+  // 1b (24-sep-2026): antes le tocaba solo a Ventas y Pricing se quedaba
+  // mirando. Con clientes de oficina y agentes de carga no hay vendedor a
+  // quien esperar.
+  it('1b · Pricing en consolidada SÍ envía al cliente', () => {
     const p = con('consolidada', 'pricing');
     expect(p.hacia).toBe('enviada_cliente');
-    expect(p.esDeEsteRol).toBe(false);
-    expect(p.boton).toBeNull();
-    expect(p.leTocaA).toBe('Ventas');
+    expect(p.esDeEsteRol).toBe(true);
+    expect(p.boton).not.toBeNull();
     expect(p.siguiente).toBe('enviar la cotización al cliente');
   });
 
@@ -134,7 +136,8 @@ describe('proximoPaso', () => {
 
 describe('aQuienLeToca', () => {
   it('no nombra a admin', () => {
-    expect(aQuienLeToca('consolidada', 'enviada_cliente')).toBe('Ventas');
+    // 1b · enviar al cliente ya es de Ventas y de Pricing.
+    expect(aQuienLeToca('consolidada', 'enviada_cliente')).toBe('Ventas o Pricing');
   });
   it('junta varias áreas con «o»', () => {
     expect(aQuienLeToca('negociacion', 'ganada')).toBe('Ventas o Pricing');
@@ -166,9 +169,17 @@ describe('pasoAtras', () => {
     });
   });
 
+  it('1b · Pricing también puede regresar una etapa', () => {
+    // Antes esta vuelta era de Ventas/Admin. Regresar es parte de trabajar la
+    // cotización y no saltea ningún freno.
+    expect(pasoAtras('enviada_cliente', 'pricing' as never, cotizacion('enviada_cliente')))
+      .toMatchObject({ hacia: 'consolidada' });
+  });
+
   it('el rol que no es dueño de esa vuelta no la ve', () => {
-    // Regresar de «enviada al cliente» a «consolidada» es de Ventas/Admin.
-    expect(pasoAtras('enviada_cliente', 'pricing' as never, cotizacion('enviada_cliente'))).toBeNull();
+    // Regresar de «cotizaciones recibidas» a «solicitado a Pricing» es de
+    // Pricing/Admin: Ventas no la ve.
+    expect(pasoAtras('cotizaciones_recibidas', 'ventas' as never, cotizacion('cotizaciones_recibidas'))).toBeNull();
   });
 
   it('no hay vuelta desde la primera etapa ni desde las terminales', () => {

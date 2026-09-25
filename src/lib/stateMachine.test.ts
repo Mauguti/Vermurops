@@ -192,11 +192,12 @@ describe('C. Transiciones no permitidas (arco inexistente)', () => {
 // ─── D. Bloqueos por rol ──────────────────────────────────────────────────────
 
 describe('D. Bloqueos por rol incorrecto', () => {
-  it('pricing NO puede enviar a Pricing (solicitado_pricing) — solo ventas/admin', () => {
+  // 1b (24-sep-2026): antes esto afirmaba lo contrario. Los clientes de
+  // oficina y los agentes de carga no tienen vendedor asignado por
+  // definición, así que su solicitud tiene que poder avanzar sin Ventas.
+  it('1b · pricing SÍ puede mandar su propia solicitud a Pricing', () => {
     const q = makeQuote({ servicios: [makeServicio()] });
-    const r = puedeTransicionarA('solicitud_cliente', 'solicitado_pricing', 'pricing', q);
-    expect(r.ok).toBe(false);
-    expect(r.razon).toMatch(/rol/i);
+    expect(puedeTransicionarA('solicitud_cliente', 'solicitado_pricing', 'pricing', q).ok).toBe(true);
   });
 
   it('ventas NO puede avanzar de solicitado_pricing a pricing_solicitando', () => {
@@ -212,9 +213,12 @@ describe('D. Bloqueos por rol incorrecto', () => {
     expect(puedeTransicionarA('cotizaciones_recibidas', 'consolidada', 'ventas', q).ok).toBe(false);
   });
 
-  it('pricing NO puede enviar al cliente (consolidada → enviada_cliente)', () => {
+  // 1b (24-sep-2026): antes esto afirmaba lo contrario. Esperar a Ventas
+  // trababa la cotización cuando no hay vendedor asignado o está de
+  // vacaciones.
+  it('1b · pricing SÍ puede enviar al cliente (consolidada → enviada_cliente)', () => {
     const q = makeQuote({ etapa: 'consolidada' });
-    expect(puedeTransicionarA('consolidada', 'enviada_cliente', 'pricing', q).ok).toBe(false);
+    expect(puedeTransicionarA('consolidada', 'enviada_cliente', 'pricing', q).ok).toBe(true);
   });
 
   // NOTA: hasta el 28-ago-2026 aquí se afirmaba lo contrario —que Pricing NO
@@ -287,10 +291,12 @@ describe('F. transicionesDisponibles()', () => {
     expect(disp).toEqual(['perdida']);
   });
 
-  it('pricing no ve nada desde solicitud_cliente', () => {
+  it('1b · pricing ve avanzar desde solicitud_cliente, pero no darla por perdida', () => {
+    // Marcar perdida desde solicitud_cliente sigue siendo de Ventas: es la
+    // etapa en la que la cotización todavía no le llega a Pricing (§4.11).
     const q = makeQuote({ servicios: [makeServicio()] });
     const disp = transicionesDisponibles('solicitud_cliente', 'pricing', q);
-    expect(disp).toHaveLength(0);
+    expect(disp).toEqual(['solicitado_pricing']);
   });
 
   it('admin ve todo desde solicitud_cliente (con servicios)', () => {

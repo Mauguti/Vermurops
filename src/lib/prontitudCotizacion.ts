@@ -28,6 +28,15 @@ export interface Faltante {
   tipo: TipoFaltante;
 }
 
+/** Lo que se dice, pero no detiene a nadie. */
+export type TipoAviso = 'venta_sin_costo';
+
+export interface Aviso {
+  lineaId: string;
+  concepto: string;
+  tipo: TipoAviso;
+}
+
 export interface Prontitud {
   /** Hay al menos una línea registrada. Una solicitud vacía no se envía. */
   conConceptos: boolean;
@@ -36,9 +45,15 @@ export interface Prontitud {
   /** Al menos una línea ya trae proveedor: hay respuestas que registrar. */
   algunProveedor: boolean;
   faltantes: Faltante[];
+  /** Informativos: no cuentan para `lista` ni detienen ninguna etapa. */
+  avisos: Aviso[];
   totalLineas: number;
   lineasCompletas: number;
 }
+
+export const TEXTO_AVISO: Record<TipoAviso, string> = {
+  venta_sin_costo: 'se cobra sin costo detrás',
+};
 
 const TEXTO_FALTANTE: Record<TipoFaltante, string> = {
   sin_concepto:  'sin concepto del catálogo',
@@ -46,7 +61,35 @@ const TEXTO_FALTANTE: Record<TipoFaltante, string> = {
   sin_monto:     'sin costo capturado',
 };
 
-/** Qué le falta a una línea. Puede faltarle más de una cosa. */
+const tieneProveedor = (l: LineaPlana): boolean => Boolean(l.proveedorNombre?.trim());
+const tieneCosto = (l: LineaPlana): boolean => Number.isFinite(l.costo) && l.costo > 0;
+
+/**
+ * Qué le falta a una línea PARA AVANZAR. Puede faltarle más de una cosa.
+ *
+ * ── Por qué el proveedor y el costo se exigen en pareja ────────────────────
+ * Antes se pedían los dos en TODA línea, y eso trababa una categoría entera
+ * de conceptos que existe de verdad: los que Vermur cobra y no le paga a
+ * nadie. Le pasó a Pricing en producción con «Documentation»: venta 50, sin
+ * costo, y la cotización no se podía ni enviar.
+ *
+ * La regla nueva los amarra entre sí, porque cada uno solo significa algo si
+ * el otro está:
+ *
+ *   hay costo   → hace falta proveedor, porque sin él no hay orden de compra
+ *                 y nadie sabe a quién pagarle.
+ *   hay proveedor → hace falta costo, porque un proveedor sin importe es un
+ *                 costo que se quedó a medias. Este es el caso que `sin_monto`
+ *                 protegía y que NO se relaja: un costo olvidado hace nacer el
+ *                 embarque mal y nadie se entera hasta el pago.
+ *   ni uno ni otro, pero sí venta → es una línea de pura venta. Pasa, y se
+ *                 avisa de forma informativa.
+ *   ni uno ni otro ni venta → la línea no dice nada: sigue bloqueando.
+ *
+ * Un cero declarado (`costoCapturado`) sigue siendo válido y distinto de un
+ * campo vacío: «a veces hay que poner el segundo concepto con pérdida, y el
+ * profit ponérselo al flete internacional».
+ */
 export function faltantesDeLinea(l: LineaPlana): TipoFaltante[] {
   const faltan: TipoFaltante[] = [];
 
@@ -54,15 +97,29 @@ export function faltantesDeLinea(l: LineaPlana): TipoFaltante[] {
   // Es el agujero de CC-1..CC-4, que reintrodujimos y volvimos a cerrar.
   if (!l.conceptoId) faltan.push('sin_concepto');
 
-  if (!l.proveedorNombre?.trim()) faltan.push('sin_proveedor');
+  const conProveedor = tieneProveedor(l);
+  const conCosto = tieneCosto(l);
+  const conVenta = Number.isFinite(l.venta) && l.venta > 0;
 
-  // Lo que bloquea es que NADIE haya capturado el costo, no que valga cero.
-  // Un concepto absorbido o puesto con pérdida a propósito es válido: «a veces
-  // hay que poner el segundo concepto con pérdida, y el profit ponérselo al
-  // flete internacional». Un campo vacío no es lo mismo que un cero declarado.
-  if (!l.costoCapturado || !Number.isFinite(l.costo)) faltan.push('sin_monto');
+  if (conCosto && !conProveedor) faltan.push('sin_proveedor');
+
+  if (conProveedor && !l.costoCapturado) faltan.push('sin_monto');
+  // Un costo que dice estar capturado y no es un número es un dato roto, no
+  // una decisión: bloquea aunque la línea no tenga proveedor.
+  else if (l.costoCapturado && !Number.isFinite(l.costo)) faltan.push('sin_monto');
+  else if (!conProveedor && !conCosto && !l.costoCapturado && !conVenta) {
+    faltan.push('sin_monto');
+  }
 
   return faltan;
+}
+
+/** Lo que vale la pena decir de una línea, sin detenerla. */
+export function avisosDeLinea(l: LineaPlana): TipoAviso[] {
+  const avisos: TipoAviso[] = [];
+  const conVenta = Number.isFinite(l.venta) && l.venta > 0;
+  if (conVenta && !tieneCosto(l) && !l.costoCapturado) avisos.push('venta_sin_costo');
+  return avisos;
 }
 
 /**
@@ -78,21 +135,20 @@ export function evaluarProntitud(quote: KanbanQuote): Prontitud {
   const lineas = aplanarCotizacion(quote);
 
   const faltantes: Faltante[] = [];
+  const avisos: Aviso[] = [];
   let completas = 0;
 
   lineas.forEach(l => {
+    const concepto = l.concepto || '(sin nombre)';
+
+    avisosDeLinea(l).forEach(tipo => avisos.push({ lineaId: l.id, concepto, tipo }));
+
     const faltan = faltantesDeLinea(l);
     if (faltan.length === 0) {
       completas++;
       return;
     }
-    faltan.forEach(tipo => {
-      faltantes.push({
-        lineaId: l.id,
-        concepto: l.concepto || '(sin nombre)',
-        tipo,
-      });
-    });
+    faltan.forEach(tipo => faltantes.push({ lineaId: l.id, concepto, tipo }));
   });
 
   return {
@@ -100,6 +156,7 @@ export function evaluarProntitud(quote: KanbanQuote): Prontitud {
     lista: lineas.length > 0 && faltantes.length === 0,
     algunProveedor: lineas.some(l => Boolean(l.proveedorNombre?.trim())),
     faltantes,
+    avisos,
     totalLineas: lineas.length,
     lineasCompletas: completas,
   };
