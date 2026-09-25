@@ -237,6 +237,16 @@ export interface EmbarqueDocumento {
   datos?: Record<string, unknown>;
   /** Si es factura de proveedor y se asoció a una OC del embarque. */
   ocId?: string | null;
+
+  /**
+   * ¿Lo ve el cliente en su portal? (Bloque 2)
+   *
+   * Ausente = nadie lo ha marcado y vale lo que dicte su TIPO
+   * (`lib/visibilidadDocumentoCliente`). No se lee directo: usar
+   * `esVisibleParaCliente`, que resuelve el respaldo. Los documentos
+   * guardados antes de este bloque no lo traen y no se reescriben.
+   */
+  visibleCliente?: boolean;
 }
 
 /**

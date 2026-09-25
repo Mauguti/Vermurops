@@ -11,7 +11,7 @@
 
 import React, { useMemo, useRef, useState } from 'react';
 import {
-  UploadCloud, FileText, Eye, Trash2, AlertCircle, AlertTriangle, Loader2,
+  UploadCloud, FileText, Eye, EyeOff, Trash2, AlertCircle, AlertTriangle, Loader2,
 } from 'lucide-react';
 import type { EmbarqueCompleto, EmbarqueDocumento } from './EmbarquesData';
 import RevisionDocumentoClasificado, { type RevisionConfirmada } from '../documentos/RevisionDocumentoClasificado';
@@ -24,17 +24,23 @@ import {
   type SubidaClasificada,
 } from '../../lib/documentosEmbarque';
 import { useDocumentosEmbarque } from '../../hooks/useDocumentosEmbarque';
+import {
+  esVisibleParaCliente, esExcepcion, advertenciaAlMostrar,
+} from '../../lib/visibilidadDocumentoCliente';
 
 interface Props {
   embarque: EmbarqueCompleto;
   puedeSubir: boolean;
   onAddDocumento: (doc: Omit<EmbarqueDocumento, 'id'>) => string;
   onDeleteDocumento: (id: string) => void;
+  /** Bloque 2 · Cambiar a mano si el cliente lo ve. */
+  onVisibilidadDocumento?: (id: string, visible: boolean) => void;
   onAviso: (mensaje: string, tipo: 'exito' | 'error') => void;
 }
 
 export default function DocumentosEmbarque({
-  embarque, puedeSubir, onAddDocumento, onDeleteDocumento, onAviso,
+  embarque, puedeSubir, onAddDocumento, onDeleteDocumento,
+  onVisibilidadDocumento, onAviso,
 }: Props) {
   const { procesando, subirYClasificar, autor } = useDocumentosEmbarque();
   const [dragActive, setDragActive] = useState(false);
@@ -78,7 +84,10 @@ export default function DocumentosEmbarque({
     try {
       onAddDocumento(documentoDesdeRevision(
         pendiente,
-        { tipoConfirmado: r.tipoConfirmado, nombre: r.nombre, estado: r.estado, grupo, ocId: null },
+        {
+          tipoConfirmado: r.tipoConfirmado, nombre: r.nombre, estado: r.estado,
+          grupo, ocId: null, visibleCliente: r.visibleCliente,
+        },
         autor,
         new Date().toISOString(),
       ));
@@ -178,7 +187,14 @@ export default function DocumentosEmbarque({
                 {t.etiqueta}
               </div>
               <div className="divide-y divide-gray-100">
-                {t.documentos.map(d => <FilaDocumento key={d.id} doc={d} onDelete={puedeSubir ? onDeleteDocumento : undefined} />)}
+                {t.documentos.map(d => (
+                  <FilaDocumento
+                    key={d.id}
+                    doc={d}
+                    onDelete={puedeSubir ? onDeleteDocumento : undefined}
+                    onVisibilidad={puedeSubir ? onVisibilidadDocumento : undefined}
+                  />
+                ))}
               </div>
             </div>
           ))}
@@ -194,6 +210,7 @@ export default function DocumentosEmbarque({
           bloqueo={bloqueoEnDocumentos(pendiente.clasificacion)}
           etiqueta={etiquetaTipoDocumento}
           guardando={guardando}
+          conVisibilidadCliente
           onGuardar={guardar}
           onCancelar={() => setPendiente(null)}
         >
@@ -218,10 +235,13 @@ export default function DocumentosEmbarque({
   );
 }
 
-function FilaDocumento({ doc, onDelete }: {
+function FilaDocumento({ doc, onDelete, onVisibilidad }: {
   doc: EmbarqueDocumento;
   onDelete?: (id: string) => void;
+  onVisibilidad?: (id: string, visible: boolean) => void;
 }) {
+  const visible = esVisibleParaCliente(doc);
+  const advertencia = advertenciaAlMostrar(doc.tipo);
   // Los anteriores a D-3 tienen una URL de objeto que murió con la sesión.
   const sinArchivo = !doc.storagePath && (doc.url === '#' || doc.url.startsWith('blob:'));
 
@@ -239,6 +259,20 @@ function FilaDocumento({ doc, onDelete }: {
             <span>Por: {doc.cargadoPor}</span>
             {doc.confianza && <><span>•</span><span>Confianza {doc.confianza}</span></>}
           </div>
+
+          {/* Bloque 2 · Qué ve el cliente. Se pinta siempre, también cuando
+              es interno: el silencio no distingue «oculto» de «sin revisar». */}
+          <p className={`text-[10px] font-semibold mt-1 inline-flex items-center gap-1 ${
+            visible ? 'text-emerald-700' : 'text-gray-400'}`}>
+            {visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+            {visible ? 'El cliente lo ve' : 'Solo para el equipo'}
+            {visible && advertencia && (
+              <span className="text-peligro font-bold" title={advertencia}>· sensible</span>
+            )}
+            {esExcepcion(doc) && (
+              <span className="text-gray-400 font-normal">· marcado a mano</span>
+            )}
+          </p>
           {doc.estado === 'con_observaciones' && (doc.avisos?.length ?? 0) > 0 && (
             <p className="text-[10px] text-amber-700 mt-1">{doc.avisos!.map(traducirAviso).join(' ')}</p>
           )}
@@ -255,6 +289,20 @@ function FilaDocumento({ doc, onDelete }: {
             className="p-2 text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
             <Eye className="w-4 h-4" />
           </a>
+        )}
+        {onVisibilidad && (
+          <button
+            onClick={() => onVisibilidad(doc.id, !visible)}
+            title={visible
+              ? 'Dejar de mostrárselo al cliente'
+              : (advertencia ?? 'Mostrárselo al cliente en su portal')}
+            className={`p-2 rounded-lg transition-colors ${
+              visible
+                ? 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100'
+                : 'text-gray-400 bg-gray-50 hover:bg-gray-100'}`}
+          >
+            {visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </button>
         )}
         {onDelete && (
           <button onClick={() => onDelete(doc.id)} title="Quitar del embarque"

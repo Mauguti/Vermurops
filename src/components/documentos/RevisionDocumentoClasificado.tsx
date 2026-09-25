@@ -20,6 +20,9 @@ import {
   traducirAviso,
   resolverTipoEsperado,
 } from '../../lib/clasificacionDocumentos';
+import {
+  reglaDeTipo, advertenciaAlMostrar, ETIQUETA_CLASE,
+} from '../../lib/visibilidadDocumentoCliente';
 
 export interface RevisionConfirmada {
   tipoConfirmado: string;
@@ -27,6 +30,8 @@ export interface RevisionConfirmada {
   /** Campos de la ficha que el usuario adoptó explícitamente. */
   adoptados: Record<string, string>;
   estado: EstadoDocumento;
+  /** Bloque 2 · Solo cuando la pantalla pide la casilla de visibilidad. */
+  visibleCliente?: boolean;
 }
 
 interface Props {
@@ -38,6 +43,12 @@ interface Props {
   etiqueta: (tipo: string) => string;
   /** D-2: datos extraídos que pueden escribirse en la ficha del cliente. */
   camposAdoptables?: CampoAdoptable[];
+  /**
+   * Bloque 2 · Enseña la casilla «lo ve el cliente», con el valor que dicta
+   * el tipo confirmado. Solo los documentos del embarque la piden; los
+   * tarifarios no salen a ningún portal.
+   */
+  conVisibilidadCliente?: boolean;
   /** Contenido extra del flujo (D-3 meterá aquí el selector de grupo). */
   children?: React.ReactNode;
   guardando: boolean;
@@ -58,6 +69,7 @@ const CONFIANZA_ESTILO: Record<ClasificacionValidada['confianza'], string> = {
 
 export default function RevisionDocumentoClasificado({
   clasificacion, tipoEsperado, tipos, etiqueta, camposAdoptables = [],
+  conVisibilidadCliente = false,
   children, guardando, bloqueo = null, onGuardar, onCancelar,
 }: Props) {
   /*
@@ -71,6 +83,17 @@ export default function RevisionDocumentoClasificado({
   );
   const [nombre, setNombre] = useState(clasificacion.nombrePropuesto);
   const [adoptados, setAdoptados] = useState<Record<string, string>>({});
+
+  /*
+   * Bloque 2 · `null` = el usuario no ha tocado la casilla y manda la regla
+   * del tipo. Se guarda como null y no como el booleano ya resuelto para que
+   * cambiar el tipo mueva la casilla con él: corregir «otro» a «pedimento»
+   * tiene que ocultarlo, no dejarlo visible porque así nació.
+   */
+  const [visibleManual, setVisibleManual] = useState<boolean | null>(null);
+  const reglaVis = reglaDeTipo(tipo ?? '');
+  const visible = visibleManual ?? reglaVis.porDefecto;
+  const advertencia = visible ? advertenciaAlMostrar(tipo ?? '') : null;
 
   const veredicto = useMemo(() => estadoGuardable({
     tipoConfirmado: tipo,
@@ -259,6 +282,48 @@ export default function RevisionDocumentoClasificado({
             </div>
           )}
 
+          {/* ── Bloque 2 · Qué ve el cliente ── */}
+          {conVisibilidadCliente && tipo && (
+            <div className="border border-gray-200 rounded-lg p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[9px] uppercase tracking-wider text-gray-400 font-bold">
+                    Portal del cliente
+                  </p>
+                  <p className="text-[12px] text-gray-800 mt-0.5 font-semibold">
+                    {visible ? 'El cliente lo verá' : 'Solo para el equipo'}
+                  </p>
+                  <p className="text-[10px] text-gray-500 mt-0.5">{reglaVis.razon}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVisibleManual(!visible)}
+                  className={`shrink-0 text-[11px] font-bold px-2.5 py-1.5 rounded-md border transition-colors ${
+                    visible
+                      ? 'border-emerald-300 bg-emerald-100 text-emerald-800'
+                      : 'border-gray-200 text-gray-500 hover:border-primario hover:text-primario'
+                  }`}
+                >
+                  {visible ? 'Ocultar al cliente' : 'Mostrar al cliente'}
+                </button>
+              </div>
+
+              {/* Los sensibles no se bloquean, se explican: un aviso sin
+                  motivo se vuelve un paso que la gente aprende a saltarse. */}
+              {advertencia && (
+                <p className="text-[11px] text-peligro flex items-start gap-1.5 mt-2 border-t border-gray-100 pt-2">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-px" />
+                  <span>{advertencia}</span>
+                </p>
+              )}
+
+              <p className="text-[9px] text-gray-400 mt-2">
+                {ETIQUETA_CLASE[reglaVis.clase]} · el tipo decide el valor inicial, para que
+                nadie tenga que acordarse de palomear nada.
+              </p>
+            </div>
+          )}
+
           {children}
         </div>
 
@@ -285,6 +350,7 @@ export default function RevisionDocumentoClasificado({
                 nombre: nombre.trim(),
                 adoptados,
                 estado: veredicto.estadoResultante,
+                ...(conVisibilidadCliente ? { visibleCliente: visible } : {}),
               })}
               className="flex items-center gap-2 bg-primario text-white px-4 py-2 rounded-md text-[12px] font-bold hover:bg-primario-hover disabled:opacity-50 transition-colors"
             >

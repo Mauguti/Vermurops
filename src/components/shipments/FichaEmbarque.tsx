@@ -376,6 +376,23 @@ export default function FichaEmbarque({
     return newDocObj.id;
   };
 
+  /**
+   * Bloque 2 · Cambiar a mano lo que el cliente ve de un documento ya subido.
+   *
+   * Escribe el booleano SIEMPRE, nunca lo borra: un documento sin el campo
+   * vale lo que diga la regla de su tipo, y volver a ese estado por detrás
+   * haría que un pedimento que alguien ocultó a propósito reapareciera si la
+   * regla cambiara.
+   */
+  const handleVisibilidadDocumento = (docId: string, visible: boolean) => {
+    guardar({
+      ...embarque,
+      documentos: (embarque.documentos || []).map(d =>
+        d.id === docId ? { ...d, visibleCliente: visible } : d),
+      updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+    });
+  };
+
   const handleDeleteDocumento = (docId: string) => {
     guardar({
       ...embarque,
@@ -1403,6 +1420,7 @@ export default function FichaEmbarque({
             puedeSubir={puede('embarque.generar')}
             onAddDocumento={handleAddDocumento}
             onDeleteDocumento={handleDeleteDocumento}
+            onVisibilidadDocumento={handleVisibilidadDocumento}
             onAviso={(mensaje, tipo) => setAvisoOC({ mensaje, tipo })}
           />
         )}

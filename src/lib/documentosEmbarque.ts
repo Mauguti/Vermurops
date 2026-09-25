@@ -27,6 +27,7 @@ import {
   type TipoDocEmbarque, type ClasificacionValidada, type EstadoDocumento,
   type PrecargaFactura, cotejarTotalConOC,
 } from './clasificacionDocumentos';
+import { reglaDeTipo } from './visibilidadDocumentoCliente';
 
 // ─── Etiquetas y grupos ──────────────────────────────────────────────────────
 
@@ -166,6 +167,11 @@ export interface ConfirmacionRevision {
   estado: EstadoDocumento;
   grupo: GrupoDocumentoEmbarque;
   ocId: string | null;
+  /**
+   * Bloque 2 · Lo que el usuario dejó en la casilla de visibilidad. Ausente =
+   * no la tocó, y vale la regla del tipo confirmado.
+   */
+  visibleCliente?: boolean;
 }
 
 /**
@@ -192,6 +198,17 @@ export function documentoDesdeRevision(
     avisos: c.avisos,
     datos: c.datos,
     ocId: confirmacion.ocId,
+    /*
+     * Bloque 2 · Se guarda SIEMPRE explícito, aunque sea el valor que la regla
+     * ya daba. La regla puede cambiar —un tipo que hoy es interno mañana puede
+     * nacer visible— y un documento que ya salió al cliente no debería cambiar
+     * de visibilidad por detrás. Lo que se confirmó al subirlo es lo que vale.
+     *
+     * Se calcula sobre el tipo CONFIRMADO, no sobre el que propuso n8n: si el
+     * usuario corrigió «otro» a «pedimento», manda la regla del pedimento.
+     */
+    visibleCliente: confirmacion.visibleCliente
+      ?? reglaDeTipo(confirmacion.tipoConfirmado).porDefecto,
     fechaCarga: ahora.slice(0, 16).replace('T', ' '),
     cargadoPor: autor,
   };
