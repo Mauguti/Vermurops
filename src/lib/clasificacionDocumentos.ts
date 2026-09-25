@@ -361,20 +361,46 @@ export interface PrecargaFactura {
   numeroDocumento: string;
   fecha: string;
   total: number | null;
+  /**
+   * Bloque 11a · Antes de impuestos. Es lo ÚNICO comparable contra lo que
+   * Pricing cotizó, que también va antes de IVA.
+   *
+   * El extractor ya lo devuelve —verificado con la debit note de Asia Ship:
+   * subtotal 6,197, iva 0, total 6,197— y la app simplemente lo tiraba. Sin
+   * él, `margenRealConcepto` cae en `factura_con_iva` y nunca compara.
+   *
+   * `null` = el documento no lo declaró. No se deriva de `total − iva`
+   * cuando falta alguno: un subtotal inventado se ve idéntico a uno leído.
+   */
+  subtotal: number | null;
+  /** Lo que el documento declara de impuesto. Informativo. */
+  iva: number | null;
   moneda: string;
   conceptos: string[];
 }
 
 /** Extrae de `datos` lo que la carga de factura de la OC puede precargar. */
 export function precargaFacturaProveedor(datos: Record<string, unknown>): PrecargaFactura {
-  const total = typeof datos.total === 'number' && Number.isFinite(datos.total) && datos.total > 0
-    ? datos.total
-    : null;
+  const numero = (v: unknown): number | null =>
+    typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
+
+  const total = numero(datos.total);
+  /*
+   * Un proveedor extranjero factura sin IVA, y ahí subtotal y total son el
+   * mismo número. El extractor los devuelve iguales; si alguno faltara NO se
+   * despeja del otro, porque un subtotal calculado a partir de un IVA que no
+   * se leyó bien se ve igual de creíble que uno correcto.
+   */
+  const subtotal = numero(datos.subtotal);
+  const iva = typeof datos.iva === 'number' && Number.isFinite(datos.iva) ? datos.iva : null;
+
   return {
     emisor: texto(datos.emisor),
     numeroDocumento: texto(datos.numeroDocumento),
     fecha: texto(datos.fecha),
     total,
+    subtotal,
+    iva,
     moneda: texto(datos.moneda).toUpperCase(),
     conceptos: Array.isArray(datos.conceptos)
       ? datos.conceptos.filter((c): c is string => typeof c === 'string' && c.trim() !== '')
