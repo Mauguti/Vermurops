@@ -9,6 +9,10 @@ import {
 import ConceptoSelector from '../conceptos/ConceptoSelector';
 import type { ConceptoVermur } from '../conceptos/ConceptosData';
 import EstadoVacio from '../ui/EstadoVacio';
+import {
+  totalesConImpuesto, OPCIONES_IMPUESTO, ETIQUETA_IMPUESTO,
+  type ImpuestoLinea, type OpcionImpuesto,
+} from '../../lib/impuestoLinea';
 
 /**
  * C.4 · La tabla única de conceptos. Reemplaza a las cinco tarjetas por
@@ -63,6 +67,17 @@ interface Props {
    */
   onAgregarLinea: (servicioId: string, conceptoId: string, nombre: string) => void;
   onCompararProveedor: (lineaId: string) => void;
+  /**
+   * Bloque 3 · Resuelve el impuesto de un renglón: lo capturado, o lo que
+   * derive el catálogo con el tráfico y la ubicación del servicio.
+   *
+   * Llega como función y no como dato en `LineaPlana` porque la derivación
+   * necesita el catálogo de conceptos y el servicio completo, y la tabla no
+   * los tiene. Ausente = no se pinta la columna.
+   */
+  impuestoDe?: (linea: LineaPlana) => ImpuestoLinea;
+  /** `null` quita la elección y devuelve el renglón a lo derivado. */
+  onElegirImpuesto?: (lineaId: string, opcion: OpcionImpuesto | null) => void;
   /** Mueve una línea FRESCA a otro servicio. La lib se niega si ya está fija. */
   onCambiarServicio: (lineaId: string, servicioId: string) => void;
   /** Abre los datos que el embarque necesita para ese servicio. */
@@ -83,7 +98,7 @@ export default function TablaConceptos({
   lineas, servicios, editable, soloLectura, lineaActivaId, conceptosActivos,
   onCrearConcepto, onEditarLinea, onElegirConcepto, onQuitarLinea, onMoverLinea,
   onAgregarLinea, onCompararProveedor, onCambiarServicio, onDatosEmbarque,
-  onAgregarServicio,
+  onAgregarServicio, impuestoDe, onElegirImpuesto,
 }: Props) {
   /** Servicio del renglón borrador; null = no hay borrador. */
   const [borradorServicioId, setBorradorServicioId] = useState<string | null>(null);
@@ -106,6 +121,24 @@ export default function TablaConceptos({
   const monedas = [...new Set([
     ...monedasConMonto(costoTotal), ...monedasConMonto(ventaTotal),
   ])] as Moneda[];
+
+  /*
+   * Bloque 3 · Impuestos por moneda. Se calculan aquí y no dentro del pie
+   * porque el pie se pinta una vez por moneda y recorrer todas las líneas en
+   * cada uno multiplicaría el trabajo por el número de monedas.
+   */
+  const impuestosPorMoneda: Record<string, number> = {};
+  const retencionesPorMoneda: Record<string, number> = {};
+  const indeterminadasPorMoneda: Record<string, number> = {};
+  if (impuestoDe) {
+    totalesConImpuesto(ordenadas.map(l => ({
+      moneda: l.moneda, venta: l.venta, impuesto: impuestoDe(l),
+    }))).forEach(t => {
+      impuestosPorMoneda[t.moneda] = t.impuestos;
+      retencionesPorMoneda[t.moneda] = t.retenciones;
+      indeterminadasPorMoneda[t.moneda] = t.indeterminadas;
+    });
+  }
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -154,6 +187,7 @@ export default function TablaConceptos({
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Costo</th>
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Profit</th>
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Venta</th>
+              {impuestoDe && <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Impuesto</th>}
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Margen</th>
               {editable && <th className="px-2 py-2 w-[70px]" />}
             </tr>
@@ -175,6 +209,8 @@ export default function TablaConceptos({
                 onMover={onMoverLinea}
                 onComparar={onCompararProveedor}
                 onCambiarServicio={onCambiarServicio}
+                impuestoDe={impuestoDe}
+                onElegirImpuesto={onElegirImpuesto}
               />
             ))}
 
@@ -243,6 +279,10 @@ export default function TablaConceptos({
                 variasMonedas={monedas.length > 1}
                 costo={costoTotal} profit={profitTotal} venta={ventaTotal}
                 conAcciones={editable}
+                conImpuesto={!!impuestoDe}
+                impuestos={impuestosPorMoneda[m] ?? 0}
+                retenciones={retencionesPorMoneda[m] ?? 0}
+                indeterminadas={indeterminadasPorMoneda[m] ?? 0}
               />
             ))}
           </tfoot>
@@ -267,28 +307,75 @@ export default function TablaConceptos({
 
 // ─── Pie por moneda ───────────────────────────────────────────────────────────
 
-function FilaTotal({ moneda, variasMonedas, costo, profit, venta, conAcciones }: {
+function FilaTotal({
+  moneda, variasMonedas, costo, profit, venta, conAcciones,
+  conImpuesto, impuestos, retenciones, indeterminadas,
+}: {
   moneda: Moneda;
   variasMonedas: boolean;
   costo: TotalPorMoneda; profit: TotalPorMoneda; venta: TotalPorMoneda;
   conAcciones: boolean;
+  conImpuesto: boolean;
+  impuestos: number; retenciones: number; indeterminadas: number;
 }) {
   const margen = venta[moneda] === 0 ? 0 : profit[moneda] / venta[moneda];
+  const total = Math.round((venta[moneda] + impuestos - retenciones) * 100) / 100;
+
   return (
-    <tr className="border-t border-gray-200 bg-gray-50/60 font-bold">
-      <td className="px-3 py-2 text-[11px] text-gray-500 uppercase tracking-wider" colSpan={3}>
-        Total{variasMonedas ? ` ${moneda}` : ''}
-      </td>
-      <td className="px-3 py-2 text-right tabular-nums text-gray-700">${money(costo[moneda])}</td>
-      <td className="px-3 py-2 text-right tabular-nums text-gray-700">${money(profit[moneda])}</td>
-      <td className="px-3 py-2 text-right tabular-nums text-[#18181B]">
-        ${money(venta[moneda])} <span className="text-[10px] text-gray-400 font-mono">{moneda}</span>
-      </td>
-      <td className={`px-3 py-2 text-right tabular-nums ${margen < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-        {(margen * 100).toFixed(1)}%
-      </td>
-      {conAcciones && <td />}
-    </tr>
+    <>
+      <tr className="border-t border-gray-200 bg-gray-50/60 font-bold">
+        <td className="px-3 py-2 text-[11px] text-gray-500 uppercase tracking-wider" colSpan={3}>
+          {conImpuesto ? 'Subtotal' : 'Total'}{variasMonedas ? ` ${moneda}` : ''}
+        </td>
+        <td className="px-3 py-2 text-right tabular-nums text-gray-700">${money(costo[moneda])}</td>
+        <td className="px-3 py-2 text-right tabular-nums text-gray-700">${money(profit[moneda])}</td>
+        <td className="px-3 py-2 text-right tabular-nums text-[#18181B]">
+          ${money(venta[moneda])} <span className="text-[10px] text-gray-400 font-mono">{moneda}</span>
+        </td>
+        {conImpuesto && <td />}
+        <td className={`px-3 py-2 text-right tabular-nums ${margen < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+          {(margen * 100).toFixed(1)}%
+        </td>
+        {conAcciones && <td />}
+      </tr>
+
+      {/* Bloque 3 · Subtotal, impuestos y total, separados. Un total que los
+          revuelve no se puede cotejar contra una factura. */}
+      {conImpuesto && (
+        <tr className="bg-gray-50/60 font-bold">
+          <td className="px-3 py-1.5 text-[11px] text-gray-500 uppercase tracking-wider" colSpan={5}>
+            Impuestos{variasMonedas ? ` ${moneda}` : ''}
+            {retenciones > 0 && (
+              <span className="normal-case font-normal text-[10px] text-gray-400">
+                {' '}· menos ${money(retenciones)} de retención
+              </span>
+            )}
+            {indeterminadas > 0 && (
+              <span
+                className="normal-case font-normal text-[10px] text-amber-700"
+                title="Esas líneas no tienen concepto del catálogo, o su servicio no declara tráfico y ubicación. No se les inventa una tasa."
+              >
+                {' '}· {indeterminadas} línea{indeterminadas > 1 ? 's' : ''} sin tasa
+              </span>
+            )}
+          </td>
+          <td className="px-3 py-1.5 text-right tabular-nums text-gray-700">${money(impuestos)}</td>
+          <td colSpan={conAcciones ? 2 : 1} />
+        </tr>
+      )}
+
+      {conImpuesto && (
+        <tr className="border-t border-gray-300 bg-gray-100/80 font-bold">
+          <td className="px-3 py-2 text-[11px] text-gray-600 uppercase tracking-wider" colSpan={5}>
+            Total{variasMonedas ? ` ${moneda}` : ''}
+          </td>
+          <td className="px-3 py-2 text-right tabular-nums text-[#18181B] text-[13px]">
+            ${money(total)} <span className="text-[10px] text-gray-400 font-mono">{moneda}</span>
+          </td>
+          <td colSpan={conAcciones ? 2 : 1} />
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -310,11 +397,14 @@ interface RenglonProps {
   onMover: (id: string, d: 'arriba' | 'abajo') => void;
   onComparar: (id: string) => void;
   onCambiarServicio: Props['onCambiarServicio'];
+  impuestoDe?: Props['impuestoDe'];
+  onElegirImpuesto?: Props['onElegirImpuesto'];
 }
 
 function Renglon({
   linea, servicios, editable, soloLectura, activa, conceptosActivos, onCrearConcepto,
   onEditar, onElegirConcepto, onQuitar, onMover, onComparar, onCambiarServicio,
+  impuestoDe, onElegirImpuesto,
 }: RenglonProps) {
   const target = compararConTarget(linea);
 
@@ -475,6 +565,15 @@ function Renglon({
         )}
       </td>
 
+      {impuestoDe && (
+        <CeldaImpuesto
+          linea={linea}
+          impuesto={impuestoDe(linea)}
+          editable={editable && !soloLectura && !!onElegirImpuesto}
+          onElegir={onElegirImpuesto}
+        />
+      )}
+
       <td className={`px-3 py-1.5 text-right tabular-nums ${linea.margen < 0 ? 'text-red-600' : 'text-gray-600'}`}>
         {(linea.margen * 100).toFixed(1)}%
       </td>
@@ -495,5 +594,68 @@ function Renglon({
         </td>
       )}
     </tr>
+  );
+}
+
+// ─── Bloque 3 · La celda de impuesto ──────────────────────────────────────────
+
+/**
+ * La tasa del renglón: precargada del catálogo, cambiable a mano.
+ *
+ * Enseña de dónde salió el número. «Derivado» significa que el catálogo lo
+ * resolvió con el tráfico y la ubicación del servicio; «capturado», que
+ * alguien decidió otra cosa para este cliente. Sin esa distinción, corregir
+ * una tasa mal derivada y corregir una bien capturada se ven igual.
+ */
+function CeldaImpuesto({ linea, impuesto, editable, onElegir }: {
+  linea: LineaPlana;
+  impuesto: ImpuestoLinea;
+  editable: boolean;
+  onElegir?: (lineaId: string, opcion: OpcionImpuesto | null) => void;
+}) {
+  const indeterminado = impuesto.tasa === null;
+
+  if (!editable) {
+    return (
+      <td className="px-3 py-1.5" title={impuesto.detalle}>
+        {indeterminado ? (
+          <span className="text-[11px] text-amber-700">Sin determinar</span>
+        ) : (
+          <span className="text-[11px] text-gray-600">
+            {impuesto.opcion ? ETIQUETA_IMPUESTO[impuesto.opcion] : `${impuesto.tasa}%`}
+          </span>
+        )}
+      </td>
+    );
+  }
+
+  return (
+    <td className="px-3 py-1.5" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center gap-1">
+        <select
+          value={linea.impuesto ?? ''}
+          onChange={e => onElegir?.(linea.id, (e.target.value || null) as OpcionImpuesto | null)}
+          title={impuesto.detalle}
+          className={`text-[11px] bg-transparent border border-transparent hover:border-gray-200 focus:border-primario rounded px-1 py-0.5 outline-none ${
+            indeterminado ? 'text-amber-700' : 'text-gray-600'}`}
+        >
+          {/* La opción vacía NO es «sin impuesto»: es «lo que diga el catálogo». */}
+          <option value="">
+            {indeterminado
+              ? 'Sin determinar'
+              : `${impuesto.opcion ? ETIQUETA_IMPUESTO[impuesto.opcion] : `${impuesto.tasa}%`} · del catálogo`}
+          </option>
+          {OPCIONES_IMPUESTO.map(o => (
+            <option key={o} value={o}>{ETIQUETA_IMPUESTO[o]}</option>
+          ))}
+        </select>
+
+        {impuesto.especial && (
+          <span className="text-[9px] font-bold text-primario" title={impuesto.detalle}>
+            {impuesto.especial === 'aereo_split' ? '25/75' : 'ret. 4%'}
+          </span>
+        )}
+      </div>
+    </td>
   );
 }

@@ -225,6 +225,19 @@ export interface ConceptoCotizacion {
    */
   costoCapturado?: boolean;
 
+  /**
+   * Bloque 3 · El impuesto que Pricing eligió para ESTE renglón.
+   *
+   * Ausente = nadie lo eligió y vale lo que derive el catálogo con el tráfico
+   * y la ubicación del servicio (`lib/impuestoLinea`). No se lee directo:
+   * usar `impuestoDeLinea`, que resuelve el respaldo. Los conceptos anteriores
+   * al bloque no lo traen y no se reescriben.
+   *
+   * Se elige AL COTIZAR, no después: el seguro unos clientes lo piden con IVA
+   * y otros sin, y eso no lo sabe el catálogo.
+   */
+  impuesto?: 'iva16' | 'iva0' | 'exento';
+
   id: string;
   nombre: string;
   /** FK al catálogo conceptos/. null/undefined = concepto legacy (texto libre). */

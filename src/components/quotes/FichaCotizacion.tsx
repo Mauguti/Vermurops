@@ -46,6 +46,11 @@ import {
   reordenarLinea, aplicarOrden, estaCongelada, moverLineaDeServicio,
   repararConceptosDuplicados,
 } from '../../lib/lineasCotizacion';
+import type { LineaPlana } from '../../lib/lineasCotizacion';
+import {
+  impuestoDeLinea, type OpcionImpuesto,
+} from '../../lib/impuestoLinea';
+import { reglaDeConcepto } from '../../lib/ivaCotizacion';
 import {
   matricesPorServicio, escribirCelda, quitarAgenteDeCotizacion,
   conceptosSinCotizar, claveAgente, construirMatriz, CONCEPTOS_POR_PLANTILLA,
@@ -850,6 +855,27 @@ export default function FichaCotizacion({
   };
 
   /**
+   * Bloque 3 · El impuesto del renglón.
+   *
+   * `impuestoDeLineaPlana` resuelve lo capturado o, si no hay, lo que derive
+   * el catálogo con el tráfico y la ubicación del servicio. Vive aquí y no en
+   * la tabla porque necesita las dos cosas que la tabla no tiene: el catálogo
+   * de conceptos y el servicio completo.
+   */
+  const impuestoDeLineaPlana = (linea: LineaPlana) => {
+    const servicio = (quote.servicios ?? []).find(sv => sv.id === linea.servicioId);
+    const regla = reglaDeConcepto(linea.conceptoId, conceptosCatalogo);
+    if (!servicio) {
+      return impuestoDeLinea(linea.impuesto, regla, { } as never);
+    }
+    return impuestoDeLinea(linea.impuesto, regla, servicio);
+  };
+
+  const handleElegirImpuesto = (lineaId: string, opcion: OpcionImpuesto | null) => {
+    onUpdateQuote(aplicarEdicionLinea(quote, lineaId, { impuesto: opcion }));
+  };
+
+  /**
    * Concepto elegido del catálogo.
    *
    * Se guardan el id Y el nombre juntos: el nombre es para leer, el id es lo
@@ -1608,6 +1634,8 @@ export default function FichaCotizacion({
               onAgregarLinea={handleAgregarLineaPlana}
               onCompararProveedor={handleCompararProveedor}
               onCambiarServicio={handleCambiarServicioDeLinea}
+              impuestoDe={impuestoDeLineaPlana}
+              onElegirImpuesto={rolActivo !== 'ventas' && !bloqueada ? handleElegirImpuesto : undefined}
               onDatosEmbarque={() => { setActiveTab('info'); setShowLossReasonForm(false); }}
               onAgregarServicio={rolActivo !== 'ventas' && !bloqueada
                 ? () => setShowAddServicio(true)

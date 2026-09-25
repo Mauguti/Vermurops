@@ -12,6 +12,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   mapearCotizacionAEmbarque,
+  mapearLineasAEmbarque,
   ingresoPorMoneda,
   gastoPorProveedor,
 } from './cotizacionAEmbarque';
@@ -406,5 +407,40 @@ describe('advertencia: cliente sin expediente validado', () => {
   it('ninguna de las dos bloquea: los cargos se generan igual', () => {
     const { cargos } = mapearCotizacionAEmbarque(conVigencia('2020-01-01'), { fechaReferencia: HOY });
     expect(cargos.length).toBeGreaterThan(0);
+  });
+});
+
+// ─── Bloque 3 · el impuesto elegido viaja al embarque ─────────────────────────
+
+describe('la tasa elegida al cotizar llega al embarque', () => {
+  const base = {
+    id: 'L1', servicioId: 'S1', servicioTipo: 'maritimo', concepto: 'Seguro',
+    conceptoId: 'CON-003', conceptoLocalId: 'c1', proveedorNombre: 'Chubb',
+    moneda: 'USD', costo: 100, profit: 20, venta: 120, margen: 0,
+    costoDerivado: false, tarifasOficiales: 0, costos: [], costoCapturado: true,
+    ubicacion: 'destino' as const,
+  };
+
+  it('se hereda en el ingreso', () => {
+    const { cargos } = mapearLineasAEmbarque(
+      [{ ...base, impuesto: 'iva16' } as never], 'COT-1',
+    );
+    const ingreso = cargos.find(c => c.tipo === 'ingreso')!;
+    expect(ingreso.impuesto).toBe('iva16');
+  });
+
+  it('sin elección, la clave NO se escribe (Firestore rechaza undefined)', () => {
+    const { cargos } = mapearLineasAEmbarque([base as never], 'COT-1');
+    const ingreso = cargos.find(c => c.tipo === 'ingreso')!;
+    expect('impuesto' in ingreso).toBe(false);
+  });
+
+  it('el gasto no lleva impuesto: el IVA que importa es el del cliente', () => {
+    const { cargos } = mapearLineasAEmbarque([{
+      ...base, impuesto: 'iva16',
+      costos: [{ id: 'k1', proveedorId: 'PRV-1', descripcion: '', monto: 100, moneda: 'USD' }],
+    } as never], 'COT-1');
+    const gasto = cargos.find(c => c.tipo === 'gasto')!;
+    expect('impuesto' in gasto).toBe(false);
   });
 });
