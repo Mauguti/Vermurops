@@ -11,6 +11,7 @@ import { useConceptos } from '../../hooks/useConceptos';
 import { useFacturas } from '../../hooks/useFacturas';
 import PanelFacturasEmbarque from '../facturas/PanelFacturasEmbarque';
 import { traficoDeFolio } from '../../lib/facturacionEmbarque';
+import { aplicaSoloExportacion } from '../../lib/pedimentosEmbarque';
 import { evaluarCierres, avisoDeOrden } from '../../lib/cierresEmbarque';
 import { useProveedores } from '../../hooks/useProveedores';
 import { useAuth, usuariosPorRol } from '../../auth/AuthContext';
@@ -801,15 +802,28 @@ export default function FichaEmbarque({
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Límite de Documentación</label>
-                    <input type="date" value={limDoc} onChange={e => setLimDoc(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
-                  </div>
+                  {/*
+                    Bloque 6 · «Límite de documentación» y «Orden General de
+                    Aduana» son de EXPORTACIÓN. En importación confunden, y si
+                    se cuelan a un booking confirmation el cliente pregunta.
 
-                  <div>
-                    <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Orden General (Aduana)</label>
-                    <input type="date" value={ordenGen} onChange={e => setOrdenGen(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
-                  </div>
+                    Un tráfico que no se pudo determinar tampoco los enseña: de
+                    los dos errores posibles, esconder un campo que hacía falta
+                    se nota al capturar; enseñar uno de más se va al cliente.
+                  */}
+                  {aplicaSoloExportacion(traficoDeFolio(embarque.folio)) && (
+                    <>
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Límite de Documentación</label>
+                        <input type="date" value={limDoc} onChange={e => setLimDoc(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
+                      </div>
+
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Orden General (Aduana)</label>
+                        <input type="date" value={ordenGen} onChange={e => setOrdenGen(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
+                      </div>
+                    </>
+                  )}
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
