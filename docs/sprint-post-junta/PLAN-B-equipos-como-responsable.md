@@ -92,11 +92,21 @@ documenta como el agujero abierto.
 
 ## 5. Decisiones que hacen falta antes de construir
 
-1. **¿El embarque se queda en el equipo, o se asigna a una persona al
-   abrirlo?** Si se queda en el equipo, «Solo los míos» de Operaciones deja de
-   distinguir quién lo está trabajando y la bandeja se vuelve una lista
-   compartida sin dueño. *Recomiendo: nace con el equipo y la primera persona
-   que lo toca se lo queda, con la posibilidad de devolverlo.*
+1. **El embarque nace con el equipo y se toma con un botón explícito.**
+   **RESUELTO (25-sep-2026)**, y corrigiendo mi recomendación: propuse que la
+   primera persona que lo tocara se lo quedara, y Mau lo rechazó. Va un botón
+   **«Tomar»**.
+
+   Tenía razón: «tocar» no es una acción, es un efecto secundario de abrir
+   una ficha. Quedarse con un embarque por haberlo mirado produce dos cosas
+   malas —alguien se queda con lo que solo estaba revisando, y nadie sabe si
+   el dueño lo es porque decidió serlo—. Un botón es una decisión con fecha y
+   autor; abrir una ficha no.
+
+   Consecuencias: hace falta también **«Soltar»** (devolverlo al equipo), y la
+   lista necesita distinguir tres estados —del equipo sin tomar, tomado por
+   mí, tomado por otro— porque «Solo los míos» con un equipo detrás ya no es
+   un sí/no.
 2. **¿Un cliente puede tener equipo en un área y persona en otra?** Con el
    diseño de arriba, sí y sin esfuerzo. *Recomiendo permitirlo: es justo el
    caso de los clientes de oficina, que Pricing atiende en equipo mientras
