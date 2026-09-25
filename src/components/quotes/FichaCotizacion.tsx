@@ -1553,12 +1553,24 @@ export default function FichaCotizacion({
         onCambiar={(id) => { setActiveTab(id); setShowLossReasonForm(false); }}
       />
 
-      {/* ── Contenido: Servicios en UNA columna (4-sep-2026) ─────────────────
-          El catálogo de tarifas deja el panel lateral y baja al final, a todo
-          lo ancho: la tabla recupera el espacio donde se captura y se decide,
-          y el orden vertical refleja cómo se trabaja — defines conceptos,
-          comparas agentes, y las tarifas son el insumo de esa comparación.
-          Es el orden del sistema de Luis. */}
+      {/* ── Contenido: Servicios en UNA columna ──────────────────────────────
+          El catálogo de tarifas dejó el panel lateral y bajó a todo lo ancho
+          (4-sep-2026): la tabla recupera el espacio donde se captura y se
+          decide.
+
+          Bloque 4 (24-sep-2026) · El orden vertical es el del TRABAJO, no el
+          de la importancia. Textual: «no debería de pedir la información
+          fuera del proceso» — la ficha obligaba a brincar de arriba abajo
+          mientras se cargaban tarifas.
+
+            1. Servicios / conceptos  la base, donde se captura
+            2. Evidencias             sube el tarifario, desde el fondo
+            3. Catálogo de tarifas    ya cargado, se ve aquí
+            4. Comparativa de agentes se compara lo del catálogo
+            5. Resumen de la operación
+            6. Desglose consolidado
+
+          Es reordenar, no rediseñar: ninguna sección cambió por dentro. */}
       {activeTab === 'servicios' && visible.desglosePorConcepto && (
         <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd} onDragCancel={handleDragCancel}>
         <div className="flex-1 flex min-h-0">
@@ -1572,7 +1584,7 @@ export default function FichaCotizacion({
                 el criterio de agrupación visual. */}
             {franjaSolicitud}
 
-            {/* 3 · Por proveedor (default) o por concepto. Editar concepto,
+            {/* 1b · Por proveedor (default) o por concepto. Editar concepto,
                 comparar y arrastrar tarifas viven en la vista por concepto;
                 por proveedor se edita costo y profit de lo que no está
                 compartido, y se responde «¿a quién le debo cuánto?». */}
@@ -1675,46 +1687,31 @@ export default function FichaCotizacion({
               </div>
             )}
 
-            {/* 2 · La comparativa de agentes, una por servicio. Pricing pide
-                la misma ruta «a entre 7 y 10» proveedores, y un agente
-                marítimo no compite contra un transportista terrestre. */}
-            {matrizActiva && (
-              <MatrizAgentes
-                matriz={matrizActiva.matriz}
-                titulo={matrizActiva.servicioTipo}
-                servicios={matrices.map(m => ({ id: m.servicioId, etiqueta: m.servicioTipo }))}
-                servicioActivoId={matrizActiva.servicioId}
-                onCambiarServicio={setServicioComparativa}
-                totalesComparables={totalesConMoneda}
-                comparacion={comparacionMatriz}
-                tipoCambio={
-                  <CapturaTipoCambio
-                    tipoCambio={quote.tipoCambio}
-                    editable={rolActivo !== 'ventas' && !bloqueada}
-                    onCambiar={(tc) => onUpdateQuote({
-                      ...quote,
-                      ...(tc ? { tipoCambio: tc } : { tipoCambio: undefined }),
-                    })}
-                  />
-                }
+            {/* 2 · Evidencias: «¿de dónde saqué este costo?». Sube desde el
+                fondo de la pantalla y por eso va antes que el catálogo: el
+                orden de la ficha es el del trabajo —cargar tarifas, verlas
+                en el catálogo, compararlas, y hasta el final el resumen—.
+                Textual de la junta: «no debería de pedir la información
+                fuera del proceso». Solo pricing/admin: son costos de
+                proveedor. */}
+            {visible.adjuntosTarifa && (
+              <EvidenciasTarifas
+                documentos={documentos}
                 editable={rolActivo !== 'ventas' && !bloqueada}
-                seleccion={seleccionActiva}
-                dominante={dominanteActivo}
-                menoresPorFila={menoresActivos}
-                resumen={resumenActivo!}
-                onElegirCelda={handleElegirCelda}
-                onElegirAgente={handleElegirColumnaCompleta}
-                onEditarCelda={handleEditarCelda}
-                onEditarMoneda={handleEditarMoneda}
-                onEditarVigencia={handleEditarVigencia}
-                onEditarEtiqueta={(filaId, etiqueta) =>
-                  onUpdateQuote(aplicarEdicionLinea(quote, filaId, { concepto: etiqueta }))}
-                onQuitarAgente={handleQuitarAgente}
-                onQuitarFila={(filaId) => onUpdateQuote(quitarLinea(quote, filaId))}
-                onAgregarAgente={() => setModalAgente(matrizActiva.servicioId)}
-                conceptosActivos={conceptosActivos}
-                onAgregarFila={(conceptoId, nombre) => onUpdateQuote(
-                  agregarLinea(quote, { servicioId: matrizActiva.servicioId, concepto: nombre, conceptoId }))}
+                subiendo={subiendoDoc}
+                onCargarTarifario={() => setCargandoTarifario(true)}
+                onSubir={(file) => {
+                  subirDocumento(file, { procesarConIA: false, cotizacionId: quote.id })
+                    .then(({ duplicadoDe }) => {
+                      if (duplicadoDe) {
+                        setToastLocal(
+                          `Este archivo ya se había subido el ${duplicadoDe.fechaSubida.slice(0, 10)}` +
+                          ` por ${duplicadoDe.subidoPorNombre}. Se guardó de todos modos.`,
+                        );
+                      }
+                    })
+                    .catch(err => setToastLocal(err instanceof Error ? err.message : String(err)));
+                }}
               />
             )}
 
@@ -1764,6 +1761,49 @@ export default function FichaCotizacion({
               </div>
             )}
 
+            {/* 4 · La comparativa de agentes, una por servicio. Pricing pide
+                la misma ruta «a entre 7 y 10» proveedores, y un agente
+                marítimo no compite contra un transportista terrestre. */}
+            {matrizActiva && (
+              <MatrizAgentes
+                matriz={matrizActiva.matriz}
+                titulo={matrizActiva.servicioTipo}
+                servicios={matrices.map(m => ({ id: m.servicioId, etiqueta: m.servicioTipo }))}
+                servicioActivoId={matrizActiva.servicioId}
+                onCambiarServicio={setServicioComparativa}
+                totalesComparables={totalesConMoneda}
+                comparacion={comparacionMatriz}
+                tipoCambio={
+                  <CapturaTipoCambio
+                    tipoCambio={quote.tipoCambio}
+                    editable={rolActivo !== 'ventas' && !bloqueada}
+                    onCambiar={(tc) => onUpdateQuote({
+                      ...quote,
+                      ...(tc ? { tipoCambio: tc } : { tipoCambio: undefined }),
+                    })}
+                  />
+                }
+                editable={rolActivo !== 'ventas' && !bloqueada}
+                seleccion={seleccionActiva}
+                dominante={dominanteActivo}
+                menoresPorFila={menoresActivos}
+                resumen={resumenActivo!}
+                onElegirCelda={handleElegirCelda}
+                onElegirAgente={handleElegirColumnaCompleta}
+                onEditarCelda={handleEditarCelda}
+                onEditarMoneda={handleEditarMoneda}
+                onEditarVigencia={handleEditarVigencia}
+                onEditarEtiqueta={(filaId, etiqueta) =>
+                  onUpdateQuote(aplicarEdicionLinea(quote, filaId, { concepto: etiqueta }))}
+                onQuitarAgente={handleQuitarAgente}
+                onQuitarFila={(filaId) => onUpdateQuote(quitarLinea(quote, filaId))}
+                onAgregarAgente={() => setModalAgente(matrizActiva.servicioId)}
+                conceptosActivos={conceptosActivos}
+                onAgregarFila={(conceptoId, nombre) => onUpdateQuote(
+                  agregarLinea(quote, { servicioId: matrizActiva.servicioId, concepto: nombre, conceptoId }))}
+              />
+            )}
+
             {/* Resumen financiero DENTRO de la ficha: «mientras cotizan no lo
                 pueden ver, se tendrían que salir de lo que están haciendo». */}
             {lineasPlanas.length > 0 && (
@@ -1771,29 +1811,6 @@ export default function FichaCotizacion({
                 lineas={lineasPlanas}
                 moneda={quote.moneda}
                 diasCredito={clienteVinculado?.dias ?? 0}
-              />
-            )}
-
-            {/* Evidencias: «¿de dónde saqué este costo?». Solo pricing/admin,
-                porque son costos de proveedor. */}
-            {visible.adjuntosTarifa && (
-              <EvidenciasTarifas
-                documentos={documentos}
-                editable={rolActivo !== 'ventas' && !bloqueada}
-                subiendo={subiendoDoc}
-                onCargarTarifario={() => setCargandoTarifario(true)}
-                onSubir={(file) => {
-                  subirDocumento(file, { procesarConIA: false, cotizacionId: quote.id })
-                    .then(({ duplicadoDe }) => {
-                      if (duplicadoDe) {
-                        setToastLocal(
-                          `Este archivo ya se había subido el ${duplicadoDe.fechaSubida.slice(0, 10)}` +
-                          ` por ${duplicadoDe.subidoPorNombre}. Se guardó de todos modos.`,
-                        );
-                      }
-                    })
-                    .catch(err => setToastLocal(err instanceof Error ? err.message : String(err)));
-                }}
               />
             )}
 
