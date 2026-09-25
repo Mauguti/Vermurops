@@ -308,3 +308,39 @@ describe('camposAdoptablesExpediente — nada se adopta en automático', () => {
     expect(campos.map(c => c.campo)).toEqual(['representante', 'codigoPostal']);
   });
 });
+
+// ─── Bloque 11a · el subtotal, verificado contra la debit note de Asia Ship ───
+
+describe('precargaFacturaProveedor · subtotal', () => {
+  /** Lo que el extractor devolvió de verdad (docs/fixtures/asia-ship-clasificacion.json). */
+  const ASIA_SHIP = {
+    numeroDocumento: 'SZHD26070166', fecha: '2026-08-04',
+    emisor: 'ASIA SHIP CO., LTD', moneda: 'USD',
+    subtotal: 6197, iva: 0, total: 6197,
+  };
+
+  it('un proveedor extranjero factura sin IVA: subtotal y total coinciden', () => {
+    const p = precargaFacturaProveedor(ASIA_SHIP);
+    expect(p.subtotal).toBe(6197);
+    expect(p.total).toBe(6197);
+    expect(p.iva).toBe(0);
+  });
+
+  it('un iva de cero se conserva; no se confunde con «no lo declaró»', () => {
+    expect(precargaFacturaProveedor({ ...ASIA_SHIP, iva: 0 }).iva).toBe(0);
+    expect(precargaFacturaProveedor({ ...ASIA_SHIP, iva: undefined }).iva).toBeNull();
+  });
+
+  it('sin subtotal NO se despeja de total − iva', () => {
+    // Un subtotal calculado a partir de un IVA que no se leyó bien se ve
+    // igual de creíble que uno leído, y de ahí sale a un excedente falso.
+    const p = precargaFacturaProveedor({ ...ASIA_SHIP, subtotal: undefined, iva: 1600, total: 11600 });
+    expect(p.subtotal).toBeNull();
+    expect(p.total).toBe(11600);
+  });
+
+  it('un subtotal en cero o negativo se descarta', () => {
+    expect(precargaFacturaProveedor({ ...ASIA_SHIP, subtotal: 0 }).subtotal).toBeNull();
+    expect(precargaFacturaProveedor({ ...ASIA_SHIP, subtotal: -5 }).subtotal).toBeNull();
+  });
+});

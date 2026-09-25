@@ -165,6 +165,15 @@ export interface OrdenCompra {
     fecha: string;
     emisor: string;
     total: number | null;
+    /**
+     * Bloque 11a · Antes de impuestos, tal como lo leyó el clasificador.
+     * `null` = el documento no lo declaró. Es lo único comparable contra lo
+     * cotizado, que también va antes de IVA: `lib/margenRealConcepto` lo lee
+     * para decidir si puede calcular el excedente.
+     */
+    subtotal?: number | null;
+    /** Lo que el documento declara de impuesto. Informativo. */
+    iva?: number | null;
     moneda: string;
     /** El documento del embarque del que salió. */
     documentoId: string;

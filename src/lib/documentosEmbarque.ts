@@ -243,6 +243,13 @@ export function proponerParaOC(
       fecha: precarga.fecha,
       emisor: precarga.emisor,
       total: precarga.total,
+      /*
+       * Bloque 11a · Lo que enciende la comparación antes de IVA del margen
+       * real. `OCParaMargen.subtotal` ya lo leía; lo que faltaba era que
+       * alguien lo escribiera aquí.
+       */
+      subtotal: precarga.subtotal,
+      iva: precarga.iva,
       moneda: precarga.moneda || oc.moneda,
       documentoId,
       cotejo: precarga.total === null ? 'sin_total' : cotejo.coincide ? 'coincide' : 'difiere',

@@ -1,0 +1,103 @@
+{
+    "ok": true,
+    "tipo": "factura_proveedor",
+    "etiquetaTipo": "factura proveedor",
+    "confianza": "alta",
+    "razonTipo": "Es una Debit Note (nota de d\u00e9bito) emitida por ASIA SHIP CO., LTD a IMPORTACIONES Y LOGISTICA VERMUR, lo que constituye un documento de cobro por servicios de flete y gesti\u00f3n log\u00edstica. Vermur es el receptor, por lo tanto es una factura de proveedor.",
+    "nombreOriginal": "asia-ship-debit-note.pdf",
+    "nombrePropuesto": "Debit Note SZHD26070166 Asia Ship",
+    "destinoSugerido": "facturas_proveedor",
+    "datos": {
+        "numeroDocumento": "SZHD26070166",
+        "fecha": "2026-08-04",
+        "emisor": "ASIA SHIP CO., LTD",
+        "receptor": "IMPORTACIONES Y LOGISTICA VERMUR S DE RL DE CV",
+        "rfcEmisor": null,
+        "rfcReceptor": null,
+        "shipper": null,
+        "consignatario": "IMPORTACIONES Y LOGISTICA VERMUR S DE RL DE CV",
+        "notificar": null,
+        "puertoOrigen": "NANJING, CHINA",
+        "puertoDestino": "LAZARO CARDENAS, MEXICO",
+        "naviera": "COSCO",
+        "buque": "ZHONGYUANHAIYUNLVSHUI02 V.030E",
+        "contenedores": [
+            "OOLU6981210"
+        ],
+        "sellos": [],
+        "piezas": 1,
+        "pesoBruto": 0,
+        "volumen": 0,
+        "descripcionMercancia": "1X40HC",
+        "subtotal": 6197,
+        "iva": 0,
+        "total": 6197,
+        "moneda": "USD",
+        "conceptos": [
+            {
+                "descripcion": "CUSTOMS CLEARANCE FEE",
+                "importe": 35
+            },
+            {
+                "descripcion": "OCEAN FREIGHT",
+                "importe": 5150
+            },
+            {
+                "descripcion": "PROFIT SHARE",
+                "importe": 50
+            },
+            {
+                "descripcion": "TELEX RELEASE FEE",
+                "importe": 75
+            },
+            {
+                "descripcion": "AMS",
+                "importe": 30
+            },
+            {
+                "descripcion": "ISPS",
+                "importe": 12
+            },
+            {
+                "descripcion": "TERMINAL HANDLING CHARGE",
+                "importe": 160
+            },
+            {
+                "descripcion": "DOCUMENT FEE",
+                "importe": 75
+            },
+            {
+                "descripcion": "SEAL CHARGE",
+                "importe": 10
+            },
+            {
+                "descripcion": "VGM",
+                "importe": 15
+            },
+            {
+                "descripcion": "BOOKING CHARGE",
+                "importe": 75
+            },
+            {
+                "descripcion": "ELECTRONIC DATA INTERCHANGE",
+                "importe": 25
+            },
+            {
+                "descripcion": "TRAILER COST",
+                "importe": 260
+            },
+            {
+                "descripcion": "YS Port fee",
+                "importe": 150
+            },
+            {
+                "descripcion": "HBL TLX RLS FEE",
+                "importe": 75
+            }
+        ]
+    },
+    "legible": true,
+    "observaciones": "Documento legible. Fecha futura (2026) puede ser error de captura. B/L No. COSU6506304710, S/O: 2606166702. Incluye detalles bancarios de ICBC Shenzhen para pago.",
+    "avisos": [],
+    "requiereRevision": false
+}
