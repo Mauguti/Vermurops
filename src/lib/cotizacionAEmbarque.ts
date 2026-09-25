@@ -209,6 +209,16 @@ function cargosDeLinea(linea: LineaPlana, cotizacionId: string): CargoDetalle[] 
       // cotización. Solo en el ingreso: el IVA que importa es el que se le
       // cobra al cliente.
       ubicacionIVA: linea.ubicacion,
+      /*
+       * Bloque 3 · La tasa elegida al cotizar viaja al embarque. Sin esto, el
+       * embarque volvería a derivarla del catálogo y perdería justo lo que
+       * Pricing decidió para ESTE cliente —el seguro con IVA, el agente al que
+       * se le cotizó con IVA incluido—, que es el caso que motivó el bloque.
+       *
+       * Se omite la clave cuando no hubo elección: Firestore rechaza undefined
+       * y tumbaría la escritura del embarque entero.
+       */
+      ...(linea.impuesto !== undefined ? { impuesto: linea.impuesto } : {}),
     });
   }
 

@@ -132,6 +132,11 @@ export interface LineaPlana {
    * no. Ver ConceptoCotizacion.costoCapturado.
    */
   costoCapturado: boolean;
+  /**
+   * Bloque 3 · Lo que el usuario eligió en la columna de impuesto.
+   * `undefined` = no lo tocó y manda la regla del catálogo.
+   */
+  impuesto?: 'iva16' | 'iva0' | 'exento';
 }
 
 // ─── Aplanado ─────────────────────────────────────────────────────────────────
@@ -241,6 +246,7 @@ function lineaDesdeConcepto(
     tarifaOrigenId,
     costos,
     costoCapturado,
+    ...(concepto.impuesto !== undefined ? { impuesto: concepto.impuesto } : {}),
   };
 }
 
@@ -360,6 +366,8 @@ export interface EdicionLinea {
   profit?: number;
   target?: number | null;
   orden?: number;
+  /** Bloque 3 · `null` limpia la elección y devuelve el renglón a lo derivado. */
+  impuesto?: 'iva16' | 'iva0' | 'exento' | null;
 }
 
 /**
@@ -405,8 +413,20 @@ export function aplicarEdicionLinea(
         const costoCapturado = edicion.costo !== undefined ? true : c.costoCapturado;
         const { venta, margen } = calcLinea(costo, profit);
 
+        /*
+         * Bloque 3 · `null` QUITA la elección y devuelve el renglón a lo
+         * derivado del catálogo. Hay que sacar la clave del objeto base,
+         * porque `...c` la volvería a meter; y se omite en vez de ponerla en
+         * undefined, que hace a Firestore rechazar el documento entero.
+         */
+        const { impuesto: _impuestoPrevio, ...cSinImpuesto } = c;
+        const impuesto = edicion.impuesto === null
+          ? undefined
+          : (edicion.impuesto ?? c.impuesto);
+
         return {
-          ...c,
+          ...cSinImpuesto,
+          ...(impuesto !== undefined ? { impuesto } : {}),
           ...(costoCapturado !== undefined ? { costoCapturado } : {}),
           nombre: edicion.concepto ?? c.nombre,
           // Se omite la clave en vez de ponerla en undefined (Firestore la

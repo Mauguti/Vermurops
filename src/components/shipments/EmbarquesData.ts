@@ -171,6 +171,18 @@ export interface CargoDetalle {
    * tasa: una tasa inventada se ve idéntica a una correcta.
    */
   ubicacionIVA?: 'origen' | 'destino';
+
+  /**
+   * Bloque 3 · El impuesto que Pricing ELIGIÓ en la cotización, heredado al
+   * abrir el embarque. Solo en líneas de ingreso: el IVA que importa es el que
+   * se le cobra al cliente.
+   *
+   * Ausente = Pricing no lo eligió y sigue mandando lo que derive la regla del
+   * concepto con `ubicacionIVA`. Es una elección, no un cálculo: por eso viaja
+   * como la opción y no como un número, que no diría si el cero es tasa cero o
+   * exento.
+   */
+  impuesto?: 'iva16' | 'iva0' | 'exento';
 }
 
 /** Totales de una sola moneda. Nunca mezclados con otra. */
