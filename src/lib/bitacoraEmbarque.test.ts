@@ -129,3 +129,40 @@ describe('lectura', () => {
     expect(tituloOC('pagada', 'OC-2026-0001', 'Oñate', 'Julio')).toBe('Julio pagó la orden de compra OC-2026-0001 a Oñate');
   });
 });
+
+// ─── Bloque 12 · el tipo de cambio se anota ───────────────────────────────────
+
+describe('cambios de tipo de cambio en la bitácora', () => {
+  const tc = (valor: number, fuente = 'banamex_venta') =>
+    ({ valor, base: 'USD', destino: 'MXN', fuente, fecha: '2026-09-20' } as never);
+
+  it('fijarlo por primera vez queda registrado', () => {
+    const out = diffParaBitacora(emb(), emb({ tipoCambio: tc(18.5) }), ANGEL, AHORA, HOY);
+    const e = out.find(x => x.evento === 'tipo_cambio');
+    expect(e?.titulo).toContain('18.5');
+    expect(e?.detalle).toContain('sin tipo de cambio →');
+  });
+
+  it('corregirlo guarda el valor anterior', () => {
+    const out = diffParaBitacora(
+      emb({ tipoCambio: tc(18.5) }), emb({ tipoCambio: tc(19.2) }), ANGEL, AHORA, HOY);
+    const e = out.find(x => x.evento === 'tipo_cambio');
+    expect(e?.detalle).toContain('18.5');
+    expect(e?.detalle).toContain('19.2');
+  });
+
+  it('cambiar solo la fuente también se anota', () => {
+    // El número puede ser el mismo y venir de otro lado: Banxico y Banamex
+    // pueden coincidir un día, y de cuál salió es lo que se defiende.
+    const out = diffParaBitacora(
+      emb({ tipoCambio: tc(18.5, 'banamex_venta') }),
+      emb({ tipoCambio: tc(18.5, 'manual') }), ANGEL, AHORA, HOY);
+    expect(out.some(x => x.evento === 'tipo_cambio')).toBe(true);
+  });
+
+  it('sin cambio no se anota nada', () => {
+    const out = diffParaBitacora(
+      emb({ tipoCambio: tc(18.5) }), emb({ tipoCambio: tc(18.5) }), ANGEL, AHORA, HOY);
+    expect(out.some(x => x.evento === 'tipo_cambio')).toBe(false);
+  });
+});

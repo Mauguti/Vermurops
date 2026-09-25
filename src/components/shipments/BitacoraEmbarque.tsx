@@ -33,6 +33,7 @@ const ICONO: Record<EventoBitacora, React.ReactNode> = {
   entidad: <Building2 className="w-3.5 h-3.5" />,
   responsable: <UserCheck className="w-3.5 h-3.5" />,
   documento: <Paperclip className="w-3.5 h-3.5" />,
+  tipo_cambio: <Banknote className="w-3.5 h-3.5" />,
   otro: <Info className="w-3.5 h-3.5" />,
 };
 

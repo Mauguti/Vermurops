@@ -425,3 +425,21 @@ describe('servicios marcados para operarse aparte', () => {
     expect(grupos[0].esPrincipal).toBe(true);
   });
 });
+
+// ─── Bloque 12 · el tipo de cambio se hereda ──────────────────────────────────
+
+describe('el tipo de cambio de la cotización viaja al embarque', () => {
+  const TC = {
+    valor: 18.5, base: 'USD' as const, destino: 'MXN' as const,
+    fuente: 'banamex_venta' as const, fecha: '2026-09-20',
+    reglaAplicada: 'Banamex venta + 4.00',
+  };
+
+  it('se copia con su fuente, su fecha y la regla', () => {
+    expect(generar({ ...quote([SRV_MAR]), tipoCambio: TC } as never).tipoCambio).toEqual(TC);
+  });
+
+  it('sin tipo de cambio la clave NO se escribe (Firestore rechaza undefined)', () => {
+    expect('tipoCambio' in generar(quote([SRV_MAR]))).toBe(false);
+  });
+});
