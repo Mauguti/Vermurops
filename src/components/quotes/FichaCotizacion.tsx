@@ -880,10 +880,18 @@ export default function FichaCotizacion({
   const impuestoDeLineaPlana = (linea: LineaPlana) => {
     const servicio = (quote.servicios ?? []).find(sv => sv.id === linea.servicioId);
     const regla = reglaDeConcepto(linea.conceptoId, conceptosCatalogo);
+    /*
+     * El concepto del catálogo, para que la ubicación salga de ÉL cuando
+     * declara un solo lado: un concepto de destino ocurre en destino aunque
+     * su servicio esté marcado «origen».
+     */
+    const delCatalogo = linea.conceptoId
+      ? conceptosCatalogo.find(c => c.id === linea.conceptoId)
+      : null;
     if (!servicio) {
-      return impuestoDeLinea(linea.impuesto, regla, { } as never);
+      return impuestoDeLinea(linea.impuesto, regla, { } as never, delCatalogo);
     }
-    return impuestoDeLinea(linea.impuesto, regla, servicio);
+    return impuestoDeLinea(linea.impuesto, regla, servicio, delCatalogo);
   };
 
   /**

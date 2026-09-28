@@ -28,6 +28,8 @@ import { KanbanQuote } from '../components/quotes/QuotesData';
 import { ClienteVermur } from '../components/clientes/ClientesData';
 import { CargoDetalle, MonedaCargo } from '../components/shipments/EmbarquesData';
 import { aplanarCotizacion, LineaPlana } from './lineasCotizacion';
+import { ubicacionDeLinea } from './ivaCotizacion';
+import type { ConceptoVermur } from '../components/conceptos/ConceptosData';
 
 // ─── Advertencias ─────────────────────────────────────────────────────────────
 
@@ -98,6 +100,15 @@ export interface ContextoMapeo {
   cliente?: ClienteVermur | null;
   /** Fecha contra la que se evalúa la vigencia. ISO. Default: hoy. */
   fechaReferencia?: string;
+  /**
+   * El catálogo de conceptos, para resolver la ubicación de cada renglón.
+   *
+   * Un concepto que solo existe en destino ocurre en destino, aunque su
+   * servicio esté marcado «origen». Sin el catálogo se hereda la del servicio,
+   * que es lo que había: el mapeo sigue funcionando, solo que sin la
+   * corrección.
+   */
+  conceptos?: readonly Pick<ConceptoVermur, 'id' | 'aplicaOrigen' | 'aplicaDestino'>[];
 }
 
 // ─── Utilidades ───────────────────────────────────────────────────────────────
@@ -182,7 +193,9 @@ function revisarLinea(linea: LineaPlana, fechaRef: string): Advertencia[] {
   return avisos;
 }
 
-function cargosDeLinea(linea: LineaPlana, cotizacionId: string): CargoDetalle[] {
+function cargosDeLinea(
+  linea: LineaPlana, cotizacionId: string, contexto: ContextoMapeo = {},
+): CargoDetalle[] {
   const cargos: CargoDetalle[] = [];
   const grupo = grupoDe(linea);
 
@@ -208,7 +221,16 @@ function cargosDeLinea(linea: LineaPlana, cotizacionId: string): CargoDetalle[] 
       // 2.1 · Se hereda para que la factura derive su IVA sin volver a la
       // cotización. Solo en el ingreso: el IVA que importa es el que se le
       // cobra al cliente.
-      ubicacionIVA: linea.ubicacion,
+      /*
+       * La del CONCEPTO cuando el catálogo la declara; si no, la del servicio.
+       * Sin esto, un marítimo de importación marcado «origen» mandaba al
+       * embarque —y de ahí a la factura— todos sus conceptos en 0%, incluidos
+       * los que ocurren en destino. Sobre la regla espejo eso es IVA de menos.
+       */
+      ubicacionIVA: ubicacionDeLinea(
+        contexto.conceptos?.find(c => c.id === linea.conceptoId),
+        { ubicacion: linea.ubicacion },
+      ),
       /*
        * Bloque 3 · La tasa elegida al cotizar viaja al embarque. Sin esto, el
        * embarque volvería a derivarla del catálogo y perdería justo lo que
@@ -333,7 +355,7 @@ export function mapearLineasAEmbarque(
   const advertencias: Advertencia[] = [];
 
   lineas.forEach(linea => {
-    cargos.push(...cargosDeLinea(linea, cotizacionId));
+    cargos.push(...cargosDeLinea(linea, cotizacionId, contexto));
     advertencias.push(...revisarLinea(linea, fechaRef));
   });
 

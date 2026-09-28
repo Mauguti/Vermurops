@@ -219,6 +219,18 @@ export default function Shipments() {
     if (!EMBARQUE_AUTOMATICO_DISPONIBLE) {
       try {
         const cliente = clientes.find(c => c.id === quote.clienteId) ?? null;
+        /*
+         * TODO · El catálogo debería ir en el contexto para que la ubicación
+         * de cada cargo salga del CONCEPTO cuando éste declara un solo lado
+         * (`ContextoMapeo.conceptos`, ya soportado y probado).
+         *
+         * No se monta `useConceptos()` aquí porque ese hook SIEMBRA la
+         * colección, y una segunda instancia compite con la del módulo de
+         * cotizaciones: el recorrido e2e falló al elegir concepto con el
+         * catálogo a medio sembrar. Primero hay que mover el candado del seed
+         * a nivel de módulo; hasta entonces el cargo hereda la ubicación del
+         * servicio, como antes.
+         */
         const { cargos, advertencias } = mapearCotizacionAEmbarque(quote, { cliente });
         /*
          * B3 (21-sep-2026): la ruta manual ya usa la SERIE que Operaciones
