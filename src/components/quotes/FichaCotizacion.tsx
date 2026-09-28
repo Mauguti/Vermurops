@@ -47,6 +47,7 @@ import {
   repararConceptosDuplicados,
 } from '../../lib/lineasCotizacion';
 import { totalDeCotizacion, tieneTotal, NOTA_VARIAS_MONEDAS } from '../../lib/totalCotizacion';
+import { capturarTarifaManual } from '../../lib/tarifaManual';
 import type { LineaPlana } from '../../lib/lineasCotizacion';
 import {
   impuestoDeLinea, type OpcionImpuesto,
@@ -885,6 +886,23 @@ export default function FichaCotizacion({
     return impuestoDeLinea(linea.impuesto, regla, servicio);
   };
 
+  /**
+   * Bloque 1 · Proveedor y moneda para un costo tecleado a mano.
+   *
+   * Crea una tarifa DENTRO de la cotización —no en el tarifario general del
+   * proveedor: es un precio de esta operación, no una tarifa publicada— y la
+   * deja elegida escribiendo las dos marcas a la vez.
+   */
+  const handleCapturarProveedor = (
+    lineaId: string, proveedorId: string, nombre: string, moneda: 'MXN' | 'USD',
+  ) => {
+    const linea = lineasPlanas.find(l => l.id === lineaId);
+    if (!linea?.conceptoLocalId) return;
+    onUpdateQuote(capturarTarifaManual(quote, linea.servicioId, linea.conceptoLocalId, {
+      proveedorId, proveedorNombre: nombre, monto: linea.costo, moneda,
+    }));
+  };
+
   const handleElegirImpuesto = (lineaId: string, opcion: OpcionImpuesto | null) => {
     onUpdateQuote(aplicarEdicionLinea(quote, lineaId, { impuesto: opcion }));
   };
@@ -1691,6 +1709,8 @@ export default function FichaCotizacion({
               onCompararProveedor={handleCompararProveedor}
               onCambiarServicio={handleCambiarServicioDeLinea}
               impuestoDe={impuestoDeLineaPlana}
+              onCapturarProveedor={rolActivo !== 'ventas' && !bloqueada ? handleCapturarProveedor : undefined}
+              proveedores={proveedores}
               onElegirImpuesto={rolActivo !== 'ventas' && !bloqueada ? handleElegirImpuesto : undefined}
               onDatosEmbarque={() => { setActiveTab('info'); setShowLossReasonForm(false); }}
               onAgregarServicio={rolActivo !== 'ventas' && !bloqueada

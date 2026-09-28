@@ -8,6 +8,7 @@ import {
 } from '../../lib/sumarPorMoneda';
 import ConceptoSelector from '../conceptos/ConceptoSelector';
 import type { ConceptoVermur } from '../conceptos/ConceptosData';
+import type { ProveedorVermur } from '../proveedores/ProveedoresData';
 import EstadoVacio from '../ui/EstadoVacio';
 import {
   totalesConImpuesto, OPCIONES_IMPUESTO, ETIQUETA_IMPUESTO,
@@ -78,6 +79,13 @@ interface Props {
   impuestoDe?: (linea: LineaPlana) => ImpuestoLinea;
   /** `null` quita la elección y devuelve el renglón a lo derivado. */
   onElegirImpuesto?: (lineaId: string, opcion: OpcionImpuesto | null) => void;
+  /**
+   * Bloque 1 · Le da proveedor y moneda a un costo tecleado a mano, creando
+   * una tarifa DENTRO de la cotización. Ausente = no se ofrece.
+   */
+  onCapturarProveedor?: (lineaId: string, proveedorId: string, nombre: string, moneda: 'MXN' | 'USD') => void;
+  /** Catálogo para ese selector. */
+  proveedores?: ProveedorVermur[];
   /** Mueve una línea FRESCA a otro servicio. La lib se niega si ya está fija. */
   onCambiarServicio: (lineaId: string, servicioId: string) => void;
   /** Abre los datos que el embarque necesita para ese servicio. */
@@ -99,6 +107,7 @@ export default function TablaConceptos({
   onCrearConcepto, onEditarLinea, onElegirConcepto, onQuitarLinea, onMoverLinea,
   onAgregarLinea, onCompararProveedor, onCambiarServicio, onDatosEmbarque,
   onAgregarServicio, impuestoDe, onElegirImpuesto,
+  onCapturarProveedor, proveedores = [],
 }: Props) {
   /** Servicio del renglón borrador; null = no hay borrador. */
   const [borradorServicioId, setBorradorServicioId] = useState<string | null>(null);
@@ -211,6 +220,8 @@ export default function TablaConceptos({
                 onCambiarServicio={onCambiarServicio}
                 impuestoDe={impuestoDe}
                 onElegirImpuesto={onElegirImpuesto}
+                onCapturarProveedor={onCapturarProveedor}
+                proveedores={proveedores}
               />
             ))}
 
@@ -399,12 +410,14 @@ interface RenglonProps {
   onCambiarServicio: Props['onCambiarServicio'];
   impuestoDe?: Props['impuestoDe'];
   onElegirImpuesto?: Props['onElegirImpuesto'];
+  onCapturarProveedor?: Props['onCapturarProveedor'];
+  proveedores?: ProveedorVermur[];
 }
 
 function Renglon({
   linea, servicios, editable, soloLectura, activa, conceptosActivos, onCrearConcepto,
   onEditar, onElegirConcepto, onQuitar, onMover, onComparar, onCambiarServicio,
-  impuestoDe, onElegirImpuesto,
+  impuestoDe, onElegirImpuesto, onCapturarProveedor, proveedores = [],
 }: RenglonProps) {
   const target = compararConTarget(linea);
 
@@ -498,12 +511,29 @@ function Renglon({
             <span className="text-gray-600">{linea.proveedorNombre}</span>
           )
         ) : aceptaTarifas ? (
-          <button
-            onClick={() => onComparar(linea.id)}
-            className="text-[11px] font-semibold text-primario hover:underline"
-          >
-            Elegir proveedor
-          </button>
+          <div className="flex flex-col gap-1 items-start">
+            <button
+              onClick={() => onComparar(linea.id)}
+              className="text-[11px] font-semibold text-primario hover:underline"
+            >
+              Elegir del catálogo →
+            </button>
+            {/*
+              Bloque 1 · El callejón: un costo tecleado a mano nacía sin
+              proveedor y sin forma de ponerle uno, y el freno se lo pedía.
+              Aquí se captura, creando una tarifa DENTRO de la cotización.
+              La moneda se elige: nada de caer a USD, que es como un costo en
+              pesos terminaba rotulado en dólares.
+            */}
+            {onCapturarProveedor && !linea.costoDerivado && linea.costo > 0 && (
+              <CapturaProveedor
+                proveedores={proveedores}
+                costo={linea.costo}
+                onCapturar={(id, nombre, moneda) =>
+                  onCapturarProveedor(linea.id, id, nombre, moneda)}
+              />
+            )}
+          </div>
         ) : (
           <span className="text-gray-300">—</span>
         )}
@@ -536,7 +566,16 @@ function Renglon({
               ? `Viene de ${linea.tarifasCount} tarifa(s) elegida(s). Para cambiarlo, cambia las tarifas.`
               : undefined}
           >
-            {linea.costoDerivado && <Lock className="w-3 h-3 text-gray-300" />}
+            {linea.costoDerivado && (
+              <button
+                type="button"
+                onClick={e => { e.stopPropagation(); onComparar(linea.id); }}
+                title="Ver de dónde viene este costo"
+                className="shrink-0"
+              >
+                <Lock className="w-3 h-3 text-gray-300 hover:text-primario" />
+              </button>
+            )}
             ${money(linea.costo)}
           </span>
         )}
@@ -657,5 +696,83 @@ function CeldaImpuesto({ linea, impuesto, editable, onElegir }: {
         )}
       </div>
     </td>
+  );
+}
+
+// ─── Bloque 1 · Capturar proveedor para un costo tecleado a mano ──────────────
+
+/**
+ * Proveedor y moneda para un costo que se tecleó sin tarifa.
+ *
+ * La moneda NO tiene valor por omisión: elegirla es parte de capturar. Un
+ * costo en pesos rotulado en dólares se ve perfectamente bien y solo se
+ * descubre cuando llega a una factura.
+ */
+function CapturaProveedor({ proveedores, costo, onCapturar }: {
+  proveedores: ProveedorVermur[];
+  costo: number;
+  onCapturar: (proveedorId: string, nombre: string, moneda: 'MXN' | 'USD') => void;
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const [provId, setProvId] = useState('');
+  const [moneda, setMoneda] = useState<'MXN' | 'USD' | ''>('');
+
+  if (!abierto) {
+    return (
+      <button
+        type="button"
+        onClick={e => { e.stopPropagation(); setAbierto(true); }}
+        className="text-[10px] text-gray-500 hover:text-primario hover:underline"
+      >
+        + Capturar proveedor de este costo
+      </button>
+    );
+  }
+
+  const prov = proveedores.find(p => p.id === provId);
+  const listo = !!prov && !!moneda;
+
+  return (
+    <div className="flex flex-col gap-1" onClick={e => e.stopPropagation()}>
+      <select
+        value={provId}
+        onChange={e => setProvId(e.target.value)}
+        className="text-[11px] border border-gray-200 rounded px-1 py-0.5 max-w-[150px]"
+      >
+        <option value="">— Proveedor —</option>
+        {proveedores.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+      </select>
+
+      <div className="flex items-center gap-1">
+        <select
+          value={moneda}
+          onChange={e => setMoneda(e.target.value as 'MXN' | 'USD' | '')}
+          className="text-[11px] border border-gray-200 rounded px-1 py-0.5"
+        >
+          <option value="">— Moneda —</option>
+          <option value="MXN">MXN</option>
+          <option value="USD">USD</option>
+        </select>
+        <span className="text-[10px] text-gray-400 tabular-nums">${money(costo)}</span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          disabled={!listo}
+          onClick={() => prov && moneda && onCapturar(prov.id, prov.nombre, moneda)}
+          className="text-[10px] font-bold text-primario hover:underline disabled:opacity-40"
+        >
+          Guardar
+        </button>
+        <button
+          type="button"
+          onClick={() => setAbierto(false)}
+          className="text-[10px] text-gray-400 hover:text-gray-600"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
   );
 }

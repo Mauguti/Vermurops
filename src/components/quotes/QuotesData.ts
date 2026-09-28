@@ -69,6 +69,22 @@ export interface CotizacionProveedor {
   conceptoId?: string | null;
   /** FK a TarifaVermur.id — trazabilidad: de qué tarifa del catálogo provino. */
   tarifaOrigenId?: string | null;
+
+  /**
+   * Se capturó DENTRO de esta cotización, no vino del tarifario.
+   *
+   * Es un precio negociado para esta operación, no una tarifa publicada del
+   * proveedor: no se escribe en el catálogo general. El candado del costo lo
+   * lee para decir de dónde viene el número. Ver `lib/tarifaManual`.
+   */
+  capturadaEnCotizacion?: boolean;
+
+  /**
+   * Modalidad del servicio que la contiene. No hace falta para encontrarla
+   * —vive dentro del concepto— pero sí para que el filtro por modalidad nunca
+   * la confunda con una de otra.
+   */
+  modalidad?: string;
 }
 
 
