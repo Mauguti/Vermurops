@@ -92,6 +92,8 @@ export interface EmbarqueCierres {
   administrativo: boolean;
 }
 
+import type { TipoCambioCotizacion } from '../../lib/monedaComparativa';
+
 export type MonedaCargo = 'USD' | 'MXN';
 
 /** De dónde salió la línea: heredada de la cotización o capturada a mano. */
@@ -285,7 +287,7 @@ export interface EmbarqueDocumento {
  */
 export type EventoBitacora =
   | 'etapa' | 'cierre' | 'cargo' | 'orden_compra' | 'factura' | 'cobro'
-  | 'entidad' | 'responsable' | 'documento' | 'otro';
+  | 'entidad' | 'responsable' | 'documento' | 'tipo_cambio' | 'otro';
 
 export interface EntradaBitacora {
   id: string;
@@ -440,6 +442,23 @@ export interface EmbarqueCompleto {
   descripcionCarga: string;
   valorDeclarado: number;
   cierres: EmbarqueCierres;
+  /**
+   * Bloque 12 · El tipo de cambio con el que se cotizó, heredado al abrir el
+   * embarque.
+   *
+   * Se COPIA de la cotización, no se relee: una tasa que cambia sola
+   * reordenaría los costos de un embarque ya operado y contradiría la
+   * decisión con la que se cotizó (§4.3). Viaja con su fuente y su fecha,
+   * porque un número sin ellas no se puede defender ante el cliente.
+   *
+   * Ausente = el embarque nació antes de este bloque, o su cotización no
+   * declaraba ninguno. En ese caso los costos en otra moneda NO se comparan:
+   * `margenRealConcepto` dice «Sin tipo de cambio» en vez de inventar uno.
+   *
+   * Operaciones puede corregirlo a mano; el cambio queda en la bitácora.
+   */
+  tipoCambio?: TipoCambioCotizacion;
+
   cargos: EmbarqueCargos;
   documentos: EmbarqueDocumento[];
   eventos: EmbarqueEvento[];

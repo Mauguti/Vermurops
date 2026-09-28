@@ -168,6 +168,13 @@ export function construirEmbarqueDesdeCotizacion(d: DatosGeneracion): EmbarqueCo
     valorDeclarado: 0,
     cierres: { operativo: false, pago: false, administrativo: false },
 
+    /*
+     * Bloque 12 · Se copia el de la cotización. La clave se OMITE cuando no
+     * hay: Firestore rechaza `undefined` y tumbaría la escritura del embarque
+     * entero.
+     */
+    ...(quote.tipoCambio ? { tipoCambio: quote.tipoCambio } : {}),
+
     cargos: recalcularCargos(cargos),
 
     documentos: [],

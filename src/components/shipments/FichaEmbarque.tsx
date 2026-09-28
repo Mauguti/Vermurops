@@ -446,6 +446,12 @@ export default function FichaEmbarque({
   const ctxMargen: ContextoMargen = {
     ordenes: new Map(ocDelEmbarque.map(o => [o.id, o])),
     cargos: embarque.cargos.detalles ?? [],
+    /*
+     * Bloque 12 · El tipo de cambio heredado de la cotización. Sin él, un
+     * costo en otra moneda no se compara en vez de convertirse con una tasa
+     * inventada (§4.3).
+     */
+    tipoCambio: embarque.tipoCambio?.valor ?? null,
   };
   const margenEmbarque = new Map(
     margenDelEmbarque(embarque.cargos.detalles ?? [], ctxMargen).map(f => [f.moneda, f]),
@@ -1086,6 +1092,7 @@ export default function FichaEmbarque({
                  * convertirse con una tasa inventada (§4.3).
                  */
                 ordenes={ocDelEmbarque}
+                tipoCambio={embarque.tipoCambio?.valor ?? null}
                 editable={puedeEditarCargos}
                 nombreProveedor={nombreProveedor}
                 onEditarMonto={handleEditarMontoCargo}
@@ -1332,6 +1339,59 @@ export default function FichaEmbarque({
                         </div>
                       ))}
                     </div>
+                  )}
+                </div>
+
+                {/*
+                  Bloque 12 · El tipo de cambio del embarque. Se hereda de la
+                  cotización y Operaciones puede corregirlo; el cambio queda en
+                  la bitácora con el valor anterior, porque corregirlo mueve el
+                  costo real de todos los conceptos en otra moneda a la vez.
+
+                  Se enseña SIEMPRE, también cuando no hay: el silencio no
+                  distingue «no aplica» de «nadie lo puso», y sin él los costos
+                  en otra moneda no se comparan.
+                */}
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                    Tipo de cambio
+                  </p>
+                  {embarque.tipoCambio ? (
+                    <p className="text-xs font-mono text-gray-700">
+                      {embarque.tipoCambio.valor} MXN/USD
+                      <span className="text-[10px] text-gray-400 font-sans ml-1">
+                        · {embarque.tipoCambio.fuente} · {embarque.tipoCambio.fecha.slice(0, 10)}
+                      </span>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-amber-700">
+                      Sin tipo de cambio
+                      <span className="block text-[10px] text-gray-400 mt-0.5">
+                        Los costos en otra moneda no se comparan contra lo cotizado.
+                      </span>
+                    </p>
+                  )}
+                  {puedeEditarCargos && (
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="Corregir…"
+                      defaultValue={embarque.tipoCambio?.valor ?? ''}
+                      onBlur={e => {
+                        const v = Number(e.target.value);
+                        if (!Number.isFinite(v) || v <= 0 || v === embarque.tipoCambio?.valor) return;
+                        guardar({
+                          ...embarque,
+                          tipoCambio: {
+                            valor: Math.round(v * 10000) / 10000,
+                            base: 'USD', destino: 'MXN', fuente: 'manual',
+                            fecha: new Date().toISOString().slice(0, 10),
+                          },
+                          updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+                        });
+                      }}
+                      className="mt-1.5 w-full border border-gray-200 rounded-lg p-1.5 text-xs font-mono outline-none focus:border-primario"
+                    />
                   )}
                 </div>
 

@@ -163,6 +163,23 @@ export function diffParaBitacora(
       autor, ahora, antes.responsableOperativo ? `Antes: ${antes.responsableOperativo}` : undefined));
   }
 
+  // Tipo de cambio (Bloque 12)
+  const tc1 = antes.tipoCambio, tc2 = despues.tipoCambio;
+  if ((tc1?.valor ?? null) !== (tc2?.valor ?? null)
+      || (tc1?.fuente ?? '') !== (tc2?.fuente ?? '')) {
+    /*
+     * Se anota SIEMPRE, también cuando baja. Corregir el tipo de cambio mueve
+     * el costo real de todos los conceptos en otra moneda a la vez, así que
+     * quién lo tocó y con qué tasa es lo primero que alguien va a preguntar
+     * cuando un margen no cuadre.
+     */
+    const antesTxt = tc1 ? `${tc1.valor} (${tc1.fuente}, ${tc1.fecha.slice(0, 10)})` : 'sin tipo de cambio';
+    const despuesTxt = tc2 ? `${tc2.valor} (${tc2.fuente}, ${tc2.fecha.slice(0, 10)})` : 'sin tipo de cambio';
+    out.push(entradaSistema('tipo_cambio',
+      tc2 ? `${quien} fijó el tipo de cambio en ${tc2.valor}` : `${quien} quitó el tipo de cambio`,
+      autor, ahora, `${antesTxt} → ${despuesTxt}`));
+  }
+
   // Entidades y transportista
   (Object.keys(ROLES) as (keyof EmbarqueEntidades)[]).forEach(rol => {
     const a = antes.entidades?.[rol] ?? '', d = despues.entidades?.[rol] ?? '';
@@ -219,7 +236,8 @@ export function filtrarBitacora(bitacora: readonly EntradaBitacora[], filtro: Fi
 /** Etiqueta corta del evento, para el icono/badge. */
 export const ETIQUETA_EVENTO: Record<EventoBitacora, string> = {
   etapa: 'Etapa', cierre: 'Cierre', cargo: 'Cargo', orden_compra: 'Orden de compra', factura: 'Factura',
-  cobro: 'Cobro', entidad: 'Entidad', responsable: 'Responsable', documento: 'Documento', otro: 'Sistema',
+  cobro: 'Cobro', entidad: 'Entidad', responsable: 'Responsable', documento: 'Documento',
+  tipo_cambio: 'Tipo de cambio', otro: 'Sistema',
 };
 
 /** Lo que registra un cargo con OC, para los hooks que no ven el embarque entero. */
