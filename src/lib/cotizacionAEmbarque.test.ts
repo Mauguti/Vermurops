@@ -444,3 +444,35 @@ describe('la tasa elegida al cotizar llega al embarque', () => {
     expect('impuesto' in gasto).toBe(false);
   });
 });
+
+// ─── La ubicación del concepto viaja al embarque ─────────────────────────────
+
+describe('el embarque hereda la ubicación del CONCEPTO', () => {
+  const linea = {
+    id: 'L1', servicioId: 'S1', servicioTipo: 'maritimo', concepto: 'Maniobras destino',
+    conceptoId: 'CON-DEST', conceptoLocalId: 'c1', proveedorNombre: 'X', moneda: 'USD',
+    costo: 100, profit: 20, venta: 120, margen: 0, costoDerivado: false,
+    tarifasOficiales: 0, costos: [], costoCapturado: true,
+    ubicacion: 'origen' as const,
+  };
+
+  it('un concepto de destino en un servicio marcado origen viaja como destino', () => {
+    // Sin esto, el embarque —y de ahí la factura— salían en 0%.
+    const { cargos } = mapearLineasAEmbarque([linea as never], 'COT-1', {
+      conceptos: [{ id: 'CON-DEST', aplicaOrigen: false, aplicaDestino: true }],
+    });
+    expect(cargos.find(c => c.tipo === 'ingreso')!.ubicacionIVA).toBe('destino');
+  });
+
+  it('sin catálogo se hereda la del servicio, como antes', () => {
+    const { cargos } = mapearLineasAEmbarque([linea as never], 'COT-1');
+    expect(cargos.find(c => c.tipo === 'ingreso')!.ubicacionIVA).toBe('origen');
+  });
+
+  it('un concepto que aplica a los dos lados también hereda la del servicio', () => {
+    const { cargos } = mapearLineasAEmbarque([linea as never], 'COT-1', {
+      conceptos: [{ id: 'CON-DEST', aplicaOrigen: true, aplicaDestino: true }],
+    });
+    expect(cargos.find(c => c.tipo === 'ingreso')!.ubicacionIVA).toBe('origen');
+  });
+});

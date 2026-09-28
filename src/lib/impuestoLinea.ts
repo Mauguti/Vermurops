@@ -35,7 +35,7 @@
  * Lógica pura: sin React ni Firestore.
  */
 
-import type { ReglaIVA } from '../components/conceptos/ConceptosData';
+import type { ReglaIVA, ConceptoVermur } from '../components/conceptos/ConceptosData';
 import type { ServicioSolicitado } from '../components/quotes/QuotesData';
 import { ivaDeLinea, montoIVA, montoRetencion } from './ivaCotizacion';
 
@@ -94,6 +94,11 @@ export function impuestoDeLinea(
   capturado: OpcionImpuesto | null | undefined,
   reglaIVA: ReglaIVA | null | undefined,
   servicio: ServicioSolicitado,
+  /**
+   * El concepto del catálogo. Cuando declara un solo lado —origen o destino—
+   * esa es la ubicación del renglón, aunque su servicio diga otra cosa.
+   */
+  concepto?: Pick<ConceptoVermur, 'aplicaOrigen' | 'aplicaDestino'> | null,
 ): ImpuestoLinea {
   if (capturado) {
     return { opcion: capturado, tasa: TASA_DE_OPCION[capturado], origen: 'capturado' };
@@ -103,7 +108,7 @@ export function impuestoDeLinea(
     return { opcion: 'exento', tasa: 0, origen: 'derivado' };
   }
 
-  const r = ivaDeLinea(reglaIVA, servicio);
+  const r = ivaDeLinea(reglaIVA, servicio, concepto);
   if (!r.iva) {
     return { opcion: null, tasa: null, origen: 'indeterminado', detalle: r.detalle };
   }

@@ -4,6 +4,7 @@ import EmbarquesList from './shipments/EmbarquesList';
 import FichaEmbarque from './shipments/FichaEmbarque';
 import { useEmbarques } from '../hooks/useEmbarques';
 import { useCotizaciones } from '../hooks/useCotizaciones';
+import { useConceptos } from '../hooks/useConceptos';
 import { useClientes } from '../hooks/useClientes';
 import CotizacionesGanadas from './shipments/CotizacionesGanadas';
 import { agruparPorEstado, estadoDe, ETAPAS_EMBARQUE } from '../lib/estadoEmbarque';
@@ -29,6 +30,8 @@ export default function Shipments() {
   const { embarques, loading, error, guardarEmbarque } = useEmbarques();
   const { quotes, updateCotizacion } = useCotizaciones();
   const { clientes } = useClientes();
+  /** Para resolver la ubicación de cada cargo por su concepto (regla espejo). */
+  const { conceptos: conceptosCatalogo } = useConceptos();
   const { user, puede } = useAuth();
   const { serviciosActivos } = useServicios();
   const [selectedEmbarqueId, setSelectedEmbarqueId] = useState<string | null>(null);
@@ -219,7 +222,15 @@ export default function Shipments() {
     if (!EMBARQUE_AUTOMATICO_DISPONIBLE) {
       try {
         const cliente = clientes.find(c => c.id === quote.clienteId) ?? null;
-        const { cargos, advertencias } = mapearCotizacionAEmbarque(quote, { cliente });
+        /*
+         * El catálogo va en el contexto para que la ubicación de cada cargo
+         * salga del CONCEPTO cuando éste declara un solo lado. Sin él, un
+         * servicio marcado «origen» mandaba al embarque —y de ahí a la
+         * factura— también sus conceptos de destino, en 0%.
+         */
+        const { cargos, advertencias } = mapearCotizacionAEmbarque(quote, {
+          cliente, conceptos: conceptosCatalogo,
+        });
         /*
          * B3 (21-sep-2026): la ruta manual ya usa la SERIE que Operaciones
          * elige (VLIM, VLIT…), no el SHP- genérico. Del prefijo sale el

@@ -47,9 +47,44 @@ export interface ResultadoIVALinea {
  * @param reglaIVA  Regla del concepto del catálogo (105 conceptos, §4.4).
  * @param servicio  Servicio al que pertenece la línea.
  */
+/**
+ * Dónde ocurre ESTE concepto, que no siempre es donde ocurre su servicio.
+ *
+ * ── El bug que cierra ──────────────────────────────────────────────────────
+ * La ubicación vivía SOLO en el servicio, así que un marítimo de importación
+ * marcado «origen» ponía en 0% a TODOS sus conceptos, incluidos los que
+ * ocurren en destino. Sobre la regla espejo (§4.2) eso es IVA de menos.
+ *
+ * ── Lo que el catálogo ya sabe ─────────────────────────────────────────────
+ * Cada concepto trae `aplicaOrigen` y `aplicaDestino`. Cuando declara UNA
+ * sola, esa manda: un concepto que solo existe en destino ocurre en destino,
+ * esté donde esté marcado el servicio.
+ *
+ * Cuando declara las dos —o ninguna— el catálogo no sabe distinguir, y se cae
+ * al servicio, que es lo que había. No se inventa: se usa el único dato que
+ * queda.
+ *
+ * Alcance real: de los 105 conceptos solo 17 usan la regla espejo (los demás
+ * son tasa fija, exentos, retención o «revisar», y no miran la ubicación). De
+ * esos 17, ocho declaran un solo lado y quedan resueltos aquí; los nueve
+ * restantes siguen dependiendo del servicio. Para ésos hace falta ubicación
+ * por renglón, que es modelo nuevo.
+ */
+export function ubicacionDeLinea(
+  concepto: Pick<ConceptoVermur, 'aplicaOrigen' | 'aplicaDestino'> | null | undefined,
+  servicio: Pick<ServicioSolicitado, 'ubicacion'>,
+): 'origen' | 'destino' | undefined {
+  if (concepto) {
+    if (concepto.aplicaOrigen && !concepto.aplicaDestino) return 'origen';
+    if (concepto.aplicaDestino && !concepto.aplicaOrigen) return 'destino';
+  }
+  return servicio.ubicacion;
+}
+
 export function ivaDeLinea(
   reglaIVA: ReglaIVA | undefined | null,
   servicio: ServicioSolicitado,
+  concepto?: Pick<ConceptoVermur, 'aplicaOrigen' | 'aplicaDestino'> | null,
 ): ResultadoIVALinea {
   if (!reglaIVA) {
     return {
@@ -64,17 +99,18 @@ export function ivaDeLinea(
     return { iva: null, motivo: 'sin_trafico', detalle: motivo };
   }
 
-  if (!servicio.ubicacion) {
+  const ubicacion = ubicacionDeLinea(concepto, servicio);
+  if (!ubicacion) {
     return {
       iva: null,
       motivo: 'sin_ubicacion',
-      detalle: 'El servicio no declara si ocurre en origen o en destino, que es la otra mitad de la regla espejo (§4.2).',
+      detalle: 'Ni el concepto ni el servicio declaran si ocurre en origen o en destino, que es la otra mitad de la regla espejo (§4.2).',
     };
   }
 
   const contexto: ContextoIVA = {
     trafico: traficoParaIVA(trafico),
-    ubicacion: servicio.ubicacion,
+    ubicacion,
   };
 
   const iva = calcularIVA(reglaIVA, contexto);
