@@ -1,3 +1,4 @@
+import type { CambioEnLista } from '../../lib/edicionEnLista';
 // ============================================================
 // ClientesData.ts — Modelo de datos del módulo de Clientes
 //
@@ -142,6 +143,9 @@ export interface ClienteVermur {
   responsableVentas?: string | null;
   responsablePricing?: string | null;
   responsableOperativo?: string | null;
+
+  /** Bloque 14 · Quién cambió qué desde la lista y cuándo. Aditivo. */
+  cambios?: CambioEnLista[];
 
   // ── Preferencias de proveedores (CP-1: comparativa de pricing) ────────────
   /** IDs de ProveedorVermur que el cliente prefiere. */
