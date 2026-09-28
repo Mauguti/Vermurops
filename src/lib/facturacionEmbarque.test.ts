@@ -218,3 +218,64 @@ describe('traficoDeFolio', () => {
     expect(traficoDeFolio('')).toBeNull();
   });
 });
+
+// ─── La tasa que Pricing eligió manda sobre lo derivado ──────────────────────
+
+describe('lineaDeFactura — la tasa elegida en la cotización', () => {
+  it('«revisar» + IVA 16% elegido a mano: se factura al 16, no en cero', () => {
+    /*
+     * El bug que motivó el arreglo: el bloque 3 escribía la elección y la
+     * heredaba al embarque, y aquí nadie la leía. Una línea con concepto
+     * «revisar» donde Pricing puso 16% se facturaba en CERO con aviso — la
+     * decisión se tomaba y la factura la ignoraba.
+     */
+    const l = lineaDeFactura(
+      cargo({ conceptoId: 'CON-REVISAR', monto: 1000, impuesto: 'iva16' }), ctx,
+    );
+    expect(l.tasaIVA).toBe(16);
+    expect(l.montoIVA).toBe(160);
+    expect(l.avisoIVA).toBeUndefined();
+  });
+
+  it('manda sobre la regla del catálogo, no solo sobre «revisar»', () => {
+    // El seguro es exento; este cliente lo pidió con IVA.
+    const l = lineaDeFactura(
+      cargo({ conceptoId: 'CON-EXENTO', monto: 1000, impuesto: 'iva16' }), ctx,
+    );
+    expect(l.tasaIVA).toBe(16);
+    expect(l.montoIVA).toBe(160);
+  });
+
+  it('IVA 0% elegido a mano da cero SIN aviso: es una decisión, no un hueco', () => {
+    const l = lineaDeFactura(cargo({ monto: 1000, impuesto: 'iva0' }), ctx);
+    expect(l.tasaIVA).toBe(0);
+    expect(l.montoIVA).toBe(0);
+    expect(l.avisoIVA).toBeUndefined();
+  });
+
+  it('«exento» conserva por qué es cero: no es lo mismo que tasa cero', () => {
+    const l = lineaDeFactura(cargo({ monto: 1000, impuesto: 'exento' }), ctx);
+    expect(l.montoIVA).toBe(0);
+    expect(l.avisoIVA).toMatch(/fuera del objeto/i);
+  });
+
+  it('sin elección, se sigue derivando como antes', () => {
+    expect(lineaDeFactura(cargo({ monto: 1000 }), ctx).tasaIVA).toBe(16);
+  });
+
+  it('sin elección y con concepto «revisar», sigue el aviso y NO se asume tasa', () => {
+    const l = lineaDeFactura(cargo({ conceptoId: 'CON-REVISAR', monto: 1000 }), ctx);
+    expect(l.tasaIVA).toBe(0);
+    expect(l.montoIVA).toBe(0);
+    expect(l.avisoIVA).toMatch(/revisar/i);
+  });
+
+  it('la elección funciona aunque el embarque no declare tráfico ni ubicación', () => {
+    // Es una decisión de Pricing, no una derivación: no necesita el contexto.
+    const l = lineaDeFactura(
+      cargo({ monto: 1000, impuesto: 'iva16', ubicacionIVA: undefined }),
+      { trafico: null, conceptos: CATALOGO },
+    );
+    expect(l.tasaIVA).toBe(16);
+  });
+});
