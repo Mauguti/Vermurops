@@ -22,6 +22,7 @@ import type { ConceptoVermur } from '../components/conceptos/ConceptosData';
 import type { Moneda } from './sumarPorMoneda';
 import { calcularIVA, type ContextoIVA } from './calcularIVA';
 import { montoIVA, montoRetencion } from './ivaCotizacion';
+import { TASA_DE_OPCION } from './impuestoLinea';
 import { programarPago } from './calendarioPagos';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -59,6 +60,32 @@ export function lineaDeFactura(
     montoIVA: 0,
     montoRetencion: 0,
   };
+
+  /*
+   * La tasa que Pricing ELIGIÓ en la cotización manda sobre lo derivado.
+   *
+   * Es el mismo orden que en la ficha (`lib/impuestoLinea`): el catálogo
+   * precarga, la persona decide. Quien sabe si ESTE cliente quiere el seguro
+   * con IVA, o si al agente se le cotizó con IVA incluido, es Pricing.
+   *
+   * Faltaba el call site: el bloque 3 escribió el campo y lo heredó al
+   * embarque, y aquí nadie lo leía. Una línea con concepto «revisar» donde
+   * Pricing puso IVA 16% se facturaba en CERO con aviso — es decir, la
+   * decisión se tomaba y la factura la ignoraba.
+   */
+  if (cargo.impuesto) {
+    const tasa = TASA_DE_OPCION[cargo.impuesto];
+    return {
+      ...base,
+      tasaIVA: tasa,
+      montoIVA: Math.round(cargo.monto * (tasa / 100) * 100) / 100,
+      // `exento` y `iva0` dan el mismo dinero y no son lo mismo para el SAT:
+      // el aviso conserva cuál de los dos se eligió.
+      ...(cargo.impuesto === 'exento'
+        ? { avisoIVA: 'Exento por decisión de Pricing: fuera del objeto del impuesto, no tasa cero.' }
+        : {}),
+    };
+  }
 
   const concepto = cargo.conceptoId
     ? ctx.conceptos.find(c => c.id === cargo.conceptoId)
