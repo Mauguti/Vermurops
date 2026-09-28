@@ -1158,10 +1158,27 @@ export default function FichaCotizacion({
    * el enlace «Elegir proveedor», que aparece cuando la línea NO tiene
    * proveedor: una línea ya resuelta quedaba fuera del alcance del panel.
    */
+  /**
+   * «Elegir proveedor» — lo que Operaciones reportó como «no pasa nada».
+   *
+   * El botón SÍ hacía algo: marcaba el concepto como activo, que es lo que
+   * filtra el catálogo de tarifas. Pero el catálogo está más abajo en la
+   * columna —y desde el Bloque 4 quedó en tercer lugar—, así que quien pulsa
+   * se queda mirando la misma tabla y concluye que el botón está muerto.
+   *
+   * Un efecto fuera de la pantalla es indistinguible de ningún efecto. Ahora
+   * el catálogo se abre si estaba plegado y sube a la vista, con el mismo
+   * patrón que «Vincular cliente →».
+   */
   const handleCompararProveedor = (lineaId: string) => {
     const linea = lineasPlanas.find(l => l.id === lineaId);
     if (!linea?.conceptoLocalId) return;
     handleConceptoActivate(linea.conceptoLocalId, linea.servicioId);
+    setCatalogoAbierto(true);
+    setTimeout(() => {
+      document.getElementById('catalogo-tarifas')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
   };
 
   /*
@@ -1748,7 +1765,7 @@ export default function FichaCotizacion({
                 vía el concepto activo, igual que siempre. Ya no se oculta en
                 móvil: abajo no le roba ancho a nadie. */}
             {rolActivo !== 'ventas' && (
-              <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+              <div id="catalogo-tarifas" className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden scroll-mt-4">
                 <button
                   onClick={() => setCatalogoAbierto(v => !v)}
                   className="w-full flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/60"
