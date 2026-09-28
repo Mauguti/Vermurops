@@ -46,6 +46,7 @@ import {
   reordenarLinea, aplicarOrden, estaCongelada, moverLineaDeServicio,
   repararConceptosDuplicados,
 } from '../../lib/lineasCotizacion';
+import { totalDeCotizacion, tieneTotal, NOTA_VARIAS_MONEDAS } from '../../lib/totalCotizacion';
 import type { LineaPlana } from '../../lib/lineasCotizacion';
 import {
   impuestoDeLinea, type OpcionImpuesto,
@@ -717,9 +718,6 @@ export default function FichaCotizacion({
 
   // ─── Total consolidado ───────────────────────────────────────────────────
 
-  const totalConsolidado = quote.valorTotalConsolidado > 0
-    ? quote.valorTotalConsolidado
-    : calcularTotalConsolidado(quote.servicios);
 
   /**
    * Margen de la OPERACIÓN COMPLETA, no de un concepto.
@@ -757,10 +755,26 @@ export default function FichaCotizacion({
    * líneas en USD: el número era de una moneda y el rótulo de otra. La
    * etiqueta sale de las MISMAS líneas que producen el número.
    */
-  const totalEncabezado = useMemo(() => {
-    const t = sumarPorMoneda(lineasPlanas, l => l.venta, l => l.moneda);
-    return monedasConMonto(t).length > 0 ? formatearPorMoneda(t) : null;
-  }, [lineasPlanas]);
+  /*
+   * Bloque B · UN solo total, para el encabezado y para el desglose.
+   *
+   * Antes el desglose leía `quote.valorTotalConsolidado` —un campo GUARDADO
+   * que ganaba sobre el cálculo— y, cuando sí calculaba, sumaba las ventas sin
+   * mirar la moneda. En COT-2026-0034 eso daba «$26,660 USD» abajo contra
+   * «USD 26,550.00 + MXN 70.00» arriba.
+   *
+   * Ahora siempre manda lo calculado, por moneda. El guardado no se toca ni se
+   * migra —hay cotizaciones vivas que lo traen— pero se declara aparte cuando
+   * difiere: un número viejo declarado no engaña; uno disfrazado de actual, sí.
+   */
+  const total = useMemo(
+    () => totalDeCotizacion(lineasPlanas, quote.valorTotalConsolidado),
+    [lineasPlanas, quote.valorTotalConsolidado],
+  );
+  /** ¿Hay algo que enseñar? Sustituye al viejo `totalConsolidado > 0`. */
+  const hayTotal = tieneTotal(total);
+
+  const totalEncabezado = total.texto || null;
 
   /**
    * Qué le falta a la cotización para poder avanzar (BC-1).
@@ -1330,7 +1344,7 @@ export default function FichaCotizacion({
   const TABS = TODAS_LAS_TABS.filter(t => (tabsPermitidas as string[]).includes(t.id));
 
   const renderConsolidadoPanel = () => {
-    if (totalConsolidado === 0) return null;
+    if (!hayTotal) return null;
 
     return (
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mt-6">
@@ -1417,9 +1431,22 @@ export default function FichaCotizacion({
                 {textoBaseDelTotal(quote)}
               </p>
             </div>
-            <p className="text-2xl font-black text-primario tabular-nums">
-              ${totalConsolidado.toLocaleString()} <span className="text-sm font-bold text-primario/70">{quote.moneda}</span>
-            </p>
+            <div className="text-right">
+              {/* Bloque B · El MISMO número del encabezado, por moneda. */}
+              <p className="text-2xl font-black text-primario tabular-nums">
+                {total.texto}
+              </p>
+              {total.variasMonedas && (
+                <p className="text-[9px] text-amber-700 max-w-[280px] mt-1">
+                  {NOTA_VARIAS_MONEDAS}
+                </p>
+              )}
+              {total.guardadoDistinto !== null && (
+                <p className="text-[9px] text-gray-400 mt-1">
+                  Total guardado anteriormente: ${total.guardadoDistinto.toLocaleString()}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -1858,7 +1885,7 @@ export default function FichaCotizacion({
           <div className="mb-6 space-y-4">
             {/* Margen de la OPERACIÓN, sin desglose. Es lo único de rentabilidad
                 que Ventas necesita: «que vean la coti y el margen. Eso es todo». */}
-            {visible.margenGeneral && totalConsolidado > 0 && (
+            {visible.margenGeneral && hayTotal && (
               <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm flex items-center justify-between">
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Valor de la operación</p>

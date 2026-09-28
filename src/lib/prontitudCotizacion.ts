@@ -26,6 +26,16 @@ export interface Faltante {
   /** Nombre visible de la línea. Vacío si ni concepto tiene. */
   concepto: string;
   tipo: TipoFaltante;
+  /**
+   * El dato que hace verificable el faltante: «costo 110.00 USD» en
+   * `sin_proveedor`.
+   *
+   * Sin él, «(sin proveedor)» es un bloqueo mudo: quien lo lee no puede saber
+   * si el freno tiene razón, porque la regla depende de un costo que el
+   * mensaje no enseña. Con el número, o se asigna el proveedor o se ve que el
+   * costo está mal y se corrige.
+   */
+  detalle?: string;
 }
 
 /** Lo que se dice, pero no detiene a nadie. */
@@ -148,7 +158,10 @@ export function evaluarProntitud(quote: KanbanQuote): Prontitud {
       completas++;
       return;
     }
-    faltan.forEach(tipo => faltantes.push({ lineaId: l.id, concepto, tipo }));
+    faltan.forEach(tipo => faltantes.push({
+      lineaId: l.id, concepto, tipo,
+      ...(tipo === 'sin_proveedor' ? { detalle: `costo ${dinero(l.costo)} ${l.moneda}` } : {}),
+    }));
   });
 
   return {
@@ -162,9 +175,13 @@ export function evaluarProntitud(quote: KanbanQuote): Prontitud {
   };
 }
 
+const dinero = (n: number): string =>
+  n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
 /** Una línea de texto por faltante: «Maniobras de descarga — sin proveedor». */
 export function textoFaltante(f: Faltante): string {
-  return `${f.concepto} — ${TEXTO_FALTANTE[f.tipo]}`;
+  const base = `${f.concepto} — ${TEXTO_FALTANTE[f.tipo]}`;
+  return f.detalle ? `${base} · ${f.detalle}` : base;
 }
 
 /**
@@ -186,23 +203,41 @@ export function resumenFaltantes(p: Prontitud): string {
 }
 
 /** Agrupa los faltantes por línea, para no repetir el nombre del concepto. */
-export function faltantesPorLinea(
-  p: Prontitud,
-): { lineaId: string; concepto: string; tipos: TipoFaltante[] }[] {
-  const mapa = new Map<string, { lineaId: string; concepto: string; tipos: TipoFaltante[] }>();
+export interface GrupoFaltantes {
+  lineaId: string;
+  concepto: string;
+  tipos: TipoFaltante[];
+  /** Los detalles de esa línea, en el mismo orden que `tipos`. */
+  detalles: (string | undefined)[];
+}
+
+/** Agrupa los faltantes por línea, para no repetir el nombre del concepto. */
+export function faltantesPorLinea(p: Prontitud): GrupoFaltantes[] {
+  const mapa = new Map<string, GrupoFaltantes>();
 
   p.faltantes.forEach(f => {
-    const actual = mapa.get(f.lineaId) ?? { lineaId: f.lineaId, concepto: f.concepto, tipos: [] };
+    const actual = mapa.get(f.lineaId)
+      ?? { lineaId: f.lineaId, concepto: f.concepto, tipos: [], detalles: [] };
     actual.tipos.push(f.tipo);
+    actual.detalles.push(f.detalle);
     mapa.set(f.lineaId, actual);
   });
 
   return [...mapa.values()];
 }
 
-/** Frase para una línea con varios faltantes: «sin proveedor y sin monto». */
-export function textoFaltantesLinea(tipos: TipoFaltante[]): string {
-  const textos = tipos.map(t => TEXTO_FALTANTE[t]);
+/**
+ * Frase para una línea con varios faltantes: «sin proveedor · costo 110.00 USD
+ * y sin costo capturado».
+ *
+ * El detalle va pegado a su faltante, no al final: con dos faltantes, un
+ * número suelto al cierre no dice a cuál de los dos pertenece.
+ */
+export function textoFaltantesLinea(
+  tipos: TipoFaltante[], detalles: (string | undefined)[] = [],
+): string {
+  const textos = tipos.map((t, i) =>
+    detalles[i] ? `${TEXTO_FALTANTE[t]} · ${detalles[i]}` : TEXTO_FALTANTE[t]);
   if (textos.length === 1) return textos[0];
   return `${textos.slice(0, -1).join(', ')} y ${textos[textos.length - 1]}`;
 }
