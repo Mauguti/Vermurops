@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import { useNavegacion, TipoEntidad } from '../../../navegacion/NavegacionContext';
+import { urlDeEntidad } from '../../../lib/enlaceDirecto';
 
 /**
  * Un enlace a otra entidad: un clic, sin buscar.
@@ -19,15 +20,34 @@ export function EnlaceEntidad({
   title?: string;
 }) {
   const irA = useNavegacion();
+
+  /*
+   * Bloque 13 · Es un <a> con href de verdad, no un <button>.
+   *
+   * El clic normal sigue siendo el salto de dentro de la app —sin recargar,
+   * que es lo que hace útil el enlace mientras se captura—. Lo que cambia es
+   * que el navegador ahora puede hacer lo suyo: cmd+clic, clic de en medio y
+   * «abrir en pestaña nueva» del menú contextual funcionan solos, sin un
+   * botón aparte que haya que descubrir.
+   *
+   * Es la diferencia entre ver la ficha del proveedor Y perder la cotización
+   * a medio capturar, o verla al lado.
+   */
   return (
-    <button
-      onClick={() => irA({ tipo, id })}
-      title={title ?? `Abrir ${id}`}
+    <a
+      href={urlDeEntidad(tipo, id)}
+      onClick={e => {
+        // Los modificadores son del navegador: abrir en pestaña o ventana.
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+        e.preventDefault();
+        irA({ tipo, id });
+      }}
+      title={title ?? `Abrir ${id} · cmd+clic para pestaña nueva`}
       className="inline-flex items-center gap-1 font-mono text-[12px] font-semibold text-primario hover:underline"
     >
       {children ?? id}
       <ArrowUpRight className="w-3 h-3 shrink-0" />
-    </button>
+    </a>
   );
 }
 

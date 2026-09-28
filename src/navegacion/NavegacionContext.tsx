@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 /**
  * Navegación entre entidades (U-4).
@@ -52,10 +52,16 @@ const Ctx = createContext<Contexto>({
 });
 
 export function NavegacionProvider({
-  children, onCambiarVista,
+  children, onCambiarVista, destinoInicial = null,
 }: {
   children: React.ReactNode;
   onCambiarVista: (vista: string) => void;
+  /**
+   * Bloque 13 · Lo que pidió la URL (`?proveedor=PRV-0042`). Se salta UNA vez
+   * al montar; después la URL ya no manda. Vive aquí y no en `AppShell`
+   * porque `irA` solo existe dentro del proveedor.
+   */
+  destinoInicial?: Destino | null;
 }) {
   const [pendiente, setPendiente] = useState<Destino | null>(null);
 
@@ -63,6 +69,21 @@ export function NavegacionProvider({
     setPendiente(destino);
     onCambiarVista(MODULO[destino.tipo]);
   }, [onCambiarVista]);
+
+  /*
+   * El salto inicial va en un efecto y no en el `useState` de arriba: además
+   * de dejar el destino pendiente hay que cambiar de módulo, y hacerlo
+   * durante el render de otro componente es un `setState` en render.
+   *
+   * `saltoHecho` es una ref y no un estado: si fuera estado, el re-render que
+   * provoca volvería a entrar aquí antes de que el valor nuevo esté leído.
+   */
+  const saltoHecho = useRef(false);
+  useEffect(() => {
+    if (saltoHecho.current || !destinoInicial) return;
+    saltoHecho.current = true;
+    irA(destinoInicial);
+  }, [destinoInicial, irA]);
 
   const consumir = useCallback(() => setPendiente(null), []);
 

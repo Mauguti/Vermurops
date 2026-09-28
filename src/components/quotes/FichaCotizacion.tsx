@@ -75,7 +75,7 @@ import TablaConceptos, { ServicioDeLaTabla } from './TablaConceptos';
 import {
   FichaLayout, FichaHeader, FichaTabs, FichaFooter, BadgeEstado,
 } from '../ui/ficha/FichaLayout';
-import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
+import { BloqueEnlaces, EnlaceEntidad } from '../ui/ficha/EnlaceEntidad';
 import ProximosPasos from './ProximosPasos';
 import { buscarClientes } from '../../lib/buscarClientes';
 import { proximoPaso, pasoAtras } from '../../lib/proximosPasos';
@@ -1946,6 +1946,20 @@ export default function FichaCotizacion({
                           {clienteVinculado.rfc && (
                             <div className="text-[10px] text-gray-500 font-mono mt-0.5">RFC {clienteVinculado.rfc}</div>
                           )}
+                          {/*
+                            Bloque 13 · Abrir la ficha completa del cliente sin
+                            perder la cotización a medio capturar: clic normal
+                            salta dentro de la app, cmd+clic la abre al lado.
+                          */}
+                          <div className="mt-1">
+                            <EnlaceEntidad
+                              tipo="cliente"
+                              id={quote.clienteId!}
+                              title={`Abrir la ficha de ${clienteVinculado.nombre} · cmd+clic para pestaña nueva`}
+                            >
+                              Ver ficha del cliente
+                            </EnlaceEntidad>
+                          </div>
                         </div>
                       </div>
                       <button

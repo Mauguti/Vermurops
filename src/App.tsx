@@ -13,6 +13,7 @@ import { SolicitarRecuperacion, RestablecerContrasena } from './components/Recup
 import { leerAccionDeUrl } from './lib/recuperarContrasena';
 import Sidebar from './components/Sidebar';
 import { NavegacionProvider } from './navegacion/NavegacionContext';
+import { leerEntidadDeUrl, urlSinEntidad } from './lib/enlaceDirecto';
 import EmuladorBadge from './components/ui/EmuladorBadge';
 import { medirVistaDeSeccion } from './lib/analitica';
 import Dashboard from './components/Dashboard';
@@ -289,6 +290,22 @@ function AppShell() {
     medirVistaDeSeccion(vistaEfectiva, user.rol);
   }, [vistaEfectiva, user]);
 
+  /*
+   * Bloque 13 · La ficha que pidió la URL (`?proveedor=PRV-0042`). Se lee UNA
+   * vez y se limpia en el mismo efecto: recargar no debe volver a saltar, y
+   * un parámetro muerto colgando confunde a quien copie la URL después.
+   *
+   * Se conservan los parámetros que no son nuestros: `mode` y `oobCode` del
+   * correo de contraseña pasan por aquí.
+   */
+  const [destinoInicial] = useState(() => leerEntidadDeUrl(window.location.search));
+  useEffect(() => {
+    if (!destinoInicial) return;
+    window.history.replaceState(
+      null, '', urlSinEntidad(window.location.pathname, window.location.search),
+    );
+  }, [destinoInicial]);
+
   const safeNavigate = (view: string) => {
     // notifications is accessible to all roles
     if (view === 'notifications' || isAllowed(view)) {
@@ -325,7 +342,7 @@ function AppShell() {
        sus embarques) necesitan cambiar de módulo Y decirle al módulo qué
        abrir. El proveedor envuelve todo porque el origen y el destino del
        salto viven en módulos distintos. */
-    <NavegacionProvider onCambiarVista={safeNavigate}>
+    <NavegacionProvider onCambiarVista={safeNavigate} destinoInicial={destinoInicial}>
     <div className="flex min-h-screen bg-canvas font-sans">
       <Sidebar currentView={currentView} onChangeView={safeNavigate} />
 
