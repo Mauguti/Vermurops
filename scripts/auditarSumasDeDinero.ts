@@ -29,6 +29,7 @@ const MIRA_MONEDA = /\b(moneda|currency|porMoneda|sumarPorMoneda|MXN|USD)\b/;
  * Formato: 'ruta:línea aproximada' → motivo.
  */
 const LEGITIMOS: Record<string, string> = {
+  'src/lib/impuestoLinea.ts': 'Suma PORCENTAJES del split aéreo (25% al 16% + 75% al 0%) para la tasa efectiva, no dinero. El monto sale de montoImpuesto, que sí respeta la moneda del renglón.',
   'src/lib/matrizComparativa.ts': 'La matriz separa por moneda en monedaComparativa.ts, que es quien decide si hay total comparable.',
   'src/lib/ivaCotizacion.ts': 'Suma las partes de UN mismo importe (el split 25/75 del flete aéreo), todas en su moneda.',
   'src/components/ordenesCompra/OrdenesCompraData.ts': 'Anticipos: OC-0 decidió exigir la misma moneda y marcar para revisión manual. El guard va en C-6, donde se cruzan.',

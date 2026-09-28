@@ -188,7 +188,8 @@ export default function ProximosPasos({
 function LineaFaltantes({ prontitud, porque, accion }: { prontitud: Prontitud; porque: string; accion: string }) {
   const grupos = faltantesPorLinea(prontitud);
   const resumen = resumenFaltantes(prontitud);
-  const detalle = grupos.map(g => `${g.concepto || '(sin nombre)'} (${textoFaltantesLinea(g.tipos)})`);
+  const detalle = grupos.map(g =>
+    `${g.concepto || '(sin nombre)'} (${textoFaltantesLinea(g.tipos, g.detalles)})`);
   const visibles = detalle.slice(0, 3).join(' · ');
   const resto = detalle.length - 3;
 

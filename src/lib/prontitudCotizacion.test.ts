@@ -273,3 +273,38 @@ describe('costo cero: decisión, no olvido', () => {
     expect(textoFaltante(f)).toContain('sin costo capturado');
   });
 });
+
+// ─── A · El freno dice cuánto es el costo (COT-2026-0034) ────────────────────
+
+describe('el bloqueo por proveedor enseña el costo que lo provoca', () => {
+  it('«sin proveedor · costo 110.00 USD»', () => {
+    // Sin el número, el mensaje es un bloqueo mudo: quien lo lee no puede
+    // saber si el freno tiene razón, porque la regla depende de un costo que
+    // el mensaje no enseñaba.
+    const linea = concepto({
+      id: 'cA', nombre: 'Inland Freight Coordination', conceptoId: 'CON-055',
+      costo: 110, costoCapturado: true,
+    });
+    const p = evaluarProntitud(quote([linea]));
+    const f = p.faltantes.find(x => x.tipo === 'sin_proveedor')!;
+    expect(f.detalle).toBe('costo 110.00 USD');
+
+    const [g] = faltantesPorLinea(p);
+    expect(textoFaltantesLinea(g.tipos, g.detalles))
+      .toContain('sin proveedor · costo 110.00 USD');
+  });
+
+  it('el detalle va pegado a SU faltante, no al final', () => {
+    // Con dos faltantes, un número suelto al cierre no dice a cuál pertenece.
+    expect(textoFaltantesLinea(
+      ['sin_concepto', 'sin_proveedor'],
+      [undefined, 'costo 110.00 USD'],
+    )).toBe('sin concepto del catálogo y sin proveedor · costo 110.00 USD');
+  });
+
+  it('los demás faltantes no llevan detalle', () => {
+    const pelado = concepto({ id: 'cB', nombre: 'Gestoría' });
+    const p = evaluarProntitud(quote([pelado]));
+    expect(p.faltantes.every(f => f.tipo === 'sin_proveedor' || f.detalle === undefined)).toBe(true);
+  });
+});
