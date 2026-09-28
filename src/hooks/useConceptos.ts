@@ -10,7 +10,7 @@
  *  3. Expone { conceptos, loading, error, createConcepto, updateConcepto }.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { compararTexto } from '../lib/texto';
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, setDoc, updateDoc, getDocsFromServer } from 'firebase/firestore';
@@ -22,6 +22,13 @@ import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
+/**
+ * Compartido por TODAS las instancias del hook: el seed corre una vez por
+ * carga de la app, no una por componente que lo monte. Ver el comentario de
+ * abajo.
+ */
+let seedIntentado = false;
+
 export function useConceptos() {
   const { user } = useAuth();
 
@@ -29,8 +36,23 @@ export function useConceptos() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Evita que el seed corra más de una vez por sesión de usuario.
-  const seedAttempted = useRef(false);
+  /*
+   * El candado del seed vive a nivel de MÓDULO, no del hook.
+   *
+   * Era un `useRef`, o sea uno por INSTANCIA. Montar el hook en dos módulos
+   * —cotizaciones y embarques— creaba dos sembradores compitiendo: el
+   * recorrido e2e falló dos veces seguidas al elegir concepto, con el catálogo
+   * a medio sembrar.
+   *
+   * `evaluarSeed` ya descarta los snapshots de caché y `getDocsFromServer`
+   * confirma contra el servidor antes de escribir, pero las dos barreras son
+   * por instancia: dos hooks pueden pasarlas a la vez. El candado compartido
+   * cierra la ventana en el cliente, que es donde nace.
+   *
+   * Mismo patrón (`useRef`) en usePuertos, useTerminosPago, useProveedores,
+   * useClientes y useCotizaciones. Ahí el riesgo no se ha materializado porque
+   * cada uno se monta en un solo lugar; anotado, sin tocar.
+   */
 
   useEffect(() => {
     if (!user) {
@@ -45,8 +67,8 @@ export function useConceptos() {
         // evaluarSeed descarta los snapshots de caché: uno vacío NO prueba que
         // la colección esté vacía en el servidor, solo que este cliente aún no
         // la bajó. Ver src/lib/seedGuard.ts.
-        if (evaluarSeed(snapshot, seedAttempted.current).sembrar) {
-          seedAttempted.current = true;
+        if (evaluarSeed(snapshot, seedIntentado).sembrar) {
+          seedIntentado = true;
           try {
             // Segunda barrera, ya con el servidor de por medio: confirma que
             // 'conceptos' sigue vacía justo antes de escribir. Cubre la carrera

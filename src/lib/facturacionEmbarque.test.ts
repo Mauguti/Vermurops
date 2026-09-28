@@ -12,6 +12,7 @@ import {
 } from './facturacionEmbarque';
 import type { CargoDetalle } from '../components/shipments/EmbarquesData';
 import type { ConceptoVermur } from '../components/conceptos/ConceptosData';
+import { mapearLineasAEmbarque } from './cotizacionAEmbarque';
 
 const concepto = (over: Partial<ConceptoVermur> = {}): ConceptoVermur => ({
   id: 'CON-001', idSemantico: 'ocean_freight', nombre: 'Ocean Freight',
@@ -277,5 +278,56 @@ describe('lineaDeFactura — la tasa elegida en la cotización', () => {
       { trafico: null, conceptos: CATALOGO },
     );
     expect(l.tasaIVA).toBe(16);
+  });
+});
+
+// ─── El caso completo: cotización → embarque → factura ───────────────────────
+
+describe('un concepto de destino en un servicio marcado «origen» llega al 16%', () => {
+  /*
+   * El bug fiscal, de punta a punta. La ubicación vivía SOLO en el servicio,
+   * así que un marítimo de importación marcado «origen» ponía en 0% también
+   * sus conceptos de destino — y ese 0% viajaba al cargo del embarque por
+   * `ubicacionIVA` y de ahí a la factura.
+   */
+  const LINEA = {
+    id: 'L1', servicioId: 'S1', servicioTipo: 'maritimo',
+    concepto: 'Maniobras en destino', conceptoId: 'CON-DEST', conceptoLocalId: 'c1',
+    proveedorNombre: 'X', moneda: 'MXN', costo: 1000, profit: 0, venta: 1000,
+    margen: 0, costoDerivado: false, tarifasOficiales: 0, costos: [],
+    costoCapturado: true,
+    /** El SERVICIO dice origen. El concepto, no. */
+    ubicacion: 'origen' as const,
+  };
+
+  const CATALOGO_DEST = [
+    concepto({ id: 'CON-DEST', nombre: 'Maniobras en destino', reglaIVA: 'espejo' }),
+  ];
+
+  it('el cargo del embarque nace con ubicación destino', () => {
+    const { cargos } = mapearLineasAEmbarque([LINEA as never], 'COT-1', {
+      conceptos: [{ id: 'CON-DEST', aplicaOrigen: false, aplicaDestino: true }],
+    });
+    expect(cargos.find(c => c.tipo === 'ingreso')!.ubicacionIVA).toBe('destino');
+  });
+
+  it('y la factura lo cobra al 16%, no en cero', () => {
+    const { cargos } = mapearLineasAEmbarque([LINEA as never], 'COT-1', {
+      conceptos: [{ id: 'CON-DEST', aplicaOrigen: false, aplicaDestino: true }],
+    });
+    const ingreso = cargos.find(c => c.tipo === 'ingreso')!;
+    const l = lineaDeFactura(ingreso, { trafico: 'impo', conceptos: CATALOGO_DEST });
+    expect(l.tasaIVA).toBe(16);
+    expect(l.montoIVA).toBe(160);
+    expect(l.avisoIVA).toBeUndefined();
+  });
+
+  it('sin el catálogo en el mapeo, seguiría saliendo en cero', () => {
+    // Es la regresión que hay que evitar: el arreglo depende de que Embarques
+    // le pase los conceptos al mapeo.
+    const { cargos } = mapearLineasAEmbarque([LINEA as never], 'COT-1');
+    const ingreso = cargos.find(c => c.tipo === 'ingreso')!;
+    const l = lineaDeFactura(ingreso, { trafico: 'impo', conceptos: CATALOGO_DEST });
+    expect(l.tasaIVA).toBe(0);
   });
 });
