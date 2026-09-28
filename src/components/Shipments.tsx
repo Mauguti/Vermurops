@@ -4,6 +4,7 @@ import EmbarquesList from './shipments/EmbarquesList';
 import FichaEmbarque from './shipments/FichaEmbarque';
 import { useEmbarques } from '../hooks/useEmbarques';
 import { useCotizaciones } from '../hooks/useCotizaciones';
+import { useConceptos } from '../hooks/useConceptos';
 import { useClientes } from '../hooks/useClientes';
 import CotizacionesGanadas from './shipments/CotizacionesGanadas';
 import { agruparPorEstado, estadoDe, ETAPAS_EMBARQUE } from '../lib/estadoEmbarque';
@@ -29,6 +30,8 @@ export default function Shipments() {
   const { embarques, loading, error, guardarEmbarque } = useEmbarques();
   const { quotes, updateCotizacion } = useCotizaciones();
   const { clientes } = useClientes();
+  /** Para resolver la ubicación de cada cargo por su concepto (regla espejo). */
+  const { conceptos: conceptosCatalogo } = useConceptos();
   const { user, puede } = useAuth();
   const { serviciosActivos } = useServicios();
   const [selectedEmbarqueId, setSelectedEmbarqueId] = useState<string | null>(null);
@@ -220,18 +223,19 @@ export default function Shipments() {
       try {
         const cliente = clientes.find(c => c.id === quote.clienteId) ?? null;
         /*
-         * TODO · El catálogo debería ir en el contexto para que la ubicación
-         * de cada cargo salga del CONCEPTO cuando éste declara un solo lado
-         * (`ContextoMapeo.conceptos`, ya soportado y probado).
+         * El catálogo va en el contexto para que la ubicación de cada cargo
+         * salga del CONCEPTO cuando éste declara un solo lado. Sin él, un
+         * marítimo de importación marcado «origen» mandaba al embarque —y de
+         * ahí a la factura— también sus conceptos de destino, en 0%.
          *
-         * No se monta `useConceptos()` aquí porque ese hook SIEMBRA la
-         * colección, y una segunda instancia compite con la del módulo de
-         * cotizaciones: el recorrido e2e falló al elegir concepto con el
-         * catálogo a medio sembrar. Primero hay que mover el candado del seed
-         * a nivel de módulo; hasta entonces el cargo hereda la ubicación del
-         * servicio, como antes.
+         * Montar `useConceptos()` aquí era seguro solo después de mover el
+         * candado del seed a nivel de módulo: con el candado por instancia,
+         * este hook competía con el de cotizaciones y dejaba el catálogo a
+         * medio sembrar.
          */
-        const { cargos, advertencias } = mapearCotizacionAEmbarque(quote, { cliente });
+        const { cargos, advertencias } = mapearCotizacionAEmbarque(quote, {
+          cliente, conceptos: conceptosCatalogo,
+        });
         /*
          * B3 (21-sep-2026): la ruta manual ya usa la SERIE que Operaciones
          * elige (VLIM, VLIT…), no el SHP- genérico. Del prefijo sale el
