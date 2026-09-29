@@ -1,0 +1,243 @@
+/**
+ * borrador-por-rol.rules — reglas de Firestore con permisos por rol.
+ *
+ * BORRADOR. No desplegar sin revisión. Sustituye el parche de correos
+ * (esDelEquipo) por permisos basados en custom claims, puestos por la
+ * Function gestionarUsuarios.
+ *
+ * Qué cambia al desplegar:
+ *
+ * 1. esDelEquipo() → esDelEquipoPorClaim(). El acceso ya no depende de una
+ *    lista de correos sino del claim `rol` en el token, que solo la Function
+ *    puede poner. Un correo fuera de la lista pero con claim válido ENTRA;
+ *    un correo en la lista pero sin claim NO entra.
+ *
+ * 2. Los roles gobiernan las escrituras. Hoy cualquier autenticado del equipo
+ *    puede escribir cualquier colección. Con estas reglas, cada colección
+ *    exige la capacidad del negocio.
+ *
+ * 3. La colección usuarios/{uid} queda protegida: solo la Function (Admin SDK)
+ *    escribe; cada usuario lee solo su propio documento.
+ *
+ * QUÉ SE ROMPE al desplegarlas:
+ *
+ * - La siembra automática desde el navegador (seedGuard) deja de funcionar:
+ *   necesita poder escribir en todas las colecciones desde el cliente, y las
+ *   reglas por rol lo impiden. Solución: mover la siembra a una Function o a
+ *   un script con Admin SDK.
+ *
+ * - Los correos que hoy están en esDelEquipo() pero NO tienen custom claims
+ *   se quedan fuera. Hay que asignar claims a TODOS los usuarios del equipo
+ *   antes de desplegar. Orden: crear los documentos usuarios/{uid} con la
+ *   Function → verificar claims → desplegar reglas.
+ *
+ * - Las cuentas de prueba del emulador necesitan claims: sembrarEmuladores.sh
+ *   debe poner el claim después de crear la cuenta, o la Function debe correr
+ *   al arrancar el emulador.
+ *
+ * - info@digsol.com en las reglas debería ser info@digsol.com.mx.
+ *   Al migrar a claims, el correo deja de importar.
+ */
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Rol del usuario autenticado ─────────────────────────────────────────
+    // Requisito: gestionarUsuarios puso request.auth.token.rol al invitar o
+    // al cambiar el rol.
+
+    function rolDelUsuario() {
+      return request.auth != null
+        ? request.auth.token.rol
+        : null;
+    }
+
+    function estaAutenticado() {
+      return request.auth != null && rolDelUsuario() != null;
+    }
+
+    function tieneRol(roles) {
+      return estaAutenticado() && rolDelUsuario() in roles;
+    }
+
+    // Admin (superusuario técnico) puede todo. Equivalente a TODAS_LAS_CAPACIDADES.
+    function esAdmin() {
+      return tieneRol(['admin']);
+    }
+
+    // ── Denegar todo lo que no esté explícitamente permitido ────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ── Usuarios ────────────────────────────────────────────────────────────
+    // Solo la Function (Admin SDK) escribe. Cada usuario lee su propio doc
+    // (para detectar cambios de rol sin polling).
+    match /usuarios/{uid} {
+      allow read: if estaAutenticado() && request.auth.uid == uid;
+      allow write: if false;  // Solo Admin SDK
+    }
+
+    // ── Cotizaciones ────────────────────────────────────────────────────────
+    match /cotizaciones/{id} {
+      allow read:   if estaAutenticado();
+      // Crear: ventas (solicitud), pricing (cotización), admin
+      allow create: if tieneRol(['ventas', 'pricing', 'administracion', 'admin']);
+      // Editar: pricing, administracion, admin (ventas solo envía/marca)
+      allow update: if tieneRol(['ventas', 'pricing', 'administracion', 'admin']);
+      allow delete: if false;
+    }
+
+    match /cotizaciones/{id}/versiones/{numero} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['pricing', 'administracion', 'admin']);
+      allow update, delete: if false;
+    }
+
+    // ── Prospectos / leads ──────────────────────────────────────────────────
+    match /prospectos/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['ventas', 'admin']);
+      allow update: if tieneRol(['ventas', 'admin']);
+      allow delete: if false;
+    }
+
+    // ── Contadores ──────────────────────────────────────────────────────────
+    match /contadores/{id} {
+      allow read:  if estaAutenticado();
+      allow write: if estaAutenticado();  // runTransaction de folios
+    }
+
+    // ── Clientes ────────────────────────────────────────────────────────────
+    match /clientes/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['administracion', 'admin']);
+      allow update: if estaAutenticado();  // Responsables, expediente, status
+      allow delete: if false;
+    }
+
+    // ── Proveedores ─────────────────────────────────────────────────────────
+    match /proveedores/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['administracion', 'pricing', 'admin']);  // pricing = alta rápida
+      allow update: if estaAutenticado();
+      allow delete: if false;
+    }
+
+    // ── Conceptos ───────────────────────────────────────────────────────────
+    match /conceptos/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['administracion', 'admin']);
+      allow update: if tieneRol(['administracion', 'admin']);
+      allow delete: if false;
+    }
+
+    // ── Términos de pago ────────────────────────────────────────────────────
+    match /terminosPago/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['administracion', 'admin']);
+      allow update: if tieneRol(['administracion', 'admin']);
+      allow delete: if false;
+    }
+
+    // ── Puertos ─────────────────────────────────────────────────────────────
+    match /puertos/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['administracion', 'admin']);
+      allow update: if tieneRol(['administracion', 'admin']);
+      allow delete: if false;
+    }
+
+    // ── Tarifas ─────────────────────────────────────────────────────────────
+    match /tarifas/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['pricing', 'admin']);
+      allow update: if tieneRol(['pricing', 'admin']);
+      allow delete: if false;
+    }
+
+    // ── Documentos de tarifario ─────────────────────────────────────────────
+    match /documentosTarifario/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['pricing', 'admin'])
+                    && request.resource.data.subidoPor == request.auth.uid;
+      allow update: if tieneRol(['pricing', 'admin']);
+      allow delete: if false;
+    }
+
+    // ── Importaciones de tarifarios ─────────────────────────────────────────
+    match /importacionesTarifas/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['pricing', 'admin'])
+                    && request.resource.data.creadoPor == request.auth.uid;
+      allow update: if tieneRol(['pricing', 'admin']);
+      allow delete: if false;
+    }
+
+    // ── Embarques ───────────────────────────────────────────────────────────
+    match /embarques/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['operaciones', 'admin']);
+      allow update: if estaAutenticado();  // Admin cierra, Ops edita
+      allow delete: if false;
+    }
+
+    // ── Órdenes de compra ───────────────────────────────────────────────────
+    match /ordenesCompra/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['operaciones', 'administracion', 'admin']);
+      allow update: if tieneRol(['operaciones', 'administracion', 'admin']);
+      allow delete: if false;
+    }
+
+    // ── Depósitos del cliente ───────────────────────────────────────────────
+    match /depositosCliente/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['administracion', 'admin']);
+      allow update: if tieneRol(['administracion', 'admin']);
+      allow delete: if false;
+    }
+
+    // ── Facturas y cobros ───────────────────────────────────────────────────
+    match /facturas/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['operaciones', 'administracion', 'admin']);
+      allow update: if tieneRol(['operaciones', 'administracion', 'admin']);
+      allow delete: if false;
+    }
+
+    match /cobros/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if tieneRol(['administracion', 'admin']);
+      allow update: if tieneRol(['administracion', 'admin']);
+      allow delete: if false;
+    }
+
+    // ── Vistas y preferencias de usuario ────────────────────────────────────
+    match /preferenciasUsuario/{uid} {
+      allow read, write: if estaAutenticado() && request.auth.uid == uid;
+    }
+
+    match /vistasUsuario/{id} {
+      allow read:   if estaAutenticado();
+      allow create: if estaAutenticado()
+                    && request.resource.data.usuarioId == request.auth.uid;
+      allow update: if estaAutenticado()
+                    && resource.data.usuarioId == request.auth.uid;
+      allow delete: if estaAutenticado()
+                    && resource.data.usuarioId == request.auth.uid;
+    }
+
+    // ── Notificaciones ──────────────────────────────────────────────────────
+    match /notificaciones/{id} {
+      allow read:   if estaAutenticado()
+                    && resource.data.destinatarioId == request.auth.uid;
+      allow create: if estaAutenticado();
+      allow update: if estaAutenticado()
+                    && resource.data.destinatarioId == request.auth.uid;
+      allow delete: if false;
+    }
+
+  }
+}
