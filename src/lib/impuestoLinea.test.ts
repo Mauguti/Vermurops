@@ -204,3 +204,50 @@ describe('aplanarCotizacion y aplicarEdicionLinea conservan la elección', () =>
     expect(aplanarCotizacion(r)[0].impuesto).toBe('exento');
   });
 });
+
+// ─── 1b · La celda del renglón en una cotización recién nacida ───────────────
+
+describe('el impuesto que ve Pricing antes de llenar Operación', () => {
+  /*
+   * Ningún camino de alta escribe `ubicacion`, así que éste es el estado
+   * normal de una cotización nueva — y de cada línea que se agregue en ella,
+   * venga de la comparativa, del panel de tarifas o de un costo tecleado.
+   */
+  const nuevo = srv({ trafico: undefined, ubicacion: undefined,
+                      ruta: { origen: 'Por definir', destino: 'Por definir' } } as never);
+
+  it('un concepto de tasa fija precarga 16% en vez de «Sin determinar»', () => {
+    const r = impuestoDeLinea(null, 'fijo16', nuevo);
+    expect(r.tasa).toBe(16);
+    expect(r.opcion).toBe('iva16');
+    expect(r.origen).toBe('derivado');
+  });
+
+  it('uno de tasa cero precarga 0%', () => {
+    expect(impuestoDeLinea(null, 'fijo0', nuevo).tasa).toBe(0);
+  });
+
+  it('el flete terrestre conserva la retención del 4%', () => {
+    const r = impuestoDeLinea(null, 'terrestre_retencion', nuevo);
+    expect(r.tasa).toBe(16);
+    expect(r.retencion).toBe(4);
+    expect(r.especial).toBe('terrestre_retencion');
+  });
+
+  it('el flete aéreo conserva el 25/75', () => {
+    expect(impuestoDeLinea(null, 'aereo_split', nuevo).especial).toBe('aereo_split');
+  });
+
+  it('espejo sí queda indeterminado: le falta la mitad de su regla', () => {
+    const r = impuestoDeLinea(null, 'espejo', nuevo);
+    expect(r.tasa).toBeNull();
+    expect(r.origen).toBe('indeterminado');
+    expect(r.detalle).toBeTruthy();
+  });
+
+  it('y con el concepto declarando un solo lado, espejo solo espera el tráfico', () => {
+    const r = impuestoDeLinea(null, 'espejo', nuevo, { aplicaOrigen: false, aplicaDestino: true });
+    expect(r.tasa).toBeNull();
+    expect(r.detalle).toMatch(/tráfico|trafico|ruta/i);
+  });
+});

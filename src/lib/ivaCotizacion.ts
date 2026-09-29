@@ -81,6 +81,38 @@ export function ubicacionDeLinea(
   return servicio.ubicacion;
 }
 
+/**
+ * ¿Esta regla MIRA el tráfico y la ubicación?
+ *
+ * Solo una lo hace: la regla espejo. `calcularIVA` ignora el contexto en las
+ * demás —fijo16, fijo0, exento, aereo_split y terrestre_retencion devuelven lo
+ * mismo pase lo que pase— y «revisar» se captura a mano.
+ *
+ * ── El bug que cierra (1b) ─────────────────────────────────────────────────
+ * `ivaDeLinea` exigía tráfico Y ubicación ANTES de mirar la regla, así que un
+ * concepto de tasa fija quedaba «Sin determinar» por faltarle un dato que su
+ * regla nunca iba a leer. Y la ubicación NO la escribe ningún camino de alta
+ * —ni el formulario de solicitud, ni «Agregar servicio», ni el alta rápida del
+ * Kanban—: solo se pone a mano en Información → Operación. O sea que en una
+ * cotización recién nacida el impuesto salía sin precargar SIEMPRE, viniera la
+ * línea de donde viniera.
+ *
+ * Son 56 de los 105 conceptos: 34 de fijo16, 20 de fijo0, el de
+ * terrestre_retencion y el de aereo_split. Los 17 de espejo sí necesitan los
+ * dos datos y lo siguen diciendo; los 27 de «revisar» son manuales por diseño.
+ */
+export function necesitaContextoIVA(regla: ReglaIVA): boolean {
+  return regla === 'espejo';
+}
+
+/**
+ * Contexto de relleno para las reglas que no lo leen.
+ *
+ * No es un default disfrazado: `calcularIVA` no toca estos valores salvo en
+ * espejo, y a espejo no se le pasa nunca este objeto.
+ */
+const CONTEXTO_NO_LEIDO: ContextoIVA = { trafico: 'impo', ubicacion: 'destino' };
+
 export function ivaDeLinea(
   reglaIVA: ReglaIVA | undefined | null,
   servicio: ServicioSolicitado,
@@ -94,6 +126,21 @@ export function ivaDeLinea(
     };
   }
 
+  if (reglaIVA === 'revisar') {
+    return {
+      iva: null,
+      motivo: 'requiere_revision',
+      detalle: 'El concepto está marcado como «revisar»: su IVA se captura a mano.',
+    };
+  }
+
+  // Tasa fija, exento, retención o split aéreo: la regla ya trae la respuesta.
+  // Pedir el tráfico para esto es pedir un dato que nadie va a leer.
+  if (!necesitaContextoIVA(reglaIVA)) {
+    return { iva: calcularIVA(reglaIVA, CONTEXTO_NO_LEIDO)! };
+  }
+
+  // ── Regla espejo: aquí sí hacen falta los dos (§4.2) ─────────────────────
   const { trafico, motivo } = resolverTrafico(servicio);
   if (!trafico) {
     return { iva: null, motivo: 'sin_trafico', detalle: motivo };
@@ -113,16 +160,8 @@ export function ivaDeLinea(
     ubicacion,
   };
 
-  const iva = calcularIVA(reglaIVA, contexto);
-  if (iva === null) {
-    return {
-      iva: null,
-      motivo: 'requiere_revision',
-      detalle: 'El concepto está marcado como «revisar»: su IVA se captura a mano.',
-    };
-  }
-
-  return { iva };
+  // «revisar» ya salió arriba, así que aquí calcularIVA no devuelve null.
+  return { iva: calcularIVA(reglaIVA, contexto)! };
 }
 
 /** Busca la regla de IVA de un concepto del catálogo. */
