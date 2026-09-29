@@ -24,7 +24,7 @@ Lo que no alcance a correr esta noche se queda en [ ] para la siguiente.
 - [x] 15 Script de auditoría: tarifa elegida, costos sin moneda y conceptos sin catálogo
 - [x] 16 Conceptos sin catálogo desde la comparativa y la bandeja (camino B)
 - [x] 17 PLAN: una sola fuente de verdad para la tarifa elegida
-- [ ] 18 PLAN: equipos, la parte mínima para Operaciones
+- [x] 18 PLAN: equipos, la parte mínima para Operaciones
 - [ ] 19 PLAN: reciclar cotizaciones y orden de la bandeja de Pricing
 - [ ] 20 PLAN C: documentos operativos y talonario del HBL
 - [ ] 21 Usuarios y roles, paso 1 (solo emuladores)
