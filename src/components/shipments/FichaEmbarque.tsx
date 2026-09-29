@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { expedientePendiente, textoSalto } from '../../lib/frenoExpediente';
-import { ChevronRight, Save, X, Calendar, Plus, Check, FileText, Landmark, ShieldCheck, DollarSign, Activity, GitCommit, Ship, Plane, Truck, ArrowRight, Trash2, Package, Layers } from 'lucide-react';
+import { ChevronRight, Save, X, Calendar, Plus, Check, FileText, Landmark, ShieldCheck, DollarSign, Activity, GitCommit, Ship, Plane, Truck, ArrowRight, Trash2, Package, Layers, Eye } from 'lucide-react';
 import { EmbarqueCompleto, TIPOS_DOCUMENTO, EVENT_TYPES, CargoDetalle, EmbarqueEvento, EmbarqueDocumento, recalcularCargos, EmbarqueProducto, totalesDe, monedasConMovimiento } from './EmbarquesData';
 import EntidadesEmbarque from './EntidadesEmbarque';
 import RutaEmbarque from './RutaEmbarque';
@@ -21,6 +21,7 @@ import BitacoraEmbarque from './BitacoraEmbarque';
 import ConciliacionFacturaProveedor from '../facturas/ConciliacionFacturaProveedor';
 import { marcarCargosConFactura } from '../../lib/conciliacionFactura';
 import { conBitacora, comentario, editarComentario } from '../../lib/bitacoraEmbarque';
+import VistaCliente from './VistaCliente';
 import TablaPorProveedor, { ToggleVistaCargos } from '../cargos/TablaPorProveedor';
 import { consolidarPorProveedor, desdeCargos, estadoDelProveedor } from '../../lib/cargosPorProveedor';
 import { usePreferenciasUsuario } from '../../hooks/usePreferenciasUsuario';
@@ -153,6 +154,7 @@ export default function FichaEmbarque({
   };
 
   const [activeTab, setActiveTab] = useState<PestanaEmbarque>('informacion');
+  const [vistaCliente, setVistaCliente] = useState(false);
 
   // Estado temporal de edición general
   const [desc, setDesc] = useState(embarque.descripcionCarga);
@@ -592,6 +594,16 @@ export default function FichaEmbarque({
               {embarque.ruta.origen.puertoCarga || '—'} → {embarque.ruta.destino.puertoDescarga || '—'}
             </p>
           ) : undefined
+        }
+        acciones={
+          <button
+            onClick={() => setVistaCliente(true)}
+            className="flex items-center gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
+            title="Ver el embarque como lo vería el cliente, sin costos ni proveedores"
+          >
+            <Eye className="w-3.5 h-3.5" />
+            Ver como cliente
+          </button>
         }
       />
 
@@ -1697,6 +1709,14 @@ export default function FichaEmbarque({
         {/* MASTER / HIJO TAB */}
 
       </div>
+
+      {/* ── Vista previa para el cliente ──────────────────────────── */}
+      {vistaCliente && (
+        <VistaCliente
+          embarque={embarque}
+          onCerrar={() => setVistaCliente(false)}
+        />
+      )}
     </div>
   );
 }
