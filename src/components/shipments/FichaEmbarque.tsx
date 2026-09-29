@@ -16,6 +16,7 @@ import { evaluarCierres, avisoDeOrden } from '../../lib/cierresEmbarque';
 import { useProveedores } from '../../hooks/useProveedores';
 import { useAuth, usuariosPorRol } from '../../auth/AuthContext';
 import TablaCargosEmbarque from './TablaCargosEmbarque';
+import TablaUnificadaCargos from './TablaUnificadaCargos';
 import BitacoraEmbarque from './BitacoraEmbarque';
 import ConciliacionFacturaProveedor from '../facturas/ConciliacionFacturaProveedor';
 import { marcarCargosConFactura } from '../../lib/conciliacionFactura';
@@ -1075,26 +1076,20 @@ export default function FichaEmbarque({
               <p className="text-[10px] text-gray-400">
                 {vistaCargos === 'proveedor'
                   ? 'Mismas columnas que Pricing: lo cotizado y lo real, por proveedor.'
-                  : 'Por concepto: qué se cobra y qué se paga por cada línea.'}
+                  : 'Un renglón por concepto con costo, profit, venta, margen y estado.'}
               </p>
             </div>
 
             {vistaCargos === 'concepto' ? (
-              /* A-3 · Cargos por concepto, editables por Operaciones. */
-              <TablaCargosEmbarque
+              /* Tabla unificada: un renglón por concepto con todas las
+                 columnas que pidió Luis. */
+              <TablaUnificadaCargos
                 detalles={embarque.cargos.detalles || []}
-                /*
-                 * De las órdenes sale el costo REAL de cada concepto: lo que
-                 * el proveedor facturó y lo que se le pagó.
-                 *
-                 * No se pasa tipo de cambio porque el embarque no guarda uno.
-                 * Sin él, un costo en otra moneda no se compara en vez de
-                 * convertirse con una tasa inventada (§4.3).
-                 */
                 ordenes={ocDelEmbarque}
                 tipoCambio={embarque.tipoCambio?.valor ?? null}
                 editable={puedeEditarCargos}
                 nombreProveedor={nombreProveedor}
+                clienteCobrar={embarque.entidades?.clienteCobrar ?? ''}
                 onEditarMonto={handleEditarMontoCargo}
                 onRestaurar={handleRestaurarCargo}
                 onQuitar={handleDeleteCargo}
