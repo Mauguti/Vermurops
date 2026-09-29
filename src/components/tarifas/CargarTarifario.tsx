@@ -2,7 +2,7 @@ import React, { useRef, useState } from 'react';
 import {
   X, Upload, FileText, Sparkles, Loader2, ClipboardPaste, AlertTriangle,
 } from 'lucide-react';
-import { useDocumentosTarifario } from '../../hooks/useDocumentosTarifario';
+import { useDocumentosTarifario, type Duplicado } from '../../hooks/useDocumentosTarifario';
 import { usePuertos } from '../../hooks/usePuertos';
 import { useConceptos } from '../../hooks/useConceptos';
 import { useProveedores } from '../../hooks/useProveedores';
@@ -10,7 +10,7 @@ import { useTarifas } from '../../hooks/useTarifas';
 import RevisionTarifasExtraidas from './RevisionTarifasExtraidas';
 import SelectorProveedor from '../proveedores/SelectorProveedor';
 import type { LineaEnRevision } from '../../lib/importacionTarifas';
-import type { DocumentoTarifario } from '../../lib/documentoTarifario';
+import { resumenDocumento, type DocumentoTarifario } from '../../lib/documentoTarifario';
 
 /**
  * Carga de tarifario con IA — el MISMO componente en los dos puntos de entrada.
@@ -40,7 +40,7 @@ interface Props {
 export default function CargarTarifario({
   onCerrar, cotizacionId, pedirProveedorAntes, onGuardadas,
 }: Props) {
-  const { subiendo, subirDocumento, registrarExtraccion } = useDocumentosTarifario();
+  const { subiendo, buscarDuplicado, subirDocumento, registrarExtraccion } = useDocumentosTarifario();
   const { puertos } = usePuertos();
   const { conceptos } = useConceptos();
   const { proveedores } = useProveedores();
@@ -53,24 +53,43 @@ export default function CargarTarifario({
   const [error, setError] = useState<string | null>(null);
   const [pendiente, setPendiente] =
     useState<{ documento: DocumentoTarifario; respuesta: unknown } | null>(null);
+  /** Archivo esperando confirmación porque ya se había subido. */
+  const [repetido, setRepetido] = useState<{ file: File; dup: Duplicado } | null>(null);
 
   const listoParaSubir = !pedirProveedorAntes || Boolean(proveedorId);
 
+  /**
+   * Punto de entrada de todo archivo: primero se pregunta si ya está.
+   *
+   * Avisar DESPUÉS de subir —como antes— no evita nada: el archivo ya se
+   * subió, el extractor ya cobró y el duplicado ya existe. En la auditoría hay
+   * la misma captura cinco veces y el mismo PDF cuatro.
+   */
+  const elegir = async (file: File) => {
+    setError(null);
+    const dup = await buscarDuplicado(file);
+    if (dup.porHash || dup.porNombre) {
+      setRepetido({ file, dup });
+      return;
+    }
+    await procesar(file);
+  };
+
   const procesar = async (file: File) => {
     setError(null);
+    setRepetido(null);
     try {
-      const { documento, extraccion, duplicadoDe } = await subirDocumento(file, {
+      const { documento, extraccion } = await subirDocumento(file, {
         procesarConIA: true, cotizacionId: cotizacionId ?? null,
       });
-      if (duplicadoDe) {
-        setError(
-          `Este archivo ya se procesó el ${duplicadoDe.fechaSubida.slice(0, 10)} ` +
-          `por ${duplicadoDe.subidoPorNombre}. Se guardó de todos modos.`,
-        );
-      }
       setPendiente({ documento, respuesta: extraccion });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      // El documento YA quedó marcado como «falló» con este motivo: se puede
+      // reintentar desde la lista de evidencias sin volver a buscar el archivo.
+      setError(
+        (e instanceof Error ? e.message : String(e))
+        + ' El tarifario quedó registrado como «falló», con la razón, para poder reintentarlo.',
+      );
     }
   };
 
@@ -82,7 +101,7 @@ export default function CargarTarifario({
       `correo-${new Date().toISOString().slice(0, 10)}.txt`,
       { type: 'text/plain' },
     );
-    await procesar(blob);
+    await elegir(blob);
   };
 
   if (pendiente) {
@@ -199,10 +218,51 @@ export default function CargarTarifario({
             accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.webp,.heic"
             onChange={e => {
               const f = e.target.files?.[0];
-              if (f) procesar(f);
+              if (f) elegir(f);
               e.target.value = '';
             }}
           />
+
+          {repetido && (
+            <div className="px-3 py-2.5 rounded-lg border border-amber-300 bg-amber-50 space-y-2">
+              <p className="text-[11px] text-amber-900 leading-snug">
+                {repetido.dup.porHash ? (
+                  <>
+                    <span className="font-bold">Este archivo ya se subió.</span>{' '}
+                    Es el mismo contenido que «{repetido.dup.porHash.nombreArchivo}»,
+                    subido el {repetido.dup.porHash.fechaSubida.slice(0, 10)} por{' '}
+                    {repetido.dup.porHash.subidoPorNombre} — {resumenDocumento(repetido.dup.porHash)}.
+                  </>
+                ) : (
+                  <>
+                    <span className="font-bold">Ya hay uno con este nombre y tamaño:</span>{' '}
+                    «{repetido.dup.porNombre!.nombreArchivo}», del{' '}
+                    {repetido.dup.porNombre!.fechaSubida.slice(0, 10)} — {resumenDocumento(repetido.dup.porNombre!)}.
+                    El contenido no es idéntico, así que puede ser una versión nueva.
+                  </>
+                )}
+              </p>
+              {(repetido.dup.porHash ?? repetido.dup.porNombre)?.motivoExtraccion && (
+                <p className="text-[10px] text-amber-800 italic">
+                  La vez anterior: {(repetido.dup.porHash ?? repetido.dup.porNombre)!.motivoExtraccion}
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => procesar(repetido.file)}
+                  className="text-[10px] font-bold uppercase tracking-wider bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1.5 rounded"
+                >
+                  Subirlo otra vez
+                </button>
+                <button
+                  onClick={() => setRepetido(null)}
+                  className="text-[10px] font-bold uppercase tracking-wider text-amber-800 hover:text-amber-900 px-2 py-1.5"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
 
           {!listoParaSubir && (
             <p className="text-[11px] text-amber-700 flex items-start gap-1.5">

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   tipoDeArchivo, validarArchivo, rutaStorage, formatoTamano,
-  admitePrevisualizacion, resumenDocumento, TAMANO_MAXIMO_BYTES,
+  admitePrevisualizacion, resumenDocumento, admiteReintento, TAMANO_MAXIMO_BYTES,
   DocumentoTarifario,
 } from './documentoTarifario';
 
@@ -91,5 +91,71 @@ describe('resumen del documento', () => {
 
   it('procesado sin resultados lo dice, no finge cero tarifas', () => {
     expect(resumenDocumento(doc({ tarifasExtraidas: 0 }))).toBe('Sin tarifas extraídas');
+  });
+});
+
+// ─── Cómo terminó la extracción (28-sep-2026) ────────────────────────────────
+
+describe('un tarifario que falla deja de verse igual que uno que nadie guardó', () => {
+  const doc = (p: Partial<DocumentoTarifario>): DocumentoTarifario =>
+    ({ tarifasExtraidas: 0, procesadoConIA: true, ...p } as DocumentoTarifario);
+
+  /*
+   * El agujero: `tarifasExtraidas: 0` era el estado de TRES cosas distintas —
+   * la extracción falló, el documento no traía tarifas, o nadie guardó. Por
+   * eso el equipo volvió a subir la misma captura cinco veces y el mismo PDF
+   * cuatro: no había forma de saber si había servido.
+   */
+  it('«Falló» cuando el extractor no contestó', () => {
+    expect(resumenDocumento(doc({ estadoExtraccion: 'fallo' }))).toBe('Falló');
+  });
+
+  it('«Sin tarifas» cuando contestó pero no traía nada utilizable', () => {
+    // Es el caso de subir una factura al wizard de tarifarios.
+    expect(resumenDocumento(doc({ estadoExtraccion: 'sin_tarifas' }))).toBe('Sin tarifas');
+  });
+
+  it('el estado manda sobre el conteo', () => {
+    expect(resumenDocumento(doc({ estadoExtraccion: 'fallo', tarifasExtraidas: 0 })))
+      .not.toBe('Sin tarifas extraídas');
+  });
+
+  it('«Solo respaldo» sigue ganando: ése nunca pasó por el extractor', () => {
+    expect(resumenDocumento(doc({ procesadoConIA: false, estadoExtraccion: 'fallo' })))
+      .toBe('Solo respaldo');
+  });
+
+  it('los documentos anteriores no traen estado y se siguen leyendo igual', () => {
+    // Campo opcional con respaldo: nada se migra (§ regla de trabajo).
+    expect(resumenDocumento(doc({ tarifasExtraidas: 7 }))).toBe('7 tarifas extraídas');
+    expect(resumenDocumento(doc({ tarifasExtraidas: 0 }))).toBe('Sin tarifas extraídas');
+  });
+});
+
+describe('a cuál se le ofrece «Reintentar»', () => {
+  const doc = (p: Partial<DocumentoTarifario>): DocumentoTarifario =>
+    ({ tarifasExtraidas: 0, procesadoConIA: true, ...p } as DocumentoTarifario);
+
+  it('al que falló, sí', () => {
+    expect(admiteReintento(doc({ estadoExtraccion: 'fallo' }))).toBe(true);
+  });
+
+  it('al que contestó sin tarifas, NO', () => {
+    // Reintentar una factura da otra vez cero: lo que hace falta es subirla
+    // donde va, no volver a gastar una ejecución del agente.
+    expect(admiteReintento(doc({ estadoExtraccion: 'sin_tarifas' }))).toBe(false);
+  });
+
+  it('al que sí trajo tarifas, no', () => {
+    expect(admiteReintento(doc({ estadoExtraccion: 'ok', tarifasExtraidas: 12 }))).toBe(false);
+  });
+
+  it('al respaldo, nunca: no pasó por el extractor a propósito', () => {
+    expect(admiteReintento(doc({ procesadoConIA: false }))).toBe(false);
+  });
+
+  it('a los de antes en cero, sí: son los 22 de la auditoría', () => {
+    // Sin estado y sin tarifas es justo el grupo que hay que recuperar.
+    expect(admiteReintento(doc({ tarifasExtraidas: 0 }))).toBe(true);
   });
 });

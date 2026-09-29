@@ -15,6 +15,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
 import {
   DocumentoTarifario, validarArchivo, rutaStorage, tipoDeArchivo,
+  type EstadoExtraccion,
 } from '../lib/documentoTarifario';
 import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
@@ -46,6 +47,14 @@ export interface ResultadoSubida {
   duplicadoDe?: DocumentoTarifario;
 }
 
+/** Lo que se sabe de un archivo ANTES de subirlo. */
+export interface Duplicado {
+  /** Mismo contenido: el hash coincide. No hay duda. */
+  porHash?: DocumentoTarifario;
+  /** Mismo nombre y tamaño: casi seguro el mismo, pero pudo editarse. */
+  porNombre?: DocumentoTarifario;
+}
+
 export function useDocumentosTarifario(cotizacionId?: string) {
   const { user } = useAuth();
   const [documentos, setDocumentos] = useState<DocumentoTarifario[]>([]);
@@ -66,6 +75,24 @@ export function useDocumentosTarifario(cotizacionId?: string) {
     );
     return () => unsub();
   }, [user, cotizacionId]);
+
+  /**
+   * ¿Este archivo ya está? Se pregunta ANTES de subir.
+   *
+   * Antes el aviso llegaba DESPUÉS de haber subido y llamado al extractor —que
+   * cuesta dinero y tiempo—, y decía «se guardó de todos modos». En la
+   * auditoría hay la misma captura cinco veces y el mismo PDF cuatro: gente
+   * reintentando sin saber si había servido. Avisar antes es la diferencia
+   * entre prevenir el duplicado y contarlo.
+   */
+  const buscarDuplicado = async (file: File): Promise<Duplicado> => {
+    const hash = await hashArchivo(file);
+    return {
+      porHash: documentos.find(d => d.hash === hash),
+      porNombre: documentos.find(d =>
+        d.hash !== hash && d.nombreArchivo === file.name && d.tamanoBytes === file.size),
+    };
+  };
 
   /**
    * Sube el documento.
@@ -121,10 +148,30 @@ export function useDocumentosTarifario(cotizacionId?: string) {
       try {
         const extraccion = await extraer(file);
         const propuestas = (extraccion as { tarifas?: unknown[] } | null)?.tarifas;
-        medirTarifarioCargado('exito', Array.isArray(propuestas) ? propuestas.length : 0);
-        return { documento, extraccion, duplicadoDe };
+        const cuantas = Array.isArray(propuestas) ? propuestas.length : 0;
+        medirTarifarioCargado('exito', cuantas);
+
+        /*
+         * Contestar no es lo mismo que traer tarifas. n8n puede devolver 200
+         * con cero líneas —un documento que no es tarifario, una factura— y
+         * eso hay que decirlo y dejarlo escrito, no dejar el documento en
+         * cero como si nadie lo hubiera tocado.
+         */
+        const ok = (extraccion as { ok?: boolean } | null)?.ok === true && cuantas > 0;
+        await marcarExtraccion(id, ok ? 'ok' : 'sin_tarifas', ok ? undefined
+          : razonSinTarifas(extraccion));
+
+        return {
+          documento: { ...documento, estadoExtraccion: ok ? 'ok' : 'sin_tarifas' },
+          extraccion,
+          duplicadoDe,
+        };
       } catch (err) {
         medirTarifarioCargado('error');
+        // Lo que NO pasaba antes: que el fallo quedara escrito. Un tarifario
+        // que falla se veía idéntico a uno que nadie guardó.
+        const motivo = err instanceof Error ? err.message : String(err);
+        await marcarExtraccion(id, 'fallo', motivo);
         throw err;
       }
     } finally {
@@ -156,6 +203,60 @@ export function useDocumentosTarifario(cotizacionId?: string) {
     return cuerpo;
   };
 
+  /**
+   * Deja escrito cómo terminó la extracción.
+   *
+   * No usa `conAviso`: si esta escritura falla, lo que importa es el error
+   * original, no un segundo aviso encima. Se registra en consola y ya.
+   */
+  const marcarExtraccion = async (
+    documentoId: string, estado: EstadoExtraccion, motivo?: string,
+  ): Promise<void> => {
+    try {
+      await updateDoc(doc(db, COL, documentoId), sanitizarParaFirestore({
+        estadoExtraccion: estado,
+        fechaExtraccion: new Date().toISOString(),
+        ...(motivo ? { motivoExtraccion: motivo.slice(0, 500) } : {}),
+      }) as Record<string, unknown>);
+    } catch (e) {
+      console.warn('[tarifario] no se pudo registrar el estado de la extracción', e);
+    }
+  };
+
+  /**
+   * Vuelve a intentar la extracción de un documento que ya está en Storage.
+   *
+   * No hace falta volver a buscar el archivo en la computadora: la evidencia
+   * ya está guardada, que es justo para lo que sirve. Se baja de Storage y se
+   * manda otra vez al extractor.
+   */
+  const reintentarExtraccion = async (d: DocumentoTarifario): Promise<unknown> => {
+    exigir(user?.rol as UserRole | undefined, 'tarifario.cargar');
+    setSubiendo(true);
+    try {
+      const r = await fetch(d.url);
+      if (!r.ok) throw new Error('No se pudo recuperar el archivo guardado.');
+      const file = new File([await r.blob()], d.nombreArchivo, { type: d.tipoMime });
+
+      try {
+        const extraccion = await extraer(file);
+        const propuestas = (extraccion as { tarifas?: unknown[] } | null)?.tarifas;
+        const cuantas = Array.isArray(propuestas) ? propuestas.length : 0;
+        const ok = (extraccion as { ok?: boolean } | null)?.ok === true && cuantas > 0;
+        medirTarifarioCargado('exito', cuantas);
+        await marcarExtraccion(d.id, ok ? 'ok' : 'sin_tarifas',
+          ok ? undefined : razonSinTarifas(extraccion));
+        return extraccion;
+      } catch (err) {
+        medirTarifarioCargado('error');
+        await marcarExtraccion(d.id, 'fallo', err instanceof Error ? err.message : String(err));
+        throw err;
+      }
+    } finally {
+      setSubiendo(false);
+    }
+  };
+
   /** Enlaza el documento con la importación y cuántas tarifas produjo. */
   const registrarExtraccion = async (
     documentoId: string, importacionId: string, tarifas: number,
@@ -166,5 +267,27 @@ export function useDocumentosTarifario(cotizacionId?: string) {
       }) as Record<string, unknown>));
   };
 
-  return { documentos, loading, subiendo, subirDocumento, registrarExtraccion };
+  return {
+    documentos, loading, subiendo,
+    buscarDuplicado, subirDocumento, reintentarExtraccion, registrarExtraccion,
+  };
+}
+
+/**
+ * Por qué una respuesta válida no trajo tarifas.
+ *
+ * El extractor contesta 200 aunque el documento no sea un tarifario. Decirlo
+ * es la diferencia entre «reintenta» y «esto es una factura, va en otro lado».
+ */
+function razonSinTarifas(extraccion: unknown): string {
+  const r = extraccion as { ok?: boolean; error?: string; tarifas?: unknown[] } | null;
+  if (r?.ok === false) {
+    return r.error?.trim()
+      ? `El extractor no pudo procesarlo: ${r.error}`
+      : 'El extractor no pudo procesar el archivo.';
+  }
+  if (Array.isArray(r?.tarifas) && r.tarifas.length === 0) {
+    return 'El extractor no encontró ninguna tarifa. Puede que el documento no sea un tarifario —una factura, por ejemplo— o que la imagen no se lea.';
+  }
+  return 'El extractor contestó sin la lista de tarifas.';
 }

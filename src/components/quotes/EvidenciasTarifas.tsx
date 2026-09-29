@@ -4,7 +4,7 @@ import {
   Mail, X, Sparkles, ExternalLink,
 } from 'lucide-react';
 import {
-  formatoTamano, admitePrevisualizacion, resumenDocumento,
+  formatoTamano, admitePrevisualizacion, resumenDocumento, admiteReintento,
   type DocumentoTarifario, type TipoDocumento,
 } from '../../lib/documentoTarifario';
 
@@ -38,10 +38,15 @@ interface Props {
   onSubir: (file: File, procesarConIA: boolean) => void;
   /** Abre la carga de tarifario con IA — el mismo componente que en Tarifas. */
   onCargarTarifario: () => void;
+  /**
+   * Vuelve a mandar al extractor un tarifario que falló, usando el archivo
+   * que ya está en Storage. Opcional: sin él, el botón no se pinta.
+   */
+  onReintentar?: (d: DocumentoTarifario) => void;
 }
 
 export default function EvidenciasTarifas({
-  documentos, editable, subiendo, onSubir, onCargarTarifario,
+  documentos, editable, subiendo, onSubir, onCargarTarifario, onReintentar,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<DocumentoTarifario | null>(null);
@@ -104,20 +109,31 @@ export default function EvidenciasTarifas({
       ) : (
         <ul className="divide-y divide-gray-50">
           {documentos.map(d => (
-            <li key={d.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50/60">
-              <span className="shrink-0">{ICONO[d.tipo]}</span>
+            <li key={d.id} className="flex items-start gap-3 px-4 py-2.5 hover:bg-gray-50/60">
+              <span className="shrink-0 mt-0.5">{ICONO[d.tipo]}</span>
 
               <div className="min-w-0 flex-1">
                 <p className="text-[12px] font-medium text-gray-800 truncate">{d.nombreArchivo}</p>
                 <p className="text-[10px] text-gray-400">
                   {d.subidoPorNombre} · {d.fechaSubida.slice(0, 10)} · {formatoTamano(d.tamanoBytes)}
                 </p>
+                {/* La razón, donde se ve. Un tarifario que falla en silencio se
+                    vuelve a subir cinco veces: eso ya pasó. */}
+                {d.motivoExtraccion && (
+                  <p className="text-[10px] text-amber-700 leading-snug mt-0.5">
+                    {d.motivoExtraccion}
+                  </p>
+                )}
               </div>
 
-              <span className={`shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                d.procesadoConIA && d.tarifasExtraidas > 0
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'bg-gray-100 text-gray-500'
+              <span className={`shrink-0 mt-0.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                d.estadoExtraccion === 'fallo'
+                  ? 'bg-red-50 text-red-700'
+                  : d.estadoExtraccion === 'sin_tarifas'
+                    ? 'bg-amber-50 text-amber-700'
+                    : d.procesadoConIA && d.tarifasExtraidas > 0
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-gray-100 text-gray-500'
               }`}>
                 {d.procesadoConIA && d.tarifasExtraidas > 0 && (
                   <Sparkles className="w-2.5 h-2.5 inline mr-0.5" />
@@ -126,6 +142,16 @@ export default function EvidenciasTarifas({
               </span>
 
               <div className="flex items-center gap-1 shrink-0">
+                {onReintentar && editable && admiteReintento(d) && (
+                  <button
+                    onClick={() => onReintentar(d)}
+                    disabled={subiendo}
+                    className="text-[10px] font-bold text-primario hover:text-primario-hover px-1.5 py-1 disabled:opacity-40"
+                    title="Volver a mandarlo al extractor con el archivo ya guardado"
+                  >
+                    Reintentar
+                  </button>
+                )}
                 {admitePrevisualizacion(d.tipo) && (
                   <button
                     onClick={() => setPreview(d)}

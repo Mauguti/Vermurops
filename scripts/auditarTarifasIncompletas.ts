@@ -179,6 +179,48 @@ async function main() {
     console.log(muestra.join('\n'));
   }
 
+  // ── ¿Las ocho primeras cotizaciones son las de demostración? ───────────
+  //
+  // useCotizaciones sembraba con `snapshot.empty` a secas, y un snapshot de
+  // caché llega vacío: podía escribir las ocho de ejemplo ENCIMA de las
+  // reales, con setDoc sin merge. Ya está cerrado, pero hay que saber si
+  // alcanzó a pasar. Se compara contra el seed por empresa, etapa y total.
+  const SEMILLA: Record<string, { empresa: string; etapa: string }> = {
+    'COT-2026-0001': { empresa: 'Alfa Corporativo S.A.',        etapa: 'solicitud_cliente' },
+    'COT-2026-0002': { empresa: 'Distribuidora Nacional',       etapa: 'solicitado_pricing' },
+    'COT-2026-0003': { empresa: 'Industrias Metalúrgicas',      etapa: 'pricing_solicitando' },
+    'COT-2026-0004': { empresa: 'Grupo Textil Monterrey',       etapa: 'cotizaciones_recibidas' },
+    'COT-2026-0005': { empresa: 'Importadora del Golfo',        etapa: 'consolidada' },
+    'COT-2026-0006': { empresa: 'Comercial del Norte',          etapa: 'enviada_cliente' },
+    'COT-2026-0007': { empresa: 'Electrodomésticos Premium',    etapa: 'negociacion' },
+    'COT-2026-0008': { empresa: 'Plásticos Ramírez S.A.',       etapa: 'ganada' },
+  };
+
+  console.log('\n── COT-2026-0001 … 0008: ¿demostración o reales? ──');
+  for (const folio of Object.keys(SEMILLA)) {
+    const snap = await db.collection('cotizaciones').doc(folio).get();
+    if (!snap.exists) { console.log(`  ${folio}  no existe`); continue; }
+    const d = snap.data() as Fila;
+    const empresa = String((d.prospecto as Fila)?.empresa ?? d.cliente ?? '—');
+    const etapa = String(d.etapa ?? '—');
+    const esperado = SEMILLA[folio];
+    const igual = empresa.trim() === esperado.empresa && etapa === esperado.etapa;
+    console.log(
+      `  ${folio}  ${igual ? 'DEMOSTRACIÓN' : 'real        '}` +
+      `  ${empresa.slice(0, 32).padEnd(32)} · ${etapa.padEnd(22)}` +
+      `  total ${String(d.valorTotalConsolidado ?? '—').padStart(10)}` +
+      `  creada ${String(d.createdAt ?? '—').slice(0, 19)}` +
+      `  modificada ${String(d.updatedAt ?? '—').slice(0, 19)}`,
+    );
+    if (!igual) {
+      console.log(`      el seed decía: ${esperado.empresa} · ${esperado.etapa}`);
+    }
+  }
+  console.log(
+    '\n  «DEMOSTRACIÓN» = empresa y etapa coinciden con el seed. Si la fecha de\n' +
+    '  modificación es muy posterior a la de creación, alguien la reescribió.\n',
+  );
+
   console.log(
     '\n  Ninguna se tocó. Lo inferido es lo que el panel SUGERIRÍA; con el plan\n' +
     '  aprobado, Pricing lo confirma con un clic antes de que la tarifa se use.\n',
