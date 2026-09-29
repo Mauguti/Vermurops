@@ -225,7 +225,8 @@ export default function FichaCotizacion({
    * Es la misma pieza que sube los tarifarios — una subida, dos usos.
    */
   const {
-    documentos, subiendo: subiendoDoc, subirDocumento, registrarExtraccion,
+    documentos, subiendo: subiendoDoc, subirDocumento, reintentarExtraccion,
+    registrarExtraccion,
   } = useDocumentosTarifario(quote.id);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
@@ -1772,6 +1773,15 @@ export default function FichaCotizacion({
                 editable={rolActivo !== 'ventas' && !bloqueada}
                 subiendo={subiendoDoc}
                 onCargarTarifario={() => setCargandoTarifario(true)}
+                /* El archivo ya está en Storage: reintentar no obliga a
+                   volver a buscarlo en la computadora. */
+                onReintentar={(d) => {
+                  reintentarExtraccion(d)
+                    .then(() => setToastLocal(
+                      'Se volvió a mandar al extractor. El resultado queda en la lista.'))
+                    .catch((e) => setToastLocal(
+                      e instanceof Error ? e.message : 'No se pudo reintentar.'));
+                }}
                 onSubir={(file) => {
                   subirDocumento(file, { procesarConIA: false, cotizacionId: quote.id })
                     .then(({ duplicadoDe }) => {

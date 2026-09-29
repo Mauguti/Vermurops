@@ -46,8 +46,47 @@ export interface DocumentoTarifario {
   /**
    * false = se subió solo como respaldo, sin pasar por el extractor.
    * No todo documento es un tarifario: a veces es solo la evidencia.
+   *
+   * OJO: se escribe al SUBIR, antes de que el extractor conteste. Dice «se
+   * pidió procesarlo», no «se procesó». Lo segundo lo dice `estadoExtraccion`.
    */
   procesadoConIA: boolean;
+
+  // ── Cómo terminó la extracción (28-sep-2026) ─────────────────────────────
+  //
+  // Antes no quedaba rastro: un tarifario que fallaba se veía EXACTAMENTE
+  // igual que uno que nadie guardó —`tarifasExtraidas: 0` en los dos— y el
+  // equipo volvía a subir el mismo archivo una y otra vez. En la auditoría
+  // aparecen la misma captura cinco veces y el mismo PDF cuatro.
+  //
+  // Opcionales con respaldo: los documentos anteriores no los traen y se leen
+  // como 'sin registro', que es la verdad.
+
+  /** Cómo terminó. Ausente = se subió antes de que esto existiera. */
+  estadoExtraccion?: EstadoExtraccion;
+  /** La razón, en el idioma de quien la lee. Solo en 'fallo' y 'sin_tarifas'. */
+  motivoExtraccion?: string;
+  /** Cuándo se resolvió, para distinguir un reintento de la subida. */
+  fechaExtraccion?: string;
+}
+
+/**
+ * En qué terminó el paso de extracción.
+ *
+ *   ok           n8n devolvió tarifas y se pudieron revisar.
+ *   sin_tarifas  contestó, pero no había nada utilizable: el documento puede
+ *                no ser un tarifario (una factura, por ejemplo).
+ *   fallo        no contestó, tardó de más o contestó algo ilegible.
+ *
+ * `sin_tarifas` y `fallo` se separan porque piden cosas distintas: uno se
+ * reintenta, el otro se sube al lugar que le toca.
+ */
+export type EstadoExtraccion = 'ok' | 'sin_tarifas' | 'fallo';
+
+/** ¿Vale la pena ofrecer «Reintentar»? Un documento que no es tarifario, no. */
+export function admiteReintento(d: DocumentoTarifario): boolean {
+  return d.procesadoConIA && (d.estadoExtraccion === 'fallo'
+    || (d.estadoExtraccion === undefined && d.tarifasExtraidas === 0));
 }
 
 // ─── Límites y tipos aceptados ────────────────────────────────────────────────
@@ -142,6 +181,10 @@ export function admitePrevisualizacion(tipo: TipoDocumento): boolean {
  */
 export function resumenDocumento(d: DocumentoTarifario): string {
   if (!d.procesadoConIA) return 'Solo respaldo';
+  // El estado manda sobre el conteo: «falló» y «no trae tarifas» daban los dos
+  // cero, y el equipo no podía distinguirlos.
+  if (d.estadoExtraccion === 'fallo') return 'Falló';
+  if (d.estadoExtraccion === 'sin_tarifas') return 'Sin tarifas';
   if (d.tarifasExtraidas === 0) return 'Sin tarifas extraídas';
   return `${d.tarifasExtraidas} tarifa${d.tarifasExtraidas !== 1 ? 's' : ''} extraída${d.tarifasExtraidas !== 1 ? 's' : ''}`;
 }
