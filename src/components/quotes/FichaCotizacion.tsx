@@ -28,6 +28,7 @@ import OperacionServicio from './OperacionServicio';
 import {
   puedeEditarOperacion, camposOperacionCambiados, anotarCambioOperacion,
 } from '../../lib/operacionServicio';
+import { ALMACENAJE_SUGERIDO } from '../../lib/diasLibres';
 import TarifaPanel from '../tarifas/TarifaPanel';
 import { resolverMonto, fmtPrecio } from '../tarifas/tarifaMatching';
 import { useProveedores } from '../../hooks/useProveedores';
@@ -2242,6 +2243,77 @@ export default function FichaCotizacion({
                 />
               </div>
             ))}
+          </div>
+
+          {/* ── Plazos del contenedor (tarea 08, 28-sep-2026) ──────────────
+              Los días libres de demora y almacenaje los captura Pricing.
+              Operaciones ve la fecha = ETA + días en el embarque.
+              NO son los días de crédito del cliente (plazo de pago). */}
+          <div className="space-y-4">
+            <h3 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-2 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" /> Plazos del contenedor
+              <span className="ml-1 normal-case tracking-normal font-semibold text-gray-400">— no son días de crédito</span>
+              {!puedeEditarOperacion(rolActivo, quote.etapa, bloqueada) && (
+                <span className="ml-auto normal-case tracking-normal font-semibold text-gray-400">solo lectura</span>
+              )}
+            </h3>
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">
+                    Días libres de demora
+                  </label>
+                  {puedeEditarOperacion(rolActivo, quote.etapa, bloqueada) ? (
+                    <input
+                      type="number"
+                      min={0}
+                      max={90}
+                      value={quote.diasLibresDemora ?? ''}
+                      onChange={e => {
+                        const v = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                        onUpdateQuote({ ...quote, diasLibresDemora: (v != null && !isNaN(v) && v >= 0) ? v : null });
+                      }}
+                      placeholder="Ej. 21"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario"
+                    />
+                  ) : (
+                    <p className="text-xs font-semibold text-gray-700 px-1 py-2">
+                      {quote.diasLibresDemora != null ? `${quote.diasLibresDemora} días` : '—'}
+                    </p>
+                  )}
+                  <p className="mt-1 text-[10px] leading-snug text-gray-500">
+                    Días que el contenedor puede quedarse en puerto sin generar
+                    cargo de demora. Varía por cotización, típicamente hasta 21.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1.5">
+                    Días libres de almacenaje
+                  </label>
+                  {puedeEditarOperacion(rolActivo, quote.etapa, bloqueada) ? (
+                    <input
+                      type="number"
+                      min={0}
+                      max={90}
+                      value={quote.diasLibresAlmacenaje ?? ''}
+                      onChange={e => {
+                        const v = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                        onUpdateQuote({ ...quote, diasLibresAlmacenaje: (v != null && !isNaN(v) && v >= 0) ? v : null });
+                      }}
+                      placeholder={`Ej. ${ALMACENAJE_SUGERIDO}`}
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario"
+                    />
+                  ) : (
+                    <p className="text-xs font-semibold text-gray-700 px-1 py-2">
+                      {quote.diasLibresAlmacenaje != null ? `${quote.diasLibresAlmacenaje} días` : '—'}
+                    </p>
+                  )}
+                  <p className="mt-1 text-[10px] leading-snug text-gray-500">
+                    Días libres de almacenaje en terminal. Sugerido: {ALMACENAJE_SUGERIDO} días.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
           </div>
         )}

@@ -26,6 +26,7 @@ import { consolidarPorProveedor, desdeCargos, estadoDelProveedor } from '../../l
 import { usePreferenciasUsuario } from '../../hooks/usePreferenciasUsuario';
 import { clienteDelEmbarque } from '../../lib/entidadesEmbarque';
 import { editarMontoCargo, restaurarMontoCargo, desviacionDelEmbarque, desviacionDe } from '../../lib/cargosEditables';
+import { fechaLimite, diasVencidos, ALMACENAJE_SUGERIDO } from '../../lib/diasLibres';
 import { margenDelEmbarque, TEXTO_SIN_COMPARAR, type ContextoMargen } from '../../lib/margenRealConcepto';
 import { construirOCDesdeCargo, marcarCargoConOrden, puedeConvertirse } from '../../lib/ocDesdeCargo';
 import { generateFolioEmbarque, parseFolioNumero } from '../../lib/folioService';
@@ -173,6 +174,13 @@ export default function FichaEmbarque({
   const [limDoc, setLimDoc] = useState(embarque.fechas.limiteDocumentacion);
   const [libDem, setLibDem] = useState(embarque.fechas.libreDemoras);
   const [libAlm, setLibAlm] = useState(embarque.fechas.libreAlmacenaje);
+  // Tarea 08 · Días libres: el número de días se guarda, la fecha se calcula.
+  const [diasDemora, setDiasDemora] = useState<number | null>(embarque.diasLibresDemora ?? null);
+  const [diasAlmacenaje, setDiasAlmacenaje] = useState<number | null>(embarque.diasLibresAlmacenaje ?? null);
+  const fechaDemora = fechaLimite(arribo, diasDemora);
+  const fechaAlmacenaje = fechaLimite(arribo, diasAlmacenaje);
+  const vencidosDemora = diasVencidos(fechaDemora);
+  const vencidosAlmacenaje = diasVencidos(fechaAlmacenaje);
 
   // Estados de adición manual de cargos y eventos
   const [newCargoConcept, setNewCargoConcept] = useState('');
@@ -205,9 +213,14 @@ export default function FichaEmbarque({
         arribo,
         ordenGeneral: ordenGen,
         limiteDocumentacion: limDoc,
-        libreDemoras: libDem,
-        libreAlmacenaje: libAlm
+        // Legacy: si hay días, la fecha se calcula y no se guarda.
+        // Si no hay días, se conserva el valor manual que ya existía.
+        libreDemoras: diasDemora != null ? '' : libDem,
+        libreAlmacenaje: diasAlmacenaje != null ? '' : libAlm,
       },
+      // Tarea 08 · Los días se guardan; la fecha se calcula en la UI.
+      ...(diasDemora != null ? { diasLibresDemora: diasDemora } : {}),
+      ...(diasAlmacenaje != null ? { diasLibresAlmacenaje: diasAlmacenaje } : {}),
       updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
     };
     guardar(updated);
@@ -832,14 +845,74 @@ export default function FichaEmbarque({
                     </>
                   )}
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Libre de Demoras</label>
-                      <input type="date" value={libDem} onChange={e => setLibDem(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
-                    </div>
-                    <div>
-                      <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Libre Almacenaje</label>
-                      <input type="date" value={libAlm} onChange={e => setLibAlm(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
+                  {/* ── Tarea 08 · Plazos del contenedor ──────────────────
+                      Los días se capturan; la fecha se calcula = ETA + días.
+                      NO son los días de crédito del cliente (plazo de pago). */}
+                  <div className="pt-2 border-t border-gray-100">
+                    <p className="text-[9px] font-bold text-gray-400 uppercase mb-2 tracking-wider">
+                      Plazos del contenedor <span className="normal-case font-semibold text-gray-400">— no son días de crédito</span>
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Días libres de demora</label>
+                        <input
+                          type="number" min={0} max={90}
+                          value={diasDemora ?? ''}
+                          onChange={e => {
+                            const v = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                            setDiasDemora(v != null && !isNaN(v) && v >= 0 ? v : null);
+                          }}
+                          placeholder="Ej. 21"
+                          className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario"
+                        />
+                        {diasDemora != null && arribo ? (
+                          <p className={`mt-1 text-[10px] font-semibold ${vencidosDemora != null && vencidosDemora > 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                            Límite: {fechaDemora}
+                            {vencidosDemora != null && vencidosDemora > 0 && ` · vencida hace ${vencidosDemora} día(s)`}
+                          </p>
+                        ) : diasDemora != null ? (
+                          <p className="mt-1 text-[10px] text-amber-600 font-semibold">Captura la ETA para ver la fecha límite</p>
+                        ) : embarque.diasLibresDemora == null && !libDem ? (
+                          <p className="mt-1 text-[10px] text-amber-600 font-semibold">La cotización no trae días libres de demora</p>
+                        ) : null}
+                        {/* Legacy: fecha manual vieja, si existe y no hay días */}
+                        {diasDemora == null && libDem && (
+                          <div className="mt-1">
+                            <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Fecha manual (anterior)</label>
+                            <input type="date" value={libDem} onChange={e => setLibDem(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Días libres de almacenaje</label>
+                        <input
+                          type="number" min={0} max={90}
+                          value={diasAlmacenaje ?? ''}
+                          onChange={e => {
+                            const v = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                            setDiasAlmacenaje(v != null && !isNaN(v) && v >= 0 ? v : null);
+                          }}
+                          placeholder={`Ej. ${ALMACENAJE_SUGERIDO}`}
+                          className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario"
+                        />
+                        {diasAlmacenaje != null && arribo ? (
+                          <p className={`mt-1 text-[10px] font-semibold ${vencidosAlmacenaje != null && vencidosAlmacenaje > 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                            Límite: {fechaAlmacenaje}
+                            {vencidosAlmacenaje != null && vencidosAlmacenaje > 0 && ` · vencida hace ${vencidosAlmacenaje} día(s)`}
+                          </p>
+                        ) : diasAlmacenaje != null ? (
+                          <p className="mt-1 text-[10px] text-amber-600 font-semibold">Captura la ETA para ver la fecha límite</p>
+                        ) : embarque.diasLibresAlmacenaje == null && !libAlm ? (
+                          <p className="mt-1 text-[10px] text-amber-600 font-semibold">La cotización no trae días libres de almacenaje</p>
+                        ) : null}
+                        {/* Legacy: fecha manual vieja, si existe y no hay días */}
+                        {diasAlmacenaje == null && libAlm && (
+                          <div className="mt-1">
+                            <label className="block text-[9px] font-bold text-gray-400 uppercase mb-0.5">Fecha manual (anterior)</label>
+                            <input type="date" value={libAlm} onChange={e => setLibAlm(e.target.value)} className="w-full border border-gray-200 rounded-lg p-1.5 text-xs font-semibold outline-none focus:border-primario" />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

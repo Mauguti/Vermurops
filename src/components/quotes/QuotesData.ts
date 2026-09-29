@@ -452,6 +452,21 @@ export interface KanbanQuote {
   tipoCambio?: TipoCambioCotizacion;
 
   /**
+   * Días libres de demora negociados con el proveedor (tarea 08, 28-sep-2026).
+   *
+   * Pricing los captura; el embarque los hereda y Operaciones ve la fecha
+   * límite = ETA + estos días, CALCULADA, no guardada. Típicamente hasta 21.
+   * Distintos de los días de crédito del cliente: estos son del contenedor.
+   */
+  diasLibresDemora?: number | null;
+  /**
+   * Días libres de almacenaje (tarea 08, 28-sep-2026).
+   *
+   * Sugeridos 7 para todos. La fecha límite = ETA + estos días.
+   */
+  diasLibresAlmacenaje?: number | null;
+
+  /**
    * Embarques generados desde esta cotización (E-4).
    * Con al menos uno, la cotización queda CONGELADA: sus conceptos ya no se
    * editan. Decisión del cliente: «una vez que pasa a embarques ya así se
