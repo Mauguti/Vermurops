@@ -26,7 +26,7 @@ Lo que no alcance a correr esta noche se queda en [ ] para la siguiente.
 - [x] 17 PLAN: una sola fuente de verdad para la tarifa elegida
 - [x] 18 PLAN: equipos, la parte mínima para Operaciones
 - [x] 19 PLAN: reciclar cotizaciones y orden de la bandeja de Pricing
-- [ ] 20 PLAN C: documentos operativos y talonario del HBL
+- [x] 20 PLAN C: documentos operativos y talonario del HBL
 - [ ] 21 Usuarios y roles, paso 1 (solo emuladores)
 - [ ] 22 Token en el webhook del PDF (JSON para importar)
 - [ ] 23 Bug en frío: solicitud vacía tras «Enviar a Pricing»
