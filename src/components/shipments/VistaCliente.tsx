@@ -20,8 +20,7 @@ import {
   AlertTriangle, Package,
 } from 'lucide-react';
 import type { EmbarqueCompleto, EmbarqueDocumento, EmbarqueEvento } from './EmbarquesData';
-import { EVENT_TYPES } from './EmbarquesData';
-import { documentosParaCliente, ETIQUETA_CLASE, reglaDeTipo } from '../../lib/visibilidadDocumentoCliente';
+import { documentosParaCliente, reglaDeTipo } from '../../lib/visibilidadDocumentoCliente';
 import { etiquetaTipoDocumento } from '../../lib/documentosEmbarque';
 import { estadoDe, ETAPA_MAP } from '../../lib/estadoEmbarque';
 
@@ -198,7 +197,6 @@ function FilaDocCliente({ doc }: { doc: EmbarqueDocumento }) {
 }
 
 function EventoCliente({ evt }: { evt: EmbarqueEvento }) {
-  const typeStyle = EVENT_TYPES[evt.tipo] || EVENT_TYPES.info;
   return (
     <div className="relative">
       <div className="absolute -left-[22px] top-1.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-primario ring-3 ring-white" />
