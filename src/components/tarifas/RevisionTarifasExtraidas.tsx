@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import {
-  X, AlertTriangle, Sparkles, Trash2, Check, Coins, Ruler,
+  X, AlertTriangle, Sparkles, Trash2, Check, CheckCheck, Coins, Ruler,
 } from 'lucide-react';
 import {
   validarRespuestaN8N, construirLineasEnRevision, motivosNoGuardable,
   esGuardable, resumenRevision, ordenarParaRevision, textoDeAviso, TEXTO_MOTIVO,
   resolverProveedor, estadoGuardable,
+  confirmarLinea, confirmarTodas, pendientesDeConfirmar, tieneQueConfirmar,
   type LineaEnRevision, type NivelConfianza, type NivelMatch,
 } from '../../lib/importacionTarifas';
 import type { ConceptoMatch } from './tarifaMatching';
@@ -26,6 +27,11 @@ import type { ProveedorVermur } from '../proveedores/ProveedoresData';
  * Dos cosas exigen confirmación explícita y no solo ser editables: la MONEDA y
  * la UNIDAD. Un 1,200 que era MXN cargado como USD se ve perfectamente bien en
  * esta pantalla, y nadie lo atrapa hasta que llega la factura.
+ *
+ * Y confirmar es una ACCIÓN con su propio botón, no un efecto de cambiar el
+ * valor (1a): el extractor casi siempre trae USD y CONTENEDOR bien, y elegir
+ * el mismo valor en el selector no disparaba nada, así que el dato correcto no
+ * se podía aprobar. Ver `confirmarLinea` en lib/importacionTarifas.
  */
 
 const COLOR_CONFIANZA: Record<NivelConfianza, string> = {
@@ -85,8 +91,21 @@ export default function RevisionTarifasExtraidas({
   const [guardando, setGuardando] = useState(false);
 
   const resumen = resumenRevision(lineas);
-  const ordenadas = useMemo(() => ordenarParaRevision(lineas), [lineas]);
   const estado = estadoGuardable(proveedorId, nivelProveedor === 'exacto', lineas);
+  const porConfirmar = pendientesDeConfirmar(lineas);
+
+  /*
+   * El orden se calcula UNA VEZ, al abrir: primero lo que necesita atención.
+   *
+   * Recalcularlo en cada cambio hacía que la línea saltara al final en cuanto
+   * quedaba lista — justo en el clic con el que la acababas de arreglar. Con
+   * cuarenta líneas eso es una tabla que se reacomoda sola mientras trabajas.
+   */
+  const [orden] = useState<string[]>(() => ordenarParaRevision(lineas).map(l => l.lineaId));
+  const ordenadas = useMemo(
+    () => orden.map(id => lineas.find(l => l.lineaId === id)).filter(Boolean) as LineaEnRevision[],
+    [orden, lineas],
+  );
 
   const actualizar = (id: string, cambios: Partial<LineaEnRevision>) =>
     setLineas(prev => prev.map(l => (l.lineaId === id ? { ...l, ...cambios } : l)));
@@ -164,15 +183,30 @@ export default function RevisionTarifasExtraidas({
           )}
         </div>
 
-        <p className="text-[12px] font-semibold text-gray-700">
-          {resumen.total} línea{resumen.total !== 1 ? 's' : ''}
-          {resumen.requierenRevision > 0 && (
-            <span className="text-amber-700"> · {resumen.requierenRevision} requiere{resumen.requierenRevision !== 1 ? 'n' : ''} revisión</span>
+        <div className="flex items-center gap-3 flex-wrap">
+          <p className="text-[12px] font-semibold text-gray-700">
+            {resumen.total} línea{resumen.total !== 1 ? 's' : ''}
+            {resumen.requierenRevision > 0 && (
+              <span className="text-amber-700"> · {resumen.requierenRevision} requiere{resumen.requierenRevision !== 1 ? 'n' : ''} revisión</span>
+            )}
+            {resumen.descartadas > 0 && (
+              <span className="text-gray-400"> · {resumen.descartadas} descartada{resumen.descartadas !== 1 ? 's' : ''}</span>
+            )}
+          </p>
+
+          {/* Revisar cuarenta líneas una por una es lo que nadie hace. Con un
+              clic sigue siendo una decisión de alguien, que es lo que la
+              confirmación certifica. */}
+          {porConfirmar > 0 && (
+            <button
+              onClick={() => setLineas(confirmarTodas)}
+              className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-2 py-1 rounded transition-colors"
+            >
+              <CheckCheck className="w-3 h-3" />
+              Confirmar moneda y unidad de las {porConfirmar}
+            </button>
           )}
-          {resumen.descartadas > 0 && (
-            <span className="text-gray-400"> · {resumen.descartadas} descartada{resumen.descartadas !== 1 ? 's' : ''}</span>
-          )}
-        </p>
+        </div>
 
         {d.observaciones && (
           <p className="text-[11px] text-gray-500 italic">«{d.observaciones}»</p>
@@ -240,7 +274,6 @@ export default function RevisionTarifasExtraidas({
                     <Confirmable
                       icono={<Coins className="w-3 h-3" />}
                       confirmado={l.monedaConfirmada}
-                      onConfirmar={() => actualizar(l.lineaId, { monedaConfirmada: true })}
                     >
                       <select
                         value={l.moneda ?? ''}
@@ -259,7 +292,6 @@ export default function RevisionTarifasExtraidas({
                     <Confirmable
                       icono={<Ruler className="w-3 h-3" />}
                       confirmado={l.unidadConfirmada}
-                      onConfirmar={() => actualizar(l.lineaId, { unidadConfirmada: true })}
                     >
                       <select
                         value={l.unidad ?? ''}
@@ -290,6 +322,17 @@ export default function RevisionTarifasExtraidas({
 
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   {lista && <Check className="w-4 h-4 text-emerald-600" />}
+                  {/* Confirmar es una ACCIÓN: marca la línea aunque el valor
+                      que trajo el extractor sea el correcto y no cambie. */}
+                  {tieneQueConfirmar(l) && (
+                    <button
+                      onClick={() => actualizar(l.lineaId, confirmarLinea(l))}
+                      className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-1.5 py-0.5 rounded transition-colors whitespace-nowrap"
+                      title="Marcar la moneda y la unidad como revisadas"
+                    >
+                      Confirmar
+                    </button>
+                  )}
                   <button
                     onClick={() => actualizar(l.lineaId, { descartada: !l.descartada })}
                     className={`p-1 rounded transition-colors ${
@@ -358,18 +401,27 @@ function Marco({ titulo, onCerrar, ancho, children }: {
   );
 }
 
-/** Campo que exige confirmación explícita, no solo ser editable. */
-function Confirmable({ icono, confirmado, onConfirmar, children }: {
-  icono: React.ReactNode; confirmado: boolean;
-  onConfirmar: () => void; children: React.ReactNode;
+/**
+ * Campo que exige confirmación explícita, no solo ser editable.
+ *
+ * El chip DICE si está confirmado; no confirma. Antes tenía un `onClick` que
+ * lo hacía, y ése era el fondo del bug 1a: un clic real sobre un `<select>`
+ * abre el menú del sistema y el navegador no entrega el `click` al elemento,
+ * así que el único trozo confirmable eran los pocos píxeles del borde. Con un
+ * clic sintético sí funcionaba — por eso ninguna prueba lo atrapó.
+ *
+ * Confirmar vive ahora en un botón que se ve. Cambiar el valor sigue
+ * confirmando: elegir otra moneda ES haberla revisado.
+ */
+function Confirmable({ icono, confirmado, children }: {
+  icono: React.ReactNode; confirmado: boolean; children: React.ReactNode;
 }) {
   return (
     <span
-      onClick={() => !confirmado && onConfirmar()}
-      className={`inline-flex items-center gap-1 px-1.5 py-1 rounded border transition-colors ${
+      className={`inline-flex items-center gap-1 px-1.5 py-1 rounded border ${
         confirmado
           ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-          : 'border-amber-300 bg-amber-50 text-amber-800 cursor-pointer hover:bg-amber-100'
+          : 'border-amber-300 bg-amber-50 text-amber-800'
       }`}
       title={confirmado ? 'Confirmado' : 'Sin confirmar: revísalo y confírmalo'}
     >

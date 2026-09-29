@@ -12,6 +12,7 @@ import {
   resolverConcepto, resolverPuerto, resolverProveedor,
   motivosNoGuardable, esGuardable, resumenRevision, ordenarParaRevision,
   estadoGuardable,
+  confirmarLinea, confirmarTodas, pendientesDeConfirmar, tieneQueConfirmar,
   vigenciasSeTraslapan, detectarColisiones,
   LineaEnRevision,
 } from './importacionTarifas';
@@ -497,5 +498,85 @@ describe('el proveedor del tarifario es bloqueante', () => {
     const e = estadoGuardable(null, false, [linea({ conceptoId: null })]);
     expect(e.faltantes).toHaveLength(2);
     expect(e.faltantes[0]).toContain('proveedor');
+  });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Confirmar es una ACCIÓN, no un cambio de valor (1a)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('confirmar la línea', () => {
+  /** Lo que llega del extractor cuando ACERTÓ: datos buenos, sin confirmar. */
+  const recienExtraida = () => linea({
+    moneda: 'USD', unidad: 'CONTENEDOR',
+    monedaConfirmada: false, unidadConfirmada: false,
+  });
+
+  it('EL BUG: con los valores correctos, la línea no se podía guardar', () => {
+    /*
+     * El extractor trae USD y CONTENEDOR, que es lo que dice el documento.
+     * Como confirmar solo se disparaba al CAMBIAR el valor, elegir el mismo
+     * valor no confirmaba nada: «GUARDAR 0 TARIFAS» con el dato correcto en
+     * pantalla. Bloqueó al equipo varios días.
+     */
+    expect(esGuardable(recienExtraida())).toBe(false);
+    expect(motivosNoGuardable(recienExtraida()))
+      .toEqual(['moneda_sin_confirmar', 'unidad_sin_confirmar']);
+  });
+
+  it('un clic en «Confirmar» la deja lista, sin tocar ningún valor', () => {
+    const antes = recienExtraida();
+    const despues = confirmarLinea(antes);
+
+    expect(esGuardable(despues)).toBe(true);
+    // Confirmar CERTIFICA, no corrige: los datos son los mismos.
+    expect(despues.moneda).toBe(antes.moneda);
+    expect(despues.unidad).toBe(antes.unidad);
+    expect(despues.monto).toBe(antes.monto);
+  });
+
+  it('un campo VACÍO no se confirma: no hay nada que revisar', () => {
+    const sinMoneda = confirmarLinea(linea({
+      moneda: null, monedaConfirmada: false, unidadConfirmada: false,
+    }));
+    expect(sinMoneda.monedaConfirmada).toBe(false);
+    expect(sinMoneda.unidadConfirmada).toBe(true);
+    expect(motivosNoGuardable(sinMoneda)).toEqual(['sin_moneda']);
+  });
+
+  it('NO acepta un concepto que solo se parece: eso conserva su propio botón', () => {
+    // Es el camino por el que «Almacenaje IN» termina apuntando a «OUT».
+    const sugerido = confirmarLinea(recienExtraida());
+    expect(esGuardable({ ...sugerido, nivelConcepto: 'sugerido' })).toBe(false);
+    expect(motivosNoGuardable({ ...sugerido, nivelConcepto: 'sugerido' }))
+      .toEqual(['concepto_sin_confirmar']);
+  });
+
+  it('una línea descartada no se confirma ni se cuenta', () => {
+    const fuera = linea({ descartada: true, monedaConfirmada: false, unidadConfirmada: false });
+    expect(tieneQueConfirmar(fuera)).toBe(false);
+    expect(confirmarLinea(fuera)).toEqual(fuera);
+  });
+
+  it('«Confirmar todas» deja guardables las que solo esperaban el clic', () => {
+    const lineas = [
+      linea({ lineaId: 'a', ...recienExtraida() }),
+      linea({ lineaId: 'b', ...recienExtraida() }),
+      linea({ lineaId: 'c', moneda: null, monedaConfirmada: false, unidadConfirmada: false }),
+    ];
+    expect(pendientesDeConfirmar(lineas)).toBe(3);
+
+    const listas = confirmarTodas(lineas);
+    expect(listas.filter(esGuardable)).toHaveLength(2);
+    // La que le falta la moneda sigue bloqueada, y lo dice.
+    expect(motivosNoGuardable(listas[2])).toEqual(['sin_moneda']);
+    expect(pendientesDeConfirmar(listas)).toBe(0);
+  });
+
+  it('el pie deja de decir «ninguna línea está lista»', () => {
+    const lineas = confirmarTodas([recienExtraida()]);
+    expect(estadoGuardable('PRV-1', true, lineas))
+      .toEqual({ puedeGuardar: true, faltantes: [] });
   });
 });

@@ -430,6 +430,56 @@ export function motivosNoGuardable(l: LineaEnRevision): MotivoNoGuardable[] {
   return motivos;
 }
 
+/**
+ * ── Confirmar es una ACCIÓN, no un cambio de valor (1a) ────────────────────
+ *
+ * El extractor casi siempre acierta: trae USD y CONTENEDOR, que es justo lo
+ * que dice el documento. Y como confirmar solo podía dispararse al CAMBIAR el
+ * valor, elegir el mismo valor no confirmaba nada: la línea correcta se
+ * quedaba en ámbar para siempre y el pie decía «Ninguna línea está lista para
+ * guardar». El dato era bueno y no había forma de aprobarlo.
+ *
+ * La confirmación sigue siendo obligatoria —es la constancia de que alguien
+ * miró— pero ahora tiene su propio botón, que marca la línea aunque nada
+ * cambie.
+ *
+ * Lo que este botón NO hace: aceptar un concepto que solo se PARECE. Ése es
+ * el camino por el que «Almacenaje IN» termina apuntando a «Almacenaje OUT»,
+ * y conserva su botón aparte. Tampoco se confirma solo por confianza alta:
+ * entonces la confirmación no sería constancia de nada.
+ */
+
+/** ¿Hay algo que este botón pueda confirmar en esta línea? */
+export function tieneQueConfirmar(l: LineaEnRevision): boolean {
+  if (l.descartada) return false;
+  return (!!l.moneda && !l.monedaConfirmada) || (!!l.unidad && !l.unidadConfirmada);
+}
+
+/**
+ * Marca como revisadas la moneda y la unidad que YA tienen valor.
+ *
+ * Un campo vacío no se confirma: no hay nada que revisar. La línea sigue
+ * bloqueada y el motivo lo dice («Falta la moneda»).
+ */
+export function confirmarLinea(l: LineaEnRevision): LineaEnRevision {
+  if (l.descartada) return l;
+  return {
+    ...l,
+    monedaConfirmada: l.moneda ? true : l.monedaConfirmada,
+    unidadConfirmada: l.unidad ? true : l.unidadConfirmada,
+  };
+}
+
+/** «Confirmar todas»: lo mismo, línea por línea, sin tocar las descartadas. */
+export function confirmarTodas(lineas: LineaEnRevision[]): LineaEnRevision[] {
+  return lineas.map(confirmarLinea);
+}
+
+/** Cuántas líneas esperan ese clic. Cero = el botón de arriba sobra. */
+export function pendientesDeConfirmar(lineas: LineaEnRevision[]): number {
+  return lineas.filter(tieneQueConfirmar).length;
+}
+
 export function esGuardable(l: LineaEnRevision): boolean {
   return !l.descartada && motivosNoGuardable(l).length === 0;
 }
