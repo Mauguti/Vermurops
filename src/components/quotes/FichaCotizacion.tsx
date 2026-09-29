@@ -1472,9 +1472,9 @@ export default function FichaCotizacion({
               );
             })}
 
-            {/* Trámites aduanales agregados a la cotización */}
-            {quote.servicios.filter(s => s.subTramites && s.subTramites.length > 0).map(srv => (
-              srv.subTramites!.map(tram => (
+            {/* Trámites aduanales agregados a la cotización (campo legacy) */}
+            {quote.servicios.filter(s => (s as any).subTramites && (s as any).subTramites.length > 0).map(srv => (
+              ((srv as any).subTramites as Array<{ id: string; nombre: string; proveedor: string; costo: number; margenPct: number; moneda: string }>).map(tram => (
                 <div key={tram.id} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0 text-xs">
                   <div className="flex-1">
                     <span className="font-bold text-gray-600">↳ Sub-trámite: {tram.nombre}</span>
@@ -2463,7 +2463,7 @@ export default function FichaCotizacion({
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-[#18181B]">
-                            {item.title} {item.autor ? `por ${item.autor}` : ''}
+                            {item.title} {'autor' in item && item.autor ? `por ${item.autor}` : ''}
                           </span>
                           <span className="text-[9px] text-gray-400 font-semibold tabular-nums">{item.date}</span>
                         </div>
