@@ -72,6 +72,8 @@ import { totalesComparables } from '../../lib/matrizComparativa';
 import { compararColumnas, type MonedaCotizacion } from '../../lib/monedaComparativa';
 import {
   evaluarProntitud,
+  faltantesDeImpuesto,
+  resumenImpuestoFaltante,
 } from '../../lib/prontitudCotizacion';
 import TablaConceptos, { ServicioDeLaTabla } from './TablaConceptos';
 import {
@@ -896,6 +898,28 @@ export default function FichaCotizacion({
   };
 
   /**
+   * Tarea 03 · Líneas con venta > 0 cuyo impuesto quedó indeterminado.
+   * Frena «Enviar al cliente»: una factura sin tasa sale mal y nadie lo
+   * atrapa hasta que el SAT la rechace. Se evalúa aquí porque necesita el
+   * catálogo de conceptos, que prontitudCotizacion no tiene.
+   */
+  const impuestoFaltantes = useMemo(
+    () => faltantesDeImpuesto(quote, impuestoDeLineaPlana),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [quote, conceptosCatalogo],
+  );
+
+  /**
+   * Prontitud aumentada: incluye los faltantes de impuesto para que la franja
+   * pueda mostrarlos con el mismo formato que los demás. Consolidar no los
+   * exige; enviar al cliente y marcar ganada sí.
+   */
+  const prontitudConImpuesto = useMemo(() => ({
+    ...prontitud,
+    faltantes: [...prontitud.faltantes, ...impuestoFaltantes],
+  }), [prontitud, impuestoFaltantes]);
+
+  /**
    * Bloque 1 · Proveedor y moneda para un costo tecleado a mano.
    *
    * Crea una tarifa DENTRO de la cotización —no en el tarifario general del
@@ -1265,10 +1289,21 @@ export default function FichaCotizacion({
     solicitado_pricing:     { ok: prontitud.conConceptos, porque: 'Agrega al menos un concepto antes de enviarla a Pricing.' },
     // Registrar respuestas exige que haya alguna respuesta.
     cotizaciones_recibidas: { ok: prontitud.algunProveedor, porque: 'Ningún concepto tiene proveedor todavía.' },
-    // Consolidar, enviar y ganar exigen la cotización completa.
+    // Consolidar exige la cotización completa.
     consolidada:            { ok: prontitud.lista, porque: '' },
-    enviada_cliente:        { ok: prontitud.lista, porque: '' },
-    ganada:                 { ok: prontitud.lista, porque: '' },
+    // Enviar y ganar exigen además que todas las líneas con venta tengan tasa.
+    enviada_cliente:        {
+      ok: prontitud.lista && impuestoFaltantes.length === 0,
+      porque: impuestoFaltantes.length > 0
+        ? resumenImpuestoFaltante(impuestoFaltantes)
+        : '',
+    },
+    ganada:                 {
+      ok: prontitud.lista && impuestoFaltantes.length === 0,
+      porque: impuestoFaltantes.length > 0
+        ? resumenImpuestoFaltante(impuestoFaltantes)
+        : '',
+    },
   };
 
   const condicionAvance = advanceTarget ? CONDICION_AVANCE[advanceTarget] : undefined;
@@ -1292,7 +1327,7 @@ export default function FichaCotizacion({
     : null;
 
   /** «Marcar ganada» como botón secundario obedece la misma condición. */
-  const puedeMarcarGanada = disponibles.includes('ganada') && prontitud.lista;
+  const puedeMarcarGanada = disponibles.includes('ganada') && prontitud.lista && impuestoFaltantes.length === 0;
 
   /**
    * Bloque 2a · el freno «sin cliente vinculado», con camino.
@@ -1607,7 +1642,7 @@ export default function FichaCotizacion({
         rol={rolActivo}
         etapa={quote.etapa}
         paso={paso}
-        prontitud={prontitud}
+        prontitud={prontitudConImpuesto}
         puedeAvanzar={puedeAvanzar}
         porque={porqueNoAvanza}
         onAvanzar={avanzarA}

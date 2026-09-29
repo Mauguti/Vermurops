@@ -13,6 +13,7 @@ import { describe, it, expect } from 'vitest';
 import {
   evaluarProntitud, faltantesDeLinea, textoFaltante,
   resumenFaltantes, faltantesPorLinea, textoFaltantesLinea,
+  faltantesDeImpuesto, resumenImpuestoFaltante,
 } from './prontitudCotizacion';
 import { LineaPlana } from './lineasCotizacion';
 import {
@@ -306,5 +307,110 @@ describe('el bloqueo por proveedor enseña el costo que lo provoca', () => {
     const pelado = concepto({ id: 'cB', nombre: 'Gestoría' });
     const p = evaluarProntitud(quote([pelado]));
     expect(p.faltantes.every(f => f.tipo === 'sin_proveedor' || f.detalle === undefined)).toBe(true);
+  });
+});
+
+// ─── Tarea 03 · Freno de impuesto para «Enviar al cliente» ──────────────────
+
+describe('faltantesDeImpuesto — líneas con venta sin tasa de impuesto', () => {
+  /** Resolvedor que simula tasa resuelta. */
+  const resuelta = () => ({ tasa: 16 });
+  /** Resolvedor que simula tasa indeterminada. */
+  const indeterminada = () => ({ tasa: null });
+
+  it('una línea con venta > 0 y tasa resuelta pasa', () => {
+    const conVenta = concepto({
+      id: 'i1', nombre: 'Flete marítimo', conceptoId: 'CON-001', profit: 500,
+      tarifas: [tarifa({ id: 't1', monto: 2000, proveedorId: 'PRV-1' })],
+      proveedoresOficialIds: ['t1'],
+    });
+    const f = faltantesDeImpuesto(quote([conVenta]), resuelta);
+    expect(f).toHaveLength(0);
+  });
+
+  it('una línea con venta > 0 y tasa indeterminada bloquea', () => {
+    const conVenta = concepto({
+      id: 'i2', nombre: 'Warehouse', conceptoId: 'CON-102', profit: 500,
+      tarifas: [tarifa({ id: 't2', monto: 2000, proveedorId: 'PRV-2' })],
+      proveedoresOficialIds: ['t2'],
+    });
+    const f = faltantesDeImpuesto(quote([conVenta]), indeterminada);
+    expect(f).toHaveLength(1);
+    expect(f[0].tipo).toBe('sin_impuesto');
+    expect(f[0].concepto).toBe('Warehouse');
+    expect(f[0].detalle).toContain('columna Impuesto');
+  });
+
+  it('una línea sin venta no cuenta, aunque su tasa sea indeterminada', () => {
+    // Un concepto interno sin profit tiene venta = 0: no genera factura.
+    // Exigirle tasa traba conceptos que no se le cobran al cliente.
+    const sinVenta = concepto({
+      id: 'i3', nombre: 'Reserva interna', conceptoId: 'CON-003',
+    });
+    const f = faltantesDeImpuesto(quote([sinVenta]), indeterminada);
+    expect(f).toHaveLength(0);
+  });
+
+  it('mezcla: solo las que tienen venta y tasa nula aparecen', () => {
+    const resueltaC = concepto({
+      id: 'i4', nombre: 'Flete', conceptoId: 'CON-001', profit: 500,
+      tarifas: [tarifa({ id: 't4', monto: 2000, proveedorId: 'PRV-1' })],
+      proveedoresOficialIds: ['t4'],
+    });
+    const sinTasa = concepto({
+      id: 'i5', nombre: 'Maniobras', conceptoId: 'CON-002', profit: 100,
+      tarifas: [tarifa({ id: 't5', monto: 1000, proveedorId: 'PRV-2' })],
+      proveedoresOficialIds: ['t5'],
+    });
+    // El resolvedor devuelve resuelta para Flete, indeterminada para Maniobras.
+    const resolver = (l: LineaPlana) =>
+      l.concepto === 'Flete' ? { tasa: 16 } : { tasa: null };
+    const f = faltantesDeImpuesto(quote([resueltaC, sinTasa]), resolver);
+    expect(f).toHaveLength(1);
+    expect(f[0].concepto).toBe('Maniobras');
+  });
+
+  it('resumen para una línea', () => {
+    const f = faltantesDeImpuesto(
+      quote([concepto({ id: 'i6', nombre: 'Seguro', conceptoId: 'CON-006', profit: 50,
+        tarifas: [tarifa({ id: 't6', monto: 100, proveedorId: 'PRV-6' })],
+        proveedoresOficialIds: ['t6'],
+      })]),
+      indeterminada,
+    );
+    expect(resumenImpuestoFaltante(f)).toBe('1 línea con venta sin tasa de impuesto');
+  });
+
+  it('resumen para varias líneas', () => {
+    const dos = [
+      concepto({ id: 'i7a', nombre: 'A', conceptoId: 'CON-007', profit: 10,
+        tarifas: [tarifa({ id: 't7a', monto: 100, proveedorId: 'PRV-7' })],
+        proveedoresOficialIds: ['t7a'],
+      }),
+      concepto({ id: 'i7b', nombre: 'B', conceptoId: 'CON-008', profit: 20,
+        tarifas: [tarifa({ id: 't7b', monto: 200, proveedorId: 'PRV-8' })],
+        proveedoresOficialIds: ['t7b'],
+      }),
+    ];
+    const f = faltantesDeImpuesto(quote(dos), indeterminada);
+    expect(resumenImpuestoFaltante(f)).toBe('2 líneas con venta sin tasa de impuesto');
+  });
+
+  it('el texto del faltante dice cómo resolverlo', () => {
+    const f = faltantesDeImpuesto(
+      quote([concepto({ id: 'i8', nombre: 'AMS', conceptoId: 'CON-009', profit: 30,
+        tarifas: [tarifa({ id: 't8', monto: 50, proveedorId: 'PRV-9' })],
+        proveedoresOficialIds: ['t8'],
+      })]),
+      indeterminada,
+    );
+    expect(textoFaltante(f[0])).toContain('sin tasa de impuesto');
+    expect(textoFaltante(f[0])).toContain('columna Impuesto');
+  });
+
+  it('textoFaltantesLinea incluye sin_impuesto como frase legible', () => {
+    expect(textoFaltantesLinea(['sin_impuesto'])).toBe('sin tasa de impuesto');
+    expect(textoFaltantesLinea(['sin_proveedor', 'sin_impuesto']))
+      .toBe('sin proveedor y sin tasa de impuesto');
   });
 });
