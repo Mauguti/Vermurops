@@ -341,3 +341,73 @@ describe('vistaDeVersion y restauración', () => {
     expect(plan.ok).toBe(false);
   });
 });
+
+// ─── Tarea 03 · El impuesto elegido sobrevive a «Nueva versión» ─────────────
+
+describe('«Nueva versión» conserva el impuesto elegido a mano', () => {
+  it('el campo impuesto viaja en la foto y en la raíz', () => {
+    // Pricing eligió iva16 a mano en el flete y exento en las maniobras.
+    // Usa conceptos propios para no mutar la fixture compartida SRV.
+    const c1 = concepto({ id: 'imp1', nombre: 'Flete', profit: 200, impuesto: 'iva16',
+      tarifas: [tarifa('t-imp1', 1500, 'USD')] as never, proveedoresOficialIds: ['t-imp1'] });
+    const c2 = concepto({ id: 'imp2', nombre: 'Maniobras', profit: 1000, impuesto: 'exento',
+      tarifas: [tarifa('t-imp2', 8000, 'MXN')] as never, proveedoresOficialIds: ['t-imp2'] });
+    const srv = servicio({ id: 'srv-imp', conceptos: [c1, c2] });
+    const q = quote({ servicios: [srv] });
+
+    const plan = planearNuevaVersion(q, opts());
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+
+    // La foto (v1) conserva lo que se eligió.
+    const fotoConceptos = plan.documento.foto.servicios[0].conceptos!;
+    expect(fotoConceptos[0].impuesto).toBe('iva16');
+    expect(fotoConceptos[1].impuesto).toBe('exento');
+
+    // La raíz no toca servicios: sigue igual que la viva.
+    expect(plan.patch).not.toHaveProperty('servicios');
+    // Así que los conceptos de la viva siguen con su impuesto.
+    expect(q.servicios[0].conceptos![0].impuesto).toBe('iva16');
+    expect(q.servicios[0].conceptos![1].impuesto).toBe('exento');
+  });
+
+  it('restaurar una versión recupera el impuesto de esa versión', () => {
+    // La v1 tenía iva16 en el flete.
+    const c1 = concepto({ id: 'rest1', nombre: 'Flete', profit: 200, impuesto: 'iva16',
+      tarifas: [tarifa('t-rest1', 1500, 'USD')] as never, proveedoresOficialIds: ['t-rest1'] });
+    const c2 = concepto({ id: 'rest2', nombre: 'Maniobras', profit: 1000,
+      tarifas: [tarifa('t-rest2', 8000, 'MXN')] as never, proveedoresOficialIds: ['t-rest2'] });
+    const srv = servicio({ id: 'srv-rest', conceptos: [c1, c2] });
+    const q = quote({ servicios: [srv] });
+
+    const { quote: v2, documento: docV1 } = aplicar(q, opts());
+    // Pricing cambia a exento en la v2.
+    v2.servicios[0].conceptos![0] = {
+      ...v2.servicios[0].conceptos![0],
+      impuesto: 'exento',
+    };
+
+    const plan = planearRestauracion(v2, docV1, opts({ motivo: 'Volver a la v1' }));
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+
+    // El patch restaura servicios de la v1, con iva16.
+    expect(plan.patch.servicios![0].conceptos![0].impuesto).toBe('iva16');
+  });
+
+  it('una línea sin impuesto capturado se congela sin él', () => {
+    // Verifica que la ausencia del campo también viaja correctamente.
+    // Usa concepto fresco sin impuesto, en vez de la fixture compartida.
+    const sinImpuesto = concepto({ id: 'x1', nombre: 'Sin tasa', profit: 100 });
+    const srv = servicio({ id: 'srv-x', conceptos: [sinImpuesto] });
+    const q = quote({ servicios: [srv] });
+    expect(q.servicios[0].conceptos![0].impuesto).toBeUndefined();
+
+    const plan = planearNuevaVersion(q, opts());
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+
+    // La foto tampoco lo tiene: no se inventa.
+    expect(plan.documento.foto.servicios[0].conceptos![0].impuesto).toBeUndefined();
+  });
+});

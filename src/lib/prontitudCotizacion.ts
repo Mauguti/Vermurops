@@ -19,7 +19,7 @@
 import { KanbanQuote } from '../components/quotes/QuotesData';
 import { aplanarCotizacion, LineaPlana } from './lineasCotizacion';
 
-export type TipoFaltante = 'sin_concepto' | 'sin_proveedor' | 'sin_monto';
+export type TipoFaltante = 'sin_concepto' | 'sin_proveedor' | 'sin_monto' | 'sin_impuesto';
 
 export interface Faltante {
   lineaId: string;
@@ -69,6 +69,7 @@ const TEXTO_FALTANTE: Record<TipoFaltante, string> = {
   sin_concepto:  'sin concepto del catálogo',
   sin_proveedor: 'sin proveedor',
   sin_monto:     'sin costo capturado',
+  sin_impuesto:  'sin tasa de impuesto',
 };
 
 const tieneProveedor = (l: LineaPlana): boolean => Boolean(l.proveedorNombre?.trim());
@@ -240,6 +241,55 @@ export function textoFaltantesLinea(
     detalles[i] ? `${TEXTO_FALTANTE[t]} · ${detalles[i]}` : TEXTO_FALTANTE[t]);
   if (textos.length === 1) return textos[0];
   return `${textos.slice(0, -1).join(', ')} y ${textos[textos.length - 1]}`;
+}
+
+// ─── Freno de impuesto para «Enviar al cliente» ─────────────────────────────
+
+/**
+ * Líneas con venta > 0 cuyo impuesto quedó indeterminado.
+ *
+ * Freno aparte de `evaluarProntitud` porque necesita el catálogo de conceptos
+ * para resolver la tasa: el adaptador plano solo lleva lo que el usuario
+ * capturó, no la regla del catálogo. La ficha tiene ambos; la máquina de
+ * estados no, así que el Kanban se cubre por el guard de «lista» y este
+ * freno se evalúa donde hay acceso al catálogo.
+ *
+ * Las líneas sin venta no cuentan: un costo sin venta no genera factura, y
+ * exigirle tasa traba conceptos como «Documentation» que se facturan después.
+ */
+export function faltantesDeImpuesto(
+  quote: KanbanQuote,
+  resolverImpuesto: (linea: LineaPlana) => { tasa: number | null },
+): Faltante[] {
+  const lineas = aplanarCotizacion(quote);
+  const resultado: Faltante[] = [];
+
+  for (const l of lineas) {
+    const conVenta = Number.isFinite(l.venta) && l.venta > 0;
+    if (!conVenta) continue;
+
+    const imp = resolverImpuesto(l);
+    if (imp.tasa === null) {
+      resultado.push({
+        lineaId: l.id,
+        concepto: l.concepto || '(sin nombre)',
+        tipo: 'sin_impuesto',
+        detalle: 'elegir la tasa en la columna Impuesto',
+      });
+    }
+  }
+
+  return resultado;
+}
+
+/**
+ * Resumen para el freno de impuesto. Mismo tono que `resumenFaltantes`.
+ */
+export function resumenImpuestoFaltante(faltantes: Faltante[]): string {
+  if (faltantes.length === 0) return '';
+  return faltantes.length === 1
+    ? '1 línea con venta sin tasa de impuesto'
+    : `${faltantes.length} líneas con venta sin tasa de impuesto`;
 }
 
 /**

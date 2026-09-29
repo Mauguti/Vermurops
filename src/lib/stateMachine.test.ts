@@ -106,8 +106,11 @@ describe('A. Transiciones permitidas', () => {
     expect(puedeTransicionarA('cotizaciones_recibidas', 'consolidada', 'pricing', q).ok).toBe(true);
   });
 
-  it('ventas puede enviar al cliente desde consolidada', () => {
-    const q = makeQuote({ etapa: 'consolidada' });
+  it('ventas puede enviar al cliente desde consolidada (con cotización completa)', () => {
+    const q = makeQuote({
+      etapa: 'consolidada',
+      servicios: [makeServicio({ conProveedorSeleccionado: true, conceptoId: 'CON-001' })],
+    });
     expect(puedeTransicionarA('consolidada', 'enviada_cliente', 'ventas', q).ok).toBe(true);
   });
 
@@ -217,8 +220,19 @@ describe('D. Bloqueos por rol incorrecto', () => {
   // trababa la cotización cuando no hay vendedor asignado o está de
   // vacaciones.
   it('1b · pricing SÍ puede enviar al cliente (consolidada → enviada_cliente)', () => {
-    const q = makeQuote({ etapa: 'consolidada' });
+    const q = makeQuote({
+      etapa: 'consolidada',
+      servicios: [makeServicio({ conProveedorSeleccionado: true, conceptoId: 'CON-001' })],
+    });
     expect(puedeTransicionarA('consolidada', 'enviada_cliente', 'pricing', q).ok).toBe(true);
+  });
+
+  it('Tarea 03 · enviar al cliente bloquea sin cotización completa', () => {
+    // Un servicio sin ningún concepto: no se puede enviar.
+    const q = makeQuote({ etapa: 'consolidada' });
+    const r = puedeTransicionarA('consolidada', 'enviada_cliente', 'ventas', q);
+    expect(r.ok).toBe(false);
+    expect(r.razon).toBeDefined();
   });
 
   // NOTA: hasta el 28-ago-2026 aquí se afirmaba lo contrario —que Pricing NO

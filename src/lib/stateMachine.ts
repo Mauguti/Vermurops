@@ -183,6 +183,22 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
        * inmediato. Los frenos de cliente vinculado y expediente no cambian.
        */
       roles: ['ventas', 'pricing', 'admin'],
+      /*
+       * Tarea 03 · Al enviar al cliente, la cotización debe estar completa.
+       * El freno de impuesto (sin_impuesto) vive en la ficha porque necesita
+       * el catálogo de conceptos; la máquina cubre la readiness básica para
+       * el Kanban.
+       */
+      validar: q => {
+        const vacios = serviciosSinLineas(q);
+        if (vacios.length > 0) {
+          return `El servicio «${vacios[0].tipo}» no tiene ningún concepto con proveedor todavía.`;
+        }
+        const p = evaluarProntitud(q);
+        if (p.lista) return null;
+        if (!p.conConceptos) return 'Esta cotización no tiene conceptos que enviar.';
+        return `${resumenFaltantes(p)}. Completa proveedor y costo antes de enviar.`;
+      },
     },
     {
       // Recotizar: Pricing corrige la consolidación
