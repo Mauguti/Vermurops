@@ -12,7 +12,7 @@ import FichaCliente from './clientes/FichaCliente';
 import NuevoClienteModal from './clientes/NuevoClienteModal';
 import ProveedorFormModal from './proveedores/ProveedorFormModal';
 import FichaProveedor from './proveedores/FichaProveedor';
-import { useAuth, usuariosPorRol } from '../auth/AuthContext';
+import { useAuth, usuariosPorRol, nombreDeUsuario } from '../auth/AuthContext';
 import { useDestinoPendiente } from '../navegacion/NavegacionContext';
 import SpreadsheetTable, { type VistaConfig } from './table/SpreadsheetTable';
 import VistaSelector from './table/VistaSelector';
@@ -20,9 +20,8 @@ import { useVistasUsuario } from '../hooks/useVistasUsuario';
 import { CLIENTE_COLUMNS, VISTA_DEFAULT_CLIENTES } from './clientes/clienteColumns';
 import { PROVEEDOR_COLUMNS, VISTA_DEFAULT_PROVEEDORES } from './proveedores/proveedorColumns';
 import type { ClienteVermur } from './clientes/ClientesData';
-import { puedeEditarEnLista, aplicarCambio, CAMPO_EJECUTIVO, ETIQUETA_AREA, ROL_DEL_AREA, type AreaEjecutivo } from '../lib/edicionEnLista';
+import { puedeEditarEnLista, aplicarCambio, CAMPO_EJECUTIVO, ROL_DEL_AREA, type AreaEjecutivo } from '../lib/edicionEnLista';
 import type { EdicionEnListaMeta } from './clientes/edicionMeta';
-import { nombreDeUsuario } from '../auth/AuthContext';
 
 export default function Clients() {
   // Matriz §4.1: las altas definitivas de clientes y proveedores son solo de
@@ -158,47 +157,8 @@ export default function Clients() {
     }
   }, [vistasProveedores.vistas]);
 
-  if (loading || loadingProv) {
-    return (
-      <div className="flex items-center justify-center min-h-[300px]">
-        <div className="w-8 h-8 border-4 border-brand/30 border-t-brand rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (error || errorProv) {
-    return (
-      <div className="flex items-center justify-center min-h-[300px]">
-        <div className="text-center">
-          <p className="text-[14px] font-medium text-danger-text mb-1">Error al cargar datos</p>
-          <p className="text-[12px] text-text-muted">{error || errorProv}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const filteredClients = clientes.filter(c => {
-    // Filtro por estatus: por default solo activos
-    if (!showInactivos && c.statusOperativo !== 'ACTIVO') return false;
-    const q = searchTerm.toLowerCase();
-    if (!q) return true;
-    return contiene(c.nombre, q) ||
-      (c.rfc ?? '').toLowerCase().includes(q) ||
-      (c.representante ?? '').toLowerCase().includes(q) ||
-      (c.idSemantico ?? '').toLowerCase().includes(q) ||
-      (c.comercial ?? '').toLowerCase().includes(q);
-  });
-
-  const filteredProviders = filtrarProveedores(proveedores, {
-    pestana: pestanaProveedor,
-    busqueda: providerSearchTerm,
-  });
-
-  /* Las pestañas son los TIPOS que el dato tiene (§4.5). «Navieras» y
-     «Aerolíneas» no existen como tipo y daban siempre cero. */
-  const conteoProveedores = conteoPorPestana(proveedores, { busqueda: providerSearchTerm });
-
   // ── Edición en línea (Bloque 14) ──────────────────────────────────────────
+  // ANTES de los early returns: React exige que los hooks se llamen siempre.
   // Solo admin y administracion. Los demás ven las columnas en solo lectura.
   const rolActual = user?.rol;
   const editable = puedeEditarEnLista(rolActual as any);
@@ -284,6 +244,46 @@ export default function Clients() {
       opcionesEjecutivo,
     },
   }), [editable, handleCambiarEstadoProveedor, handleCambiarEjecutivoProveedor, opcionesEjecutivo]);
+
+  if (loading || loadingProv) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <div className="w-8 h-8 border-4 border-brand/30 border-t-brand rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || errorProv) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <div className="text-center">
+          <p className="text-[14px] font-medium text-danger-text mb-1">Error al cargar datos</p>
+          <p className="text-[12px] text-text-muted">{error || errorProv}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const filteredClients = clientes.filter(c => {
+    // Filtro por estatus: por default solo activos
+    if (!showInactivos && c.statusOperativo !== 'ACTIVO') return false;
+    const q = searchTerm.toLowerCase();
+    if (!q) return true;
+    return contiene(c.nombre, q) ||
+      (c.rfc ?? '').toLowerCase().includes(q) ||
+      (c.representante ?? '').toLowerCase().includes(q) ||
+      (c.idSemantico ?? '').toLowerCase().includes(q) ||
+      (c.comercial ?? '').toLowerCase().includes(q);
+  });
+
+  const filteredProviders = filtrarProveedores(proveedores, {
+    pestana: pestanaProveedor,
+    busqueda: providerSearchTerm,
+  });
+
+  /* Las pestañas son los TIPOS que el dato tiene (§4.5). «Navieras» y
+     «Aerolíneas» no existen como tipo y daban siempre cero. */
+  const conteoProveedores = conteoPorPestana(proveedores, { busqueda: providerSearchTerm });
 
   return (
     <div className="space-y-[24px]">
