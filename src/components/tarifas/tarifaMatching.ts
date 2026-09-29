@@ -74,11 +74,26 @@ export interface ConceptoMatch {
   id: string;
   nombre: string;
   categoria?: string;
+  /** Nombre original de Magaya (alias para matching). */
+  nombreOriginal?: string;
 }
 
 /**
+ * Normaliza para matching: minúsculas, sin diacríticos, sin puntuación
+ * superflua y sin espacios dobles. Dos nombres que difieren solo en
+ * guiones, puntos o espacios extra empatan.
+ */
+export const normMatch = (s: string) =>
+  normalize(s).replace(/[-–—_.,:;/\\()]/g, ' ').replace(/\s+/g, ' ').trim();
+
+/**
  * Busca el concepto que mejor coincida con el nombre dado.
- * Match exacto primero, luego parcial (includes bidireccional).
+ *
+ * 1. Exacto normalizado contra `nombre`.
+ * 2. Exacto normalizado contra `nombreOriginal` (alias de Magaya).
+ * 3. Exacto con puntuación limpiada (guiones, puntos, espacios dobles).
+ * 4. Parcial (includes bidireccional) — solo para backward compat con
+ *    conceptos legacy sin conceptoId.
  */
 export function matchConceptByName(
   conceptoNombre: string,
@@ -86,8 +101,28 @@ export function matchConceptByName(
 ): ConceptoMatch | null {
   const q = normalize(conceptoNombre);
   if (!q) return null;
+
+  // 1. Exacto por nombre
   const exact = conceptos.find(c => normalize(c.nombre) === q);
   if (exact) return exact;
+
+  // 2. Exacto por nombreOriginal (alias de Magaya)
+  const byOriginal = conceptos.find(c =>
+    c.nombreOriginal && normalize(c.nombreOriginal) === q
+  );
+  if (byOriginal) return byOriginal;
+
+  // 3. Exacto con puntuación limpiada
+  const qClean = normMatch(conceptoNombre);
+  if (qClean) {
+    const byClean = conceptos.find(c =>
+      normMatch(c.nombre) === qClean ||
+      (c.nombreOriginal && normMatch(c.nombreOriginal) === qClean)
+    );
+    if (byClean) return byClean;
+  }
+
+  // 4. Parcial — backward compat con conceptos legacy
   return conceptos.find(c =>
     normalize(c.nombre).includes(q) || q.includes(normalize(c.nombre))
   ) ?? null;

@@ -487,7 +487,7 @@ function Renglon({
         />
         {!linea.conceptoId && !soloLectura && (
           <span className="block px-2 text-[9px] text-amber-600 font-semibold">
-            Sin concepto del catálogo: no habrá tarifas
+            Concepto fuera del catálogo — elige del catálogo ↑
           </span>
         )}
         {activa && (

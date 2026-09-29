@@ -13,6 +13,7 @@ import {
   matchConcept,
   buildConceptoMap,
   normalize,
+  normMatch,
   type ConceptoMatch,
 } from '../components/tarifas/tarifaMatching';
 
@@ -171,5 +172,141 @@ describe('matchConcept', () => {
     expect(match).not.toBeNull();
     expect(match!.id).toBe('CON-004');
     expect(method).toBe('nombre');
+  });
+});
+
+// ─── normMatch ──────────────────────────────────────────────────────────────
+
+describe('normMatch', () => {
+  it('limpia guiones y puntos', () => {
+    expect(normMatch('AMS-AT-DESTINATION')).toBe('ams at destination');
+  });
+
+  it('colapsa espacios dobles', () => {
+    expect(normMatch('Flete   Marítimo')).toBe('flete maritimo');
+  });
+
+  it('limpia paréntesis y barras', () => {
+    expect(normMatch('Warehouse (In/Out)')).toBe('warehouse in out');
+  });
+});
+
+// ─── Tarea 16 · Conceptos sin catálogo desde comparativa/bandeja ────────────
+
+describe('matchConceptByName — nombreOriginal (alias de Magaya)', () => {
+  /*
+   * Catálogo real: el concepto se llama "Ams" (nombre de la UI) pero en
+   * Magaya era "AMS" (nombreOriginal). El proveedor escribe "AMS" y tiene
+   * que empatar.
+   */
+  const conAlias: ConceptoMatch[] = [
+    { id: 'CON-001', nombre: 'Ams', nombreOriginal: 'AMS', categoria: 'documentacion' },
+    { id: 'CON-027', nombre: 'Ams At Destination', nombreOriginal: 'AMS AR DESTINATION', categoria: 'documentacion' },
+    { id: 'CON-014', nombre: 'Revalidation Bl Fee', nombreOriginal: 'REVALIDATION BL FEE', categoria: 'documentacion' },
+    { id: 'CON-006', nombre: 'Customs Clearance', nombreOriginal: 'CUSTOMS CLEARANCE', categoria: 'despacho' },
+    { id: 'CON-012', nombre: 'Storage Fee', nombreOriginal: 'STORAGE FEE', categoria: 'almacenaje' },
+    { id: 'CON-038', nombre: 'Courier Fee', nombreOriginal: 'COURIER FEE', categoria: 'otros' },
+    { id: 'CON-039', nombre: 'Courrier Fee', nombreOriginal: 'COURRIER FEE', categoria: 'otros' },
+    { id: 'CON-007', nombre: 'Customs Inspection', nombreOriginal: 'CUSTOMS INSPECTION', categoria: 'despacho' },
+  ];
+
+  it('matchea "AMS" por nombreOriginal', () => {
+    const result = matchConceptByName('AMS', conAlias);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('CON-001');
+  });
+
+  it('matchea "ams" (minúsculas) por nombreOriginal', () => {
+    const result = matchConceptByName('ams', conAlias);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('CON-001');
+  });
+
+  it('matchea "CUSTOMS CLEARANCE" (todo mayúsculas) por nombreOriginal', () => {
+    const result = matchConceptByName('CUSTOMS CLEARANCE', conAlias);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('CON-006');
+  });
+
+  it('matchea "customs clearance" (todo minúsculas) por nombre normalizado', () => {
+    const result = matchConceptByName('customs clearance', conAlias);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('CON-006');
+  });
+
+  it('matchea "REVALIDATION BL FEE" contra nombreOriginal', () => {
+    const result = matchConceptByName('REVALIDATION BL FEE', conAlias);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('CON-014');
+  });
+
+  it('matchea "STORAGE FEE" contra nombreOriginal', () => {
+    const result = matchConceptByName('STORAGE FEE', conAlias);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('CON-012');
+  });
+
+  it('nombre tiene prioridad sobre nombreOriginal', () => {
+    // "Ams" es nombre de CON-001. Si alguien busca exacto "Ams", va al nombre.
+    const result = matchConceptByName('Ams', conAlias);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('CON-001');
+  });
+});
+
+describe('matchConceptByName — nombres con puntuación', () => {
+  const conPuntuacion: ConceptoMatch[] = [
+    { id: 'CON-A', nombre: 'Pat - Taxes', nombreOriginal: 'PAT - TAXES', categoria: 'despacho' },
+    { id: 'CON-B', nombre: 'Bl Fee', nombreOriginal: 'BL FEE', categoria: 'documentacion' },
+    { id: 'CON-C', nombre: 'Inland Freight Coordination', nombreOriginal: 'INLAND FREIGHT COORDINATION', categoria: 'transporte' },
+  ];
+
+  it('matchea "PAT-TAXES" (sin espacios alrededor del guión) contra "Pat - Taxes"', () => {
+    const result = matchConceptByName('PAT-TAXES', conPuntuacion);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('CON-A');
+  });
+
+  it('matchea "PAT_TAXES" (guión bajo) contra "Pat - Taxes"', () => {
+    const result = matchConceptByName('PAT_TAXES', conPuntuacion);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('CON-A');
+  });
+
+  it('"B/L FEE" (con barra) NO empata con "Bl Fee" (sin barra)', () => {
+    // "B/L" → "b l" ≠ "bl". Es lo bastante distinto para no empatar
+    // por normalización. El proveedor debe elegir del catálogo.
+    const result = matchConceptByName('B/L FEE', conPuntuacion);
+    expect(result).toBeNull();
+  });
+
+  it('"BL FEE" (sin barra) SÍ empata con "Bl Fee" por nombre normalizado', () => {
+    const result = matchConceptByName('BL FEE', conPuntuacion);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('CON-B');
+  });
+});
+
+describe('matchConceptByName — typos NO empatan', () => {
+  const catalogo: ConceptoMatch[] = [
+    { id: 'CON-THC', nombre: 'Terminal Handling Charge', nombreOriginal: 'TERMINAL HANDLING CHARGE', categoria: 'maniobras' },
+    { id: 'CON-001', nombre: 'Ams', nombreOriginal: 'AMS', categoria: 'documentacion' },
+    { id: 'CON-027', nombre: 'Ams At Destination', nombreOriginal: 'AMS AT DESTINATION', categoria: 'documentacion' },
+  ];
+
+  it('TERMINAI HANDLING CHARGE (typo) NO empata exacto', () => {
+    // Typo real de proveedores. No debe empatar por parecido.
+    const result = matchConceptByName('TERMINAI HANDLING CHARGE', catalogo);
+    // Solo el partial includes podría empatarlo (y no debería: "terminai" ≠ "terminal")
+    // Con exact, no empata. Con includes bidireccional la query no contiene el nombre
+    // del catálogo y el nombre del catálogo no contiene la query, así que tampoco.
+    expect(result).toBeNull();
+  });
+
+  it('"Ams" NO empata con "Ams At Destination" (son conceptos distintos)', () => {
+    // "Ams" debe ir a CON-001, no a CON-027.
+    const result = matchConceptByName('Ams', catalogo);
+    expect(result).not.toBeNull();
+    expect(result!.id).toBe('CON-001');
   });
 });
