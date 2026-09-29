@@ -11,6 +11,7 @@
  * de esa versión está.
  */
 
+import { urlFuncion } from '../lib/urlFunciones';
 import { useState } from 'react';
 import { db, storage } from '../firebase';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
@@ -28,8 +29,7 @@ import {
 import { numeroVersionActual } from '../lib/versionesCotizacion';
 import { idUnico } from '../lib/idUnico';
 
-const URL_CLASIFICADOR =
-  'https://us-central1-vermur-logistics-app.cloudfunctions.net/clasificarDocumento';
+const URL_CLASIFICADOR = () => urlFuncion('clasificarDocumento');
 
 /**
  * Cuando la respuesta no trae el JSON del proxy —Cloud Run caído, timeout de
@@ -65,7 +65,7 @@ export function usePdfCotizacion() {
       const token = await getAuth().currentUser?.getIdToken();
       if (!token) throw new Error('No hay sesión activa.');
 
-      const res = await fetch(URL_CLASIFICADOR, {
+      const res = await fetch(URL_CLASIFICADOR(), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

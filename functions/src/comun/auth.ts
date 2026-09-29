@@ -27,9 +27,9 @@ export type UserRole = 'ventas' | 'pricing' | 'operaciones' | 'administracion' |
  * el clasificador y el extractor. Y el registro público estaba ABIERTO, así
  * que crear esa cuenta no requería acceso a la consola.
  *
- * Las Functions no tienen emuladores en este proyecto; si algún día los
- * tienen, las cuentas de prueba entran bajo una guardia de entorno
- * explícita, nunca sueltas en el mapa.
+ * Desde el 29-sep-2026 las Functions SÍ se emulan, y las cuentas de prueba
+ * entran bajo la guardia de entorno que ese comentario pedía: ver
+ * `ROL_CUENTAS_PRUEBA` abajo. Nunca sueltas en el mapa.
  *
  * Un correo fuera de este mapa cae al fallback de MENOR alcance, igual que
  * en el cliente: un correo desconocido no puede convertirse en un ascenso.
@@ -42,6 +42,36 @@ const ROL_POR_EMAIL: Record<string, UserRole> = {
   'angel.luna@vermur.com': 'operaciones',
   'gabriela.huerta@vermur.com': 'admin',
   'luis.renteria@vermur.com': 'admin',
+};
+
+/**
+ * Cuentas de prueba — SOLO con el emulador de Functions.
+ *
+ * `FUNCTIONS_EMULATOR` lo pone el emulador de Firebase y NO existe en el
+ * entorno desplegado: no hay forma de que estas entradas lleguen a producción
+ * aunque alguien cree esas cuentas en el Auth real.
+ *
+ * Por qué hacen falta: sin ellas, probar el extractor contra emuladores era
+ * imposible. `pricing@vermur.com` caía al fallback —'ventas'— y el proxy
+ * contestaba «El rol «ventas» no puede «tarifario.cargar»» antes de llamar a
+ * n8n. El cliente ya hace lo mismo con `USANDO_EMULADORES`, y las reglas de
+ * Firestore con `reglasEmulador.sh`: esta es la tercera cara de la misma
+ * decisión.
+ */
+const ROL_CUENTAS_PRUEBA: Record<string, UserRole> = {
+  'admin@vermur.com': 'admin',
+  'pricing@vermur.com': 'pricing',
+  'ventas@vermur.com': 'ventas',
+  'operaciones@vermur.com': 'operaciones',
+  'administracion@vermur.com': 'administracion',
+};
+
+/** ¿Corriendo dentro del emulador de Functions? Nunca cierto en producción. */
+export const EN_EMULADOR = process.env.FUNCTIONS_EMULATOR === 'true';
+
+const MAPA_EFECTIVO: Record<string, UserRole> = {
+  ...ROL_POR_EMAIL,
+  ...(EN_EMULADOR ? ROL_CUENTAS_PRUEBA : {}),
 };
 
 /**
@@ -99,7 +129,7 @@ export async function verificarUsuario(req: Request): Promise<UsuarioVerificado>
   const email = (decoded.email ?? '').toLowerCase().trim();
   if (!email) throw new ErrorAuth(401, 'El token no trae correo.');
 
-  return { uid: decoded.uid, email, rol: ROL_POR_EMAIL[email] ?? ROL_FALLBACK };
+  return { uid: decoded.uid, email, rol: MAPA_EFECTIVO[email] ?? ROL_FALLBACK };
 }
 
 /** Lanza si el usuario no tiene la capacidad. */

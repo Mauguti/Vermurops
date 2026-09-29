@@ -9,6 +9,7 @@
  * evidencia y su contenido va al clasificador. n8n propone; la app decide.
  */
 
+import { urlFuncion } from '../lib/urlFunciones';
 import { useState } from 'react';
 import { storage } from '../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -22,8 +23,7 @@ import { contenedoresDelEmbarque, type SubidaClasificada } from '../lib/document
 import type { EmbarqueCompleto } from '../components/shipments/EmbarquesData';
 
 /** La función enrutada (D-0). El flujo va en el header X-Vermur-Flujo. */
-const URL_CLASIFICADOR =
-  'https://us-central1-vermur-logistics-app.cloudfunctions.net/clasificarDocumento';
+const URL_CLASIFICADOR = () => urlFuncion('clasificarDocumento');
 
 export function useDocumentosEmbarque() {
   const { user } = useAuth();
@@ -67,7 +67,7 @@ export function useDocumentosEmbarque() {
       form.append('contenedores', JSON.stringify(contenedoresDelEmbarque(embarque)));
       if (tipoEsperado) form.append('tipoEsperado', tipoEsperado);
 
-      const res = await fetch(URL_CLASIFICADOR, {
+      const res = await fetch(URL_CLASIFICADOR(), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

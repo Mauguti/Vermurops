@@ -580,3 +580,37 @@ describe('confirmar la línea', () => {
       .toEqual({ puedeGuardar: true, faltantes: [] });
   });
 });
+
+// ─── El segundo candado del wizard: el proveedor ya elegido ─────────────────
+
+describe('el proveedor elegido antes de subir', () => {
+  /*
+   * Reproducido en emulador contra el n8n real con la debit note de Asia Ship:
+   * el extractor devolvió 15 líneas, se había elegido «ASIA SHIP CO., LTD» en
+   * la pantalla de subida, y la revisión decía «El documento dice ASIA SHIP
+   * CO.,LTD y no está en el catálogo» con el pie en «Falta elegir el proveedor
+   * del tarifario» y el botón en GUARDAR 0 TARIFAS.
+   *
+   * La decisión ya estaba tomada dos pantallas antes; volver a resolverla
+   * contra el texto del documento la tiraba.
+   */
+  const lineaLista = () => linea({
+    moneda: 'USD', unidad: 'CONTENEDOR',
+    monedaConfirmada: true, unidadConfirmada: true,
+  });
+
+  it('sin proveedor, no se guarda nada aunque las líneas estén listas', () => {
+    expect(estadoGuardable(null, false, [lineaLista()]))
+      .toEqual({ puedeGuardar: false, faltantes: ['Falta elegir el proveedor del tarifario'] });
+  });
+
+  it('un proveedor solo SUGERIDO tampoco basta: hay que confirmarlo', () => {
+    expect(estadoGuardable('PRV-1', false, [lineaLista()]).faltantes)
+      .toEqual(['El proveedor es una sugerencia: hay que confirmarlo']);
+  });
+
+  it('elegido a mano cuenta como exacto y el guardado se destraba', () => {
+    expect(estadoGuardable('PRV-1', true, [lineaLista()]))
+      .toEqual({ puedeGuardar: true, faltantes: [] });
+  });
+});

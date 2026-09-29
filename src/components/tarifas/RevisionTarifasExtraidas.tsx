@@ -50,13 +50,24 @@ interface Props {
   conceptos: ConceptoVermur[];
   puertos: PuertoMatch[];
   proveedores: ProveedorVermur[];
+  /**
+   * Proveedor ya elegido en la pantalla de subida (entrada desde Tarifas).
+   *
+   * Sin esto, la revisión volvía a resolverlo desde cero contra el nombre que
+   * trae el documento, y si no empataba con el catálogo el pie decía «Falta
+   * elegir el proveedor del tarifario» con el botón en «GUARDAR 0 TARIFAS» —
+   * aunque el usuario acabara de elegirlo dos pantallas antes. Es el segundo
+   * candado del wizard, junto al de confirmar.
+   */
+  proveedorElegidoId?: string | null;
   onCancelar: () => void;
   /** El proveedor va como parámetro: es de todo el tarifario, no de cada línea. */
   onGuardar: (lineas: LineaEnRevision[], proveedorId: string) => void | Promise<void>;
 }
 
 export default function RevisionTarifasExtraidas({
-  respuestaCruda, nombreArchivo, conceptos, puertos, proveedores, onCancelar, onGuardar,
+  respuestaCruda, nombreArchivo, conceptos, puertos, proveedores,
+  proveedorElegidoId, onCancelar, onGuardar,
 }: Props) {
   const validacion = useMemo(() => validarRespuestaN8N(respuestaCruda), [respuestaCruda]);
 
@@ -76,10 +87,17 @@ export default function RevisionTarifasExtraidas({
     [validacion.datos?.proveedor, proveedores],
   );
 
+  /*
+   * Lo que el usuario YA eligió manda sobre lo que el documento diga: es una
+   * decisión tomada, no una sugerencia. Si no eligió nada, se cae a lo que se
+   * resolvió del documento, que es lo de siempre.
+   */
   const [proveedorId, setProveedorId] = useState<string | null>(
-    sugerenciaProveedor.match?.id ?? null,
+    proveedorElegidoId ?? sugerenciaProveedor.match?.id ?? null,
   );
-  const [nivelProveedor, setNivelProveedor] = useState<NivelMatch>(sugerenciaProveedor.nivel);
+  const [nivelProveedor, setNivelProveedor] = useState<NivelMatch>(
+    proveedorElegidoId ? 'exacto' : sugerenciaProveedor.nivel,
+  );
 
   const [lineas, setLineas] = useState<LineaEnRevision[]>(() =>
     validacion.datos

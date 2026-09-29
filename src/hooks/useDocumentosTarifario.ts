@@ -8,6 +8,7 @@
  * adjuntos.
  */
 
+import { urlFuncion } from '../lib/urlFunciones';
 import { useState, useEffect } from 'react';
 import { db, storage } from '../firebase';
 import { collection, doc, onSnapshot, setDoc, updateDoc, query, orderBy } from 'firebase/firestore';
@@ -27,8 +28,7 @@ import { medirTarifarioCargado } from '../lib/analitica';
 const COL = 'documentosTarifario';
 
 /** Endpoint de la Cloud Function que hace de proxy hacia n8n. */
-const URL_EXTRACTOR =
-  'https://us-central1-vermur-logistics-app.cloudfunctions.net/extraerTarifas';
+const URL_EXTRACTOR = () => urlFuncion('extraerTarifas');
 
 /** SHA-256 del contenido, para detectar que el mismo archivo ya se procesó. */
 async function hashArchivo(file: File): Promise<string> {
@@ -37,6 +37,21 @@ async function hashArchivo(file: File): Promise<string> {
   return Array.from(new Uint8Array(digest))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
+}
+
+/**
+ * Error de una extracción que SÍ alcanzó a registrarse.
+ *
+ * Distingue el fallo que dejó rastro —el documento existe y quedó marcado
+ * «falló», se puede reintentar— del que ocurrió antes de crearlo: permiso,
+ * formato o tamaño. Prometer «quedó registrado» cuando no hay documento manda
+ * a buscarlo a una lista donde no está.
+ */
+export class ErrorExtraccion extends Error {
+  constructor(mensaje: string, readonly documentoId: string) {
+    super(mensaje);
+    this.name = 'ErrorExtraccion';
+  }
 }
 
 export interface ResultadoSubida {
@@ -172,7 +187,7 @@ export function useDocumentosTarifario(cotizacionId?: string) {
         // que falla se veía idéntico a uno que nadie guardó.
         const motivo = err instanceof Error ? err.message : String(err);
         await marcarExtraccion(id, 'fallo', motivo);
-        throw err;
+        throw new ErrorExtraccion(motivo, id);
       }
     } finally {
       setSubiendo(false);
@@ -187,7 +202,7 @@ export function useDocumentosTarifario(cotizacionId?: string) {
     const form = new FormData();
     form.append('archivo', file, file.name);
 
-    const res = await fetch(URL_EXTRACTOR, {
+    const res = await fetch(URL_EXTRACTOR(), {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
       body: form,
