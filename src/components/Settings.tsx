@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../auth/AuthContext';
 import { useServicios, renderIcon, CategoriaServicio } from '../config/serviciosStore';
 import ContadoresFolio from './settings/ContadoresFolio';
+import GestionUsuarios from './settings/GestionUsuarios';
 import CatalogoConceptos from './conceptos/CatalogoConceptos';
 
 export default function Settings() {
@@ -248,16 +249,7 @@ export default function Settings() {
               </div>
            )}
 
-           {activeSection === 'users' && (
-              <div>
-                 <h3 className="text-[18px] font-semibold text-text-primary mb-[24px]">Usuarios y Roles</h3>
-                 <div className="flex flex-col items-center justify-center p-[60px] border border-dashed border-card-border rounded-[8px] bg-white">
-                    <Users className="w-[32px] h-[32px] text-text-muted mb-[16px]" />
-                    <p className="text-[14px] font-medium text-text-primary mb-[4px]">Módulo en desarrollo</p>
-                    <p className="text-[13px] text-text-secondary text-center max-w-[300px]">La gestión de usuarios y roles estará disponible próximamente. Por ahora, los usuarios se administran directamente en Firebase.</p>
-                 </div>
-              </div>
-           )}
+           {activeSection === 'users' && <GestionUsuarios />}
 
            {activeSection === 'perfil' && renderPerfil()}
 

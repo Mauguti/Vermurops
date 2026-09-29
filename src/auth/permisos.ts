@@ -42,7 +42,9 @@ export type Capacidad =
   // Órdenes de compra (C-2): tres áreas, tres capacidades
   | 'ordenCompra.solicitar'   // Pedir que se le pague a un proveedor
   | 'ordenCompra.gestionar'   // Revisar la solicitud y prepararla para autorizar
-  | 'ordenCompra.autorizar';  // Autorizar el pago y registrarlo
+  | 'ordenCompra.autorizar'   // Autorizar el pago y registrarlo
+  // Gestión de usuarios (GU): solo admin
+  | 'usuario.gestionar';      // Invitar, cambiar rol, desactivar
 
 export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
   'lead.crear',
@@ -63,6 +65,7 @@ export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
   'ordenCompra.solicitar',
   'ordenCompra.gestionar',
   'ordenCompra.autorizar',
+  'usuario.gestionar',
 ];
 
 // ─── Matriz rol → capacidades ────────────────────────────────────────────────
