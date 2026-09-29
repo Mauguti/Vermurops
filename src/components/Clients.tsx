@@ -12,7 +12,7 @@ import FichaCliente from './clientes/FichaCliente';
 import NuevoClienteModal from './clientes/NuevoClienteModal';
 import ProveedorFormModal from './proveedores/ProveedorFormModal';
 import FichaProveedor from './proveedores/FichaProveedor';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth, usuariosPorRol, nombreDeUsuario } from '../auth/AuthContext';
 import { useDestinoPendiente } from '../navegacion/NavegacionContext';
 import SpreadsheetTable, { type VistaConfig } from './table/SpreadsheetTable';
 import VistaSelector from './table/VistaSelector';
@@ -20,6 +20,8 @@ import { useVistasUsuario } from '../hooks/useVistasUsuario';
 import { CLIENTE_COLUMNS, VISTA_DEFAULT_CLIENTES } from './clientes/clienteColumns';
 import { PROVEEDOR_COLUMNS, VISTA_DEFAULT_PROVEEDORES } from './proveedores/proveedorColumns';
 import type { ClienteVermur } from './clientes/ClientesData';
+import { puedeEditarEnLista, aplicarCambio, CAMPO_EJECUTIVO, ROL_DEL_AREA, type AreaEjecutivo } from '../lib/edicionEnLista';
+import type { EdicionEnListaMeta } from './clientes/edicionMeta';
 
 export default function Clients() {
   // Matriz §4.1: las altas definitivas de clientes y proveedores son solo de
@@ -154,6 +156,94 @@ export default function Clients() {
       setVistaProveedorTabla(VISTA_DEFAULT_PROVEEDORES);
     }
   }, [vistasProveedores.vistas]);
+
+  // ── Edición en línea (Bloque 14) ──────────────────────────────────────────
+  // ANTES de los early returns: React exige que los hooks se llamen siempre.
+  // Solo admin y administracion. Los demás ven las columnas en solo lectura.
+  const rolActual = user?.rol;
+  const editable = puedeEditarEnLista(rolActual as any);
+  const autorEmail = user?.email ?? 'desconocido';
+
+  const opcionesEjecutivo = useCallback((area: AreaEjecutivo) => {
+    return usuariosPorRol(ROL_DEL_AREA[area]);
+  }, []);
+
+  const handleCambiarEstadoCliente = useCallback(async (id: string, nuevoActivo: boolean) => {
+    const cliente = clientes.find(c => c.id === id);
+    if (!cliente) return;
+    const resultado = aplicarCambio(
+      cliente as any, 'statusOperativo',
+      nuevoActivo ? 'ACTIVO' : 'INACTIVO', autorEmail, new Date().toISOString(),
+      { antes: cliente.statusOperativo === 'ACTIVO' ? 'Activo' : 'Inactivo', despues: nuevoActivo ? 'Activo' : 'Inactivo' },
+    );
+    if (!resultado) return;
+    await updateCliente(id, {
+      statusOperativo: nuevoActivo ? 'ACTIVO' : 'INACTIVO',
+      cambios: resultado.entidad.cambios,
+    });
+  }, [clientes, autorEmail, updateCliente]);
+
+  const handleCambiarEjecutivoCliente = useCallback(async (id: string, area: AreaEjecutivo, email: string | null) => {
+    const cliente = clientes.find(c => c.id === id);
+    if (!cliente) return;
+    const campo = CAMPO_EJECUTIVO[area];
+    const resultado = aplicarCambio(
+      cliente as any, campo, email ?? null, autorEmail, new Date().toISOString(),
+      { antes: nombreDeUsuario((cliente as any)[campo]) || '—', despues: email ? nombreDeUsuario(email) : '—' },
+    );
+    if (!resultado) return;
+    await updateCliente(id, {
+      [campo]: email ?? null,
+      cambios: resultado.entidad.cambios,
+    } as any);
+  }, [clientes, autorEmail, updateCliente]);
+
+  const handleCambiarEstadoProveedor = useCallback(async (id: string, nuevoActivo: boolean) => {
+    const prov = proveedores.find(p => p.id === id);
+    if (!prov) return;
+    const resultado = aplicarCambio(
+      prov as any, 'activo', nuevoActivo, autorEmail, new Date().toISOString(),
+      { antes: prov.activo ? 'Activo' : 'Inactivo', despues: nuevoActivo ? 'Activo' : 'Inactivo' },
+    );
+    if (!resultado) return;
+    await updateProveedor(id, {
+      activo: nuevoActivo,
+      cambios: resultado.entidad.cambios,
+    });
+  }, [proveedores, autorEmail, updateProveedor]);
+
+  const handleCambiarEjecutivoProveedor = useCallback(async (id: string, area: AreaEjecutivo, email: string | null) => {
+    const prov = proveedores.find(p => p.id === id);
+    if (!prov) return;
+    const campo = CAMPO_EJECUTIVO[area];
+    const resultado = aplicarCambio(
+      prov as any, campo, email ?? null, autorEmail, new Date().toISOString(),
+      { antes: nombreDeUsuario((prov as any)[campo]) || '—', despues: email ? nombreDeUsuario(email) : '—' },
+    );
+    if (!resultado) return;
+    await updateProveedor(id, {
+      [campo]: email ?? null,
+      cambios: resultado.entidad.cambios,
+    } as any);
+  }, [proveedores, autorEmail, updateProveedor]);
+
+  const clienteTableMeta = useMemo((): EdicionEnListaMeta => ({
+    edicion: {
+      puedeEditar: editable,
+      onCambiarEstado: handleCambiarEstadoCliente,
+      onCambiarEjecutivo: handleCambiarEjecutivoCliente,
+      opcionesEjecutivo,
+    },
+  }), [editable, handleCambiarEstadoCliente, handleCambiarEjecutivoCliente, opcionesEjecutivo]);
+
+  const proveedorTableMeta = useMemo((): EdicionEnListaMeta => ({
+    edicion: {
+      puedeEditar: editable,
+      onCambiarEstado: handleCambiarEstadoProveedor,
+      onCambiarEjecutivo: handleCambiarEjecutivoProveedor,
+      opcionesEjecutivo,
+    },
+  }), [editable, handleCambiarEstadoProveedor, handleCambiarEjecutivoProveedor, opcionesEjecutivo]);
 
   if (loading || loadingProv) {
     return (
@@ -301,6 +391,7 @@ export default function Clients() {
             onVistaChange={setVistaClienteTabla}
             onRowClick={(c) => setSelectedClientId(c.id)}
             maxHeight="calc(100vh - 320px)"
+            tableMeta={clienteTableMeta}
           />
         </>
       )}
@@ -392,6 +483,7 @@ export default function Clients() {
             onVistaChange={setVistaProveedorTabla}
             onRowClick={(p) => setSelectedProviderId(p.id)}
             maxHeight="calc(100vh - 380px)"
+            tableMeta={proveedorTableMeta}
           />
         </>
       ) : null}

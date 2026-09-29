@@ -8,6 +8,7 @@
 // el formulario interno antes de la migración.
 // ============================================================
 
+import type { CambioEnLista } from '../../lib/edicionEnLista';
 import seedData from '../../data/seeds/proveedores.json';
 
 // ─── Sub-objetos ──────────────────────────────────────────────────────────────
@@ -123,6 +124,20 @@ export interface ProveedorVermur {
   // ── Estado ───────────────────────────────────────────────────────────────
   activo: boolean;
   origenDatos: string;
+
+  // ── Responsables (Bloque 14) ─────────────────────────────────────────────
+  /**
+   * Quién atiende a este proveedor en cada área, por CORREO — mismo formato
+   * que los tres del cliente.
+   *
+   * Solo pricing y operativo: a un proveedor no se le vende, así que un
+   * responsable de Ventas sería un campo que nadie llenaría.
+   */
+  responsablePricing?: string | null;
+  responsableOperativo?: string | null;
+
+  /** Bloque 14 · Quién cambió qué desde la lista y cuándo. Aditivo. */
+  cambios?: CambioEnLista[];
 
   // ── Auditoría ────────────────────────────────────────────────────────────
   fechaAlta: string;    // YYYY-MM-DD

@@ -66,6 +66,8 @@ export interface SpreadsheetTableProps<T> {
   onRowClick?: (row: T) => void;
   /** Altura máxima del contenedor. Default: sin límite (ocupa lo que necesite). */
   maxHeight?: string;
+  /** Contexto adicional disponible en las celdas vía `table.options.meta`. */
+  tableMeta?: object;
 }
 
 // ─── Componente ──────────────────────────────────────────────────────────────
@@ -78,6 +80,7 @@ export default function SpreadsheetTable<T>({
   onVistaChange,
   onRowClick,
   maxHeight,
+  tableMeta,
 }: SpreadsheetTableProps<T>) {
   // ── Resolver vista → estado de TanStack ───────────────────────────────
 
@@ -229,6 +232,7 @@ export default function SpreadsheetTable<T>({
       columnSizing: columnSizingState,
       columnPinning,
     },
+    meta: tableMeta,
     onSortingChange: setSorting,
     onColumnSizingChange: handleColumnSizingChange,
     getCoreRowModel: getCoreRowModel(),
