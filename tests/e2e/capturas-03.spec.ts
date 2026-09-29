@@ -152,9 +152,9 @@ test('Captura freno de impuesto: bloqueada y desbloqueada', async ({ browser }) 
   const lineaDoc = page.locator('tr', { hasText: 'Documentation' }).filter({ has: page.getByText('HAPAG') }).first();
   await lineaDoc.locator('input[type="number"]').last().fill('50');
 
-  // Avanzar a consolidada SIN elegir impuesto en Documentation
+  // Avanzar a «Lista para enviar» SIN elegir impuesto en Documentation
   await page.getByRole('button', { name: 'Cotizaciones recibidas' }).click();
-  await page.getByRole('button', { name: 'Consolidar cotización' }).click();
+  await page.getByRole('button', { name: 'Armar cotización' }).click();
 
   // Franja bloqueada
   await expect(page.getByText(/sin tasa de impuesto/)).toBeVisible({ timeout: 15_000 });

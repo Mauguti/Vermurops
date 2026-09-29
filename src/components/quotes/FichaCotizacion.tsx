@@ -1429,7 +1429,7 @@ export default function FichaCotizacion({
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm mt-6">
         <div className="bg-gray-50 border-b border-gray-100 px-4 py-3 flex items-center justify-between">
           <h4 className="text-[10px] font-bold text-[#18181B] uppercase tracking-widest flex items-center gap-1.5">
-            <BarChart2 className="w-4 h-4 text-primario" /> Desglose del Consolidado
+            <BarChart2 className="w-4 h-4 text-primario" /> Desglose de la cotización
           </h4>
         </div>
 
@@ -1471,7 +1471,7 @@ export default function FichaCotizacion({
               );
             })}
 
-            {/* Trámites aduanales agregados al consolidado */}
+            {/* Trámites aduanales agregados a la cotización */}
             {quote.servicios.filter(s => s.subTramites && s.subTramites.length > 0).map(srv => (
               srv.subTramites!.map(tram => (
                 <div key={tram.id} className="flex justify-between items-center py-2 border-b border-gray-50 last:border-0 text-xs">
@@ -1505,7 +1505,7 @@ export default function FichaCotizacion({
 
           <div className="pt-4 border-t border-gray-200 flex items-center justify-between">
             <div>
-              <p className="text-[10px] text-gray-500 uppercase font-bold">Total Venta Consolidado</p>
+              <p className="text-[10px] text-gray-500 uppercase font-bold">Total Venta</p>
               <p className="text-[9px] text-gray-400">
                 {textoBaseDelTotal(quote)}
               </p>
@@ -1674,7 +1674,7 @@ export default function FichaCotizacion({
             3. Catálogo de tarifas    ya cargado, se ve aquí
             4. Comparativa de agentes se compara lo del catálogo
             5. Resumen de la operación
-            6. Desglose consolidado
+            6. Desglose de la cotización
 
           Es reordenar, no rediseñar: ninguna sección cambió por dentro. */}
       {activeTab === 'servicios' && visible.desglosePorConcepto && (
@@ -1931,7 +1931,7 @@ export default function FichaCotizacion({
               />
             )}
 
-            {/* Total consolidado dentro de la tab */}
+            {/* Total de la cotización dentro de la tab */}
             {renderConsolidadoPanel()}
           </div>
         </div>
@@ -1995,7 +1995,7 @@ export default function FichaCotizacion({
         )}
 
         {/* Bloque 6: dos columnas que usan el ancho. Prospecto a la izquierda;
-            Responsables y el consolidado a la derecha; la Operación abajo, a
+            Responsables y el desglose a la derecha; la Operación abajo, a
             todo el ancho, porque su formulario de carga ya trae rejillas de
             tres y cuatro campos que en media columna se apretarían. En
             pantallas angostas vuelve a una sola columna. */}
@@ -2183,7 +2183,7 @@ export default function FichaCotizacion({
               </div>
             </div>
 
-            {/* ── Columna derecha: Responsables y el consolidado ── */}
+            {/* ── Columna derecha: Responsables y el desglose ── */}
             <div className="space-y-6">
 
             <div className="space-y-3">
@@ -2211,7 +2211,7 @@ export default function FichaCotizacion({
               </div>
             </div>
 
-            {/* Total consolidado */}
+            {/* Total de la cotización */}
             {renderConsolidadoPanel()}
 
             </div>{/* fin columna derecha */}

@@ -1104,7 +1104,7 @@ export default function Quotes() {
         <div className="bg-white rounded-2xl border border-gray-150 shadow-sm flex flex-col overflow-hidden">
           <div className="px-8 py-5 bg-gray-50/50 border-b border-gray-150 flex justify-between items-center">
             <div>
-              <h3 className="text-sm font-bold text-[#18181B] uppercase tracking-wider">Crear nueva cotización consolidada</h3>
+              <h3 className="text-sm font-bold text-[#18181B] uppercase tracking-wider">Crear nueva cotización</h3>
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-0.5">Cotizaciones — Registro inicial de RFQ</p>
             </div>
             <button onClick={cerrarFormularioSinCrear} className="text-xs font-bold text-gray-400 hover:text-gray-600 uppercase tracking-wide">Cancelar</button>

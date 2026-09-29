@@ -118,7 +118,7 @@ export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
       marginPercent: margin,
       status: 'Completado'
     });
-    alert('Cotización consolidada enviada a Ventas.');
+    alert('Cotización armada enviada a Ventas.');
     onClose();
   };
 
@@ -365,7 +365,7 @@ export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
           <div className="bg-surface-dark rounded-[12px] p-[24px] text-text-inverse shadow-md sticky top-[24px]">
             <h3 className="text-[16px] font-semibold text-white mb-[20px] flex items-center">
               <DollarSign className="w-5 h-5 mr-2 text-brand" />
-              Consolidado Final
+              Resumen Final
             </h3>
             
             <div className="space-y-[16px]">

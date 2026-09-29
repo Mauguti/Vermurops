@@ -194,7 +194,7 @@ test('Pricing · comparativa, elige el paquete, versión nueva, consolida y gene
   await lineaDoc.locator('select').selectOption('iva0');
 
   await page.getByRole('button', { name: 'Cotizaciones recibidas' }).click();
-  await page.getByRole('button', { name: 'Consolidar cotización' }).click();
+  await page.getByRole('button', { name: 'Armar cotización' }).click();
 
   // Versión nueva: la v1 queda como registro.
   await page.getByRole('button', { name: 'Nueva versión' }).click();
@@ -216,7 +216,7 @@ test('Pricing · comparativa, elige el paquete, versión nueva, consolida y gene
 });
 
 // ─── 2b · Ventas: envía al cliente y la marca ganada ─────────────────────────
-// Pricing consolida; ENVIAR al cliente y cerrar la venta es de Ventas (§4.1:
+// Pricing arma la cotización; ENVIAR al cliente y cerrar la venta es de Ventas (§4.1:
 // consolidada → enviada_cliente solo ventas/admin).
 
 // ─── 2c · Administración: valida el expediente del cliente ──────────────────
