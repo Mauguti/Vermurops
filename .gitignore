@@ -40,3 +40,6 @@ ui-debug.log
 
 # Reglas derivadas para emuladores (scripts/reglasEmulador.sh)
 *.emulador.rules
+
+# Paquete del sprint nocturno: vive solo en el worktree del sprint
+sprint/
