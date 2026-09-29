@@ -23,6 +23,7 @@ const LABEL_TIPO: Record<TipoProveedor, string> = {
   proveedor: 'Proveedor',
   transportista: 'Transportista',
   agente_carga: 'Agente de carga',
+  agente_aduanal: 'Agente aduanal',
 };
 
 function BadgeTipos({ tipos }: { tipos: TipoProveedor[] }) {

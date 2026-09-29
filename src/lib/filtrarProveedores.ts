@@ -28,6 +28,7 @@ export const PESTANAS_PROVEEDOR: { id: PestanaProveedor; label: string }[] = [
   { id: 'proveedor', label: 'Proveedores' },
   { id: 'transportista', label: 'Transportistas' },
   { id: 'agente_carga', label: 'Agentes de carga' },
+  { id: 'agente_aduanal', label: 'Agentes aduanales' },
 ];
 
 /** ¿Este proveedor cae en la pestaña? Un proveedor puede estar en varias (§4.5). */
