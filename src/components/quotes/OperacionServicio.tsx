@@ -38,6 +38,14 @@ interface Props {
 const LBL = 'block text-[9px] font-bold text-gray-400 uppercase mb-1.5';
 const INP = 'w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 outline-none focus:border-primario';
 const SEL = INP + ' bg-white cursor-pointer';
+/**
+ * La ayuda va EN PANTALLA, no en un tooltip (1c).
+ *
+ * El desarrollador interno de Vermur no entendía estas etiquetas. Si él no
+ * las entiende, nadie: son campos que deciden el IVA y el folio del embarque,
+ * y el que los llena mal no se entera hasta la factura.
+ */
+const AYUDA = 'mt-1 text-[10px] leading-snug text-gray-500';
 
 export default function OperacionServicio({
   servicio, editable, puertos, conceptos, conTitulo, onCambio,
@@ -93,7 +101,10 @@ export default function OperacionServicio({
           )}
         </div>
         <div>
-          <label className={LBL}>Ubicación</label>
+          <label className={LBL}>
+            Ubicación del servicio
+            <span className="ml-1 normal-case font-semibold text-primario">— define el IVA</span>
+          </label>
           {editable ? (
             <select
               value={servicio.ubicacion ?? ''}
@@ -107,18 +118,31 @@ export default function OperacionServicio({
           ) : (
             <Valor>{servicio.ubicacion === 'origen' ? 'Origen' : servicio.ubicacion === 'destino' ? 'Destino' : '—'}</Valor>
           )}
+          <p className={AYUDA}>
+            Dónde se presta: origen o destino. Con el tráfico decide el IVA —
+            16% solo a lo que ocurre en México. Si el concepto del catálogo
+            aplica de un solo lado, ese manda.
+          </p>
         </div>
         <div>
           <label className={LBL}>Aduana de salida</label>
           {editable
             ? <input type="text" value={servicio.ruta?.aduanaSalida ?? ''} onChange={e => setRuta({ aduanaSalida: e.target.value })} className={INP} />
             : <Valor>{servicio.ruta?.aduanaSalida || '—'}</Valor>}
+          <p className={AYUDA}>
+            Dónde se despacha la mercancía al salir. Puede ser distinta del
+            puerto de salida.
+          </p>
         </div>
         <div>
           <label className={LBL}>Aduana de recepción</label>
           {editable
             ? <input type="text" value={servicio.ruta?.aduanaRecepcion ?? ''} onChange={e => setRuta({ aduanaRecepcion: e.target.value })} className={INP} />
             : <Valor>{servicio.ruta?.aduanaRecepcion || '—'}</Valor>}
+          <p className={AYUDA}>
+            Dónde se despacha al llegar. Puede ser distinta del puerto de
+            entrada: la carga entra por un puerto y se despacha en otra aduana.
+          </p>
         </div>
       </div>
 
@@ -130,9 +154,11 @@ export default function OperacionServicio({
           onChange={e => set({ generaEmbarquePropio: e.target.checked })}
           className="mt-0.5 accent-primario"
         />
-        <span className="text-[11px] text-gray-600">
+        <span className="text-[11px] text-gray-600 max-w-[46rem]">
           <span className="font-semibold text-gray-700">Se opera como embarque aparte.</span>{' '}
-          Al ganar, este tramo nace con su propio folio en vez de ir al embarque de la cotización.
+          Si se activa, al ganar la cotización este tramo genera un embarque
+          propio, con su propio folio, en vez de sumarse al embarque principal.
+          Déjalo apagado si es un tramo del mismo embarque.
         </span>
       </label>
 
