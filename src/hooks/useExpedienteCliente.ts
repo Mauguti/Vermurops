@@ -9,6 +9,7 @@
  * n8n interpreta y propone; la app valida y escribe.
  */
 
+import { urlFuncion } from '../lib/urlFunciones';
 import { useState } from 'react';
 import { db, storage } from '../firebase';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -27,8 +28,7 @@ import type { ClienteVermur, DocsAlta } from '../components/clientes/ClientesDat
  * La función enrutada (D-0). El flujo va en el header X-Vermur-Flujo; la
  * Function exige la capacidad de ESTE flujo (cliente.alta) del lado servidor.
  */
-const URL_CLASIFICADOR =
-  'https://us-central1-vermur-logistics-app.cloudfunctions.net/clasificarDocumento';
+const URL_CLASIFICADOR = () => urlFuncion('clasificarDocumento');
 
 export interface ArchivoSubido {
   storagePath: string;
@@ -77,7 +77,7 @@ export function useExpedienteCliente() {
       form.append('clienteRfc', cliente.rfc ?? '');
       if (tipoEsperado) form.append('tipoEsperado', tipoEsperado);
 
-      const res = await fetch(URL_CLASIFICADOR, {
+      const res = await fetch(URL_CLASIFICADOR(), {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,

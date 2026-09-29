@@ -12,12 +12,29 @@
 #
 # Uso:  ./scripts/dev-emuladores.sh      → abre http://localhost:3100
 #       Ctrl+C apaga todo.
+#
+#       CON_FUNCTIONS=1 ./scripts/dev-emuladores.sh
+#         levanta también el emulador de Functions en :5001, para probar el
+#         extractor de tarifarios, el clasificador y el PDF SIN ir a
+#         producción. Las Functions llaman al n8n REAL con el secreto de
+#         functions/.secret.local, que no está en el repo: si no existe, el
+#         proxy contesta 500 diciendo que falta la credencial.
+#
+#         Es opt-in porque compila las Functions (unos segundos) y porque el
+#         resto del trabajo diario no las necesita.
 set -uo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
 mkdir -p .noche/reportes
 PUERTO="${PUERTO:-3100}"
 PUERTOS="$PUERTO,8080,9099,9199,4000,4400"
+CON_FUNCTIONS="${CON_FUNCTIONS:-0}"
+if [[ "$CON_FUNCTIONS" == "1" ]]; then
+  PUERTOS="$PUERTOS,5001"
+  EMULADORES="auth,firestore,storage,functions"
+else
+  EMULADORES="auth,firestore,storage"
+fi
 
 # ── 1 · Limpiar ─────────────────────────────────────────────────────────────
 if [[ -n "$(lsof -ti:$PUERTOS 2>/dev/null)" ]]; then
@@ -31,7 +48,12 @@ if [[ -n "$(lsof -ti:$PUERTOS 2>/dev/null)" ]]; then
 fi
 
 # ── 2 · Levantar ────────────────────────────────────────────────────────────
-./scripts/reglasEmulador.sh >/dev/null && npx firebase emulators:start --config firebase.emulador.json --only auth,firestore,storage > .noche/reportes/emu-dev.log 2>&1 &
+if [[ "$CON_FUNCTIONS" == "1" ]]; then
+  echo "· compilando las Functions"
+  npm --prefix functions run build >/dev/null || { echo "✗ no compilaron las Functions"; exit 1; }
+  [[ -f functions/.secret.local ]] || echo "  ⚠ falta functions/.secret.local: el proxy contestará 500 por credencial ausente"
+fi
+./scripts/reglasEmulador.sh >/dev/null && npx firebase emulators:start --config firebase.emulador.json --only "$EMULADORES" > .noche/reportes/emu-dev.log 2>&1 &
 EMU=$!
 VITE_USAR_EMULADORES=1 npx vite --port "$PUERTO" --strictPort > .noche/reportes/dev-emu.log 2>&1 &
 DEV=$!
@@ -42,6 +64,7 @@ esperar() { local i=0; until curl -s -o /dev/null --max-time 2 "$1"; do sleep 2;
 esperar "http://127.0.0.1:8080" 120 "emulador Firestore"
 esperar "http://127.0.0.1:9099" 60 "emulador Auth"
 esperar "http://localhost:$PUERTO" 60 "app :$PUERTO"
+[[ "$CON_FUNCTIONS" == "1" ]] && esperar "http://127.0.0.1:5001" 90 "emulador Functions"
 
 # ── 3 · Cuentas de prueba, con reintentos: Auth contesta antes de estar listo ──
 for intento in 1 2 3 4 5; do

@@ -2,7 +2,9 @@ import React, { useRef, useState } from 'react';
 import {
   X, Upload, FileText, Sparkles, Loader2, ClipboardPaste, AlertTriangle,
 } from 'lucide-react';
-import { useDocumentosTarifario, type Duplicado } from '../../hooks/useDocumentosTarifario';
+import {
+  useDocumentosTarifario, ErrorExtraccion, type Duplicado,
+} from '../../hooks/useDocumentosTarifario';
 import { usePuertos } from '../../hooks/usePuertos';
 import { useConceptos } from '../../hooks/useConceptos';
 import { useProveedores } from '../../hooks/useProveedores';
@@ -84,12 +86,13 @@ export default function CargarTarifario({
       });
       setPendiente({ documento, respuesta: extraccion });
     } catch (e) {
-      // El documento YA quedó marcado como «falló» con este motivo: se puede
-      // reintentar desde la lista de evidencias sin volver a buscar el archivo.
-      setError(
-        (e instanceof Error ? e.message : String(e))
-        + ' El tarifario quedó registrado como «falló», con la razón, para poder reintentarlo.',
-      );
+      const mensaje = e instanceof Error ? e.message : String(e);
+      // La promesa solo se hace cuando es verdad: un fallo de permiso, formato
+      // o tamaño ocurre ANTES de crear el documento, y mandar a buscarlo a la
+      // lista de evidencias sería mandar a un lugar donde no está.
+      setError(e instanceof ErrorExtraccion
+        ? `${mensaje} El tarifario quedó registrado como «falló», con la razón, para poder reintentarlo desde Evidencias.`
+        : mensaje);
     }
   };
 
@@ -112,6 +115,7 @@ export default function CargarTarifario({
         conceptos={conceptos.filter(c => c.activo)}
         puertos={puertos.map(p => ({ id: p.id, nombre: p.nombre, codigo: p.codigo }))}
         proveedores={proveedores}
+        proveedorElegidoId={proveedorId}
         onCancelar={onCerrar}
         onGuardar={async (lineas, provId) => {
           const n = await guardar(lineas, provId, pendiente.documento, createTarifa);
