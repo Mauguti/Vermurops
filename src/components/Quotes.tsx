@@ -750,6 +750,7 @@ export default function Quotes() {
     }
 
     // Reset
+    setFormProspectoOrigenId('');
     setFormEmpresa('');
     setFormContacto('');
     setFormTelefono('');
