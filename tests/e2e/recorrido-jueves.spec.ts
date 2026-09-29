@@ -228,7 +228,7 @@ test('Administración · valida el expediente del cliente', async ({ browser }) 
   const { page, ctx } = await entrar(browser, 'administracion@vermur.com');
   await irA(page, 'Altas');
   await page.getByPlaceholder('Buscar por razón social, RFC, representante...').fill('Plásticos Ramírez S.A. de C.V.');
-  await page.getByText('Ver ficha', { exact: true }).first().click();
+  await page.getByText('Plásticos Ramírez S.A. de C.V.').first().click();
   await page.getByRole('button', { name: 'Expediente' }).click();
   await page.getByPlaceholder(/Notas|checklist/).fill('Prueba: expediente físico completo en archivo de Administración.');
   await page.getByRole('button', { name: /Validar expediente|Validar formalmente/ }).click();

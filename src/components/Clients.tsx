@@ -1,24 +1,30 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   filtrarProveedores, conteoPorPestana, PESTANAS_PROVEEDOR, type PestanaProveedor,
 } from '../lib/filtrarProveedores';
-import { contiene, texto } from '../lib/texto';
-import { Search, Phone, Mail, Plane, Ship, Truck, FileText, Database, Loader2 } from 'lucide-react';
+import { contiene } from '../lib/texto';
+import { Search, Database, Loader2, SlidersHorizontal } from 'lucide-react';
 import { useClientes } from '../hooks/useClientes';
 import { useProveedores } from '../hooks/useProveedores';
 import { useCotizaciones } from '../hooks/useCotizaciones';
-import { ProveedorVermur, contactoPrincipal } from './proveedores/ProveedoresData';
+import type { ProveedorVermur } from './proveedores/ProveedoresData';
 import FichaCliente from './clientes/FichaCliente';
 import NuevoClienteModal from './clientes/NuevoClienteModal';
 import ProveedorFormModal from './proveedores/ProveedorFormModal';
 import FichaProveedor from './proveedores/FichaProveedor';
 import { useAuth } from '../auth/AuthContext';
 import { useDestinoPendiente } from '../navegacion/NavegacionContext';
+import SpreadsheetTable, { type VistaConfig } from './table/SpreadsheetTable';
+import VistaSelector from './table/VistaSelector';
+import { useVistasUsuario } from '../hooks/useVistasUsuario';
+import { CLIENTE_COLUMNS, VISTA_DEFAULT_CLIENTES } from './clientes/clienteColumns';
+import { PROVEEDOR_COLUMNS, VISTA_DEFAULT_PROVEEDORES } from './proveedores/proveedorColumns';
+import type { ClienteVermur } from './clientes/ClientesData';
 
 export default function Clients() {
   // Matriz §4.1: las altas definitivas de clientes y proveedores son solo de
   // Administración. Los demás roles entran a consultar.
-  const { puede } = useAuth();
+  const { puede, user } = useAuth();
   const puedeAltaCliente = puede('cliente.alta');
   const puedeAltaProveedor = puede('proveedor.alta');
   // Herramienta de mantenimiento, no función de negocio: solo superusuario.
@@ -95,6 +101,60 @@ export default function Clients() {
     ? (clientes.find(c => c.id === selectedClientId) ?? null)
     : null;
 
+  // ── Vistas guardadas ────────────────────────────────────────────────────────
+  const vistasClientes = useVistasUsuario('clientes');
+  const vistasProveedores = useVistasUsuario('proveedores');
+
+  const [vistaClienteId, setVistaClienteId] = useState<string | null>(null);
+  const [vistaClienteTabla, setVistaClienteTabla] = useState<VistaConfig>(VISTA_DEFAULT_CLIENTES);
+
+  const [vistaProveedorId, setVistaProveedorId] = useState<string | null>(null);
+  const [vistaProveedorTabla, setVistaProveedorTabla] = useState<VistaConfig>(VISTA_DEFAULT_PROVEEDORES);
+
+  // Cargar vista default del usuario para clientes
+  const defaultClienteCargada = useRef(false);
+  useEffect(() => {
+    if (defaultClienteCargada.current || !vistasClientes.vistaDefault || vistaClienteId !== null) return;
+    defaultClienteCargada.current = true;
+    setVistaClienteId(vistasClientes.vistaDefault.id);
+    setVistaClienteTabla({
+      columnas: vistasClientes.vistaDefault.columnas,
+      ordenamiento: vistasClientes.vistaDefault.ordenamiento ?? null,
+    });
+  }, [vistasClientes.vistaDefault, vistaClienteId]);
+
+  // Cargar vista default del usuario para proveedores
+  const defaultProveedorCargada = useRef(false);
+  useEffect(() => {
+    if (defaultProveedorCargada.current || !vistasProveedores.vistaDefault || vistaProveedorId !== null) return;
+    defaultProveedorCargada.current = true;
+    setVistaProveedorId(vistasProveedores.vistaDefault.id);
+    setVistaProveedorTabla({
+      columnas: vistasProveedores.vistaDefault.columnas,
+      ordenamiento: vistasProveedores.vistaDefault.ordenamiento ?? null,
+    });
+  }, [vistasProveedores.vistaDefault, vistaProveedorId]);
+
+  const seleccionarVistaCliente = useCallback((id: string | null) => {
+    setVistaClienteId(id);
+    const v = id ? vistasClientes.vistas.find(v => v.id === id) : null;
+    if (v) {
+      setVistaClienteTabla({ columnas: v.columnas, ordenamiento: v.ordenamiento ?? null });
+    } else {
+      setVistaClienteTabla(VISTA_DEFAULT_CLIENTES);
+    }
+  }, [vistasClientes.vistas]);
+
+  const seleccionarVistaProveedor = useCallback((id: string | null) => {
+    setVistaProveedorId(id);
+    const v = id ? vistasProveedores.vistas.find(v => v.id === id) : null;
+    if (v) {
+      setVistaProveedorTabla({ columnas: v.columnas, ordenamiento: v.ordenamiento ?? null });
+    } else {
+      setVistaProveedorTabla(VISTA_DEFAULT_PROVEEDORES);
+    }
+  }, [vistasProveedores.vistas]);
+
   if (loading || loadingProv) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
@@ -135,29 +195,6 @@ export default function Clients() {
      «Aerolíneas» no existen como tipo y daban siempre cero. */
   const conteoProveedores = conteoPorPestana(proveedores, { busqueda: providerSearchTerm });
 
-  const getTransportIcon = (type: string) => {
-    switch (type) {
-      case 'aereo':      return <Plane className="w-3 h-3 mr-1" />;
-      case 'maritimo':   return <Ship className="w-3 h-3 mr-1" />;
-      case 'terrestre':  return <Truck className="w-3 h-3 mr-1" />;
-      case 'aduanal':    return <FileText className="w-3 h-3 mr-1" />;
-      default:           return null;
-    }
-  };
-
-  const getTransportLabel = (type: string) => {
-    switch (type) {
-      case 'aereo': return 'Aéreo';
-      case 'maritimo': return 'Marítimo';
-      case 'terrestre': return 'Terrestre';
-      case 'aduanal': return 'Aduanal';
-      case 'proveedor': return 'Proveedor';
-      case 'transportista': return 'Transportista';
-      case 'agente_carga': return 'Agente';
-      default: return type;
-    }
-  };
-
   return (
     <div className="space-y-[24px]">
       {/* Top Toggle Selector */}
@@ -185,14 +222,6 @@ export default function Clients() {
 
       {viewType === 'Clientes' && !selectedClientId && (
         <>
-          {/* U-6 · Aquí había cuatro pestañas —Cuentas, Contactos, Leads,
-              Oportunidades— que solo cambiaban de color: el contenido de abajo
-              no dependía de cuál estuviera activa. Y dos de ellas, Leads y
-              Oportunidades, nombraban en vocabulario de CRM lo que este
-              sistema llama prospectos y cotizaciones, en otro módulo.
-              Se retiran: una pestaña que no lleva a ningún lado enseña que las
-              pestañas de esta app no llevan a ningún lado. */}
-
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-[16px] mb-[24px]">
             <div className="flex items-center gap-3 flex-1">
               <div className="relative flex-1 max-w-[480px]">
@@ -242,70 +271,37 @@ export default function Clients() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[24px]">
-            {filteredClients.map(cliente => (
-              <div
-                key={cliente.id}
-                className="bg-card rounded-[12px] border border-card-border transition-all overflow-hidden flex flex-col shadow-sm"
-              >
-                <div className="p-[20px] pb-[16px]">
-                  <div className="flex justify-between items-start mb-[4px]">
-                    <div className="pr-[12px]">
-                      <h3 className="font-semibold text-text-primary text-[15px] leading-snug">{cliente.nombre}</h3>
-                      {cliente.comercial && (
-                        <p className="text-[12px] text-text-muted mt-0.5">{cliente.comercial}</p>
-                      )}
-                    </div>
-                    <span className={`shrink-0 text-[11px] font-medium tracking-[0.02em] px-[8px] py-[2px] rounded-[4px] ${
-                      cliente.statusOperativo === 'ACTIVO'
-                        ? 'bg-success-bg text-success-text'
-                        : 'bg-neutral-bg text-text-secondary'
-                    }`}>
-                      {cliente.statusOperativo}
-                    </span>
-                  </div>
-                  <p className="text-[13px] text-text-muted font-mono">{cliente.rfc || '—'}</p>
-                </div>
-
-                <div className="px-[20px] pb-[20px] space-y-[10px] flex-1">
-                  <div className="flex items-center text-[13px] text-text-secondary">
-                    <Mail className="w-[16px] h-[16px] mr-[10px] text-text-muted" />
-                    <span className="truncate">{cliente.correo || '—'}</span>
-                  </div>
-                  <div className="flex items-center text-[13px] text-text-secondary">
-                    <Phone className="w-[16px] h-[16px] mr-[10px] text-text-muted" />
-                    {cliente.telefono || '—'}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 divide-x divide-divider border-t border-divider bg-canvas">
-                  <div className="p-[12px] text-center">
-                    <div className="text-[11px] text-text-muted font-medium mb-[2px]">Crédito</div>
-                    <div className="font-medium text-text-primary text-[13px]">
-                      {cliente.tipoCredito === 'credito' ? `${cliente.dias}d` : 'Contado'}
-                    </div>
-                  </div>
-                  <div className="p-[12px] text-center">
-                    <div className="text-[11px] text-text-muted font-medium mb-[2px]">Divisa</div>
-                    <div className="font-medium text-text-primary text-[13px] tabular-nums">{cliente.divisa ?? '—'}</div>
-                  </div>
-                  <div className="p-[12px] text-center">
-                    <div className="text-[11px] text-text-muted font-medium mb-[2px]">Línea</div>
-                    <div className="font-medium text-text-primary text-[13px] tabular-nums">
-                      {(cliente.monto ?? 0) > 0 ? `${((cliente.monto ?? 0) / 1000).toFixed(0)}k` : '—'}
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  onClick={() => setSelectedClientId(cliente.id)}
-                  className="border-t border-divider py-[12px] text-center cursor-pointer transition-colors hover:bg-neutral-bg group"
-                >
-                  <span className="text-[13px] font-medium text-text-primary group-hover:text-brand transition-colors">Ver ficha</span>
-                </div>
-              </div>
-            ))}
+          {/* Selector de vistas */}
+          <div className="flex items-center justify-end gap-2 mb-2">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" />
+            <VistaSelector
+              vistas={vistasClientes.vistas}
+              vistaActivaId={vistaClienteId}
+              currentUserId={user?.uid || user?.id || ''}
+              vistaActual={vistaClienteTabla}
+              labelDefault="Vista por defecto"
+              onSeleccionar={seleccionarVistaCliente}
+              onGuardar={async (nombre) => {
+                const id = await vistasClientes.crearVista(nombre, vistaClienteTabla.columnas);
+                setVistaClienteId(id);
+              }}
+              onActualizar={(id, cambios) => vistasClientes.actualizarVista(id, cambios)}
+              onEliminar={async (id) => {
+                await vistasClientes.eliminarVista(id);
+                if (vistaClienteId === id) seleccionarVistaCliente(null);
+              }}
+            />
           </div>
+
+          <SpreadsheetTable<ClienteVermur>
+            data={filteredClients}
+            columns={CLIENTE_COLUMNS}
+            pinnedColumnIds={['nombre']}
+            vista={vistaClienteTabla}
+            onVistaChange={setVistaClienteTabla}
+            onRowClick={(c) => setSelectedClientId(c.id)}
+            maxHeight="calc(100vh - 320px)"
+          />
         </>
       )}
 
@@ -366,68 +362,37 @@ export default function Clients() {
             )}
           </div>
 
-          {/* Grid de proveedores */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[24px]">
-            {filteredProviders.map(provider => {
-              const cp = contactoPrincipal(provider);
-              return (
-              <div
-                key={provider.id}
-                onClick={() => setSelectedProviderId(provider.id)}
-                className="bg-card rounded-[12px] border border-card-border transition-all overflow-hidden flex flex-col shadow-sm hover:border-brand/30 cursor-pointer group"
-              >
-                <div className="p-[20px] pb-[16px] border-b border-divider">
-                  <div className="flex justify-between items-start mb-[8px]">
-                    <h3 className="font-semibold text-text-primary text-[15px] leading-snug pr-[12px]">{provider.nombre}</h3>
-                    <span className={`shrink-0 text-[11px] font-medium tracking-[0.02em] px-[8px] py-[2px] rounded-[4px] ${provider.activo ? 'bg-success-bg text-success-text' : 'bg-neutral-bg text-text-secondary'}`}>
-                      {provider.activo ? 'Activo' : 'Inactivo'}
-                    </span>
-                  </div>
-
-                  {/* Tipos / Modalidades Badges */}
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {(provider.modalidades?.length ? provider.modalidades : provider.tipos ?? []).map(tag => (
-                      <span key={tag} className="flex items-center bg-canvas border border-card-border text-text-secondary px-2 py-1 rounded-md text-[10px] font-medium uppercase tracking-wider">
-                        {getTransportIcon(tag)}
-                        {getTransportLabel(tag)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="px-[20px] py-[16px] space-y-[10px] flex-1 bg-canvas">
-                  {cp && (
-                  <div className="flex items-start text-[13px]">
-                    <div className="w-[32px] h-[32px] bg-white border border-card-border rounded-full flex items-center justify-center font-bold text-brand mr-3 shrink-0">
-                      {texto(cp.nombre).charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-medium text-text-primary leading-tight">{cp.nombre}</p>
-                      <p className="text-[11px] text-text-muted mt-0.5">{cp.puesto ?? cp.tipo ?? ''}</p>
-                    </div>
-                  </div>
-                  )}
-                  {cp && (
-                  <div className="mt-3 space-y-2">
-                    <div className="flex items-center text-[12px] text-text-secondary">
-                      <Mail className="w-[14px] h-[14px] mr-[10px] text-text-muted" />
-                      <span className="truncate">{cp.email}</span>
-                    </div>
-                    <div className="flex items-center text-[12px] text-text-secondary">
-                      <Phone className="w-[14px] h-[14px] mr-[10px] text-text-muted" />
-                      {cp.telefono ?? '—'}
-                    </div>
-                  </div>
-                  )}
-                </div>
-
-                <div className="border-t border-divider py-[10px] bg-white text-center transition-colors group-hover:bg-brand/5">
-                  <span className="text-[12px] font-medium text-text-primary group-hover:text-brand transition-colors">Ver ficha completa</span>
-                </div>
-              </div>
-              );
-            })}
+          {/* Selector de vistas */}
+          <div className="flex items-center justify-end gap-2 mb-2">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" />
+            <VistaSelector
+              vistas={vistasProveedores.vistas}
+              vistaActivaId={vistaProveedorId}
+              currentUserId={user?.uid || user?.id || ''}
+              vistaActual={vistaProveedorTabla}
+              labelDefault="Vista por defecto"
+              onSeleccionar={seleccionarVistaProveedor}
+              onGuardar={async (nombre) => {
+                const id = await vistasProveedores.crearVista(nombre, vistaProveedorTabla.columnas);
+                setVistaProveedorId(id);
+              }}
+              onActualizar={(id, cambios) => vistasProveedores.actualizarVista(id, cambios)}
+              onEliminar={async (id) => {
+                await vistasProveedores.eliminarVista(id);
+                if (vistaProveedorId === id) seleccionarVistaProveedor(null);
+              }}
+            />
           </div>
+
+          <SpreadsheetTable<ProveedorVermur>
+            data={filteredProviders}
+            columns={PROVEEDOR_COLUMNS}
+            pinnedColumnIds={['nombre']}
+            vista={vistaProveedorTabla}
+            onVistaChange={setVistaProveedorTabla}
+            onRowClick={(p) => setSelectedProviderId(p.id)}
+            maxHeight="calc(100vh - 380px)"
+          />
         </>
       ) : null}
 
