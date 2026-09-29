@@ -20,6 +20,45 @@
     },
     {
       "parameters": {
+        "jsCode": "// Valida que la petición venga del proxy de VermurOps con el token correcto.\n// Sin este nodo, cualquiera con la URL del webhook genera PDFs a costa de Vermur.\n// El proxy (functions/src/comun/proxyN8n.ts) manda el secreto en X-Vermur-Token;\n// el valor esperado vive en la variable de entorno VERMUR_N8N_TOKEN de n8n.\nconst headers = $input.first().json.headers || {};\nconst token = headers['x-vermur-token'];\nconst esperado = process.env.VERMUR_N8N_TOKEN;\n\nif (!esperado) {\n  throw new Error('VERMUR_N8N_TOKEN no está configurada en las variables de entorno de n8n.');\n}\n\nif (!token || token !== esperado) {\n  throw new Error('Token inválido o ausente.');\n}\n\n// Token válido: pasar los datos al siguiente nodo sin modificarlos.\nreturn [$input.first()];"
+      },
+      "id": "a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+      "name": "Valida token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        -48
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: 'No autorizado.' }) }}",
+        "options": {
+          "responseCode": 401,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "b2c3d4e5-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+      "name": "Rechaza sin token",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        432,
+        -240
+      ]
+    },
+    {
+      "parameters": {
         "jsCode": "const body = $input.first().json.body || $input.first().json;\n\nconst esc = s => String(s ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c]));\nconst num = n => new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(n) || 0);\n\nconst idioma = (body.idioma === 'en') ? 'en' : 'es';\n\nconst T = {\n  es: {\n    titulo: 'COTIZACIÓN', folio: 'Folio', fecha: 'Fecha', cliente: 'Cliente',\n    atencion: 'Atención', vigencia: 'Vigencia', ruta: 'Ruta', modalidad: 'Modalidad',\n    incoterm: 'Incoterm', mercancia: 'Mercancía', carga: 'Detalle de la carga',\n    concepto: 'Concepto', importe: 'Importe', subtotal: 'Subtotal', total: 'Total',\n    notas: 'Notas y condiciones', sinVigencia: 'Sujeta a confirmación',\n    piePagina: 'Esta cotización no incluye cargos que surjan por causas ajenas a lo aquí descrito.',\n    contacto: 'Contacto'\n  },\n  en: {\n    titulo: 'QUOTATION', folio: 'Reference', fecha: 'Date', cliente: 'Client',\n    atencion: 'Attention', vigencia: 'Validity', ruta: 'Route', modalidad: 'Mode',\n    incoterm: 'Incoterm', mercancia: 'Commodity', carga: 'Cargo details',\n    concepto: 'Description', importe: 'Amount', subtotal: 'Subtotal', total: 'Total',\n    notas: 'Notes and conditions', sinVigencia: 'Subject to confirmation',\n    piePagina: 'This quotation does not include charges arising from causes other than those described herein.',\n    contacto: 'Contact'\n  }\n}[idioma];\n\nconst lineas = Array.isArray(body.lineas) ? body.lineas : [];\nconst porMoneda = {};\nfor (const l of lineas) {\n  const m = l.moneda || 'USD';\n  if (!porMoneda[m]) porMoneda[m] = { lineas: [], total: 0 };\n  porMoneda[m].lineas.push(l);\n  porMoneda[m].total += Number(l.venta) || 0;\n}\nconst monedas = Object.keys(porMoneda);\nconst filas = monedas.map(m => {\n  const g = porMoneda[m];\n  const renglones = g.lineas.map(l => `\n    <tr>\n      <td class=\"concepto\">${esc(l.concepto)}${l.detalle ? `<span class=\"detalle\">${esc(l.detalle)}</span>` : ''}</td>\n      <td class=\"importe\">${num(l.venta)}</td>\n    </tr>`).join('');\n  return `\n    <table class=\"conceptos\">\n      <thead>\n        <tr>\n          <th>${T.concepto}</th>\n          <th class=\"importe\">${T.importe} ${esc(m)}</th>\n        </tr>\n      </thead>\n      <tbody>${renglones}</tbody>\n      <tfoot>\n        <tr>\n          <td class=\"total-label\">${T.total} ${esc(m)}</td>\n          <td class=\"total-monto\">${num(g.total)}</td>\n        </tr>\n      </tfoot>\n    </table>`;\n}).join('');\n\nconst carga = body.carga || {};\nconst detallesCarga = [];\nif (carga.tipo) detallesCarga.push(['Tipo', carga.tipo.toUpperCase()]);\nif (carga.contenedores) detallesCarga.push(['Contenedores', carga.contenedores]);\nif (carga.piezas) detallesCarga.push([idioma==='es'?'Piezas':'Pieces', carga.piezas]);\nif (carga.peso) detallesCarga.push([idioma==='es'?'Peso':'Weight', carga.peso + ' kg']);\nif (carga.volumen) detallesCarga.push([idioma==='es'?'Volumen':'Volume', carga.volumen + ' m³']);\nconst filasCarga = detallesCarga.map(([k,v]) => `<div class=\"dato\"><span class=\"k\">${esc(k)}</span><span class=\"v\">${esc(v)}</span></div>`).join('');\n\nconst html = `<!DOCTYPE html>\n<html lang=\"${idioma}\">\n<head>\n<meta charset=\"utf-8\">\n<style>\n  @page { size: letter; margin: 18mm 16mm; }\n  * { box-sizing: border-box; }\n  body { font-family: Helvetica, Arial, sans-serif; color: #1F2937; font-size: 10pt; margin: 0; }\n  .encabezado { display: flex; justify-content: space-between; align-items: flex-start;\n                border-bottom: 2px solid #E11D48; padding-bottom: 14px; margin-bottom: 20px; }\n  .marca { font-size: 24pt; font-weight: bold; letter-spacing: -0.5px; }\n  .marca .v { color: #E11D48; }\n  .marca .resto { color: #1F2937; }\n  .marca-sub { font-size: 8pt; color: #6B7280; margin-top: 2px; }\n  .doc { text-align: right; }\n  .doc-titulo { font-size: 15pt; font-weight: bold; color: #E11D48; letter-spacing: 1px; }\n  .doc-folio { font-family: 'Courier New', monospace; font-size: 11pt; margin-top: 4px; }\n  .doc-fecha { font-size: 9pt; color: #6B7280; margin-top: 2px; }\n  .vigencia { background: #FEF3C7; border-left: 3px solid #D97706; padding: 9px 13px;\n              margin-bottom: 18px; font-size: 10pt; }\n  .vigencia strong { color: #92400E; }\n  .bloques { display: flex; gap: 22px; margin-bottom: 20px; }\n  .bloque { flex: 1; }\n  .bloque h3 { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.6px;\n               color: #6B7280; margin: 0 0 7px 0; font-weight: bold; }\n  .dato { display: flex; gap: 8px; font-size: 9.5pt; margin-bottom: 3px; }\n  .dato .k { color: #6B7280; min-width: 78px; }\n  .dato .v { color: #1F2937; font-weight: 500; }\n  .cliente-nombre { font-size: 12pt; font-weight: bold; margin-bottom: 5px; }\n  table.conceptos { width: 100%; border-collapse: collapse; margin-bottom: 16px; }\n  table.conceptos th { background: #1F2937; color: #fff; padding: 8px 11px;\n                       font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.4px;\n                       text-align: left; }\n  table.conceptos th.importe, table.conceptos td.importe { text-align: right; }\n  table.conceptos td { padding: 8px 11px; border-bottom: 1px solid #E5E7EB; font-size: 10pt; }\n  table.conceptos td.concepto { color: #1F2937; }\n  table.conceptos .detalle { display: block; font-size: 8.5pt; color: #6B7280; margin-top: 2px; }\n  table.conceptos td.importe { font-variant-numeric: tabular-nums; }\n  table.conceptos tfoot td { border-top: 2px solid #1F2937; border-bottom: none;\n                             padding-top: 10px; font-weight: bold; font-size: 11pt; }\n  table.conceptos tfoot .total-monto { text-align: right; color: #E11D48;\n                                       font-variant-numeric: tabular-nums; }\n  .notas { margin-top: 22px; padding-top: 14px; border-top: 1px solid #E5E7EB; }\n  .notas h3 { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.6px;\n              color: #6B7280; margin: 0 0 6px 0; }\n  .notas p { font-size: 9pt; line-height: 1.5; color: #374151; margin: 0 0 5px 0;\n             white-space: pre-line; }\n  .pie { margin-top: 26px; padding-top: 11px; border-top: 1px solid #E5E7EB;\n         font-size: 8pt; color: #9CA3AF; line-height: 1.5; }\n  .pie .contacto { color: #6B7280; margin-bottom: 4px; }\n</style>\n</head>\n<body>\n  <div class=\"encabezado\">\n    <div>\n      <div class=\"marca\"><span class=\"v\">Vermur</span><span class=\"resto\">Ops</span></div>\n      <div class=\"marca-sub\">Importaciones y Logística Vermur, S. de R.L. de C.V.</div>\n    </div>\n    <div class=\"doc\">\n      <div class=\"doc-titulo\">${T.titulo}</div>\n      <div class=\"doc-folio\">${esc(body.folio || '')}</div>\n      <div class=\"doc-fecha\">${esc(body.fecha || new Date().toLocaleDateString(idioma === 'es' ? 'es-MX' : 'en-US'))}</div>\n    </div>\n  </div>\n  <div class=\"vigencia\">\n    <strong>${T.vigencia}:</strong> ${esc(body.vigencia || T.sinVigencia)}\n  </div>\n  <div class=\"bloques\">\n    <div class=\"bloque\">\n      <h3>${T.cliente}</h3>\n      <div class=\"cliente-nombre\">${esc(body.cliente?.nombre || '')}</div>\n      ${body.cliente?.contacto ? `<div class=\"dato\"><span class=\"k\">${T.atencion}</span><span class=\"v\">${esc(body.cliente.contacto)}</span></div>` : ''}\n      ${body.cliente?.correo ? `<div class=\"dato\"><span class=\"k\">Email</span><span class=\"v\">${esc(body.cliente.correo)}</span></div>` : ''}\n    </div>\n    <div class=\"bloque\">\n      <h3>${T.carga}</h3>\n      ${body.modalidad ? `<div class=\"dato\"><span class=\"k\">${T.modalidad}</span><span class=\"v\">${esc(body.modalidad)}</span></div>` : ''}\n      ${body.ruta ? `<div class=\"dato\"><span class=\"k\">${T.ruta}</span><span class=\"v\">${esc(body.ruta)}</span></div>` : ''}\n      ${body.incoterm ? `<div class=\"dato\"><span class=\"k\">${T.incoterm}</span><span class=\"v\">${esc(body.incoterm)}</span></div>` : ''}\n      ${body.mercancia ? `<div class=\"dato\"><span class=\"k\">${T.mercancia}</span><span class=\"v\">${esc(body.mercancia)}</span></div>` : ''}\n      ${filasCarga}\n    </div>\n  </div>\n  ${filas}\n  ${body.notas ? `<div class=\"notas\"><h3>${T.notas}</h3><p>${esc(body.notas)}</p></div>` : ''}\n  <div class=\"pie\">\n    ${body.contacto ? `<div class=\"contacto\">${T.contacto}: ${esc(body.contacto)}</div>` : ''}\n    ${T.piePagina}\n  </div>\n</body>\n</html>`;\n\n// ── El archivo se arma AQUÍ, en binario, con el HTML en UTF-8 (24-sep-2026) ──\n// Antes lo hacía «HTML a archivo» (Convert to File · Move Base64 String to\n// File), que espera BASE64 en la propiedad y recibía HTML en texto plano:\n// decodificaba 14 bytes de basura y Gotenberg pintaba eso. El PDF salía\n// siempre de 7,883 bytes con una sola línea ilegible.\n// Gotenberg exige que el archivo se llame index.html; la propiedad binaria\n// se llama «archivo» (sin punto: n8n lee «a.b» como ruta anidada).\nconst archivo = await this.helpers.prepareBinaryData(Buffer.from(html, 'utf8'), 'index.html', 'text/html');\nreturn [{\n  json: { nombreArchivo: `${body.folio || 'cotizacion'}.pdf`, folio: body.folio || '', bytesHtml: Buffer.byteLength(html, 'utf8') },\n  binary: { archivo },\n}];"
       },
       "id": "f95290c3-ae4c-4b88-9c88-fdac82eb1a6a",
@@ -27,7 +66,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        192,
+        432,
         -48
       ],
       "onError": "continueErrorOutput"
@@ -62,7 +101,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        432,
+        672,
         -48
       ],
       "onError": "continueErrorOutput"
@@ -76,7 +115,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        672,
+        912,
         -48
       ],
       "onError": "continueErrorOutput"
@@ -100,7 +139,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        912,
+        1152,
         -48
       ]
     },
@@ -113,7 +152,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        672,
+        912,
         176
       ]
     },
@@ -138,7 +177,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        912,
+        1152,
         176
       ]
     }
@@ -148,7 +187,25 @@
       "main": [
         [
           {
+            "node": "Valida token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valida token": {
+      "main": [
+        [
+          {
             "node": "Arma el HTML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rechaza sin token",
             "type": "main",
             "index": 0
           }

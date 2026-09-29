@@ -28,7 +28,7 @@ Lo que no alcance a correr esta noche se queda en [ ] para la siguiente.
 - [x] 19 PLAN: reciclar cotizaciones y orden de la bandeja de Pricing
 - [x] 20 PLAN C: documentos operativos y talonario del HBL
 - [x] 21 Usuarios y roles, paso 1 (solo emuladores)
-- [ ] 22 Token en el webhook del PDF (JSON para importar)
+- [x] 22 Token en el webhook del PDF (JSON para importar)
 - [ ] 23 Bug en frío: solicitud vacía tras «Enviar a Pricing»
 - [ ] 24 Los 9 errores de tsc
 - [ ] 25 Revisión de tarifas: correo pegado como imagen y vigencias con año dudoso
