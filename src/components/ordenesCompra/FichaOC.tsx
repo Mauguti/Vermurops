@@ -189,6 +189,21 @@ export default function FichaOC({
         }
       />
 
+      {/*
+       * UNA sola área con scroll (29-sep-2026).
+       *
+       * Antes, seis bloques —enlaces, fondeo, registrar depósito, ruta del
+       * pago, anticipos y el avance— vivían FUERA de `FichaContenido`, o sea
+       * fijos, y solo «Qué se paga» y lo de abajo scrolleaba. En una pantalla
+       * baja eso deja al área con scroll una rendija de unos pocos píxeles,
+       * con una barra casi invisible: Luis vio la ficha cortada justo bajo el
+       * avance y dio por hecho que ahí terminaba.
+       *
+       * No se usa `FichaContenido` porque su `p-6` duplicaría el `px-6` que
+       * cada bloque ya trae. El contenedor es de ESTA ficha: las otras ocho
+       * que comparten FichaLayout no se tocan.
+       */}
+      <div className="flex-1 overflow-y-auto pb-6">
       {oc.origen === 'embarque' && oc.embarqueId && (
         <div className="px-6 pt-3">
           <BloqueEnlaces
@@ -199,6 +214,32 @@ export default function FichaOC({
           />
         </div>
       )}
+
+      {/* Lo primero que hay que saber de una orden es qué se paga y a quién.
+         Estaba hasta el final y más angosto que el resto. */}
+      <div className="px-6 pt-3">
+          {/* ── Qué se paga y a quién ─────────────────────────────────── */}
+          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
+            <h4 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-2">
+              Qué se paga
+            </h4>
+            <div className="grid grid-cols-2 gap-4">
+              <Dato icono={<Building2 className="w-3.5 h-3.5" />} rotulo="Proveedor" valor={oc.proveedorNombre} />
+              <Dato icono={<Package className="w-3.5 h-3.5" />} rotulo="Concepto" valor={oc.conceptoNombre} />
+              {oc.origen === 'embarque' && (
+                <>
+                  <Dato icono={<Ship className="w-3.5 h-3.5" />} rotulo="Embarque" valor={oc.embarqueFolio ?? '—'} />
+                  <Dato icono={<Building2 className="w-3.5 h-3.5" />} rotulo="Cliente" valor={oc.clienteNombre ?? '—'} />
+                </>
+              )}
+              <Dato icono={<Calendar className="w-3.5 h-3.5" />} rotulo="Se necesita el" valor={oc.fechaRequerida || '—'} />
+              <Dato icono={<Calendar className="w-3.5 h-3.5" />} rotulo="Pago sugerido" valor={oc.fechaSugeridaPago ?? 'Sin calcular'} />
+            </div>
+            {oc.descripcion && (
+              <p className="text-[12px] text-gray-600 border-t border-gray-100 pt-3">{oc.descripcion}</p>
+            )}
+          </div>
+      </div>
 
       {/* ── 1.1 · El fondeo del cliente ────────────────────────────────────
           «Tenemos que esperar el dinero del cliente para pagarle al
@@ -466,30 +507,7 @@ export default function FichaOC({
         />
       </div>
 
-      <FichaContenido>
-        <div className="max-w-3xl space-y-6">
-
-          {/* ── Qué se paga y a quién ─────────────────────────────────── */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
-            <h4 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-2">
-              Qué se paga
-            </h4>
-            <div className="grid grid-cols-2 gap-4">
-              <Dato icono={<Building2 className="w-3.5 h-3.5" />} rotulo="Proveedor" valor={oc.proveedorNombre} />
-              <Dato icono={<Package className="w-3.5 h-3.5" />} rotulo="Concepto" valor={oc.conceptoNombre} />
-              {oc.origen === 'embarque' && (
-                <>
-                  <Dato icono={<Ship className="w-3.5 h-3.5" />} rotulo="Embarque" valor={oc.embarqueFolio ?? '—'} />
-                  <Dato icono={<Building2 className="w-3.5 h-3.5" />} rotulo="Cliente" valor={oc.clienteNombre ?? '—'} />
-                </>
-              )}
-              <Dato icono={<Calendar className="w-3.5 h-3.5" />} rotulo="Se necesita el" valor={oc.fechaRequerida || '—'} />
-              <Dato icono={<Calendar className="w-3.5 h-3.5" />} rotulo="Pago sugerido" valor={oc.fechaSugeridaPago ?? 'Sin calcular'} />
-            </div>
-            {oc.descripcion && (
-              <p className="text-[12px] text-gray-600 border-t border-gray-100 pt-3">{oc.descripcion}</p>
-            )}
-          </div>
+        <div className="px-6 pt-3 space-y-6">
 
           {/* ── Papeles: la factura del proveedor y el comprobante ─────── */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
@@ -570,7 +588,7 @@ export default function FichaOC({
             </div>
           )}
         </div>
-      </FichaContenido>
+      </div>
 
       <FichaFooter>
         {disponibles.filter(e => e !== 'rechazada').map(estado => (
@@ -586,20 +604,25 @@ export default function FichaOC({
           </button>
         ))}
 
-        {/* Qué falta, en vez de un botón que va a fallar. */}
+        {/*
+          * Qué falta, en vez de un botón que va a fallar.
+          *
+          * Era una TARJETA por transición bloqueada, del mismo alto que el
+          * botón principal. La franja es fija: cada tarjeta se descuenta del
+          * alto que le queda al contenido, y en una pantalla baja eso es lo
+          * que dejaba la ficha en una rendija. El aviso dice lo mismo en una
+          * línea.
+          */}
         {bloqueados.map(({ estado, r }) => (
-          <div
+          <p
             key={estado}
-            className="w-full max-w-3xl mx-auto px-4 py-3 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-2"
+            className="w-full max-w-3xl mx-auto flex items-start gap-1.5 text-[11px] text-amber-800 leading-snug"
           >
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">
-                Para «{ACCION[estado]}»
-              </p>
-              <p className="text-[12px] text-amber-900">{r.razon}</p>
-            </div>
-          </div>
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-px" />
+            <span>
+              <span className="font-bold">Para «{ACCION[estado]}»:</span> {r.razon}
+            </span>
+          </p>
         ))}
 
         {disponibles.includes('rechazada') && (
