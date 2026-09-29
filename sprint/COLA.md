@@ -11,7 +11,7 @@ Lo que no alcance a correr esta noche se queda en [ ] para la siguiente.
 - [x] 02 Wizard de tarifas: agregar a mano la línea que el extractor se saltó
 - [x] 03 Freno al enviar con líneas sin tasa, y precarga en «versión nueva»
 - [x] 04 Renombrar «consolidada» (solo etiquetas)
-- [ ] 05 PLAN de tarifas: modelo de ONE y revisión de las 56 tarifas
+- [x] 05 PLAN de tarifas: modelo de ONE y revisión de las 56 tarifas
 - [ ] 06 PLAN del tipo de cambio de Pricing, moneda y cliente a facturar
 - [ ] 07 Tabla única de cargos en el embarque
 - [ ] 08 Demoras y almacenajes calculados
