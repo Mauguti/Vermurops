@@ -19,9 +19,10 @@
 
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, updateDoc, getDocsFromServer } from 'firebase/firestore';
 import { KanbanQuote, initialKanbanQuotes } from '../components/quotes/QuotesData';
 import { initContadorDesdeFolios } from '../lib/folioService';
+import { evaluarSeed } from '../lib/seedGuard';
 import { useAuth } from '../auth/AuthContext';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 import { puedeCrearCotizacion, PermisoDenegadoError } from '../auth/permisos';
@@ -43,8 +44,9 @@ import { guardadoAtrasado, numeroVersionActual, sinCamposDeVersion } from '../li
  * POR INSTANCIA: dos hooks pueden pasarlas a la vez. El candado compartido
  * cierra la ventana en el cliente, que es donde nace.
  *
- * Aquí el riesgo no se había materializado porque este hook se monta en un
- * solo lugar. Se cierra antes de que alguien lo monte en dos.
+ * Este hook se monta en SIETE lugares (Dashboard, CRM, Embarques, Altas, la
+ * ficha del prospecto, la del cliente y el catálogo de conceptos), así que
+ * aquí el candado por instancia eran siete sembradores.
  */
 let seedIntentado = false;
 
@@ -68,10 +70,31 @@ export function useCotizaciones() {
     const unsubscribe = onSnapshot(
       collection(db, 'cotizaciones'),
       async (snapshot) => {
-        // ── Colección vacía: seed inicial ─────────────────────────────────
-        if (snapshot.empty && !seedIntentado) {
+        // ── ¿Se puede sembrar? ────────────────────────────────────────────
+        //
+        // Antes decía `snapshot.empty && !seedIntentado`, sin evaluarSeed. Un
+        // snapshot de caché de una colección todavía no descargada llega con
+        // `empty: true`, así que bastaba para escribir las ocho cotizaciones
+        // de ejemplo ENCIMA de las reales: `setDoc` sin merge reemplaza el
+        // documento entero, y los ids del seed son folios que producción usa
+        // (COT-2026-0001 … 0008).
+        //
+        // Era el último hook con la guarda vieja, y el más expuesto: se monta
+        // en siete lugares —Dashboard, CRM, Embarques, Altas, la ficha del
+        // prospecto, la del cliente y el catálogo de conceptos—.
+        if (evaluarSeed(snapshot, seedIntentado).sembrar) {
           seedIntentado = true;
           try {
+            // Segunda barrera, ya con el servidor de por medio: confirma que
+            // 'cotizaciones' sigue vacía justo antes de escribir. Cubre la
+            // carrera con otra pestaña y falla si no hay red, en vez de
+            // sembrar a ciegas.
+            const enServidor = await getDocsFromServer(collection(db, 'cotizaciones'));
+            if (!enServidor.empty) {
+              console.warn('[seed] cotizaciones: el servidor ya tiene ' + enServidor.size + ' documentos. No se siembra.');
+              return;
+            }
+
             // setDoc preserva el folio como document ID (no usa addDoc).
             // Dos sesiones simultáneas producirían writes idénticos → sin daño.
             await conAviso('las cotizaciones iniciales', () => Promise.all(
@@ -90,6 +113,9 @@ export function useCotizaciones() {
           }
           return; // Esperar el siguiente disparo de onSnapshot con datos
         }
+
+        // Snapshot que no autoriza sembrar: se pinta tal cual. Si venía de
+        // caché, el del servidor llegará después y volverá a evaluar.
 
         // ── Snapshot con datos (normal o post-seed) ───────────────────────
         const data: KanbanQuote[] = [];
