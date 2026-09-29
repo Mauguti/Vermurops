@@ -22,7 +22,7 @@ export default function Puertos() {
 
   // ── Filtros ──────────────────────────────────────────────────────────────
   const paises = useMemo(() => {
-    const set = new Set<string>(puertos.map(p => p.pais));
+    const set = new Set<string>(puertos.map(p => p.pais).filter(Boolean));
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'es'));
   }, [puertos]);
 

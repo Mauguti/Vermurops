@@ -20,7 +20,7 @@ Lo que no alcance a correr esta noche se queda en [ ] para la siguiente.
 - [x] 11 Tipos de proveedor y patentes de agentes aduanales
 - [x] 12 «Ver como cliente» y registro de documentos sensibles visibles
 - [x] 13 Bitácora y Master/Hijo dentro de Información
-- [ ] 14 Kanban avisa del freno al arrastrar, y key duplicada en Puertos
+- [x] 14 Kanban avisa del freno al arrastrar, y key duplicada en Puertos
 - [ ] 15 Script de auditoría: tarifa elegida, costos sin moneda y conceptos sin catálogo
 - [ ] 16 Conceptos sin catálogo desde la comparativa y la bandeja (camino B)
 - [ ] 17 PLAN: una sola fuente de verdad para la tarifa elegida
