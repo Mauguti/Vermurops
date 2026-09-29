@@ -538,9 +538,11 @@ registro.» Ver `lib/versionesCotizacion.ts` y `hooks/useVersionesCotizacion.ts`
 ## 4.12 La ficha de embarque (10-sep-2026)
 
 **Pestañas, en el orden en que se trabaja:** Información · Cargos · Productos
-· Documentos · Facturas · Historial · Master/hijo. Información fusiona lo que
-eran General, Entidades y Ruta —las tres secciones del encabezado del BL—.
-Plantillas se monta cuando exista el módulo; no se monta una pestaña vacía.
+· Documentos · Facturas · Historial. Información fusiona lo que eran General,
+Entidades y Ruta —las tres secciones del encabezado del BL—, más Master/hijo
+y la Bitácora al final (tarea 13, 29-sep-2026: Vermur pidió no brincar entre
+pestañas). Plantillas se monta cuando exista el módulo; no se monta una
+pestaña vacía.
 
 **Las entidades salen del catálogo y enlazan a su ficha.** El nombre
 (`entidades.consignatario`…) sigue siendo texto: es lo que se imprime en el
