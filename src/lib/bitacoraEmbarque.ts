@@ -30,6 +30,7 @@ import type {
   EmbarqueCompleto, EntradaBitacora, EventoBitacora, CargoDetalle, EmbarqueEntidades,
 } from '../components/shipments/EmbarquesData';
 import { estadoDe, ETAPA_MAP } from './estadoEmbarque';
+import { reglaDeTipo, esVisibleParaCliente } from './visibilidadDocumentoCliente';
 
 export interface Autor { uid: string; nombre: string }
 
@@ -198,6 +199,27 @@ export function diffParaBitacora(
   const docsDespues = new Set((despues.documentos ?? []).map(d => d.id));
   (antes.documentos ?? []).forEach(d => {
     if (!docsDespues.has(d.id)) out.push(entradaSistema('documento', `${quien} quitó el documento «${d.nombre}»`, autor, ahora));
+  });
+
+  // Visibilidad de documentos: se anota cuando se marca visible un documento
+  // sensible (factura de proveedor, carta de encomienda, pedimento). Que el
+  // cliente vea un documento sensible es una decisión que alguien tiene que
+  // poder rastrear.
+  const docsAntesMap = new Map((antes.documentos ?? []).map(d => [d.id, d]));
+  (despues.documentos ?? []).forEach(d => {
+    const previo = docsAntesMap.get(d.id);
+    if (!previo) return; // documento nuevo, ya registrado arriba
+    const visAntes = esVisibleParaCliente(previo);
+    const visDespues = esVisibleParaCliente(d);
+    if (visAntes === visDespues) return;
+    const regla = reglaDeTipo(d.tipo);
+    const accion = visDespues
+      ? `${quien} marcó como visible para el cliente el documento «${d.nombre}»`
+      : `${quien} ocultó del cliente el documento «${d.nombre}»`;
+    const detalle = regla.clase === 'sensible'
+      ? `Documento sensible (${regla.razon})`
+      : undefined;
+    out.push(entradaSistema('documento', accion, autor, ahora, detalle));
   });
 
   return out;

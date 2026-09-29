@@ -130,6 +130,89 @@ describe('lectura', () => {
   });
 });
 
+// ─── Tarea 12 · visibilidad de documentos sensibles en la bitácora ───────────
+
+describe('visibilidad de documentos sensibles', () => {
+  const docSensible = {
+    id: 'd-fp', tipo: 'factura_proveedor', nombre: 'Factura Oñate',
+    url: '', fechaCarga: '', cargadoPor: '', visibleCliente: false,
+  };
+  const docInterno = {
+    id: 'd-bl', tipo: 'bl_maritimo', nombre: 'BL 123',
+    url: '', fechaCarga: '', cargadoPor: '', visibleCliente: false,
+  };
+
+  it('marcar visible un documento sensible queda en la bitácora con la razón', () => {
+    const antes = emb({ documentos: [docSensible] as any });
+    const despues = emb({
+      documentos: [{ ...docSensible, visibleCliente: true }] as any,
+    });
+    const d = diffParaBitacora(antes, despues, ANGEL, AHORA, HOY);
+    const e = d.find(x => x.evento === 'documento' && /visible/i.test(x.titulo));
+    expect(e).toBeDefined();
+    expect(e!.titulo).toContain('Factura Oñate');
+    expect(e!.detalle).toContain('sensible');
+    expect(e!.detalle).toContain('margen');
+  });
+
+  it('ocultar un documento sensible también se anota', () => {
+    const antes = emb({
+      documentos: [{ ...docSensible, visibleCliente: true }] as any,
+    });
+    const despues = emb({
+      documentos: [{ ...docSensible, visibleCliente: false }] as any,
+    });
+    const d = diffParaBitacora(antes, despues, ANGEL, AHORA, HOY);
+    expect(d.find(x => /ocultó/i.test(x.titulo))).toBeDefined();
+  });
+
+  it('marcar visible un documento interno se anota sin detalle de sensible', () => {
+    const antes = emb({ documentos: [docInterno] as any });
+    const despues = emb({
+      documentos: [{ ...docInterno, visibleCliente: true }] as any,
+    });
+    const d = diffParaBitacora(antes, despues, ANGEL, AHORA, HOY);
+    const e = d.find(x => x.evento === 'documento' && /visible/i.test(x.titulo));
+    expect(e).toBeDefined();
+    expect(e!.detalle).toBeUndefined();
+  });
+
+  it('sin cambio de visibilidad no se anota nada', () => {
+    const antes = emb({ documentos: [docSensible] as any });
+    const despues = emb({ documentos: [docSensible] as any });
+    const d = diffParaBitacora(antes, despues, ANGEL, AHORA, HOY);
+    expect(d.filter(x => /visible|ocultó/i.test(x.titulo))).toEqual([]);
+  });
+
+  it('un documento nuevo no genera entrada de visibilidad (solo la de subida)', () => {
+    const antes = emb({ documentos: [] });
+    const despues = emb({
+      documentos: [{ ...docSensible, visibleCliente: true }] as any,
+    });
+    const d = diffParaBitacora(antes, despues, ANGEL, AHORA, HOY);
+    // Solo la de subida, no la de visibilidad
+    expect(d).toHaveLength(1);
+    expect(d[0].titulo).toContain('subió');
+  });
+
+  it('carta de encomienda y pedimento también son sensibles', () => {
+    const encomienda = { ...docSensible, id: 'd-ce', tipo: 'carta_encomienda', nombre: 'Carta' };
+    const pedimento = { ...docSensible, id: 'd-pe', tipo: 'pedimento', nombre: 'Pedimento' };
+    const antes = emb({ documentos: [encomienda, pedimento] as any });
+    const despues = emb({
+      documentos: [
+        { ...encomienda, visibleCliente: true },
+        { ...pedimento, visibleCliente: true },
+      ] as any,
+    });
+    const d = diffParaBitacora(antes, despues, ANGEL, AHORA, HOY);
+    const vis = d.filter(x => /visible/i.test(x.titulo));
+    expect(vis).toHaveLength(2);
+    expect(vis[0].detalle).toContain('sensible');
+    expect(vis[1].detalle).toContain('sensible');
+  });
+});
+
 // ─── Bloque 12 · el tipo de cambio se anota ───────────────────────────────────
 
 describe('cambios de tipo de cambio en la bitácora', () => {
