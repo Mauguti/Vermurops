@@ -1,0 +1,8 @@
+{
+  "status": 200,
+  "tiempoMs": 799,
+  "body": {
+    "ok": false,
+    "error": "La IA devolvió un error: Could not process image"
+  }
+}

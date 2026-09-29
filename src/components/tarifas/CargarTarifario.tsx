@@ -69,9 +69,19 @@ export default function CargarTarifario({
    */
   const elegir = async (file: File) => {
     setError(null);
-    const dup = await buscarDuplicado(file);
-    if (dup.porHash || dup.porNombre) {
-      setRepetido({ file, dup });
+    try {
+      const dup = await buscarDuplicado(file);
+      if (dup.porHash || dup.porNombre) {
+        setRepetido({ file, dup });
+        return;
+      }
+    } catch (e) {
+      // hashArchivo puede fallar si el archivo no se puede leer (demasiado
+      // grande para bufferizar, error de crypto, etc.). Sin este catch el error
+      // se iba como promesa rechazada sin handler y el usuario no veía nada:
+      // el botón volvía a la normalidad y el archivo simplemente desaparecía.
+      // Es el hueco de «4 archivos, 2 llamadas».
+      setError(e instanceof Error ? e.message : String(e));
       return;
     }
     await procesar(file);
