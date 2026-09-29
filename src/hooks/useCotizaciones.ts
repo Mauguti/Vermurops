@@ -17,7 +17,7 @@
  * En E3.4 se añadirán createCotizacion y updateCotizacion.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, setDoc, updateDoc } from 'firebase/firestore';
 import { KanbanQuote, initialKanbanQuotes } from '../components/quotes/QuotesData';
@@ -30,16 +30,30 @@ import { conAviso } from '../lib/erroresEscritura';
 import { estaCongelada, cambiosBloqueados } from '../lib/lineasCotizacion';
 import { guardadoAtrasado, numeroVersionActual, sinCamposDeVersion } from '../lib/versionesCotizacion';
 
+/**
+ * El candado del seed vive a nivel de MÓDULO, no del hook (1d).
+ *
+ * Era un `useRef`, o sea uno por INSTANCIA: montar el hook en dos lugares
+ * creaba dos sembradores compitiendo. Ya pasó con useConceptos al montarlo
+ * también en Embarques —el recorrido e2e falló dos veces seguidas con el
+ * catálogo a medio sembrar— y se arregló así.
+ *
+ * `evaluarSeed` descarta los snapshots de caché y `getDocsFromServer`
+ * confirma contra el servidor antes de escribir, pero las dos barreras son
+ * POR INSTANCIA: dos hooks pueden pasarlas a la vez. El candado compartido
+ * cierra la ventana en el cliente, que es donde nace.
+ *
+ * Aquí el riesgo no se había materializado porque este hook se monta en un
+ * solo lugar. Se cierra antes de que alguien lo monte en dos.
+ */
+let seedIntentado = false;
+
 export function useCotizaciones() {
   const { user } = useAuth();
 
   const [quotes, setQuotes]   = useState<KanbanQuote[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
-
-  // Evita que el seed corra más de una vez por sesión de usuario,
-  // aunque onSnapshot dispare varias veces mientras las escrituras terminan.
-  const seedAttempted = useRef(false);
 
   useEffect(() => {
     // Guarda de autenticación: no abrir el listener hasta tener usuario.
@@ -55,8 +69,8 @@ export function useCotizaciones() {
       collection(db, 'cotizaciones'),
       async (snapshot) => {
         // ── Colección vacía: seed inicial ─────────────────────────────────
-        if (snapshot.empty && !seedAttempted.current) {
-          seedAttempted.current = true;
+        if (snapshot.empty && !seedIntentado) {
+          seedIntentado = true;
           try {
             // setDoc preserva el folio como document ID (no usa addDoc).
             // Dos sesiones simultáneas producirían writes idénticos → sin daño.
