@@ -11,7 +11,7 @@
  *     analizarImportacionClientes, importarClientesDesdeJSON }.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { compararTexto } from '../lib/texto';
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, setDoc, updateDoc, getDocsFromServer } from 'firebase/firestore';
@@ -24,15 +24,30 @@ import { UserRole } from '../auth/users';
 import { conAviso, reportarErrorEscritura } from '../lib/erroresEscritura';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
+/**
+ * El candado del seed vive a nivel de MÓDULO, no del hook (1d).
+ *
+ * Era un `useRef`, o sea uno por INSTANCIA: montar el hook en dos lugares
+ * creaba dos sembradores compitiendo. Ya pasó con useConceptos al montarlo
+ * también en Embarques —el recorrido e2e falló dos veces seguidas con el
+ * catálogo a medio sembrar— y se arregló así.
+ *
+ * `evaluarSeed` descarta los snapshots de caché y `getDocsFromServer`
+ * confirma contra el servidor antes de escribir, pero las dos barreras son
+ * POR INSTANCIA: dos hooks pueden pasarlas a la vez. El candado compartido
+ * cierra la ventana en el cliente, que es donde nace.
+ *
+ * Aquí el riesgo no se había materializado porque este hook se monta en un
+ * solo lugar. Se cierra antes de que alguien lo monte en dos.
+ */
+let seedIntentado = false;
+
 export function useClientes() {
   const { user } = useAuth();
 
   const [clientes, setClientes] = useState<ClienteVermur[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Evita que el seed corra más de una vez por sesión de usuario.
-  const seedAttempted = useRef(false);
 
   useEffect(() => {
     // Guarda de autenticación: no abrir el listener hasta tener usuario.
@@ -48,8 +63,8 @@ export function useClientes() {
         // evaluarSeed descarta los snapshots de caché: uno vacío NO prueba que
         // la colección esté vacía en el servidor, solo que este cliente aún no
         // la bajó. Ver src/lib/seedGuard.ts.
-        if (evaluarSeed(snapshot, seedAttempted.current).sembrar) {
-          seedAttempted.current = true;
+        if (evaluarSeed(snapshot, seedIntentado).sembrar) {
+          seedIntentado = true;
           try {
             // Segunda barrera, ya con el servidor de por medio: confirma que
             // 'clientes' sigue vacía justo antes de escribir. Cubre la carrera
