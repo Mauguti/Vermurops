@@ -36,6 +36,7 @@ describe('matriz de responsabilidades §4.1', () => {
     ['notaCredito.generar',  ['operaciones', 'administracion', 'admin']],
     ['kanban.ver',           ['ventas', 'admin']],
     ['catalogo.importarMasivo', ['admin']],
+    ['usuario.gestionar',      ['admin']],
   ];
 
   const ROLES: UserRole[] = ['ventas', 'pricing', 'operaciones', 'administracion', 'admin'];
@@ -365,6 +366,23 @@ describe('Órdenes de compra · capacidad y pantalla', () => {
 
   it('Operaciones sigue sin ver Cotizaciones: agregar Finanzas no aflojó lo demás', () => {
     expect(isViewAllowed('operaciones', 'quotes')).toBe(false);
+  });
+});
+
+// ─── Gestión de usuarios (GU) ───────────────────────────────────────────────
+describe('gestión de usuarios', () => {
+  it('solo admin puede gestionar usuarios', () => {
+    const AREAS: UserRole[] = ['ventas', 'pricing', 'operaciones', 'administracion'];
+    AREAS.forEach(rol => {
+      expect(puede(rol, 'usuario.gestionar')).toBe(false);
+    });
+    expect(puede('admin', 'usuario.gestionar')).toBe(true);
+  });
+
+  it('Administración NO gestiona usuarios: es un área, no el superusuario', () => {
+    // Esta distinción importa: el área maneja altas de clientes y proveedores,
+    // no las cuentas del sistema.
+    expect(puede('administracion', 'usuario.gestionar')).toBe(false);
   });
 });
 
