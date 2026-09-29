@@ -190,6 +190,9 @@ test('Pricing · comparativa, elige el paquete, versión nueva, consolida y gene
   const lineaDoc = page.locator('tr', { hasText: 'Documentation' }).filter({ has: page.getByText('HAPAG') }).first();
   await lineaDoc.locator('input[type="number"]').last().fill('50');
 
+  // Impuesto de Documentation: regla espejo sin tráfico → Pricing elige a mano.
+  await lineaDoc.locator('select').selectOption('iva0');
+
   await page.getByRole('button', { name: 'Cotizaciones recibidas' }).click();
   await page.getByRole('button', { name: 'Consolidar cotización' }).click();
 
