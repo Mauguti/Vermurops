@@ -13,7 +13,7 @@ Lo que no alcance a correr esta noche se queda en [ ] para la siguiente.
 - [x] 04 Renombrar «consolidada» (solo etiquetas)
 - [x] 05 PLAN de tarifas: modelo de ONE y revisión de las 56 tarifas
 - [x] 06 PLAN del tipo de cambio de Pricing, moneda y cliente a facturar
-- [ ] 07 Tabla única de cargos en el embarque
+- [x] 07 Tabla única de cargos en el embarque
 - [ ] 08 Demoras y almacenajes calculados
 - [ ] 09 Listas de clientes y proveedores en tabla
 - [ ] 10 Edición en línea de estado y ejecutivos en las listas
