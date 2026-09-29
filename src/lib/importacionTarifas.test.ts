@@ -14,6 +14,7 @@ import {
   estadoGuardable,
   confirmarLinea, confirmarTodas, pendientesDeConfirmar, tieneQueConfirmar,
   vigenciasSeTraslapan, detectarColisiones,
+  crearLineaManual,
   LineaEnRevision,
 } from './importacionTarifas';
 import { TarifaVermur } from '../components/tarifas/TarifasData';
@@ -612,5 +613,72 @@ describe('el proveedor elegido antes de subir', () => {
   it('elegido a mano cuenta como exacto y el guardado se destraba', () => {
     expect(estadoGuardable('PRV-1', true, [lineaLista()]))
       .toEqual({ puedeGuardar: true, faltantes: [] });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe('crearLineaManual: la línea que el extractor se saltó', () => {
+  it('crea una línea marcada como manual', () => {
+    const l = crearLineaManual();
+    expect(l.agregadaManual).toBe(true);
+    expect(l.lineaId).toMatch(/^manual-/);
+  });
+
+  it('nace sin concepto, sin moneda y sin unidad: no es guardable', () => {
+    const l = crearLineaManual();
+    expect(esGuardable(l)).toBe(false);
+    const motivos = motivosNoGuardable(l);
+    expect(motivos).toContain('sin_concepto');
+    expect(motivos).toContain('sin_moneda');
+    expect(motivos).toContain('sin_unidad');
+    expect(motivos).toContain('monto_invalido');
+  });
+
+  it('se vuelve guardable al llenar concepto, monto, moneda y unidad confirmados', () => {
+    let l = crearLineaManual();
+    l = {
+      ...l,
+      conceptoId: 'CON-001',
+      conceptoNombre: 'Flete marítimo',
+      nivelConcepto: 'exacto',
+      monto: 1200,
+      moneda: 'USD',
+      monedaConfirmada: true,
+      unidad: 'CONTENEDOR',
+      unidadConfirmada: true,
+    };
+    expect(esGuardable(l)).toBe(true);
+    expect(motivosNoGuardable(l)).toEqual([]);
+  });
+
+  it('dos líneas manuales tienen IDs distintos', () => {
+    const a = crearLineaManual();
+    const b = crearLineaManual();
+    expect(a.lineaId).not.toBe(b.lineaId);
+  });
+
+  it('confirmarTodas respeta líneas manuales igual que las extraídas', () => {
+    let l = crearLineaManual();
+    l = { ...l, moneda: 'USD', unidad: 'CONTENEDOR' };
+    const [confirmada] = confirmarTodas([l]);
+    expect(confirmada.monedaConfirmada).toBe(true);
+    expect(confirmada.unidadConfirmada).toBe(true);
+    expect(confirmada.agregadaManual).toBe(true);
+  });
+
+  it('el resumen cuenta las manuales como parte del total', () => {
+    const extraida: LineaEnRevision = {
+      lineaId: 'ext-1',
+      extraida: { lineaId: 'ext-1', concepto: 'Flete', monto: 100 },
+      conceptoId: 'CON-001', conceptoNombre: 'Flete', nivelConcepto: 'exacto',
+      puertoOrigenId: null, puertoDestinoId: null, rutaTexto: null,
+      monto: 100, moneda: 'USD', unidad: 'CONTENEDOR',
+      monedaConfirmada: true, unidadConfirmada: true, descartada: false,
+    };
+    const manual = crearLineaManual();
+    const r = resumenRevision([extraida, manual]);
+    expect(r.total).toBe(2);
+    expect(r.guardables).toBe(1); // solo la extraída completa
+    expect(r.requierenRevision).toBe(1); // la manual sin completar
   });
 });

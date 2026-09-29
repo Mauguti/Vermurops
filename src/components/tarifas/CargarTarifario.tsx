@@ -229,7 +229,7 @@ export default function CargarTarifario({
             ref={inputRef}
             type="file"
             hidden
-            accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.webp,.heic"
+            accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.webp,.heic,.txt,.eml"
             onChange={e => {
               const f = e.target.files?.[0];
               if (f) elegir(f);
