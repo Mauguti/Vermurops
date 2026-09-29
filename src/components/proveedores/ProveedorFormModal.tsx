@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
-import { ProveedorVermur, ContactoProveedor, Modalidad, TipoProveedor } from './ProveedoresData';
+import { ProveedorVermur, ContactoProveedor, Modalidad, TipoProveedor, PatenteAduanal } from './ProveedoresData';
 import { validarRFC } from '../../lib/validadores';
 
 interface Props {
@@ -21,6 +21,17 @@ const MODALIDADES: { key: Modalidad; label: string }[] = [
   { key: 'aduanal', label: 'Aduanal' },
 ];
 
+const TIPOS_PROVEEDOR: { key: TipoProveedor; label: string }[] = [
+  { key: 'proveedor', label: 'Proveedor' },
+  { key: 'transportista', label: 'Transportista' },
+  { key: 'agente_carga', label: 'Agente de carga' },
+  { key: 'agente_aduanal', label: 'Agente aduanal' },
+];
+
+function emptyPatente(): PatenteAduanal {
+  return { nombre: '', numero: '' };
+}
+
 function emptyContacto(): ContactoProveedor {
   return { id: `cnt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, nombre: '', puesto: '', email: '', telefono: '', principal: false };
 }
@@ -40,6 +51,7 @@ export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate,
   );
   const [notas, setNotas] = useState(proveedor?.notas ?? '');
   const [activo, setActivo] = useState(proveedor?.activo ?? true);
+  const [patentes, setPatentes] = useState<PatenteAduanal[]>(proveedor?.patentes ?? []);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -58,6 +70,27 @@ export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate,
   // ── Modalidades toggle ────────────────────────────────────────────────────
   const toggleModalidad = (m: Modalidad) => {
     setModalidades(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
+  };
+
+  // ── Tipos toggle ────────────────────────────────────────────────────────
+  const toggleTipo = (t: TipoProveedor) => {
+    setTipos(prev => {
+      const next = prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t];
+      // Al quitar agente_aduanal, limpiar patentes
+      if (t === 'agente_aduanal' && !next.includes('agente_aduanal')) {
+        setPatentes([]);
+      }
+      return next.length > 0 ? next : prev; // Al menos un tipo
+    });
+  };
+
+  const esAgenteAduanal = tipos.includes('agente_aduanal');
+
+  // ── Patentes management ────────────────────────────────────────────────
+  const addPatente = () => setPatentes(prev => [...prev, emptyPatente()]);
+  const removePatente = (idx: number) => setPatentes(prev => prev.filter((_, i) => i !== idx));
+  const updatePatente = (idx: number, field: keyof PatenteAduanal, value: string) => {
+    setPatentes(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
   };
 
   // ── Contactos management ──────────────────────────────────────────────────
@@ -87,8 +120,14 @@ export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate,
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!nombre.trim()) { setError('La razón social es obligatoria.'); return; }
+    if (tipos.length === 0) { setError('Selecciona al menos un tipo de proveedor.'); return; }
     if (modalidades.length === 0) { setError('Selecciona al menos una modalidad.'); return; }
     if (!contactos.some(c => c.nombre.trim())) { setError('Al menos un contacto debe tener nombre.'); return; }
+    // Validar patentes si es agente aduanal
+    if (tipos.includes('agente_aduanal')) {
+      const patentesInvalidas = patentes.some(p => !p.nombre.trim() || !p.numero.trim());
+      if (patentesInvalidas) { setError('Cada patente debe tener nombre y número.'); return; }
+    }
 
     // RFC validation (optional but validated if filled)
     const rfcVal = rfc.trim();
@@ -115,6 +154,11 @@ export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate,
         finalContactos[0].principal = true;
       }
 
+      // Patentes limpias: solo las que tienen nombre y número
+      const finalPatentes = tipos.includes('agente_aduanal')
+        ? patentes.filter(p => p.nombre.trim() && p.numero.trim()).map(p => ({ nombre: p.nombre.trim(), numero: p.numero.trim() }))
+        : [];
+
       if (isEdit && onUpdate) {
         await onUpdate(proveedor.id, {
           nombre: nombre.trim(),
@@ -127,6 +171,7 @@ export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate,
           contactos: finalContactos,
           notas: notas.trim(),
           activo,
+          ...(tipos.includes('agente_aduanal') ? { patentes: finalPatentes } : {}),
           updatedAt: now,
         });
       } else if (onCreate) {
@@ -154,6 +199,8 @@ export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate,
           origenDatos: 'manual',
           fechaAlta: now.split('T')[0],
           updatedAt: now,
+          // Patentes (solo agente aduanal)
+          ...(tipos.includes('agente_aduanal') && finalPatentes.length > 0 ? { patentes: finalPatentes } : {}),
           // Legacy fields
           rfc: rfcVal.toUpperCase(),
           domicilio: domicilio.trim(),
@@ -213,6 +260,82 @@ export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate,
               </div>
             </div>
           </div>
+
+          {/* ── Tipo de proveedor ────────────────────────────────── */}
+          <div>
+            <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-3">Tipo de proveedor *</h4>
+            <div className="flex flex-wrap gap-3">
+              {TIPOS_PROVEEDOR.map(t => (
+                <label key={t.key} className="flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={tipos.includes(t.key)}
+                    onChange={() => toggleTipo(t.key)}
+                    className="w-4 h-4 rounded border-card-border text-brand focus:ring-brand accent-brand"
+                  />
+                  <span className="text-[13px] text-text-primary">{t.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Patentes (solo agente aduanal) ──────────────────── */}
+          {esAgenteAduanal && (
+            <div>
+              <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-3">
+                Patentes de agente aduanal
+              </h4>
+              <p className="text-[11px] text-text-muted mb-3">
+                La agencia es la razón social; el agente es la persona con su patente.
+              </p>
+              <div className="space-y-3">
+                {patentes.map((pat, idx) => (
+                  <div key={idx} className="border border-card-border rounded-lg p-3 bg-canvas">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[12px] font-medium text-text-secondary">
+                        Patente {idx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removePatente(idx)}
+                        className="p-1 rounded text-text-muted hover:text-danger-text transition-colors"
+                        title="Eliminar patente"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={LABEL}>Nombre del agente *</label>
+                        <input
+                          className={INPUT}
+                          value={pat.nombre}
+                          onChange={e => updatePatente(idx, 'nombre', e.target.value)}
+                          placeholder="Nombre del agente aduanal"
+                        />
+                      </div>
+                      <div>
+                        <label className={LABEL}>Número de patente *</label>
+                        <input
+                          className={INPUT}
+                          value={pat.numero}
+                          onChange={e => updatePatente(idx, 'numero', e.target.value)}
+                          placeholder="Ej. 1234"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={addPatente}
+                className="mt-2 flex items-center gap-1.5 text-[12px] font-semibold text-brand hover:text-brand-hover transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" /> Agregar patente
+              </button>
+            </div>
+          )}
 
           {/* ── Modalidades ────────────────────────────────────────── */}
           <div>

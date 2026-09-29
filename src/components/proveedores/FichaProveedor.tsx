@@ -26,6 +26,7 @@ const getTransportLabel = (type: string) => {
     case 'proveedor': return 'Proveedor';
     case 'transportista': return 'Transportista';
     case 'agente_carga': return 'Agente';
+    case 'agente_aduanal': return 'Agente aduanal';
     default: return type;
   }
 };
@@ -80,7 +81,7 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit }: Pr
               </BadgeEstado>
             )}
             {(proveedor.tipos ?? []).map(t => (
-              <BadgeEstado key={t} tono="neutro">{t}</BadgeEstado>
+              <BadgeEstado key={t} tono="neutro">{getTransportLabel(t)}</BadgeEstado>
             ))}
           </>
         }
@@ -162,6 +163,20 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit }: Pr
                 })}
               </div>
             </div>
+
+            {(proveedor.tipos ?? []).includes('agente_aduanal') && (proveedor.patentes ?? []).length > 0 && (
+              <div className="mt-[24px] pt-[24px] border-t border-divider">
+                <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-[12px]">Patentes de Agente Aduanal</h4>
+                <div className="flex flex-wrap gap-3">
+                  {proveedor.patentes!.map((pat, idx) => (
+                    <div key={idx} className="flex items-center border border-brand/30 bg-brand/5 rounded-lg px-3 py-2">
+                      <span className="text-[12px] font-semibold text-brand mr-2">#{pat.numero}</span>
+                      <span className="text-[12px] text-text-primary">{pat.nombre}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {cp && (
             <div className="flex flex-wrap gap-[24px] mt-[24px] pt-[24px] border-t border-divider">

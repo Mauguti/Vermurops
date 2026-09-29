@@ -13,7 +13,13 @@ import seedData from '../../data/seeds/proveedores.json';
 
 // ─── Sub-objetos ──────────────────────────────────────────────────────────────
 
-export type TipoProveedor = 'proveedor' | 'transportista' | 'agente_carga';
+export type TipoProveedor = 'proveedor' | 'transportista' | 'agente_carga' | 'agente_aduanal';
+
+/** Patente de un agente aduanal dentro de una agencia. */
+export interface PatenteAduanal {
+  nombre: string;
+  numero: string;
+}
 
 /**
  * Días de crédito que el proveedor otorga a Vermur, por tipo de operación.
@@ -138,6 +144,9 @@ export interface ProveedorVermur {
 
   /** Bloque 14 · Quién cambió qué desde la lista y cuándo. Aditivo. */
   cambios?: CambioEnLista[];
+
+  /** Patentes de agentes aduanales (solo cuando tipos incluye agente_aduanal). */
+  patentes?: PatenteAduanal[];
 
   // ── Auditoría ────────────────────────────────────────────────────────────
   fechaAlta: string;    // YYYY-MM-DD
