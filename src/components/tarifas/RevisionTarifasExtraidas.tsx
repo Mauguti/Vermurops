@@ -1,12 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import {
   X, AlertTriangle, Sparkles, Trash2, Check, CheckCheck, Coins, Ruler,
+  Plus,
 } from 'lucide-react';
 import {
   validarRespuestaN8N, construirLineasEnRevision, motivosNoGuardable,
   esGuardable, resumenRevision, ordenarParaRevision, textoDeAviso, TEXTO_MOTIVO,
   resolverProveedor, estadoGuardable,
   confirmarLinea, confirmarTodas, pendientesDeConfirmar, tieneQueConfirmar,
+  crearLineaManual,
   type LineaEnRevision, type NivelConfianza, type NivelMatch,
 } from '../../lib/importacionTarifas';
 import type { ConceptoMatch } from './tarifaMatching';
@@ -119,7 +121,7 @@ export default function RevisionTarifasExtraidas({
    * quedaba lista — justo en el clic con el que la acababas de arreglar. Con
    * cuarenta líneas eso es una tabla que se reacomoda sola mientras trabajas.
    */
-  const [orden] = useState<string[]>(() => ordenarParaRevision(lineas).map(l => l.lineaId));
+  const [orden, setOrden] = useState<string[]>(() => ordenarParaRevision(lineas).map(l => l.lineaId));
   const ordenadas = useMemo(
     () => orden.map(id => lineas.find(l => l.lineaId === id)).filter(Boolean) as LineaEnRevision[],
     [orden, lineas],
@@ -127,6 +129,12 @@ export default function RevisionTarifasExtraidas({
 
   const actualizar = (id: string, cambios: Partial<LineaEnRevision>) =>
     setLineas(prev => prev.map(l => (l.lineaId === id ? { ...l, ...cambios } : l)));
+
+  const agregarLinea = () => {
+    const nueva = crearLineaManual();
+    setLineas(prev => [...prev, nueva]);
+    setOrden(prev => [...prev, nueva.lineaId]);
+  };
 
   // ── El extractor falló o la respuesta no pasó la frontera ──────────────
   if (!validacion.valida) {
@@ -224,6 +232,14 @@ export default function RevisionTarifasExtraidas({
               Confirmar moneda y unidad de las {porConfirmar}
             </button>
           )}
+
+          <button
+            onClick={agregarLinea}
+            className="inline-flex items-center gap-1 text-[10px] font-bold text-primario bg-primario/5 border border-primario/20 hover:bg-primario/10 px-2 py-1 rounded transition-colors"
+          >
+            <Plus className="w-3 h-3" />
+            Agregar línea
+          </button>
         </div>
 
         {d.observaciones && (
@@ -324,6 +340,12 @@ export default function RevisionTarifasExtraidas({
                       </select>
                     </Confirmable>
                   </div>
+
+                  {l.agregadaManual && (
+                    <span className="inline-block text-[9px] font-bold text-primario bg-primario/10 px-1.5 py-0.5 rounded">
+                      Agregada a mano
+                    </span>
+                  )}
 
                   {(l.extraida.avisos?.length ?? 0) > 0 && (
                     <p className="text-[10px] text-amber-700">

@@ -348,6 +348,13 @@ export interface LineaEnRevision {
   unidadConfirmada: boolean;
 
   descartada: boolean;
+
+  /**
+   * true cuando la línea fue agregada a mano por el usuario en la revisión,
+   * porque el extractor se la saltó. Pasa por las mismas validaciones y
+   * confirmaciones que las extraídas.
+   */
+  agregadaManual?: boolean;
 }
 
 /**
@@ -658,4 +665,35 @@ export function construirLineasEnRevision(
       descartada: false,
     };
   });
+}
+
+let contadorManual = 0;
+
+/**
+ * Crea una línea vacía para agregar a mano lo que el extractor se saltó.
+ *
+ * Pasa por las mismas validaciones y confirmaciones que las extraídas: sin
+ * concepto, sin moneda confirmada y sin monto no se guarda. Es un renglón
+ * más en la revisión, no un atajo.
+ */
+export function crearLineaManual(): LineaEnRevision {
+  contadorManual++;
+  const lineaId = `manual-${Date.now()}-${contadorManual}`;
+  return {
+    lineaId,
+    extraida: { lineaId, concepto: '', monto: 0 },
+    conceptoId: null,
+    conceptoNombre: '',
+    nivelConcepto: 'sin_match',
+    puertoOrigenId: null,
+    puertoDestinoId: null,
+    rutaTexto: null,
+    monto: 0,
+    moneda: null,
+    unidad: null,
+    monedaConfirmada: false,
+    unidadConfirmada: false,
+    descartada: false,
+    agregadaManual: true,
+  };
 }
