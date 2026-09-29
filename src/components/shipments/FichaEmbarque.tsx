@@ -45,10 +45,14 @@ import { sumarPorMoneda, formatearPorMoneda } from '../../lib/sumarPorMoneda';
  * secciones del encabezado del BL y se consultan juntas—; Historial es la
  * línea de tiempo que antes se llamaba Seguimiento. Plantillas se agrega
  * cuando exista: no se monta una pestaña vacía.
+ *
+ * Tarea 13 (29-sep-2026): la Bitácora dejó de ser pestaña propia y vive al
+ * final de Información, después de Master/Hijo. Vermur pidió tener todo en
+ * una sola pestaña para no brincar.
  */
 type PestanaEmbarque =
   | 'informacion' | 'cargos' | 'productos' | 'documentos' | 'facturas'
-  | 'historial' | 'bitacora';
+  | 'historial';
 
 interface FichaEmbarqueProps {
   embarque: EmbarqueCompleto;
@@ -540,7 +544,6 @@ export default function FichaEmbarque({
     // Historial = los hitos para el cliente (salen al portal). Bitácora = lo
     // interno del equipo y el rastro de auditoría. No se mezclan.
     { id: 'historial' as const, label: 'Historial' },
-    { id: 'bitacora' as const, label: 'Bitácora', contador: (embarque.bitacora ?? []).length },
   ];
 
   return (
@@ -1149,10 +1152,30 @@ export default function FichaEmbarque({
           </div>
         )}
 
+        {/* BITÁCORA · Tarea 13: se movió de pestaña propia al final de
+            Información. Es lo interno del equipo; nada sale al portal. */}
+        {activeTab === 'informacion' && (
+          <BitacoraEmbarque
+            bitacora={embarque.bitacora ?? []}
+            usuarioUid={user?.uid ?? ''}
+            puedeComentar={puede('embarque.generar')}
+            onComentar={texto => {
+              const c = comentario(texto, autorBitacora, new Date().toISOString());
+              if (c) guardar({ ...embarque, bitacora: [...(embarque.bitacora ?? []), c] });
+            }}
+            onEditar={(id, texto) => {
+              const r = editarComentario(embarque.bitacora ?? [], id, texto, user?.uid ?? '', new Date().toISOString());
+              if ('razon' in r) return r.razon;
+              guardar({ ...embarque, bitacora: r.bitacora });
+              return null;
+            }}
+          />
+        )}
+
         {/* CARGOS TAB */}
         {activeTab === 'cargos' && (
           <div className="space-y-6">
-            
+
             {/* 3 · «¿A quién le debo cuánto?» se responde por proveedor;
                 «¿cuánto me costó el flete?», por concepto. Las dos vistas
                 son la misma tabla girada; la preferencia se guarda por usuario. */}
@@ -1579,23 +1602,7 @@ export default function FichaEmbarque({
           />
         )}
 
-        {activeTab === 'bitacora' && (
-          <BitacoraEmbarque
-            bitacora={embarque.bitacora ?? []}
-            usuarioUid={user?.uid ?? ''}
-            puedeComentar={puede('embarque.generar')}
-            onComentar={texto => {
-              const c = comentario(texto, autorBitacora, new Date().toISOString());
-              if (c) guardar({ ...embarque, bitacora: [...(embarque.bitacora ?? []), c] });
-            }}
-            onEditar={(id, texto) => {
-              const r = editarComentario(embarque.bitacora ?? [], id, texto, user?.uid ?? '', new Date().toISOString());
-              if ('razon' in r) return r.razon;
-              guardar({ ...embarque, bitacora: r.bitacora });
-              return null;
-            }}
-          />
-        )}
+        {/* Bitácora se movió dentro de Información (tarea 13). */}
 
         {/* HISTORIAL · la línea de tiempo del embarque */}
         {activeTab === 'historial' && (
