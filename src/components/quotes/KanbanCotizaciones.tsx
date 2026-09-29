@@ -87,6 +87,10 @@ export default function KanbanCotizaciones({
 
   // Drag & Drop
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
+  /** Id de la cotización que se está arrastrando. */
+  const [draggedQuoteId, setDraggedQuoteId] = useState<string | null>(null);
+  /** Razón del freno para la columna sobre la que se arrastra (null = permitida). */
+  const [dragBlockReason, setDragBlockReason] = useState<string | null>(null);
 
   // ─── Filtrado ─────────────────────────────────────────────────────────────
 
@@ -109,18 +113,42 @@ export default function KanbanCotizaciones({
   const handleDragStart = (e: React.DragEvent, quoteId: string) => {
     e.dataTransfer.setData('text/plain', quoteId);
     e.dataTransfer.effectAllowed = 'move';
+    setDraggedQuoteId(quoteId);
   };
 
   const handleDragOver = (e: React.DragEvent, stageId: string) => {
     e.preventDefault();
-    if (draggedOverColumn !== stageId) setDraggedOverColumn(stageId);
+    if (draggedOverColumn !== stageId) {
+      setDraggedOverColumn(stageId);
+      // Evaluar el freno para esta columna
+      if (draggedQuoteId) {
+        const quoteToMove = quotes.find(q => q.id === draggedQuoteId);
+        if (quoteToMove && quoteToMove.etapa !== stageId) {
+          const guard = puedeTransicionarA(quoteToMove.etapa, stageId as PipelineStageId, rolActivo, quoteToMove);
+          setDragBlockReason(guard.ok ? null : (guard.razon ?? 'Transición no permitida.'));
+        } else {
+          setDragBlockReason(null);
+        }
+      }
+    }
   };
 
-  const handleDragLeave = () => setDraggedOverColumn(null);
+  const handleDragLeave = () => {
+    setDraggedOverColumn(null);
+    setDragBlockReason(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedQuoteId(null);
+    setDraggedOverColumn(null);
+    setDragBlockReason(null);
+  };
 
   const handleDrop = (e: React.DragEvent, targetStage: PipelineStageId) => {
     e.preventDefault();
     setDraggedOverColumn(null);
+    setDraggedQuoteId(null);
+    setDragBlockReason(null);
     const quoteId = e.dataTransfer.getData('text/plain');
     if (!quoteId) return;
     const quoteToMove = quotes.find(q => q.id === quoteId);
@@ -128,10 +156,7 @@ export default function KanbanCotizaciones({
 
     // ── Guard E5.3: validar transición antes de mover la tarjeta ──────────
     const guard = puedeTransicionarA(quoteToMove.etapa, targetStage, rolActivo, quoteToMove);
-    if (!guard.ok) {
-      alert(guard.razon ?? 'Transición no permitida.');
-      return;
-    }
+    if (!guard.ok) return; // La razón ya se mostró durante el arrastre
 
     updateQuoteStage(quoteId, targetStage);
   };
@@ -396,6 +421,7 @@ export default function KanbanCotizaciones({
             });
             const { count, sumText } = getColumnStats(stage.id);
             const isDraggedOver = draggedOverColumn === stage.id;
+            const isDragBlocked = isDraggedOver && dragBlockReason !== null;
             // Indicar si la columna corresponde a Pricing (visual)
             const isPricingColumn = stage.rol === 'pricing';
 
@@ -406,10 +432,12 @@ export default function KanbanCotizaciones({
                 onDragLeave={handleDragLeave}
                 onDrop={e => handleDrop(e, stage.id as PipelineStageId)}
                 className={`w-[240px] bg-gray-50/50 rounded-xl border flex flex-col min-h-[520px] transition-all duration-200
-                  ${isDraggedOver
-                    ? 'bg-primario/[0.03] border-dashed border-primario/30 ring-2 ring-primario/10'
-                    : 'border-gray-150'}
-                  ${isPricingColumn ? 'ring-1 ring-primario/30' : ''}`}
+                  ${isDragBlocked
+                    ? 'bg-red-50/60 border-dashed border-red-300 ring-2 ring-red-200/60'
+                    : isDraggedOver
+                      ? 'bg-primario/[0.03] border-dashed border-primario/30 ring-2 ring-primario/10'
+                      : 'border-gray-150'}
+                  ${isPricingColumn && !isDragBlocked ? 'ring-1 ring-primario/30' : ''}`}
               >
                 {/* Cabecera columna */}
                 <div className={`p-3.5 border-t-4 ${stage.color} rounded-t-xl border-b border-gray-150 flex flex-col justify-between shrink-0`}>
@@ -430,6 +458,11 @@ export default function KanbanCotizaciones({
                     <span className="mt-1.5 inline-block text-[8px] font-bold uppercase tracking-wider text-primario bg-primario/5 border border-primario/10 px-1.5 py-0.5 rounded w-fit">
                       Pricing
                     </span>
+                  )}
+                  {isDragBlocked && (
+                    <div className="mt-2 text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1.5 leading-tight">
+                      {dragBlockReason}
+                    </div>
                   )}
                 </div>
 
@@ -471,6 +504,7 @@ export default function KanbanCotizaciones({
                           key={quote.id}
                           draggable="true"
                           onDragStart={e => handleDragStart(e, quote.id)}
+                          onDragEnd={handleDragEnd}
                           onClick={() => setSelectedQuote(quote)}
                           className="bg-white p-3.5 rounded-xl border border-gray-200 hover:border-primario/30 shadow-2xs hover:shadow-md cursor-grab active:cursor-grabbing transition-all duration-200 space-y-2.5 group"
                         >
