@@ -15,7 +15,7 @@ Lo que no alcance a correr esta noche se queda en [ ] para la siguiente.
 - [x] 06 PLAN del tipo de cambio de Pricing, moneda y cliente a facturar
 - [x] 07 Tabla única de cargos en el embarque
 - [x] 08 Demoras y almacenajes calculados
-- [ ] 09 Listas de clientes y proveedores en tabla
+- [x] 09 Listas de clientes y proveedores en tabla
 - [ ] 10 Edición en línea de estado y ejecutivos en las listas
 - [ ] 11 Tipos de proveedor y patentes de agentes aduanales
 - [ ] 12 «Ver como cliente» y registro de documentos sensibles visibles
