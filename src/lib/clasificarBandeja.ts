@@ -2,7 +2,7 @@
  * clasificarBandeja.ts (BP-1)
  *
  * Funciones puras para clasificar cotizaciones de la Bandeja de Pricing
- * en tres bloques de acción: Te toca cotizar, Esperando respuesta, Listas para consolidar.
+ * en tres bloques de acción: Te toca cotizar, Esperando respuesta, Listas para armar.
  */
 
 import type { KanbanQuote, ConceptoCotizacion, PipelineStageId } from '../components/quotes/QuotesData';
@@ -72,7 +72,7 @@ export function clasificarCotizacion(quote: KanbanQuote): BloqueBandeja | null {
 
   const { conOficial, total } = calcularProgreso(quote);
 
-  // Progreso completo → lista para consolidar (independientemente de la etapa)
+  // Progreso completo → lista para armar (independientemente de la etapa)
   if (total > 0 && conOficial === total) return 'listas';
 
   // Sin trabajo iniciado → te toca cotizar

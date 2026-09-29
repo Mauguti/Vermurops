@@ -231,7 +231,7 @@ function CotizacionRow({ quote, progreso, dias, tarifasCount, bloque, onAbrir, o
               onClick={e => { e.stopPropagation(); onConsolidar?.(); }}
               className="text-[9px] font-bold text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded transition-colors whitespace-nowrap"
             >
-              Consolidar
+              Armar
             </button>
           )}
         </div>
@@ -338,14 +338,14 @@ export default function BandejaPricing({
       updatedAt: fechaActual,
       historialEtapas: [
         ...quote.historialEtapas,
-        { etapa: 'consolidada', fecha: fechaActual, nota: 'Consolidada por Pricing.' },
+        { etapa: 'consolidada', fecha: fechaActual, nota: 'Cotización armada por Pricing.' },
       ],
       actividades: [
         ...quote.actividades,
         {
           id: `act-sys-${Date.now()}`,
-          titulo: 'Cotización consolidada por Pricing',
-          descripcion: 'Total consolidado calculado. Lista para revisión de Ventas.',
+          titulo: 'Cotización armada por Pricing',
+          descripcion: 'Cotización lista para revisión de Ventas.',
           responsableId: quote.pricingId ?? 'Pricing',
           fechaLimite: fechaActual.split(' ')[0],
           estado: 'hecha',
@@ -401,7 +401,7 @@ export default function BandejaPricing({
           <p className="text-2xl font-black text-gray-700 tabular-nums mt-0.5">{clasificacion.esperando.length}</p>
         </div>
         <div className="rounded-xl border border-green-200/60 bg-green-50/40 px-4 py-3">
-          <p className="text-[9px] font-bold text-green-500 uppercase tracking-widest">Listas para consolidar</p>
+          <p className="text-[9px] font-bold text-green-500 uppercase tracking-widest">Listas para armar</p>
           <p className="text-2xl font-black text-green-700 tabular-nums mt-0.5">{clasificacion.listasConsolidar.length}</p>
         </div>
         <div className="rounded-xl border border-primario/30 bg-primario/5 px-4 py-3">
@@ -474,7 +474,7 @@ export default function BandejaPricing({
         })}
       </BloqueSection>
 
-      <BloqueSection titulo="Listas para consolidar" count={listasConsolidar.length}>
+      <BloqueSection titulo="Listas para armar" count={listasConsolidar.length}>
         {listasConsolidar.map(q => {
           const data = quoteData.get(q.id)!;
           return (

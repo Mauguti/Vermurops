@@ -155,8 +155,8 @@ const TRANSITIONS: Record<PipelineStageId, TransitionDef[]> = {
         }
         const p = evaluarProntitud(q);
         if (p.lista) return null;
-        if (!p.conConceptos) return 'Esta cotización no tiene conceptos que consolidar.';
-        return `${resumenFaltantes(p)}. Completa proveedor y costo antes de consolidar.`;
+        if (!p.conConceptos) return 'Esta cotización no tiene conceptos para armar.';
+        return `${resumenFaltantes(p)}. Completa proveedor y costo antes de armar la cotización.`;
       },
     },
     {

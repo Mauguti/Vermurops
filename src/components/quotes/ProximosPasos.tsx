@@ -19,7 +19,7 @@ import {
  * de Salesforce:
  *
  *     ○ Solicitud ─ ● Pricing ─ ○ Enviada ─ ○ Negociación ─ ○ Ganada
- *     Siguiente: consolidar la cotización              [ Consolidar ]
+ *     Siguiente: armar la cotización                    [ Armar cotización ]
  *     Faltan 2 conceptos por completar: Maniobras (sin proveedor) · …
  *
  * ── Lo que decide y lo que no ──────────────────────────────────────────────

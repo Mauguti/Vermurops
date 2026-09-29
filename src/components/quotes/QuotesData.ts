@@ -560,7 +560,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
   },
   {
     id: 'consolidada',
-    label: 'Cotización consolidada',
+    label: 'Lista para enviar',
     color: 'border-t-cyan-500 bg-cyan-50/50 text-cyan-800',
     rol: 'pricing',
   },
@@ -972,7 +972,7 @@ export const initialKanbanQuotes: KanbanQuote[] = [
       {
         id: 'act-004-1',
         titulo: 'Confirmar selección de Evergreen con Pricing',
-        descripcion: 'Validar margen y armar cotización consolidada final.',
+        descripcion: 'Validar margen y armar cotización final.',
         responsableId: 'Roberto Díaz',
         fechaLimite: '2026-06-12',
         estado: 'pendiente',
@@ -1051,8 +1051,8 @@ export const initialKanbanQuotes: KanbanQuote[] = [
     actividades: [
       {
         id: 'act-005-1',
-        titulo: 'Enviar cotización consolidada a Ventas',
-        descripcion: 'Pricing finalizó consolidación. Ventas debe revisar y enviar al cliente.',
+        titulo: 'Enviar cotización armada a Ventas',
+        descripcion: 'Pricing finalizó la cotización. Ventas debe revisar y enviar al cliente.',
         responsableId: 'Lucía Méndez',
         fechaLimite: '2026-06-12',
         estado: 'pendiente',

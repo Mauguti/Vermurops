@@ -127,7 +127,7 @@ export const COTIZACION_COLUMNS = [
     cell: info => info.getValue(),
   }),
 
-  // 7. Total consolidado
+  // 7. Total de la cotización
   col.accessor('valorTotalConsolidado', {
     id: 'total',
     header: 'Total',
