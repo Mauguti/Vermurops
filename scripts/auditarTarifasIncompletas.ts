@@ -111,6 +111,69 @@ async function main() {
   const tarifariosSinModalidad = tarifarios.filter(d => !d.modalidad).length;
   console.log(`\n  tarifarios sin modalidad: ${tarifariosSinModalidad} de ${tarifarios.length}`);
 
+  // ── Tarifarios que no dejaron ninguna tarifa ────────────────────────────
+  //
+  // El wizard no dejaba confirmar ninguna línea (bug 1a): el documento se
+  // guardaba como evidencia y el guardado terminaba en cero. Un tarifario
+  // procesado con IA y con `tarifasExtraidas` en cero es el rastro de eso, y
+  // es el que hay que volver a subir con el wizard arreglado.
+  //
+  // «Solo respaldo» NO cuenta: ésos se subieron a propósito sin pasar por el
+  // extractor, y cero tarifas es su estado correcto.
+  const soloRespaldo = tarifarios.filter(d => d.procesadoConIA !== true);
+  const procesados = tarifarios.filter(d => d.procesadoConIA === true);
+  const enCero = procesados.filter(d => !Number(d.tarifasExtraidas));
+  const conTarifas = procesados.filter(d => Number(d.tarifasExtraidas) > 0);
+
+  console.log('\n── Tarifarios: cuáles dejaron tarifas ──');
+  console.log(`  solo respaldo (sin extractor):    ${soloRespaldo.length}`);
+  console.log(`  procesados con IA:                ${procesados.length}`);
+  console.log(`    · con tarifas guardadas:        ${conTarifas.length}`);
+  console.log(`    · EN CERO  ← volver a subir:    ${enCero.length}`);
+
+  if (enCero.length) {
+    console.log('\n  Los que hay que volver a subir:');
+    enCero.slice(0, 40).forEach(d => console.log(
+      `    ${String(d.fechaSubida ?? '').slice(0, 10)}  ${d.nombreArchivo ?? d.id}` +
+      `  · subió ${d.subidoPorNombre ?? d.subidoPor ?? '—'}` +
+      (d.importacionId ? `  · importación ${d.importacionId}` : '  · nunca llegó a revisión'),
+    ));
+    if (enCero.length > 40) console.log(`    … y ${enCero.length - 40} más`);
+  }
+
+  // ── Borradores del wizard que se quedaron a medias ──────────────────────
+  //
+  // Un borrador en «en_revision» es exactamente la pantalla donde el equipo
+  // se quedaba atorado: la extracción funcionó y el guardado no.
+  const importaciones: Fila[] = (await db.collection('importacionesTarifas').get()).docs
+    .map(d => ({ id: d.id, ...d.data() }));
+
+  const porEstado = new Map<string, number>();
+  importaciones.forEach(i => {
+    const e = String(i.estado ?? 'sin estado');
+    porEstado.set(e, (porEstado.get(e) ?? 0) + 1);
+  });
+
+  console.log(`\n── Borradores de importación (${importaciones.length}) ──`);
+  [...porEstado].sort((a, b) => b[1] - a[1])
+    .forEach(([e, n]) => console.log(`  ${e.padEnd(22)} ${n}`));
+
+  const atoradas = importaciones.filter(i => i.estado === 'en_revision');
+  if (atoradas.length) {
+    console.log('\n  Atoradas en la pantalla de revisión (el bug del wizard):');
+    atoradas.slice(0, 40).forEach(i => console.log(
+      `    ${String(i.updatedAt ?? i.createdAt ?? '').slice(0, 10)}  ${i.nombreArchivo ?? i.id}` +
+      `  · ${Array.isArray(i.tarifas) ? i.tarifas.length : '?'} líneas extraídas`,
+    ));
+  }
+
+  // ── Cuántas tarifas nacieron del wizard ────────────────────────────────
+  const delWizard = tarifas.filter(t => (t.documentoOrigen as Fila)?.importacionId).length;
+  console.log(
+    `\n  tarifas que traen documento de origen: ${delWizard} de ${tarifas.length}` +
+    `  ← lo que el wizard alcanzó a guardar`,
+  );
+
   if (muestra.length) {
     console.log('\n── Muestra (máx. 15) ──');
     console.log(muestra.join('\n'));
