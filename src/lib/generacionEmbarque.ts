@@ -175,6 +175,14 @@ export function construirEmbarqueDesdeCotizacion(d: DatosGeneracion): EmbarqueCo
      */
     ...(quote.tipoCambio ? { tipoCambio: quote.tipoCambio } : {}),
 
+    /*
+     * Tarea 08 · Días libres heredados de la cotización. La FECHA LÍMITE se
+     * calcula en la UI (ETA + días); aquí solo viajan los días. Se omiten
+     * cuando no hay, por la misma razón que el tipo de cambio.
+     */
+    ...(quote.diasLibresDemora != null ? { diasLibresDemora: quote.diasLibresDemora } : {}),
+    ...(quote.diasLibresAlmacenaje != null ? { diasLibresAlmacenaje: quote.diasLibresAlmacenaje } : {}),
+
     cargos: recalcularCargos(cargos),
 
     documentos: [],

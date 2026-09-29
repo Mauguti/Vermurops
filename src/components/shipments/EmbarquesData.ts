@@ -459,6 +459,19 @@ export interface EmbarqueCompleto {
    */
   tipoCambio?: TipoCambioCotizacion;
 
+  /**
+   * Días libres de demora heredados de la cotización o capturados por
+   * Operaciones (tarea 08, 28-sep-2026). La fecha límite = ETA + estos días,
+   * calculada en la UI, no guardada. Distintos de los días de crédito del
+   * cliente: estos son del contenedor en puerto.
+   */
+  diasLibresDemora?: number | null;
+  /**
+   * Días libres de almacenaje heredados de la cotización o capturados por
+   * Operaciones (tarea 08, 28-sep-2026). Sugeridos 7 para todos.
+   */
+  diasLibresAlmacenaje?: number | null;
+
   cargos: EmbarqueCargos;
   documentos: EmbarqueDocumento[];
   eventos: EmbarqueEvento[];

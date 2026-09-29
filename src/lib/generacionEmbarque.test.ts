@@ -443,3 +443,34 @@ describe('el tipo de cambio de la cotización viaja al embarque', () => {
     expect('tipoCambio' in generar(quote([SRV_MAR]))).toBe(false);
   });
 });
+
+// ─── Tarea 08 · los días libres se heredan ───────────────────────────────────
+
+describe('días libres de demora y almacenaje viajan al embarque', () => {
+  it('se copian de la cotización', () => {
+    const q = { ...quote([SRV_MAR]), diasLibresDemora: 21, diasLibresAlmacenaje: 7 } as KanbanQuote;
+    const e = generar(q);
+    expect(e.diasLibresDemora).toBe(21);
+    expect(e.diasLibresAlmacenaje).toBe(7);
+  });
+
+  it('sin días libres las claves NO se escriben (Firestore rechaza undefined)', () => {
+    const e = generar(quote([SRV_MAR]));
+    expect('diasLibresDemora' in e).toBe(false);
+    expect('diasLibresAlmacenaje' in e).toBe(false);
+  });
+
+  it('0 es un valor válido y se hereda', () => {
+    const q = { ...quote([SRV_MAR]), diasLibresDemora: 0, diasLibresAlmacenaje: 0 } as KanbanQuote;
+    const e = generar(q);
+    expect(e.diasLibresDemora).toBe(0);
+    expect(e.diasLibresAlmacenaje).toBe(0);
+  });
+
+  it('solo demora sin almacenaje hereda uno solo', () => {
+    const q = { ...quote([SRV_MAR]), diasLibresDemora: 14 } as KanbanQuote;
+    const e = generar(q);
+    expect(e.diasLibresDemora).toBe(14);
+    expect('diasLibresAlmacenaje' in e).toBe(false);
+  });
+});
