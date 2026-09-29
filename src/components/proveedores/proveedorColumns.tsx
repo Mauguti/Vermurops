@@ -3,14 +3,19 @@
  *
  * Catálogo de columnas de la lista de Proveedores (SpreadsheetTable).
  * Cada id es estable: las vistas guardadas lo referencian.
+ *
+ * Soporta edición en línea de estado y ejecutivos (pricing y operativo)
+ * cuando el contexto de la tabla tiene `meta.edicion`.
  */
 
 import React from 'react';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Plane, Ship, Truck } from 'lucide-react';
 import type { ProveedorVermur, TipoProveedor } from './ProveedoresData';
 import { contactoPrincipal } from './ProveedoresData';
 import type { VistaConfig } from '../table/SpreadsheetTable';
+import { nombreDeUsuario } from '../../auth/AuthContext';
+import type { EdicionEnListaMeta } from '../clientes/edicionMeta';
+import { CeldaEstado, CeldaEjecutivoEditable } from '../table/CeldaEditable';
 
 const col = createColumnHelper<ProveedorVermur>();
 
@@ -48,15 +53,26 @@ export const PROVEEDOR_COLUMNS = [
   }),
   col.accessor('activo', {
     id: 'activo', header: 'Estado', size: 90,
-    cell: info => (
-      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-        info.getValue()
-          ? 'bg-green-50 text-green-700 border-green-200'
-          : 'bg-gray-100 text-gray-500 border-gray-200'
-      }`}>
-        {info.getValue() ? 'Activo' : 'Inactivo'}
-      </span>
-    ),
+    cell: info => {
+      const meta = info.table.options.meta as EdicionEnListaMeta | undefined;
+      const activo = info.getValue();
+      if (!meta?.edicion) {
+        return (
+          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+            activo ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-100 text-gray-500 border-gray-200'
+          }`}>{activo ? 'Activo' : 'Inactivo'}</span>
+        );
+      }
+      return (
+        <CeldaEstado
+          activo={activo}
+          puedeEditar={meta.edicion.puedeEditar}
+          onChange={async (nuevoActivo) => {
+            await meta.edicion!.onCambiarEstado(info.row.original.id, nuevoActivo);
+          }}
+        />
+      );
+    },
   }),
   col.accessor(p => contactoPrincipal(p)?.nombre ?? '', {
     id: 'contacto', header: 'Contacto', size: 180,
@@ -91,6 +107,48 @@ export const PROVEEDOR_COLUMNS = [
     id: 'credito', header: 'Crédito', size: 90,
     meta: { align: 'center' },
     cell: info => <span className="tabular-nums text-gray-600">{info.getValue() || '—'}</span>,
+  }),
+  col.accessor(p => p.responsablePricing ?? '', {
+    id: 'responsablePricing', header: 'Ejecutivo Pricing', size: 150,
+    cell: info => {
+      const meta = info.table.options.meta as EdicionEnListaMeta | undefined;
+      const email = info.getValue() || null;
+      if (!meta?.edicion) {
+        if (!email) return <span className="text-gray-300 italic">—</span>;
+        return <span className="text-gray-700" title={email}>{nombreDeUsuario(email)}</span>;
+      }
+      return (
+        <CeldaEjecutivoEditable
+          email={email}
+          puedeEditar={meta.edicion.puedeEditar}
+          opciones={meta.edicion.opcionesEjecutivo('pricing')}
+          onChange={async (nuevoEmail) => {
+            await meta.edicion!.onCambiarEjecutivo(info.row.original.id, 'pricing', nuevoEmail);
+          }}
+        />
+      );
+    },
+  }),
+  col.accessor(p => p.responsableOperativo ?? '', {
+    id: 'responsableOperativo', header: 'Ejecutivo Operaciones', size: 160,
+    cell: info => {
+      const meta = info.table.options.meta as EdicionEnListaMeta | undefined;
+      const email = info.getValue() || null;
+      if (!meta?.edicion) {
+        if (!email) return <span className="text-gray-300 italic">—</span>;
+        return <span className="text-gray-700" title={email}>{nombreDeUsuario(email)}</span>;
+      }
+      return (
+        <CeldaEjecutivoEditable
+          email={email}
+          puedeEditar={meta.edicion.puedeEditar}
+          opciones={meta.edicion.opcionesEjecutivo('operativo')}
+          onChange={async (nuevoEmail) => {
+            await meta.edicion!.onCambiarEjecutivo(info.row.original.id, 'operativo', nuevoEmail);
+          }}
+        />
+      );
+    },
   }),
 ];
 
