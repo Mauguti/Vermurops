@@ -229,7 +229,18 @@ export default function CargarTarifario({
             ref={inputRef}
             type="file"
             hidden
-            accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.webp,.heic,.txt,.eml"
+            /*
+             * Sin .txt ni .eml a propósito.
+             *
+             * La tarea 02 los agregó y la 01 demostró por qué no van: con un
+             * .txt el flujo de n8n contesta `ok: false, error: "Could not
+             * process image"` — trata todo como imagen. Ofrecerlos en el
+             * selector es ofrecer una vía que falla siempre.
+             *
+             * El correo sigue teniendo su camino: «Pegar correo», que no pasa
+             * por este input. Vuelven cuando n8n acepte texto plano.
+             */
+            accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.webp,.heic"
             onChange={e => {
               const f = e.target.files?.[0];
               if (f) elegir(f);
