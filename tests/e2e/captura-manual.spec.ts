@@ -42,11 +42,28 @@ async function irA(page: Page, modulo: string) {
 const selectCon = (page: Page, value: string) =>
   page.locator('select').filter({ has: page.locator(`option[value="${value}"]`) }).first();
 
+/**
+ * Elige un concepto del catálogo. El borrador usa `autoAbrir` que
+ * inicializa open=true, pero el portal necesita un useEffect para
+ * calcular su posición. Si no aparece a tiempo, se hace toggle
+ * (cerrar → abrir) para forzar el ciclo completo del efecto.
+ */
 async function elegirConcepto(page: Page, termino: string) {
-  await page.getByRole('button', { name: 'Seleccionar concepto...' }).last().click();
   const buscador = page.getByPlaceholder('Buscar concepto...');
+  // autoAbrir: dar tiempo al useEffect de calcular la posición del portal.
+  let visible = await buscador.isVisible({ timeout: 3000 }).catch(() => false);
+  if (!visible) {
+    const btn = page.getByRole('button', { name: /Seleccionar concepto/ }).last();
+    await btn.click();
+    visible = await buscador.isVisible({ timeout: 1500 }).catch(() => false);
+    if (!visible) {
+      // autoAbrir tenía open=true: el primer clic lo cerró. Abrir de nuevo.
+      await btn.click();
+    }
+  }
+  await expect(buscador).toBeVisible({ timeout: 5000 });
   await buscador.fill(termino);
-  await page.locator('body').getByRole('button', { name: new RegExp(termino, 'i') }).first().click();
+  await page.getByRole('button', { name: new RegExp(termino, 'i') }).first().click();
 }
 
 async function tokenDe(email: string): Promise<string> {
@@ -89,6 +106,17 @@ test('Ventas · crea una solicitud para captura manual', async ({ browser }) => 
   await selectCon(page, 'importacion').selectOption('importacion');
   await page.getByRole('button', { name: 'Marítimo', exact: true }).click();
 
+  // Puertos del catálogo (requeridos para enviar)
+  const puertos = page.getByRole('button', { name: 'Elegir del catálogo…' });
+  await puertos.first().click();
+  await page.getByPlaceholder('Buscar puerto, código o país…').fill('Shanghai');
+  await page.getByRole('button', { name: /Shanghai/ }).first().click();
+  await page.getByRole('button', { name: 'Elegir del catálogo…' }).first().click();
+  await page.getByPlaceholder('Buscar puerto, código o país…').fill('Manzanillo');
+  await page.getByRole('button', { name: /Manzanillo/ }).first().click();
+
+  await page.getByPlaceholder('18500').fill('18500');
+
   // Sin conceptos señalados — Pricing capturará todo a mano
   await page.getByRole('button', { name: 'Enviar a Pricing' }).click();
   await expect(page.getByText(/Solicitado a Pricing|solicitado/i).first()).toBeVisible({ timeout: 15_000 });
@@ -119,7 +147,7 @@ test('Pricing · captura costo, proveedor y profit a mano en «Por concepto»', 
   await page.getByRole('tab', { name: 'Por concepto' }).click();
 
   // Agregar un concepto del catálogo
-  await page.getByRole('button', { name: /Agregar concepto/ }).click();
+  await page.getByRole('button', { name: /Agregar concepto/ }).first().click();
   await elegirConcepto(page, 'Ocean Freight');
 
   // La línea debe aparecer con inputs editables
@@ -141,7 +169,7 @@ test('Pricing · captura costo, proveedor y profit a mano en «Por concepto»', 
   await page.getByText('+ Capturar proveedor de este costo').click();
   // Elegir proveedor
   const selectProv = page.locator('select').filter({ has: page.locator('option', { hasText: 'HAPAG' }) }).first();
-  await selectProv.selectOption({ label: /HAPAG LLOYD A G/i });
+  await selectProv.selectOption({ label: 'HAPAG LLOYD A G' });
   // Elegir moneda
   const selectMoneda = page.locator('select').filter({ has: page.locator('option[value="USD"]') }).last();
   await selectMoneda.selectOption('USD');
@@ -151,7 +179,7 @@ test('Pricing · captura costo, proveedor y profit a mano en «Por concepto»', 
   await expect(lineaOcean.getByText('HAPAG', { exact: false })).toBeVisible({ timeout: 5_000 });
 
   // Agregar un segundo concepto
-  await page.getByRole('button', { name: /Agregar concepto/ }).click();
+  await page.getByRole('button', { name: /Agregar concepto/ }).first().click();
   await elegirConcepto(page, 'Documentation');
   const lineaDoc = page.locator('tr', { hasText: 'Documentation' }).first();
   await lineaDoc.locator('input[type="number"]').first().fill('200');
@@ -206,7 +234,7 @@ test('Pricing · edita costo, profit e impuesto en «Por proveedor»', async ({ 
   }
 
   // Agregar concepto desde la vista Por proveedor
-  await page.getByRole('button', { name: /Agregar concepto/ }).click();
+  await page.getByRole('button', { name: /Agregar concepto/ }).first().click();
   await elegirConcepto(page, 'Handling');
 
   // El nuevo concepto debe aparecer en la tabla
