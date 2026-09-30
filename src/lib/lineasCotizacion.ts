@@ -83,10 +83,16 @@ export interface LineaPlana {
   servicioId: string;
   servicioTipo: string;
   /**
-   * Dónde ocurre el servicio (origen/destino). Se arrastra para que el cargo
-   * del embarque pueda derivar su IVA sin volver a la cotización (§4.2).
+   * Dónde ocurre ESTE concepto (origen/destino). Tarea 28: resuelto:
+   *   concepto.ubicacion ?? servicio.ubicacion. Para display y cargo.
    */
   ubicacion?: 'origen' | 'destino';
+  /**
+   * Tarea 28 · Lo que se eligió POR RENGLÓN (concepto.ubicacion en el
+   * modelo). Ausente = no se eligió y manda lo que derive el catálogo o el
+   * servicio. Distinto de `ubicacion` (resuelto con respaldo).
+   */
+  ubicacionCapturada?: 'origen' | 'destino';
   origen: OrigenLinea;
   /** id del ConceptoCotizacion. Ausente en líneas de ruta B. */
   conceptoLocalId?: string;
@@ -227,7 +233,9 @@ function lineaDesdeConcepto(
     id: `${srv.id}::${concepto.id}`,
     servicioId: srv.id,
     servicioTipo: srv.tipo,
-    ubicacion: srv.ubicacion,
+    // Tarea 28: la ubicación es del concepto. Respaldo: la vieja del servicio.
+    ubicacion: concepto.ubicacion ?? srv.ubicacion,
+    ...(concepto.ubicacion !== undefined ? { ubicacionCapturada: concepto.ubicacion } : {}),
     origen: 'concepto',
     conceptoLocalId: concepto.id,
     concepto: concepto.nombre,
@@ -368,6 +376,8 @@ export interface EdicionLinea {
   orden?: number;
   /** Bloque 3 · `null` limpia la elección y devuelve el renglón a lo derivado. */
   impuesto?: 'iva16' | 'iva0' | 'exento' | null;
+  /** Tarea 28 · `null` quita la elección y cae al catálogo o al servicio. */
+  ubicacion?: 'origen' | 'destino' | null;
 }
 
 /**
@@ -419,14 +429,20 @@ export function aplicarEdicionLinea(
          * porque `...c` la volvería a meter; y se omite en vez de ponerla en
          * undefined, que hace a Firestore rechazar el documento entero.
          */
-        const { impuesto: _impuestoPrevio, ...cSinImpuesto } = c;
+        const { impuesto: _impuestoPrevio, ubicacion: _ubicacionPrevia, ...cSinImpuestoNiUbicacion } = c;
         const impuesto = edicion.impuesto === null
           ? undefined
           : (edicion.impuesto ?? c.impuesto);
 
+        // Tarea 28: misma lógica que impuesto — null quita, undefined conserva.
+        const ubicacion = edicion.ubicacion === null
+          ? undefined
+          : (edicion.ubicacion ?? c.ubicacion);
+
         return {
-          ...cSinImpuesto,
+          ...cSinImpuestoNiUbicacion,
           ...(impuesto !== undefined ? { impuesto } : {}),
+          ...(ubicacion !== undefined ? { ubicacion } : {}),
           ...(costoCapturado !== undefined ? { costoCapturado } : {}),
           nombre: edicion.concepto ?? c.nombre,
           // Se omite la clave en vez de ponerla en undefined (Firestore la

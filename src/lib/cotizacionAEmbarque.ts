@@ -222,14 +222,15 @@ function cargosDeLinea(
       // cotización. Solo en el ingreso: el IVA que importa es el que se le
       // cobra al cliente.
       /*
-       * La del CONCEPTO cuando el catálogo la declara; si no, la del servicio.
-       * Sin esto, un marítimo de importación marcado «origen» mandaba al
-       * embarque —y de ahí a la factura— todos sus conceptos en 0%, incluidos
-       * los que ocurren en destino. Sobre la regla espejo eso es IVA de menos.
+       * Tarea 28: la captura explícita del renglón manda; si no hay, el
+       * catálogo refina a un solo lado; si no, la ubicación resuelta del
+       * servicio. `ubicacionCapturada` es SOLO lo que el usuario eligió;
+       * `ubicacion` ya incluye el respaldo del servicio.
        */
       ubicacionIVA: ubicacionDeLinea(
         contexto.conceptos?.find(c => c.id === linea.conceptoId),
         { ubicacion: linea.ubicacion },
+        linea.ubicacionCapturada,
       ),
       /*
        * Bloque 3 · La tasa elegida al cotizar viaja al embarque. Sin esto, el
