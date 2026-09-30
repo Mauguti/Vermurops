@@ -23,7 +23,7 @@ Lo que no alcance a correr esta noche se queda en [ ] para la siguiente.
 - [x] 14 Kanban avisa del freno al arrastrar, y key duplicada en Puertos
 - [x] 15 Script de auditoría: tarifa elegida, costos sin moneda y conceptos sin catálogo
 - [x] 16 Conceptos sin catálogo desde la comparativa y la bandeja (camino B)
-- [ ] 17 PLAN: una sola fuente de verdad para la tarifa elegida
+- [x] 17 PLAN: una sola fuente de verdad para la tarifa elegida
 - [ ] 18 PLAN: equipos, la parte mínima para Operaciones
 - [ ] 19 PLAN: reciclar cotizaciones y orden de la bandeja de Pricing
 - [ ] 20 PLAN C: documentos operativos y talonario del HBL
@@ -31,6 +31,7 @@ Lo que no alcance a correr esta noche se queda en [ ] para la siguiente.
 - [ ] 22 Token en el webhook del PDF (JSON para importar)
 - [ ] 23 Bug en frío: solicitud vacía tras «Enviar a Pricing»
 - [ ] 24 Los 9 errores de tsc
+- [ ] 25 Revisión de tarifas: correo pegado como imagen y vigencias con año dudoso
 
 ---
 
@@ -362,3 +363,16 @@ Dos veces se vio que el formulario de solicitud aparece vacío justo después de
 **Tipo:** código. **Modelo:** no.
 
 Están en `Quotes.tsx`, `FichaCotizacion.tsx` y `RightChatPanel.tsx`. Corrige los tipos sin cambiar comportamiento. Si alguno solo se arregla cambiando comportamiento, no lo toques y explícalo. Meta: tsc en 0 y recorrido completo.
+
+---
+
+## 25 — Revisión de tarifas: correo pegado como imagen y vigencias con año dudoso
+
+**Tipo:** código. **Modelo:** no. Hallazgos del sprint anterior (reporte 01).
+
+1. **«Pegar correo» nunca ha funcionado:** el flujo de n8n trata todo como imagen y un .txt falla con «Could not process image». Mientras se corrige el flujo, la app convierte el texto pegado en una imagen PNG (canvas, texto legible, ancho fijo, varias páginas si es largo) y manda eso al extractor. Las capturas PNG sí las lee bien. Prueba con el texto del correo de ONE de la tarea 01, a través del emulador de Functions (máximo 5 llamadas al n8n real).
+2. Quita .txt y .eml del selector de archivos si siguen ahí: el camino para correos es «Pegar correo».
+3. **Vigencias con año dudoso:** cuando el correo dice «till July 31» sin año, el extractor pone un año pasado y la tarifa nace vencida (el panel la esconde). En la revisión, una línea con fecha de fin ya vencida se marca en ámbar («vigencia vencida: ¿el año es correcto?») y no se guarda hasta que alguien confirme o corrija la fecha.
+4. **Free time contra tránsito:** en .xlsx el extractor puso los 21 días de free time en tránsito. En la revisión, muestra los dos campos juntos y con etiquetas claras para que se corrija a simple vista. No adivines cuál es cuál.
+5. Tests con las respuestas guardadas en `docs/fixtures/respuestas-extractor/` y capturas.
+
