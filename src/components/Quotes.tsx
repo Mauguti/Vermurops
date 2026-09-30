@@ -1371,7 +1371,6 @@ export default function Quotes() {
                 }}
                 prospectos={prospectos}
                 setProspectos={setProspectos}
-                quotes={permittedQuotes}
               />
             ) : (
               <KanbanCotizaciones

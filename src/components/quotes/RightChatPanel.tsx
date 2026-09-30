@@ -77,9 +77,9 @@ export default function RightChatPanel({ quotes, onSelectQuote, user, isOpen, on
               )}
               <div className="flex justify-between items-start mb-1.5">
                 <div>
-                  <span className="text-[10px] font-bold text-primario tracking-wider uppercase block mb-0.5">{quote.folio}</span>
-                  <h4 className="text-[12px] font-bold text-[#18181B] truncate max-w-[180px]" title={quote.empresa}>
-                    {quote.empresa}
+                  <span className="text-[10px] font-bold text-primario tracking-wider uppercase block mb-0.5">{quote.id}</span>
+                  <h4 className="text-[12px] font-bold text-[#18181B] truncate max-w-[180px]" title={quote.prospecto.empresa}>
+                    {quote.prospecto.empresa}
                   </h4>
                 </div>
                 <div className="flex items-center text-[10px] text-gray-400 font-medium whitespace-nowrap">
