@@ -326,11 +326,17 @@ export default function Finance() {
 
              <div className="p-[24px]">
                 {activeTab === 'Programación de pagos' && (
-                   <PanelPagos
-                     ordenes={ordenes}
-                     onAbrirOC={setOcAbiertaId}
-                     onRegistrarPago={registrarPagoDelGrupo}
-                   />
+                   <div className="space-y-4">
+                     <p className="text-[12px] text-text-muted leading-relaxed">
+                       Lo que se paga hoy: las órdenes ya autorizadas, agrupadas por proveedor y fecha de pago, listas para transferir.
+                     </p>
+                     <PanelPagos
+                       ordenes={ordenes}
+                       onAbrirOC={setOcAbiertaId}
+                       onRegistrarPago={registrarPagoDelGrupo}
+                       conteosPorEstado={conteosPorEstado}
+                     />
+                   </div>
                 )}
 
                 {activeTab === 'Facturas (CFDI)' && (
@@ -356,6 +362,9 @@ export default function Finance() {
 
                 {activeTab === 'Cuentas por pagar' && (
                    <div className="space-y-4">
+                     <p className="text-[12px] text-text-muted leading-relaxed">
+                       Todas las órdenes de compra en cualquier estado: desde la solicitud hasta el pago.
+                     </p>
                      {/* C-3 · El segundo origen. Las de embarque nacen del
                          cargo, en la ficha del embarque; aquí solo se
                          capturan las que no cuelgan de ninguno. */}

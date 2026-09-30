@@ -28,9 +28,11 @@ interface Props {
   onAbrirOC: (id: string) => void;
   /** Registra el pago del grupo: marca las órdenes como pagadas. */
   onRegistrarPago?: (ocIds: string[], comprobante: string) => void;
+  /** Conteos por estado de TODAS las OC (no solo autorizadas), para contexto. */
+  conteosPorEstado?: Record<string, number>;
 }
 
-export default function PanelPagos({ ordenes, hoy, onAbrirOC, onRegistrarPago }: Props) {
+export default function PanelPagos({ ordenes, hoy, onAbrirOC, onRegistrarPago, conteosPorEstado }: Props) {
   const fechaHoy = hoy ?? new Date().toISOString().slice(0, 10);
   const [copiado, setCopiado] = useState<string | null>(null);
 
@@ -50,6 +52,47 @@ export default function PanelPagos({ ordenes, hoy, onAbrirOC, onRegistrarPago }:
       window.prompt('Copia el detalle del pago:', texto);
     }
   };
+
+  /* ── Estado vacío especial: sin autorizadas ──────────────────────────────
+   * Si no hay NINGUNA orden autorizada, el resumen muestra cuatro ceros y el
+   * panel se ve roto. En vez de eso, se explica por qué está vacío y cuántas
+   * órdenes hay en otros estados, para que Gaby sepa que el sistema no falló
+   * sino que todavía no hay nada listo para pagar.
+   */
+  const sinAutorizadas = programadas.length === 0;
+  const totalOtros = conteosPorEstado
+    ? (conteosPorEstado['solicitada'] ?? 0)
+      + (conteosPorEstado['en_gestion'] ?? 0)
+    : 0;
+  const totalPagadas = conteosPorEstado?.['pagada'] ?? 0;
+
+  if (sinAutorizadas) {
+    return (
+      <div className="space-y-4">
+        <div className="border border-card-border rounded-lg py-10 text-center bg-white">
+          <CalendarClock className="w-8 h-8 text-gray-300 mx-auto mb-3" />
+          <p className="text-[14px] font-medium text-gray-600">
+            No hay órdenes autorizadas pendientes de pago.
+          </p>
+          <p className="text-[12px] text-gray-400 mt-2 max-w-md mx-auto leading-relaxed">
+            Aquí aparecen las órdenes que Administración ya autorizó, agrupadas por proveedor
+            y fecha de pago — listas para transferir.
+          </p>
+          {totalOtros > 0 && (
+            <p className="text-[12px] text-amber-600 mt-3">
+              Hay {totalOtros} orden{totalOtros !== 1 ? 'es' : ''} en curso
+              {' '}(solicitadas o en gestión) que aún no llegan aquí.
+            </p>
+          )}
+          {totalOtros === 0 && totalPagadas > 0 && (
+            <p className="text-[12px] text-emerald-600 mt-3">
+              {totalPagadas} orden{totalPagadas !== 1 ? 'es' : ''} ya pagada{totalPagadas !== 1 ? 's' : ''} — todo al corriente.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
