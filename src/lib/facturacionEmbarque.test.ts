@@ -331,3 +331,80 @@ describe('un concepto de destino en un servicio marcado «origen» llega al 16%'
     expect(l.tasaIVA).toBe(0);
   });
 });
+
+// ─── Tarea 28 · Puerta a puerta ─────────────────────────────────────────────
+
+describe('puerta a puerta: una importación con origen al 0% y destino al 16%', () => {
+  /*
+   * El caso que la tarea 28 resuelve de raíz. Una cotización de importación
+   * puerta a puerta tiene conceptos en AMBOS lados: el flete internacional
+   * ocurre en origen (0%) y las maniobras en destino (16%). Antes de la
+   * tarea 28, la ubicación vivía en el servicio (una sola para todos) y un
+   * «origen» ponía todo en 0%, o un «destino» ponía todo en 16%, pero nunca
+   * los dos a la vez.
+   */
+  const LINEA_ORIGEN = {
+    id: 'L-ORI', servicioId: 'S1', servicioTipo: 'maritimo',
+    concepto: 'Flete internacional', conceptoId: 'CON-FLETE', conceptoLocalId: 'c1',
+    proveedorNombre: 'Maersk', moneda: 'USD', costo: 2000, profit: 500, venta: 2500,
+    margen: 0, costoDerivado: false, tarifasOficiales: 0, costos: [],
+    costoCapturado: true,
+    ubicacion: 'origen' as const,
+    /** Tarea 28: el concepto declara explícitamente que es origen. */
+    ubicacionCapturada: 'origen' as const,
+  };
+
+  const LINEA_DESTINO = {
+    id: 'L-DST', servicioId: 'S1', servicioTipo: 'maritimo',
+    concepto: 'Maniobras en destino', conceptoId: 'CON-DEST', conceptoLocalId: 'c2',
+    proveedorNombre: 'Terminal', moneda: 'MXN', costo: 5000, profit: 1000, venta: 6000,
+    margen: 0, costoDerivado: false, tarifasOficiales: 0, costos: [],
+    costoCapturado: true,
+    ubicacion: 'destino' as const,
+    ubicacionCapturada: 'destino' as const,
+  };
+
+  const CATALOGO = [
+    concepto({ id: 'CON-FLETE', nombre: 'Flete internacional', reglaIVA: 'espejo',
+      aplicaOrigen: true, aplicaDestino: false }),
+    concepto({ id: 'CON-DEST', nombre: 'Maniobras en destino', reglaIVA: 'espejo',
+      aplicaOrigen: false, aplicaDestino: true }),
+  ];
+
+  const CTX_CONCEPTOS = {
+    conceptos: CATALOGO.map(c => ({
+      id: c.id, aplicaOrigen: c.aplicaOrigen, aplicaDestino: c.aplicaDestino,
+    })),
+  };
+
+  it('los cargos nacen con ubicaciones distintas', () => {
+    const { cargos } = mapearLineasAEmbarque(
+      [LINEA_ORIGEN as never, LINEA_DESTINO as never], 'COT-1', CTX_CONCEPTOS,
+    );
+    const ingresos = cargos.filter(c => c.tipo === 'ingreso');
+    expect(ingresos).toHaveLength(2);
+    expect(ingresos.find(c => c.conceptoId === 'CON-FLETE')!.ubicacionIVA).toBe('origen');
+    expect(ingresos.find(c => c.conceptoId === 'CON-DEST')!.ubicacionIVA).toBe('destino');
+  });
+
+  it('el flete de origen se factura al 0% y las maniobras de destino al 16%', () => {
+    const { cargos } = mapearLineasAEmbarque(
+      [LINEA_ORIGEN as never, LINEA_DESTINO as never], 'COT-1', CTX_CONCEPTOS,
+    );
+    const ingresos = cargos.filter(c => c.tipo === 'ingreso');
+
+    const facFlete = lineaDeFactura(
+      ingresos.find(c => c.conceptoId === 'CON-FLETE')!,
+      { trafico: 'impo', conceptos: CATALOGO },
+    );
+    expect(facFlete.tasaIVA).toBe(0);
+    expect(facFlete.montoIVA).toBe(0);
+
+    const facManiobras = lineaDeFactura(
+      ingresos.find(c => c.conceptoId === 'CON-DEST')!,
+      { trafico: 'impo', conceptos: CATALOGO },
+    );
+    expect(facManiobras.tasaIVA).toBe(16);
+    expect(facManiobras.montoIVA).toBe(960); // 6000 * 0.16
+  });
+});
