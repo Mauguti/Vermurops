@@ -11,6 +11,7 @@ import { resolverTrafico } from '../../lib/traficoServicio';
 import {
   borradorDeServicio, servicioDesdeBorrador, legacySinMapear, modalidadDeTipo,
 } from '../../lib/operacionServicio';
+import { precargarAduanas, esAduanaPrecargada } from '../../lib/aduanaDesdePuerto';
 
 /**
  * La sección «Operación» de la pestaña Información (Fase A, 24-sep-2026).
@@ -62,6 +63,16 @@ export default function OperacionServicio({
     return r.fuente === 'derivado' ? r.trafico : null;
   }, [servicio]);
 
+  // ── Precarga de aduanas desde el puerto (tarea 30) ──────────────────────
+  const salidaPrecargada = useMemo(
+    () => esAduanaPrecargada(puertos, servicio.ruta?.origenPuertoId, servicio.ruta?.aduanaSalida),
+    [puertos, servicio.ruta?.origenPuertoId, servicio.ruta?.aduanaSalida],
+  );
+  const recepcionPrecargada = useMemo(
+    () => esAduanaPrecargada(puertos, servicio.ruta?.destinoPuertoId, servicio.ruta?.aduanaRecepcion),
+    [puertos, servicio.ruta?.destinoPuertoId, servicio.ruta?.aduanaRecepcion],
+  );
+
   const set = (patch: Partial<ServicioSolicitado>) => onCambio({ ...servicio, ...patch });
   const setRuta = (patch: Partial<ServicioSolicitado['ruta']>) => onCambio({ ...servicio, ruta: { ...servicio.ruta, ...patch } });
 
@@ -105,20 +116,30 @@ export default function OperacionServicio({
             guardado NO se borra: se sigue leyendo como respaldo para las
             cotizaciones que ya existen. */}
         <div>
-          <label className={LBL}>Aduana de salida</label>
+          <label className={LBL}>
+            Aduana de salida
+            {salidaPrecargada && (
+              <span className="ml-1 normal-case font-semibold text-primario/60">· precargada del puerto</span>
+            )}
+          </label>
           {editable
             ? <input type="text" value={servicio.ruta?.aduanaSalida ?? ''} onChange={e => setRuta({ aduanaSalida: e.target.value })} className={INP} />
-            : <Valor>{servicio.ruta?.aduanaSalida || '—'}</Valor>}
+            : <Valor>{servicio.ruta?.aduanaSalida || '—'}{salidaPrecargada && <span className="text-primario/50 font-normal text-[10px]"> · del puerto</span>}</Valor>}
           <p className={AYUDA}>
             Dónde se despacha la mercancía al salir. Puede ser distinta del
             puerto de salida.
           </p>
         </div>
         <div>
-          <label className={LBL}>Aduana de recepción</label>
+          <label className={LBL}>
+            Aduana de recepción
+            {recepcionPrecargada && (
+              <span className="ml-1 normal-case font-semibold text-primario/60">· precargada del puerto</span>
+            )}
+          </label>
           {editable
             ? <input type="text" value={servicio.ruta?.aduanaRecepcion ?? ''} onChange={e => setRuta({ aduanaRecepcion: e.target.value })} className={INP} />
-            : <Valor>{servicio.ruta?.aduanaRecepcion || '—'}</Valor>}
+            : <Valor>{servicio.ruta?.aduanaRecepcion || '—'}{recepcionPrecargada && <span className="text-primario/50 font-normal text-[10px]"> · del puerto</span>}</Valor>}
           <p className={AYUDA}>
             Dónde se despacha al llegar. Puede ser distinta del puerto de
             entrada: la carga entra por un puerto y se despacha en otra aduana.
@@ -150,7 +171,23 @@ export default function OperacionServicio({
           conceptos={conceptos}
           incoterms={INCOTERMS}
           sinRequeridos
-          onCambio={d => onCambio(servicioDesdeBorrador(servicio, d))}
+          onCambio={d => {
+            const svc = servicioDesdeBorrador(servicio, d);
+            // Precarga: si un puerto cambió y la aduana está vacía, la llena.
+            const origenCambio = svc.ruta?.origenPuertoId !== servicio.ruta?.origenPuertoId;
+            const destinoCambio = svc.ruta?.destinoPuertoId !== servicio.ruta?.destinoPuertoId;
+            if (origenCambio || destinoCambio) {
+              const patch = precargarAduanas(
+                puertos, svc.ruta?.origenPuertoId, svc.ruta?.destinoPuertoId,
+                svc.ruta?.aduanaSalida, svc.ruta?.aduanaRecepcion,
+              );
+              if (Object.keys(patch).length > 0) {
+                onCambio({ ...svc, ruta: { ...svc.ruta, ...patch } });
+                return;
+              }
+            }
+            onCambio(svc);
+          }}
           onTraficoDerivado={t => { if (!servicio.trafico) set({ trafico: t }); }}
         />
       ) : (
