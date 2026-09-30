@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Info } from 'lucide-react';
-import type { ServicioSolicitado, TraficoServicio, UbicacionServicio } from './QuotesData';
+import type { ServicioSolicitado, TraficoServicio } from './QuotesData';
 import { INCOTERMS } from './QuotesData';
 import type { PuertoVermur } from '../puertos/PuertosData';
 import type { ConceptoVermur } from '../conceptos/ConceptosData';
@@ -72,7 +72,7 @@ export default function OperacionServicio({
       )}
 
       {/* ── Lo que solo la operación necesita ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div>
           <label className={LBL}>
             Tráfico
@@ -100,30 +100,10 @@ export default function OperacionServicio({
             </Valor>
           )}
         </div>
-        <div>
-          <label className={LBL}>
-            Ubicación del servicio
-            <span className="ml-1 normal-case font-semibold text-primario">— define el IVA</span>
-          </label>
-          {editable ? (
-            <select
-              value={servicio.ubicacion ?? ''}
-              onChange={e => set({ ubicacion: (e.target.value || undefined) as UbicacionServicio | undefined })}
-              className={SEL}
-            >
-              <option value="">— Definir —</option>
-              <option value="origen">Origen</option>
-              <option value="destino">Destino</option>
-            </select>
-          ) : (
-            <Valor>{servicio.ubicacion === 'origen' ? 'Origen' : servicio.ubicacion === 'destino' ? 'Destino' : '—'}</Valor>
-          )}
-          <p className={AYUDA}>
-            Dónde se presta: origen o destino. Con el tráfico decide el IVA —
-            16% solo a lo que ocurre en México. Si el concepto del catálogo
-            aplica de un solo lado, ese manda.
-          </p>
-        </div>
+        {/* Tarea 28: «Ubicación del servicio» se quitó de aquí. Ahora es por
+            renglón, en la tabla de conceptos (columna «Ubicación»). El campo
+            guardado NO se borra: se sigue leyendo como respaldo para las
+            cotizaciones que ya existen. */}
         <div>
           <label className={LBL}>Aduana de salida</label>
           {editable

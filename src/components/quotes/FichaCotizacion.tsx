@@ -905,9 +905,9 @@ export default function FichaCotizacion({
       ? conceptosCatalogo.find(c => c.id === linea.conceptoId)
       : null;
     if (!servicio) {
-      return impuestoDeLinea(linea.impuesto, regla, { } as never, delCatalogo);
+      return impuestoDeLinea(linea.impuesto, regla, { } as never, delCatalogo, linea.ubicacionCapturada);
     }
-    return impuestoDeLinea(linea.impuesto, regla, servicio, delCatalogo);
+    return impuestoDeLinea(linea.impuesto, regla, servicio, delCatalogo, linea.ubicacionCapturada);
   };
 
   /**
@@ -951,6 +951,26 @@ export default function FichaCotizacion({
 
   const handleElegirImpuesto = (lineaId: string, opcion: OpcionImpuesto | null) => {
     onUpdateQuote(aplicarEdicionLinea(quote, lineaId, { impuesto: opcion }));
+  };
+
+  /**
+   * Tarea 28 · Precarga: lo que el catálogo y el servicio sugieren.
+   * null = ni el catálogo ni el servicio lo resuelven.
+   */
+  const ubicacionPrecargadaDe = (linea: LineaPlana): 'origen' | 'destino' | null => {
+    const servicio = (quote.servicios ?? []).find(sv => sv.id === linea.servicioId);
+    const delCatalogo = linea.conceptoId
+      ? conceptosCatalogo.find(c => c.id === linea.conceptoId)
+      : null;
+    if (delCatalogo) {
+      if (delCatalogo.aplicaOrigen && !delCatalogo.aplicaDestino) return 'origen';
+      if (delCatalogo.aplicaDestino && !delCatalogo.aplicaOrigen) return 'destino';
+    }
+    return servicio?.ubicacion ?? null;
+  };
+
+  const handleElegirUbicacion = (lineaId: string, ubicacion: 'origen' | 'destino' | null) => {
+    onUpdateQuote(aplicarEdicionLinea(quote, lineaId, { ubicacion }));
   };
 
   /**
@@ -1719,6 +1739,7 @@ export default function FichaCotizacion({
                 consolidado={consolidadoProveedores}
                 nombreProveedor={(id, fallback) => (id ? proveedores.find(p => p.id === id)?.nombre : '') || fallback}
                 conAcciones={rolActivo !== 'ventas'}
+                conUbicacion={rolActivo !== 'ventas' && !bloqueada}
                 conImpuesto={rolActivo !== 'ventas' && !bloqueada}
                 onClickRenglon={r => handleCompararProveedor(lineaDeRenglon(r.clave))}
                 celdas={r => {
@@ -1729,6 +1750,8 @@ export default function FichaCotizacion({
                   const input = 'w-[90px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-primario focus:bg-white bg-transparent rounded outline-none text-[12px]';
                   const impuesto = impuestoDeLineaPlana(linea);
                   const indeterminado = impuesto.tasa === null;
+                  const precargada = ubicacionPrecargadaDe(linea);
+                  const efectivaUbi = linea.ubicacion ?? precargada;
                   return {
                     costo: editable && !linea.costoDerivado ? (
                       <input type="number" value={linea.costoCapturado ? linea.costo : ''} placeholder="—"
@@ -1740,6 +1763,28 @@ export default function FichaCotizacion({
                         onClick={e => e.stopPropagation()}
                         onChange={e => handleEditarLineaPlana(linea.id, 'profit', Number(e.target.value))} className={input} />
                     ) : undefined,
+                    ubicacion: editable ? (
+                      <div onClick={e => e.stopPropagation()}>
+                        <select
+                          value={linea.ubicacion ?? ''}
+                          onChange={e => handleElegirUbicacion(linea.id, (e.target.value || null) as 'origen' | 'destino' | null)}
+                          className={`text-[11px] bg-transparent border border-transparent hover:border-gray-200 focus:border-primario rounded px-1 py-0.5 outline-none ${
+                            !efectivaUbi ? 'text-amber-700' : 'text-gray-600'}`}
+                        >
+                          <option value="">
+                            {precargada
+                              ? `${precargada === 'origen' ? 'Origen' : 'Destino'} · del catálogo`
+                              : 'Elegir'}
+                          </option>
+                          <option value="origen">Origen</option>
+                          <option value="destino">Destino</option>
+                        </select>
+                      </div>
+                    ) : (
+                      <span className={`text-[11px] ${!efectivaUbi ? 'text-amber-700' : 'text-gray-600'}`}>
+                        {efectivaUbi === 'origen' ? 'Origen' : efectivaUbi === 'destino' ? 'Destino' : 'Elegir'}
+                      </span>
+                    ),
                     impuesto: editable ? (
                       <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                         <select
@@ -1857,6 +1902,8 @@ export default function FichaCotizacion({
               onCompararProveedor={handleCompararProveedor}
               onCambiarServicio={handleCambiarServicioDeLinea}
               impuestoDe={impuestoDeLineaPlana}
+              ubicacionPrecargada={ubicacionPrecargadaDe}
+              onElegirUbicacion={rolActivo !== 'ventas' && !bloqueada ? handleElegirUbicacion : undefined}
               onCapturarProveedor={rolActivo !== 'ventas' && !bloqueada ? handleCapturarProveedor : undefined}
               proveedores={proveedores}
               onElegirImpuesto={rolActivo !== 'ventas' && !bloqueada ? handleElegirImpuesto : undefined}

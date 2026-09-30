@@ -80,6 +80,13 @@ interface Props {
   /** `null` quita la elección y devuelve el renglón a lo derivado. */
   onElegirImpuesto?: (lineaId: string, opcion: OpcionImpuesto | null) => void;
   /**
+   * Tarea 28 · Precarga la ubicación de un concepto según el catálogo.
+   * Ausente = no se pinta la columna.
+   */
+  ubicacionPrecargada?: (linea: LineaPlana) => 'origen' | 'destino' | null;
+  /** Cambia la ubicación de un renglón. `null` quita y cae al catálogo/servicio. */
+  onElegirUbicacion?: (lineaId: string, ubicacion: 'origen' | 'destino' | null) => void;
+  /**
    * Bloque 1 · Le da proveedor y moneda a un costo tecleado a mano, creando
    * una tarifa DENTRO de la cotización. Ausente = no se ofrece.
    */
@@ -107,6 +114,7 @@ export default function TablaConceptos({
   onCrearConcepto, onEditarLinea, onElegirConcepto, onQuitarLinea, onMoverLinea,
   onAgregarLinea, onCompararProveedor, onCambiarServicio, onDatosEmbarque,
   onAgregarServicio, impuestoDe, onElegirImpuesto,
+  ubicacionPrecargada, onElegirUbicacion,
   onCapturarProveedor, proveedores = [],
 }: Props) {
   /** Servicio del renglón borrador; null = no hay borrador. */
@@ -196,6 +204,7 @@ export default function TablaConceptos({
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Costo</th>
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Profit</th>
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Venta</th>
+              {ubicacionPrecargada && <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Ubicación</th>}
               {impuestoDe && <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Impuesto</th>}
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Margen</th>
               {editable && <th className="px-2 py-2 w-[70px]" />}
@@ -220,6 +229,8 @@ export default function TablaConceptos({
                 onCambiarServicio={onCambiarServicio}
                 impuestoDe={impuestoDe}
                 onElegirImpuesto={onElegirImpuesto}
+                ubicacionPrecargada={ubicacionPrecargada}
+                onElegirUbicacion={onElegirUbicacion}
                 onCapturarProveedor={onCapturarProveedor}
                 proveedores={proveedores}
               />
@@ -250,7 +261,7 @@ export default function TablaConceptos({
                     onCrearNuevo={onCrearConcepto}
                   />
                 </td>
-                <td colSpan={5} className="px-3 py-1.5 text-[10px] text-amber-700">
+                <td colSpan={5 + (ubicacionPrecargada ? 1 : 0)} className="px-3 py-1.5 text-[10px] text-amber-700">
                   Elige el concepto del catálogo: la línea se crea al elegirlo.
                 </td>
                 <td className="px-2 py-1.5 text-right">
@@ -263,7 +274,7 @@ export default function TablaConceptos({
 
             {ordenadas.length === 0 && !borradorServicioId && (
               <tr>
-                <td colSpan={editable ? 8 : 7}>
+                <td colSpan={7 + (ubicacionPrecargada ? 1 : 0) + (impuestoDe ? 1 : 0) + (editable ? 1 : 0)}>
                   <EstadoVacio
                     variante="plano"
                     titulo="Sin conceptos todavía"
@@ -290,6 +301,7 @@ export default function TablaConceptos({
                 variasMonedas={monedas.length > 1}
                 costo={costoTotal} profit={profitTotal} venta={ventaTotal}
                 conAcciones={editable}
+                conUbicacion={!!ubicacionPrecargada}
                 conImpuesto={!!impuestoDe}
                 impuestos={impuestosPorMoneda[m] ?? 0}
                 retenciones={retencionesPorMoneda[m] ?? 0}
@@ -320,12 +332,13 @@ export default function TablaConceptos({
 
 function FilaTotal({
   moneda, variasMonedas, costo, profit, venta, conAcciones,
-  conImpuesto, impuestos, retenciones, indeterminadas,
+  conUbicacion = false, conImpuesto, impuestos, retenciones, indeterminadas,
 }: {
   moneda: Moneda;
   variasMonedas: boolean;
   costo: TotalPorMoneda; profit: TotalPorMoneda; venta: TotalPorMoneda;
   conAcciones: boolean;
+  conUbicacion?: boolean;
   conImpuesto: boolean;
   impuestos: number; retenciones: number; indeterminadas: number;
 }) {
@@ -343,6 +356,7 @@ function FilaTotal({
         <td className="px-3 py-2 text-right tabular-nums text-[#18181B]">
           ${money(venta[moneda])} <span className="text-[10px] text-gray-400 font-mono">{moneda}</span>
         </td>
+        {conUbicacion && <td />}
         {conImpuesto && <td />}
         <td className={`px-3 py-2 text-right tabular-nums ${margen < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
           {(margen * 100).toFixed(1)}%
@@ -371,7 +385,7 @@ function FilaTotal({
             )}
           </td>
           <td className="px-3 py-1.5 text-right tabular-nums text-gray-700">${money(impuestos)}</td>
-          <td colSpan={conAcciones ? 2 : 1} />
+          <td colSpan={(conUbicacion ? 1 : 0) + (conAcciones ? 2 : 1)} />
         </tr>
       )}
 
@@ -383,7 +397,7 @@ function FilaTotal({
           <td className="px-3 py-2 text-right tabular-nums text-[#18181B] text-[13px]">
             ${money(total)} <span className="text-[10px] text-gray-400 font-mono">{moneda}</span>
           </td>
-          <td colSpan={conAcciones ? 2 : 1} />
+          <td colSpan={(conUbicacion ? 1 : 0) + (conAcciones ? 2 : 1)} />
         </tr>
       )}
     </>
@@ -410,6 +424,8 @@ interface RenglonProps {
   onCambiarServicio: Props['onCambiarServicio'];
   impuestoDe?: Props['impuestoDe'];
   onElegirImpuesto?: Props['onElegirImpuesto'];
+  ubicacionPrecargada?: Props['ubicacionPrecargada'];
+  onElegirUbicacion?: Props['onElegirUbicacion'];
   onCapturarProveedor?: Props['onCapturarProveedor'];
   proveedores?: ProveedorVermur[];
 }
@@ -417,7 +433,8 @@ interface RenglonProps {
 function Renglon({
   linea, servicios, editable, soloLectura, activa, conceptosActivos, onCrearConcepto,
   onEditar, onElegirConcepto, onQuitar, onMover, onComparar, onCambiarServicio,
-  impuestoDe, onElegirImpuesto, onCapturarProveedor, proveedores = [],
+  impuestoDe, onElegirImpuesto, ubicacionPrecargada, onElegirUbicacion,
+  onCapturarProveedor, proveedores = [],
 }: RenglonProps) {
   const target = compararConTarget(linea);
 
@@ -604,6 +621,15 @@ function Renglon({
         )}
       </td>
 
+      {ubicacionPrecargada && (
+        <CeldaUbicacion
+          linea={linea}
+          precargada={ubicacionPrecargada(linea)}
+          editable={editable && !soloLectura && !!onElegirUbicacion}
+          onElegir={onElegirUbicacion}
+        />
+      )}
+
       {impuestoDe && (
         <CeldaImpuesto
           linea={linea}
@@ -695,6 +721,53 @@ function CeldaImpuesto({ linea, impuesto, editable, onElegir }: {
           </span>
         )}
       </div>
+    </td>
+  );
+}
+
+// ─── Tarea 28 · La celda de ubicación ──────────────────────────────────────────
+
+/**
+ * Origen o destino del renglón, junto al impuesto. Precargada del catálogo o
+ * del servicio, editable por Pricing. «Sin determinar» es el freno natural:
+ * el impuesto que derive de la regla espejo saldrá indeterminado y el freno de
+ * «líneas sin tasa» ya lo detiene.
+ */
+function CeldaUbicacion({ linea, precargada, editable, onElegir }: {
+  linea: LineaPlana;
+  precargada: 'origen' | 'destino' | null;
+  editable: boolean;
+  onElegir?: (lineaId: string, ubicacion: 'origen' | 'destino' | null) => void;
+}) {
+  // Lo que se muestra: la captura del renglón, o la precarga.
+  const efectiva = linea.ubicacion ?? precargada;
+
+  if (!editable) {
+    return (
+      <td className="px-3 py-1.5">
+        <span className={`text-[11px] ${!efectiva ? 'text-amber-700' : 'text-gray-600'}`}>
+          {efectiva === 'origen' ? 'Origen' : efectiva === 'destino' ? 'Destino' : 'Elegir'}
+        </span>
+      </td>
+    );
+  }
+
+  return (
+    <td className="px-3 py-1.5" onClick={e => e.stopPropagation()}>
+      <select
+        value={linea.ubicacion ?? ''}
+        onChange={e => onElegir?.(linea.id, (e.target.value || null) as 'origen' | 'destino' | null)}
+        className={`text-[11px] bg-transparent border border-transparent hover:border-gray-200 focus:border-primario rounded px-1 py-0.5 outline-none ${
+          !efectiva ? 'text-amber-700' : 'text-gray-600'}`}
+      >
+        <option value="">
+          {precargada
+            ? `${precargada === 'origen' ? 'Origen' : 'Destino'} · del catálogo`
+            : 'Elegir'}
+        </option>
+        <option value="origen">Origen</option>
+        <option value="destino">Destino</option>
+      </select>
     </td>
   );
 }
