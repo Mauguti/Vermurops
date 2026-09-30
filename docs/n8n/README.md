@@ -7,7 +7,7 @@ a la derecha): la URL de producción `/webhook/...` solo responde activo.
 
 | Archivo | Webhook | Qué hace |
 |---|---|---|
-| `generar-pdf-cotizacion.n8n.json` | `POST /webhook/generar-pdf-cotizacion` | Recibe el payload de `lib/pdfCotizacion.ts`, arma el HTML, Gotenberg lo convierte y devuelve `application/pdf`. Si algo falla, responde JSON `{ ok: false, error }` con 502. |
+| `generar-pdf-cotizacion.n8n.json` | `POST /webhook/generar-pdf-cotizacion` | Valida `X-Vermur-Token` (401 si falta o no coincide), recibe el payload de `lib/pdfCotizacion.ts`, arma el HTML, Gotenberg lo convierte y devuelve `application/pdf`. Si algo falla, responde JSON `{ ok: false, error }` con 502. |
 
 ## generar-pdf-cotizacion — historia
 
@@ -30,7 +30,21 @@ la Cloud Function esperaba hasta el timeout. Ahora «Arma el HTML»,
 (JSON, 502). «Prepara respuesta» además verifica que el binario empiece con
 `%PDF-`.
 
-**Pendiente de seguridad.** El flujo NO valida `X-Vermur-Token`: cualquiera
-que conozca la URL genera PDFs a costa de Vermur. Los otros flujos sí lo
-validan; falta agregar el mismo nodo aquí (decisión de Mau: cómo se compara
-el token en n8n).
+**Seguridad (29-sep-2026).** El nodo «Valida token» (Code, con
+`onError: continueErrorOutput`) lee `headers['x-vermur-token']` y lo compara
+contra `process.env.VERMUR_N8N_TOKEN`. Sin token o con token incorrecto
+responde 401 JSON `{ ok: false, error: 'No autorizado.' }` vía «Rechaza sin
+token» (Respond to Webhook). Si la variable no existe en n8n, el nodo falla
+con un mensaje claro. El proxy (`proxyN8n.ts:156`) ya manda el header a todos
+los flujos, así que la app sigue funcionando igual; solo se cierra el acceso
+directo al webhook.
+
+**Configuración requerida en n8n:** variable de entorno `VERMUR_N8N_TOKEN` con
+el mismo valor que está en Firebase Secret Manager. Si n8n corre en Docker,
+se pone en `docker-compose.yml` o en el `.env` de n8n. Verificar que el valor
+coincida con `firebase functions:secrets:access VERMUR_N8N_TOKEN`.
+
+**Rollback:** importar la versión anterior del JSON desde git
+(`git show HEAD~1:docs/n8n/generar-pdf-cotizacion.n8n.json`), que no trae el
+nodo de validación. O desactivar el flujo nuevo y reactivar el anterior desde
+el historial de versiones de n8n.
