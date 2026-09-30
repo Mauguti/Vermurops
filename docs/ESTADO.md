@@ -1,61 +1,70 @@
-# Estado de VermurOps — 29 de septiembre de 2026 (tarde)
+# Estado de VermurOps — 30 de septiembre de 2026
 
-Corte tras publicar la segunda mitad del sprint nocturno.
+Corte tras cerrar los pendientes de la publicación 17–24.
 Todo lo que dice «verificado» trae el comando que lo comprobó.
 
 ---
 
-## 1. Qué se publicó hoy
+## 1. Lo que cerró hoy
 
-**Las 24 tareas del sprint están en producción.** Por la mañana las 16
-primeras (`0a38100`); esta tarde las ocho restantes.
+**`tsc` bloquea el build** (`94d455b`, publicado). `npm run build` era
+`vite build` a secas y vite no hace typecheck: por eso los nueve errores de
+la línea base convivieron meses con builds «limpios». Ahora es
+`tsc --noEmit && vite build`, y está comprobado que bloquea: con un error de
+tipos metido a propósito el build sale con código 2 y vite no llega a correr.
+1752 tests, tsc 0, recorrido 6/6.
 
-| # | Tarea | Merge |
-|---|---|---|
-| 17 | PLAN: una sola fuente de verdad para la tarifa elegida | `8e0fd9a` |
-| 18 | PLAN: equipos, la parte mínima para Operaciones | `49631e6` |
-| 19 | PLAN: reciclar cotizaciones y orden de la bandeja | `32ed131` |
-| 20 | PLAN C: documentos operativos y talonario del HBL | `23616df` |
-| 21 | Usuarios y roles, paso 1 | `ac6c0f2` |
-| 22 | Token en el webhook del PDF (JSON de n8n) | `0cf0de7` |
-| 23 | Bug en frío: solicitud vacía tras «Enviar a Pricing» | `de28464` |
-| 24 | Los 9 errores de tsc | `0257a96` |
+**El correo de las reglas, corregido — sin desplegar** (rama
+`fix/correo-reglas`, `adc0ca7`). `esDelEquipo()` tenía `info@digsol.com`
+desde el Bloque 9. Y `tests/reglas/equipo.test.ts` lo fijaba como correcto:
+afirmaba que «INFO@DIGSOL.COM.MX» NO era del equipo. El test protegía el
+typo. Ahora el que queda fuera es el dominio equivocado. 13/13 en verde.
 
-Antes, dos cosas sueltas: el arreglo del scroll de la ficha de la orden
-(`02062a9`), que salió por la mañana sin recorrido y **quedó validado con
-6/6** antes de empezar; y un commit sobre la 22 (`9b0d238`) que saca de git
-los diez archivos de `sprint/` que las sesiones 17 a 22 forzaron con
-`git add -f`, por la misma contradicción de la noche anterior: corrieron
-antes de que SPRINT.md dejara de pedir el reporte commiteado.
-
-**`tsc` quedó en CERO por primera vez.** Los nueve errores de la línea base
-—`Quotes.tsx`, `FichaCotizacion.tsx`, `RightChatPanel.tsx`— se cerraron en
-la tarea 24. Ya se puede volver bloqueante.
-
-**Verificado:** tests de 1730 a 1752, `tsc` 9 → 0, build limpio después de
-cada merge, y el recorrido completo **6/6** al final.
-
-### Lo que se desplegó
-
-- **Hosting:** `index-gMdkU_nb.js`, verificado contra producción.
-- **Functions: `gestionarUsuarios`** (nueva). Sin sesión responde
-  `401 {"ok":false,"error":"Falta el token de sesión."}`, comprobado.
-  Punto de regreso: `firebase functions:delete gestionarUsuarios`; la
-  pantalla queda sin backend y avisa, nada más se rompe.
-- **Reglas e índices:** nada.
-
-**Pendiente de desplegar, en `main` desde el 28-sep:** el cambio de
-`functions/src/comun/auth.ts` que mete las cinco cuentas de prueba en el
-mapa de roles del servidor **solo** bajo `FUNCTIONS_EMULATOR`. Afecta solo
-al emulador.
-
-```bash
-npx firebase deploy --only functions:extraerTarifas,functions:clasificarDocumento
-```
+**Sigue sin corregir `storage.rules:51`**, con el mismo typo. Ahí vive el
+expediente KYC. No se tocó por instrucción explícita.
 
 ---
 
-## 2. Usuarios y roles: qué hay y qué falta
+## 2. Reglas: qué está desplegado y qué no
+
+**El parche del Bloque 9 nunca se ha desplegado.** Producción sigue con
+`allow read, write: if request.auth != null`: cualquier cuenta autenticada
+lee y escribe todo. `firestore.rules` no se toca desde `0f3ec79` (24-sep).
+
+No se puede leer el ruleset desplegado desde esta máquina: el CLI de Firebase
+no expone las reglas activas, `gcloud` no está instalado y la API de
+Firebase Rules pide un token que no hay. **Confírmalo en la consola** antes
+de dar por buena cualquier suposición.
+
+Comando para publicarlas, con el equipo presente:
+
+```bash
+npx firebase deploy --only firestore:rules
+```
+
+Punto de regreso: `git revert` del commit y volver a desplegar; o desplegar
+la versión anterior del archivo (`git show 0f3ec79^:firestore.rules`). El
+despliegue de reglas es instantáneo y reversible en el mismo minuto.
+
+---
+
+## 3. Usuarios y roles: el arranque en frío
+
+`gestionarUsuarios` está desplegada y exige `usuario.gestionar`, que **solo
+tiene admin**. Tanto el cliente como el servidor leen **primero el custom
+claim** y caen al mapa de correos como respaldo.
+
+**Mau no puede invitarse a sí mismo.** Su correo no está en ninguno de los
+dos mapas de roles —ni `AuthContext` ni `functions/comun/auth.ts`—, así que
+sin claim cae al fallback `ventas` y la Function lo rechaza con 403.
+
+Quien arranca la cadena: **Gabriela Huerta o Luis Rentería**, que sí son
+`admin` en los dos mapas. Uno de ellos invita a Mau; a partir de ahí Mau
+tiene claim propio y puede invitar al resto.
+
+---
+
+## 4. Usuarios y roles: qué construyó la tarea 21
 
 La tarea 21 dejó el **paso 1**, y conviene saber qué es y qué no:
 
@@ -77,14 +86,14 @@ alimentan la UI.
 
 ---
 
-## 3. Qué hay en producción
+## 5. Qué hay en producción
 
 Las 24 tareas del sprint, el arreglo de la ficha de la orden y la Function
 `gestionarUsuarios`. Ver la sección 1 para los hashes y la verificación.
 
 ---
 
-## 4. Entregables nuevos que no son código
+## 6. Entregables nuevos que no son código
 
 **Planes** (`docs/sprint-post-junta/`):
 - `PLAN-FUENTE-TARIFA.md` — un solo campo para la tarifa elegida, reconciliacion
@@ -108,7 +117,7 @@ Las 24 tareas del sprint, el arreglo de la ficha de la orden y la Function
 
 ---
 
-## 5. Pendientes, verificados contra el código
+## 7. Pendientes, verificados contra el código
 
 ### Cola restante
 
@@ -153,8 +162,10 @@ Y lo que arrastramos de antes:
 
 ---
 
-## 6. Orden propuesto
+## 8. Orden propuesto
 
+0. **La cadena 27–34 del sprint de anoche está sin publicar.** Ocho ramas
+   empujadas, ningún merge. Va antes que todo lo demás.
 1. **Validación del equipo** con la lista consolidada. Es lo único que
    convierte «publicado» en «terminado».
 2. **Importar el JSON de n8n** del PDF y poner `VERMUR_N8N_TOKEN` como variable
@@ -166,6 +177,6 @@ Y lo que arrastramos de antes:
 5. **Desplegar las reglas por rol** (borrador en `docs/reglas/`), que es lo que
    convierte los claims en protección real.
 6. **Deshabilitar las tres cuentas de prueba** en el Auth de producción.
-7. **Volver `tsc` bloqueante** en el build, ahora que está en cero.
+7. ~~Volver `tsc` bloqueante~~ — hecho hoy (`94d455b`).
 8. Las Functions pendientes del 28-sep, cuando haya hueco:
    `npx firebase deploy --only functions:extraerTarifas,functions:clasificarDocumento`
