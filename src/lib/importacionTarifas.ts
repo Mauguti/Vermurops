@@ -523,6 +523,52 @@ export function ordenarParaRevision(lineas: LineaEnRevision[]): LineaEnRevision[
 // 5 · Duplicados contra el catálogo vivo
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 5a · Vigencia revisada — lo que llega al guardado
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Las fechas y el texto que salen de la revisión hacia el guardado. */
+export interface VigenciaRevisada {
+  fechaInicio: string | null;
+  fechaFin: string | null;
+  vigenciaTexto: string;
+}
+
+/**
+ * ¿La fecha de fin ya pasó?
+ *
+ * Cuando el correo dice «till July 31» sin año, el extractor asume uno
+ * pasado y la tarifa nace vencida — el panel la esconde. En la revisión
+ * se marca en ámbar y no se guarda hasta que alguien confirme o corrija.
+ */
+export function esVigenciaVencida(fechaFin: string | null | undefined): boolean {
+  if (!fechaFin) return false;
+  const hoy = new Date().toISOString().slice(0, 10);
+  return fechaFin < hoy;
+}
+
+/**
+ * Estado de la vigencia con respecto al guardado.
+ *
+ * Si la fecha de fin ya pasó y no se ha confirmado explícitamente,
+ * bloquea el guardado con un faltante claro.
+ */
+export function estadoVigenciaGuardable(
+  fechaFin: string | null | undefined,
+  vigenciaConfirmada: boolean,
+): { bloqueaGuardado: boolean; motivo?: string } {
+  if (!esVigenciaVencida(fechaFin)) {
+    return { bloqueaGuardado: false };
+  }
+  if (vigenciaConfirmada) {
+    return { bloqueaGuardado: false };
+  }
+  return {
+    bloqueaGuardado: true,
+    motivo: `La vigencia venció el ${fechaFin} — confirma que el año es correcto o corrige la fecha`,
+  };
+}
+
 export type AccionDuplicado = 'omitir' | 'reemplazar' | 'crear_igual';
 
 export interface Colision {

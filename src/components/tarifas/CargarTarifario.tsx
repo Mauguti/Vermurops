@@ -11,8 +11,9 @@ import { useProveedores } from '../../hooks/useProveedores';
 import { useTarifas } from '../../hooks/useTarifas';
 import RevisionTarifasExtraidas from './RevisionTarifasExtraidas';
 import SelectorProveedor from '../proveedores/SelectorProveedor';
-import type { LineaEnRevision } from '../../lib/importacionTarifas';
+import type { LineaEnRevision, VigenciaRevisada } from '../../lib/importacionTarifas';
 import { resumenDocumento, type DocumentoTarifario } from '../../lib/documentoTarifario';
+import { textoAImagen } from '../../lib/textoAImagen';
 
 /**
  * Carga de tarifario con IA — el MISMO componente en los dos puntos de entrada.
@@ -108,13 +109,15 @@ export default function CargarTarifario({
 
   const procesarTexto = async () => {
     if (!texto.trim()) return;
-    // El correo pegado se convierte en archivo: mismo camino, misma evidencia.
-    const blob = new File(
-      [texto],
-      `correo-${new Date().toISOString().slice(0, 10)}.txt`,
-      { type: 'text/plain' },
-    );
-    await elegir(blob);
+    setError(null);
+    try {
+      // n8n trata todo como imagen: un .txt falla con «Could not process image».
+      // Se renderiza el texto como PNG legible y eso sí lo lee bien.
+      const img = await textoAImagen(texto);
+      await elegir(img);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   };
 
   if (pendiente) {
@@ -127,8 +130,8 @@ export default function CargarTarifario({
         proveedores={proveedores}
         proveedorElegidoId={proveedorId}
         onCancelar={onCerrar}
-        onGuardar={async (lineas, provId) => {
-          const n = await guardar(lineas, provId, pendiente.documento, createTarifa);
+        onGuardar={async (lineas, provId, vigencia) => {
+          const n = await guardar(lineas, provId, vigencia, pendiente.documento, createTarifa);
           await registrarExtraccion(pendiente.documento.id, pendiente.documento.id, n);
           onGuardadas?.(n);
           onCerrar();
@@ -319,6 +322,7 @@ export default function CargarTarifario({
 async function guardar(
   lineas: LineaEnRevision[],
   proveedorId: string,
+  vigencia: VigenciaRevisada,
   documento: DocumentoTarifario,
   createTarifa: (t: never) => Promise<void>,
 ): Promise<number> {
@@ -341,9 +345,9 @@ async function guardar(
           ...(l.montoMinimo ? { montoMinimo: l.montoMinimo } : {}),
         },
         moneda: l.moneda!,
-        vigenciaTexto: '',
-        fechaInicio: new Date().toISOString().slice(0, 10),
-        fechaFin: null,
+        vigenciaTexto: vigencia.vigenciaTexto,
+        fechaInicio: vigencia.fechaInicio ?? new Date().toISOString().slice(0, 10),
+        fechaFin: vigencia.fechaFin ?? null,
         tiempoTransitoDias: l.extraida.tiempoTransito ?? null,
         freeTimeDias: l.extraida.freeTime ?? null,
         condiciones: l.extraida.condiciones ?? '',
