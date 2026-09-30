@@ -16,6 +16,8 @@ import type { Request } from 'firebase-functions/v2/https';
 
 export type UserRole = 'ventas' | 'pricing' | 'operaciones' | 'administracion' | 'admin';
 
+export const ROLES_VALIDOS: UserRole[] = ['ventas', 'pricing', 'operaciones', 'administracion', 'admin'];
+
 /**
  * ⚠️ SOLO el equipo real de Vermur (Bloque 8, 25-sep-2026).
  *
@@ -90,7 +92,8 @@ const CAPACIDADES: Record<UserRole, string[]> = {
   admin: ['lead.crear', 'cotizacion.solicitar', 'kanban.ver', 'cotizacion.crear',
           'tarifa.gestionar', 'tarifario.cargar', 'proveedor.altaRapida',
           'catalogo.importarMasivo', 'cliente.alta', 'proveedor.alta', 'puerto.alta',
-          'embarque.generar', 'factura.generar', 'notaCredito.generar'],
+          'embarque.generar', 'factura.generar', 'notaCredito.generar',
+          'usuario.gestionar'],
 };
 
 export interface UsuarioVerificado {
@@ -129,7 +132,13 @@ export async function verificarUsuario(req: Request): Promise<UsuarioVerificado>
   const email = (decoded.email ?? '').toLowerCase().trim();
   if (!email) throw new ErrorAuth(401, 'El token no trae correo.');
 
-  return { uid: decoded.uid, email, rol: MAPA_EFECTIVO[email] ?? ROL_FALLBACK };
+  // Custom claims primero (puestos por asignarRol), mapa viejo como respaldo.
+  const rolClaim = decoded.rol as UserRole | undefined;
+  const rolEfectivo = (rolClaim && ROLES_VALIDOS.includes(rolClaim))
+    ? rolClaim
+    : MAPA_EFECTIVO[email] ?? ROL_FALLBACK;
+
+  return { uid: decoded.uid, email, rol: rolEfectivo };
 }
 
 /** Lanza si el usuario no tiene la capacidad. */

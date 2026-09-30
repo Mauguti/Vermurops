@@ -1,9 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { onAuthStateChanged, signOut as firebaseSignOut } from 'firebase/auth';
+import { onAuthStateChanged, signOut as firebaseSignOut, getIdTokenResult } from 'firebase/auth';
 import { AuthUser, isViewAllowed, UserRole } from './users';
 import { Capacidad, puede as puedeCapacidad } from './permisos';
 import { auth, USANDO_EMULADORES } from '../firebase';
 import { medirInicioDeSesion } from '../lib/analitica';
+
+const ROLES_VALIDOS: UserRole[] = ['ventas', 'pricing', 'operaciones', 'administracion', 'admin'];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // AuthContext — contexto global de autenticación para VermurOps
@@ -117,9 +119,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const rolMedido = useRef<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser && firebaseUser.email) {
-        const rol = getRolByEmail(firebaseUser.email);
+        // Custom claims primero (puestos por gestionarUsuarios), mapa viejo como respaldo.
+        let rol: UserRole;
+        try {
+          const tokenResult = await getIdTokenResult(firebaseUser);
+          const claimRol = tokenResult.claims.rol as string | undefined;
+          rol = (claimRol && ROLES_VALIDOS.includes(claimRol as UserRole))
+            ? claimRol as UserRole
+            : getRolByEmail(firebaseUser.email);
+        } catch {
+          rol = getRolByEmail(firebaseUser.email);
+        }
         const nombre = firebaseUser.displayName || firebaseUser.email.split('@')[0];
         const avatar = nombre.substring(0, 2).toUpperCase();
 
@@ -145,7 +157,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Al volver a la pestaña, refrescar el token para detectar cambios de rol.
+    // gestionarUsuarios revoca los refresh tokens al cambiar rol, y el claim
+    // nuevo solo se ve con un token fresco.
+    const refrescarAlVolver = () => {
+      if (document.visibilityState === 'visible' && auth.currentUser) {
+        auth.currentUser.getIdToken(true).catch(() => {
+          // Si falla (token revocado), onAuthStateChanged lo maneja.
+        });
+      }
+    };
+    document.addEventListener('visibilitychange', refrescarAlVolver);
+
+    return () => {
+      unsubscribe();
+      document.removeEventListener('visibilitychange', refrescarAlVolver);
+    };
   }, []);
 
   const logout = useCallback(async () => {
