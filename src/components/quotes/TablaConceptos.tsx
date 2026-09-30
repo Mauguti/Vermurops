@@ -708,7 +708,7 @@ function CeldaImpuesto({ linea, impuesto, editable, onElegir }: {
  * costo en pesos rotulado en dólares se ve perfectamente bien y solo se
  * descubre cuando llega a una factura.
  */
-function CapturaProveedor({ proveedores, costo, onCapturar }: {
+export function CapturaProveedor({ proveedores, costo, onCapturar }: {
   proveedores: ProveedorVermur[];
   costo: number;
   onCapturar: (proveedorId: string, nombre: string, moneda: 'MXN' | 'USD') => void;

@@ -32,6 +32,8 @@ export interface CeldasRenglon {
   profit?: React.ReactNode;
   venta?: React.ReactNode;
   acciones?: React.ReactNode;
+  /** Bloque 27 · Impuesto del renglón, para la cotización. */
+  impuesto?: React.ReactNode;
 }
 
 const ESTADO_CLS: Record<EstadoProveedor, string> = {
@@ -53,6 +55,8 @@ interface Props {
   extraGrupo?: (g: GrupoProveedor) => React.ReactNode;
   /** Hay columna de acciones. */
   conAcciones?: boolean;
+  /** Mostrar columna de impuesto (la cotización la necesita, el embarque no). */
+  conImpuesto?: boolean;
   /** Renglón «resaltado» (la línea activa del panel de tarifas). */
   claveActiva?: string | null;
   onClickRenglon?: (r: RenglonProveedor) => void;
@@ -61,7 +65,7 @@ interface Props {
 
 export default function TablaPorProveedor({
   consolidado, nombreProveedor, celdas, estadoDe, extraGrupo, conAcciones = false,
-  claveActiva, onClickRenglon, vacio,
+  conImpuesto = false, claveActiva, onClickRenglon, vacio,
 }: Props) {
   const [cerrados, setCerrados] = useState<Set<string>>(new Set());
   const toggle = (k: string) => setCerrados(prev => {
@@ -73,7 +77,7 @@ export default function TablaPorProveedor({
   }
 
   const variasMonedas = consolidado.monedasActivas.length > 1;
-  const cols = 5 + (conAcciones ? 1 : 0);
+  const cols = 5 + (conImpuesto ? 1 : 0) + (conAcciones ? 1 : 0);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
@@ -86,6 +90,7 @@ export default function TablaPorProveedor({
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Profit</th>
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Venta</th>
               <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider text-right">Margen %</th>
+              {conImpuesto && <th className="px-3 py-2 text-[9px] font-bold text-gray-400 uppercase tracking-wider">Impuesto</th>}
               {conAcciones && <th className="px-2 py-2 w-[140px]" />}
             </tr>
           </thead>
@@ -173,6 +178,7 @@ export default function TablaPorProveedor({
                       <td className={`px-3 py-1.5 text-right tabular-nums ${r.margen !== null && r.margen < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
                         {pct(r.margen)}
                       </td>
+                      {conImpuesto && <td className="px-3 py-1.5">{c.impuesto ?? null}</td>}
                       {conAcciones && <td className="px-2 py-1.5">{c.acciones ?? null}</td>}
                     </tr>
                   );
@@ -220,7 +226,7 @@ function FilaTotal({ etiqueta, moneda, variasMonedas, t, cols, tono }: {
       <td className={`px-3 py-2 text-right tabular-nums ${t.margen !== null && t.margen < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
         {pct(t.margen)}
       </td>
-      {cols > 5 && <td />}
+      {cols > 5 && <td colSpan={cols - 5} />}
     </tr>
   );
 }
