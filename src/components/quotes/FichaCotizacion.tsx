@@ -51,7 +51,8 @@ import { totalDeCotizacion, tieneTotal, NOTA_VARIAS_MONEDAS } from '../../lib/to
 import { capturarTarifaManual } from '../../lib/tarifaManual';
 import type { LineaPlana } from '../../lib/lineasCotizacion';
 import {
-  impuestoDeLinea, type OpcionImpuesto,
+  impuestoDeLinea, OPCIONES_IMPUESTO, ETIQUETA_IMPUESTO,
+  type OpcionImpuesto,
 } from '../../lib/impuestoLinea';
 import { reglaDeConcepto } from '../../lib/ivaCotizacion';
 import {
@@ -76,7 +77,7 @@ import {
   faltantesDeImpuesto,
   resumenImpuestoFaltante,
 } from '../../lib/prontitudCotizacion';
-import TablaConceptos, { ServicioDeLaTabla } from './TablaConceptos';
+import TablaConceptos, { ServicioDeLaTabla, CapturaProveedor } from './TablaConceptos';
 import {
   FichaLayout, FichaHeader, FichaTabs, FichaFooter, BadgeEstado,
 } from '../ui/ficha/FichaLayout';
@@ -105,6 +106,7 @@ import { usePdfCotizacion } from '../../hooks/usePdfCotizacion';
 import TablaPorProveedor, { ToggleVistaCargos } from '../cargos/TablaPorProveedor';
 import { consolidarPorProveedor, desdeLineas } from '../../lib/cargosPorProveedor';
 import { usePreferenciasUsuario } from '../../hooks/usePreferenciasUsuario';
+import ConceptoSelector from '../conceptos/ConceptoSelector';
 
 // ─── Re-exports for backward compat (other files may import these from here) ──
 export { ServicioSection } from './ServicioSection';
@@ -243,6 +245,9 @@ export default function FichaCotizacion({
   // Nuevo Servicio
   const [showAddServicio, setShowAddServicio] = useState(false);
   const [newServicioTipo, setNewServicioTipo] = useState<TipoServicio>('maritimo');
+
+  // Borrador para «Agregar concepto» en la vista Por proveedor
+  const [borradorProvServicio, setBorradorProvServicio] = useState<string | null>(null);
 
   // FC-2: concepto activo en el panel de tarifas
   const [activeConcepto, setActiveConcepto] = useState<{ id: string; servicioId: string } | null>(null);
@@ -750,8 +755,15 @@ export default function FichaCotizacion({
   const consolidadoProveedores = useMemo(() => consolidarPorProveedor(desdeLineas(lineasPlanas)), [lineasPlanas]);
   const { prefs, guardar: guardarPreferencia } = usePreferenciasUsuario();
   const vistaCargos = prefs.vistaCargos ?? 'proveedor';
-  /** La clave del renglón es `${lineaId}::${componenteId}` o la línea sola. */
-  const lineaDeRenglon = (clave: string) => clave.split('::')[0];
+  /**
+   * La clave del renglón es `${lineaId}::${componenteId}` o la línea sola.
+   * lineaId ya contiene un `::` (servicioId::conceptoId), así que se toman
+   * las dos primeras partes para reconstruirlo.
+   */
+  const lineaDeRenglon = (clave: string) => {
+    const partes = clave.split('::');
+    return partes.slice(0, 2).join('::');
+  };
 
   /**
    * El total del encabezado, POR MONEDA de las líneas (§4.3).
@@ -1702,11 +1714,12 @@ export default function FichaCotizacion({
               )}
             </div>
 
-            {vistaCargos === 'proveedor' ? (
+            {vistaCargos === 'proveedor' ? (<>
               <TablaPorProveedor
                 consolidado={consolidadoProveedores}
                 nombreProveedor={(id, fallback) => (id ? proveedores.find(p => p.id === id)?.nombre : '') || fallback}
                 conAcciones={rolActivo !== 'ventas'}
+                conImpuesto={rolActivo !== 'ventas' && !bloqueada}
                 onClickRenglon={r => handleCompararProveedor(lineaDeRenglon(r.clave))}
                 celdas={r => {
                   const lineaId = lineaDeRenglon(r.clave);
@@ -1714,6 +1727,8 @@ export default function FichaCotizacion({
                   if (!linea) return {};
                   const editable = rolActivo !== 'ventas' && !bloqueada && !r.compartido;
                   const input = 'w-[90px] px-2 py-1 text-right tabular-nums border border-transparent hover:border-gray-200 focus:border-primario focus:bg-white bg-transparent rounded outline-none text-[12px]';
+                  const impuesto = impuestoDeLineaPlana(linea);
+                  const indeterminado = impuesto.tasa === null;
                   return {
                     costo: editable && !linea.costoDerivado ? (
                       <input type="number" value={linea.costoCapturado ? linea.costo : ''} placeholder="—"
@@ -1725,20 +1740,108 @@ export default function FichaCotizacion({
                         onClick={e => e.stopPropagation()}
                         onChange={e => handleEditarLineaPlana(linea.id, 'profit', Number(e.target.value))} className={input} />
                     ) : undefined,
-                    acciones: rolActivo !== 'ventas' && !bloqueada && linea.conceptoLocalId ? (
-                      <button onClick={e => { e.stopPropagation(); handleCompararProveedor(linea.id); }} className="text-[11px] font-semibold text-primario hover:underline whitespace-nowrap">
-                        Comparar
-                      </button>
+                    impuesto: editable ? (
+                      <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                        <select
+                          value={linea.impuesto ?? ''}
+                          onChange={e => handleElegirImpuesto(linea.id, (e.target.value || null) as OpcionImpuesto | null)}
+                          title={impuesto.detalle}
+                          className={`text-[11px] bg-transparent border border-transparent hover:border-gray-200 focus:border-primario rounded px-1 py-0.5 outline-none ${
+                            indeterminado ? 'text-amber-700' : 'text-gray-600'}`}
+                        >
+                          <option value="">
+                            {indeterminado
+                              ? 'Sin determinar'
+                              : `${impuesto.opcion ? ETIQUETA_IMPUESTO[impuesto.opcion] : `${impuesto.tasa}%`} · del catálogo`}
+                          </option>
+                          {OPCIONES_IMPUESTO.map(o => (
+                            <option key={o} value={o}>{ETIQUETA_IMPUESTO[o]}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <span className={`text-[11px] ${indeterminado ? 'text-amber-700' : 'text-gray-600'}`} title={impuesto.detalle}>
+                        {indeterminado ? 'Sin determinar' : (impuesto.opcion ? ETIQUETA_IMPUESTO[impuesto.opcion] : `${impuesto.tasa}%`)}
+                      </span>
+                    ),
+                    acciones: rolActivo !== 'ventas' && !bloqueada ? (
+                      <div className="flex flex-col gap-1 items-start">
+                        {linea.conceptoLocalId && (
+                          <button onClick={e => { e.stopPropagation(); handleCompararProveedor(linea.id); }} className="text-[11px] font-semibold text-primario hover:underline whitespace-nowrap">
+                            Comparar
+                          </button>
+                        )}
+                        {!linea.costoDerivado && linea.costo > 0 && !linea.proveedorId && (
+                          <CapturaProveedor
+                            proveedores={proveedores}
+                            costo={linea.costo}
+                            onCapturar={(id, nombre, moneda) =>
+                              handleCapturarProveedor(linea.id, id, nombre, moneda)}
+                          />
+                        )}
+                      </div>
                     ) : undefined,
                   };
                 }}
                 vacio={(
                   <div className="bg-white border border-dashed border-gray-200 rounded-xl py-10 text-center">
-                    <p className="text-[12px] text-gray-400">Sin conceptos todavía. Cambia a «Por concepto» para agregar el primero.</p>
+                    <p className="text-[12px] text-gray-400">Sin conceptos todavía.</p>
+                    {rolActivo !== 'ventas' && !bloqueada && serviciosDeLaTabla[0] && (
+                      <button
+                        onClick={() => setBorradorProvServicio(serviciosDeLaTabla[0].id)}
+                        className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-primario hover:bg-primario/5 px-2.5 py-1.5 rounded-lg transition-colors"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Agregar el primero
+                      </button>
+                    )}
                   </div>
                 )}
               />
-            ) : (
+
+              {/* Agregar concepto desde la vista Por proveedor */}
+              {rolActivo !== 'ventas' && !bloqueada && serviciosDeLaTabla.length > 0 && !borradorProvServicio && consolidadoProveedores.grupos.length > 0 && (
+                <div className="px-3 py-2">
+                  <button
+                    onClick={() => setBorradorProvServicio(serviciosDeLaTabla[0].id)}
+                    className="flex items-center gap-1.5 text-[11px] font-bold text-primario hover:bg-primario/5 px-2 py-1.5 rounded-lg transition-colors"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Agregar concepto
+                  </button>
+                </div>
+              )}
+
+              {borradorProvServicio && (
+                <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-2 shadow-sm">
+                  <div className="flex items-center gap-2">
+                    {serviciosDeLaTabla.length > 1 && (
+                      <select
+                        value={borradorProvServicio}
+                        onChange={e => setBorradorProvServicio(e.target.value)}
+                        className="px-2 py-1 bg-gray-50 border border-gray-200 rounded text-[11px] font-semibold text-gray-700 outline-none focus:border-primario cursor-pointer"
+                      >
+                        {serviciosDeLaTabla.map(s => <option key={s.id} value={s.id}>{s.etiqueta}</option>)}
+                      </select>
+                    )}
+                    <div className="flex-1">
+                      <ConceptoSelector
+                        compacto
+                        autoAbrir
+                        selectedNombre={null}
+                        conceptos={conceptosActivos}
+                        onSelect={(conceptoId, nombre) => {
+                          handleAgregarLineaPlana(borradorProvServicio!, conceptoId, nombre);
+                          setBorradorProvServicio(null);
+                        }}
+                      />
+                    </div>
+                    <button onClick={() => setBorradorProvServicio(null)} className="p-1 text-gray-300 hover:text-red-500" title="Cancelar">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-amber-700">Elige el concepto del catálogo: la línea se crea al elegirlo.</p>
+                </div>
+              )}
+            </>) : (
             <TablaConceptos
               lineas={lineasPlanas}
               servicios={serviciosDeLaTabla}
