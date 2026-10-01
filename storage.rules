@@ -48,7 +48,7 @@ service firebase.storage {
           'angel.luna@vermur.com',
           'gabriela.huerta@vermur.com',
           'luis.renteria@vermur.com',
-          'info@digsol.com'
+          'info@digsol.com.mx'
           // EQUIPO:FIN
         ];
     }
