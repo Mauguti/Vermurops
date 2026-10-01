@@ -254,6 +254,20 @@ export interface ConceptoCotizacion {
    */
   impuesto?: 'iva16' | 'iva0' | 'exento';
 
+  /**
+   * Tarea 28 · Dónde ocurre ESTE concepto: origen o destino.
+   *
+   * Un embarque puerta a puerta lleva servicios en origen Y en destino a la
+   * vez. Un solo campo a nivel servicio no lo puede representar: la ubicación
+   * es del concepto.
+   *
+   * Ausente en los conceptos anteriores a esto. El fallback:
+   *   1. Si el concepto del catálogo declara un solo lado, ese manda.
+   *   2. Si no, se lee `servicio.ubicacion` (campo viejo, no se borra).
+   *   3. Si tampoco, queda indeterminado.
+   */
+  ubicacion?: 'origen' | 'destino';
+
   id: string;
   nombre: string;
   /** FK al catálogo conceptos/. null/undefined = concepto legacy (texto libre). */

@@ -73,11 +73,20 @@ export interface ResultadoIVALinea {
 export function ubicacionDeLinea(
   concepto: Pick<ConceptoVermur, 'aplicaOrigen' | 'aplicaDestino'> | null | undefined,
   servicio: Pick<ServicioSolicitado, 'ubicacion'>,
+  /**
+   * Tarea 28 · Ubicación capturada POR RENGLÓN. Si está, manda sobre todo:
+   * es una decisión explícita de Pricing para esta línea.
+   */
+  ubicacionDelConcepto?: 'origen' | 'destino',
 ): 'origen' | 'destino' | undefined {
+  // 1. Captura explícita del renglón (tarea 28): manda.
+  if (ubicacionDelConcepto) return ubicacionDelConcepto;
+  // 2. El catálogo lo resuelve a un solo lado.
   if (concepto) {
     if (concepto.aplicaOrigen && !concepto.aplicaDestino) return 'origen';
     if (concepto.aplicaDestino && !concepto.aplicaOrigen) return 'destino';
   }
+  // 3. Respaldo: la ubicación vieja del servicio.
   return servicio.ubicacion;
 }
 
@@ -117,6 +126,8 @@ export function ivaDeLinea(
   reglaIVA: ReglaIVA | undefined | null,
   servicio: ServicioSolicitado,
   concepto?: Pick<ConceptoVermur, 'aplicaOrigen' | 'aplicaDestino'> | null,
+  /** Tarea 28 · Ubicación capturada por renglón. */
+  ubicacionDelConcepto?: 'origen' | 'destino',
 ): ResultadoIVALinea {
   if (!reglaIVA) {
     return {
@@ -146,7 +157,7 @@ export function ivaDeLinea(
     return { iva: null, motivo: 'sin_trafico', detalle: motivo };
   }
 
-  const ubicacion = ubicacionDeLinea(concepto, servicio);
+  const ubicacion = ubicacionDeLinea(concepto, servicio, ubicacionDelConcepto);
   if (!ubicacion) {
     return {
       iva: null,

@@ -99,6 +99,8 @@ export function impuestoDeLinea(
    * esa es la ubicación del renglón, aunque su servicio diga otra cosa.
    */
   concepto?: Pick<ConceptoVermur, 'aplicaOrigen' | 'aplicaDestino'> | null,
+  /** Tarea 28 · Ubicación capturada por renglón, manda sobre todo. */
+  ubicacionDelConcepto?: 'origen' | 'destino',
 ): ImpuestoLinea {
   if (capturado) {
     return { opcion: capturado, tasa: TASA_DE_OPCION[capturado], origen: 'capturado' };
@@ -108,7 +110,7 @@ export function impuestoDeLinea(
     return { opcion: 'exento', tasa: 0, origen: 'derivado' };
   }
 
-  const r = ivaDeLinea(reglaIVA, servicio, concepto);
+  const r = ivaDeLinea(reglaIVA, servicio, concepto, ubicacionDelConcepto);
   if (!r.iva) {
     return { opcion: null, tasa: null, origen: 'indeterminado', detalle: r.detalle };
   }

@@ -43,6 +43,26 @@ describe('ubicacionDeLinea', () => {
   it('sin ubicación en ninguno de los dos, no se inventa', () => {
     expect(ubicacionDeLinea(null, { ubicacion: undefined })).toBeUndefined();
   });
+
+  // ─── Tarea 28 · tercer argumento: ubicación explícita del concepto ──────
+
+  it('la ubicación capturada del concepto gana sobre todo', () => {
+    // El usuario eligió «destino» en la fila, y el catálogo dice origen-only.
+    // Lo explícito manda.
+    expect(ubicacionDeLinea(
+      { aplicaOrigen: true, aplicaDestino: false }, srvOrigen, 'destino',
+    )).toBe('destino');
+  });
+
+  it('sin captura explícita, el catálogo sigue mandando', () => {
+    expect(ubicacionDeLinea(
+      { aplicaOrigen: false, aplicaDestino: true }, srvOrigen, undefined,
+    )).toBe('destino');
+  });
+
+  it('sin captura ni catálogo, el servicio sigue como fallback', () => {
+    expect(ubicacionDeLinea(null, srvDestino, undefined)).toBe('destino');
+  });
 });
 
 describe('ivaDeLinea con la ubicación del concepto', () => {

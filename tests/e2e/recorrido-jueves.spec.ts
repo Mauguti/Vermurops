@@ -191,7 +191,9 @@ test('Pricing · comparativa, elige el paquete, versión nueva, consolida y gene
   await lineaDoc.locator('input[type="number"]').last().fill('50');
 
   // Impuesto de Documentation: regla espejo sin tráfico → Pricing elige a mano.
-  await lineaDoc.locator('select').selectOption('iva0');
+  // Tarea 28: hay dos selects por fila (impuesto + ubicación); apuntar al de impuesto
+  // que tiene las opciones iva0/iva16, no al de ubicación (origen/destino).
+  await lineaDoc.locator('select', { has: page.locator('option[value="iva0"]') }).selectOption('iva0');
 
   await page.getByRole('button', { name: 'Cotizaciones recibidas' }).click();
   await page.getByRole('button', { name: 'Armar cotización' }).click();
