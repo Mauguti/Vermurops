@@ -6,7 +6,8 @@
         "httpMethod": "POST",
         "path": "generar-pdf-cotizacion",
         "responseMode": "responseNode",
-        "options": {}
+        "options": {},
+        "authentication": "headerAuth"
       },
       "id": "96b68f74-24f7-4491-a3eb-7691253a0eea",
       "name": "Recibe cotización",
@@ -16,46 +17,12 @@
         -48,
         -48
       ],
-      "webhookId": "vermur-pdf-cotizacion"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Valida que la petición venga del proxy de VermurOps con el token correcto.\n// Sin este nodo, cualquiera con la URL del webhook genera PDFs a costa de Vermur.\n// El proxy (functions/src/comun/proxyN8n.ts) manda el secreto en X-Vermur-Token;\n// el valor esperado vive en la variable de entorno VERMUR_N8N_TOKEN de n8n.\nconst headers = $input.first().json.headers || {};\nconst token = headers['x-vermur-token'];\nconst esperado = process.env.VERMUR_N8N_TOKEN;\n\nif (!esperado) {\n  throw new Error('VERMUR_N8N_TOKEN no está configurada en las variables de entorno de n8n.');\n}\n\nif (!token || token !== esperado) {\n  throw new Error('Token inválido o ausente.');\n}\n\n// Token válido: pasar los datos al siguiente nodo sin modificarlos.\nreturn [$input.first()];"
-      },
-      "id": "a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
-      "name": "Valida token",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        192,
-        -48
-      ],
-      "onError": "continueErrorOutput"
-    },
-    {
-      "parameters": {
-        "respondWith": "json",
-        "responseBody": "={{ JSON.stringify({ ok: false, error: 'No autorizado.' }) }}",
-        "options": {
-          "responseCode": 401,
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Content-Type",
-                "value": "application/json"
-              }
-            ]
-          }
+      "webhookId": "vermur-pdf-cotizacion",
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Token VermurOps"
         }
-      },
-      "id": "b2c3d4e5-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
-      "name": "Rechaza sin token",
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1,
-      "position": [
-        432,
-        -240
-      ]
+      }
     },
     {
       "parameters": {
@@ -187,25 +154,7 @@
       "main": [
         [
           {
-            "node": "Valida token",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Valida token": {
-      "main": [
-        [
-          {
             "node": "Arma el HTML",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Rechaza sin token",
             "type": "main",
             "index": 0
           }

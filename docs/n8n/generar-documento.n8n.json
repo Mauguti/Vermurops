@@ -1,0 +1,275 @@
+{
+  "name": "Generar documento (general)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generar-documento",
+        "responseMode": "responseNode",
+        "options": {},
+        "authentication": "headerAuth"
+      },
+      "id": "0d6f0a8e-3b1c-4f7a-9e21-6a1c2b3d4e01",
+      "name": "Recibe documento",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        -48
+      ],
+      "webhookId": "vermur-generar-documento",
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Token VermurOps"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Flujo GENERAL de documentos (30-sep-2026).\n// n8n ya no arma el HTML: la plataforma llena la plantilla (Cloud Function,\n// versionada en git) y aquí solo se convierte a PDF. Así un documento nuevo\n// (carta encomienda de otra naviera, HBL, booking…) no requiere flujo nuevo.\n//\n// Body esperado (JSON):\n//   html          string   documento HTML completo, UTF-8. Imágenes en data: URI.\n//   nombreArchivo string   p. ej. \"VLIM-2026-0042-carta-encomienda-cosco-v1.pdf\"\n//   tipo          string   p. ej. \"carta_encomienda\" (solo para el log)\n//   pagina        objeto   opcional: { ancho, alto } en pulgadas y\n//                          { margenSup, margenInf, margenIzq, margenDer } en pulgadas.\n//                          Si no viene, manda el @page del CSS de la plantilla.\nconst body = $input.first().json.body || $input.first().json;\nconst html = body.html;\n\nif (typeof html !== 'string' || !/<html[\\s>]/i.test(html)) {\n  throw new Error('Falta «html» o no es un documento HTML completo.');\n}\nconst bytesHtml = Buffer.byteLength(html, 'utf8');\nif (bytesHtml > 8 * 1024 * 1024) {\n  throw new Error('El HTML pesa ' + Math.round(bytesHtml / 1024) + ' KB; el límite es 8 MB.');\n}\n\nconst limpio = s => String(s || '').replace(/[^\\w.\\-]+/g, '-').replace(/-+/g, '-').slice(0, 120);\nlet nombre = limpio(body.nombreArchivo) || ('documento-' + Date.now());\nif (!/\\.pdf$/i.test(nombre)) nombre += '.pdf';\n\n// Tamaño y márgenes: número en pulgadas o vacío. Vacío = lo decide el CSS.\nconst num = v => (v === undefined || v === null || v === '' || isNaN(Number(v))) ? '' : String(Number(v));\nconst p = body.pagina || {};\nconst gotenberg = {\n  preferCssPageSize: 'true',\n  printBackground: 'true',\n  paperWidth: num(p.ancho) || '8.5',\n  paperHeight: num(p.alto) || '11',\n  marginTop: num(p.margenSup) || '0',\n  marginBottom: num(p.margenInf) || '0',\n  marginLeft: num(p.margenIzq) || '0',\n  marginRight: num(p.margenDer) || '0',\n};\n\n// Gotenberg exige que el archivo se llame index.html. La propiedad binaria\n// se llama «archivo» (sin punto: n8n lee «a.b» como ruta anidada).\nconst archivo = await this.helpers.prepareBinaryData(Buffer.from(html, 'utf8'), 'index.html', 'text/html');\nreturn [{\n  json: { nombreArchivo: nombre, tipo: String(body.tipo || ''), bytesHtml, gotenberg },\n  binary: { archivo },\n}];"
+      },
+      "id": "0d6f0a8e-3b1c-4f7a-9e21-6a1c2b3d4e04",
+      "name": "Arma el archivo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        -48
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://gotenberg:3000/forms/chromium/convert/html",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "files",
+              "inputDataFieldName": "archivo"
+            },
+            {
+              "parameterType": "formData",
+              "name": "preferCssPageSize",
+              "value": "={{ $('Arma el archivo').first().json.gotenberg.preferCssPageSize }}"
+            },
+            {
+              "parameterType": "formData",
+              "name": "printBackground",
+              "value": "={{ $('Arma el archivo').first().json.gotenberg.printBackground }}"
+            },
+            {
+              "parameterType": "formData",
+              "name": "paperWidth",
+              "value": "={{ $('Arma el archivo').first().json.gotenberg.paperWidth }}"
+            },
+            {
+              "parameterType": "formData",
+              "name": "paperHeight",
+              "value": "={{ $('Arma el archivo').first().json.gotenberg.paperHeight }}"
+            },
+            {
+              "parameterType": "formData",
+              "name": "marginTop",
+              "value": "={{ $('Arma el archivo').first().json.gotenberg.marginTop }}"
+            },
+            {
+              "parameterType": "formData",
+              "name": "marginBottom",
+              "value": "={{ $('Arma el archivo').first().json.gotenberg.marginBottom }}"
+            },
+            {
+              "parameterType": "formData",
+              "name": "marginLeft",
+              "value": "={{ $('Arma el archivo').first().json.gotenberg.marginLeft }}"
+            },
+            {
+              "parameterType": "formData",
+              "name": "marginRight",
+              "value": "={{ $('Arma el archivo').first().json.gotenberg.marginRight }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "pdf"
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "0d6f0a8e-3b1c-4f7a-9e21-6a1c2b3d4e05",
+      "name": "Gotenberg convierte",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        672,
+        -48
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst origen = $('Arma el archivo').first().json;\nconst bin = item.binary && item.binary.pdf;\nif (!bin) {\n  throw new Error('Gotenberg no devolvió el archivo PDF.');\n}\n// Un PDF válido empieza con «%PDF-». Si Gotenberg devolvió otra cosa, es error.\nconst buffer = await this.helpers.getBinaryDataBuffer(0, 'pdf');\nif (buffer.subarray(0, 5).toString('latin1') !== '%PDF-') {\n  throw new Error('Gotenberg devolvió algo que no es un PDF: ' + buffer.subarray(0, 40).toString('latin1'));\n}\nbin.fileName = origen.nombreArchivo;\nbin.mimeType = 'application/pdf';\nreturn [{ json: { ok: true, nombreArchivo: origen.nombreArchivo, tipo: origen.tipo, bytes: buffer.length }, binary: { pdf: bin } }];"
+      },
+      "id": "0d6f0a8e-3b1c-4f7a-9e21-6a1c2b3d4e06",
+      "name": "Prepara respuesta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        -48
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "binary",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/pdf"
+              }
+            ]
+          }
+        }
+      },
+      "id": "0d6f0a8e-3b1c-4f7a-9e21-6a1c2b3d4e07",
+      "name": "Devuelve el PDF",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Rama de error: el HTML no llegó bien, Gotenberg falló o no devolvió PDF.\n// Se contesta JSON para que la plataforma lo muestre; el detalle queda en la\n// ejecución de n8n.\nconst item = $input.first();\nconst detalle = (item.json && (item.json.error && (item.json.error.message || item.json.error))) || item.json?.message || 'sin detalle';\nreturn [{ json: {\n  ok: false,\n  error: 'El generador de documentos falló al armar el PDF. Vuelve a intentarlo; si se repite, avisa a sistemas.',\n  detalle: String(detalle).slice(0, 500),\n} }];"
+      },
+      "id": "0d6f0a8e-3b1c-4f7a-9e21-6a1c2b3d4e08",
+      "name": "Arma el error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        176
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 502,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "0d6f0a8e-3b1c-4f7a-9e21-6a1c2b3d4e09",
+      "name": "Devuelve el error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        176
+      ]
+    }
+  ],
+  "connections": {
+    "Recibe documento": {
+      "main": [
+        [
+          {
+            "node": "Arma el archivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Arma el archivo": {
+      "main": [
+        [
+          {
+            "node": "Gotenberg convierte",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Arma el error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gotenberg convierte": {
+      "main": [
+        [
+          {
+            "node": "Prepara respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Arma el error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara respuesta": {
+      "main": [
+        [
+          {
+            "node": "Devuelve el PDF",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Arma el error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Arma el error": {
+      "main": [
+        [
+          {
+            "node": "Devuelve el error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {}
+}

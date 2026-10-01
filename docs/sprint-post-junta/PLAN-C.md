@@ -19,6 +19,15 @@ La pregunta es si los seis documentos comparten un mismo editor por bloques
 
 ## 1. ¿Un editor o seis generadores?
 
+> **Decisión tomada (1-oct-2026).** Esta sección proponía un flujo de n8n por
+> documento. No va así: hay **un solo convertidor**, `generar-documento`
+> (`POST /webhook/generar-documento`), que recibe HTML y devuelve PDF. Las
+> plantillas HTML viven en el repo y las llena una Cloud Function; n8n solo
+> convierte. En Storage van el logo, la firma y los PDFs generados; los datos
+> de la empresa, en `configuracion/empresa`. El JSON del flujo y cómo se
+> configura su credencial están en `docs/n8n/`.
+
+
 ### Lo que tienen en común
 
 Los seis documentos:
