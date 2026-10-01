@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { estadoValidacion, etiquetaValidacion } from '../../lib/frenoExpediente';
 import { ClienteVermur, DocsAlta, ContratoCliente, PagareCliente } from './ClientesData';
+import type { DiasCredito } from '../proveedores/ProveedoresData';
 import { validarRFC } from '../../lib/validadores';
 import { ChevronRight, Loader2, Check, Upload, AlertTriangle } from 'lucide-react';
 import {
@@ -18,6 +19,10 @@ import { useFacturas } from '../../hooks/useFacturas';
 import { resumenDeCliente } from '../../lib/cuentasPorCobrar';
 import { formatearPorMoneda } from '../../lib/sumarPorMoneda';
 import { usuariosPorRol, useAuth } from '../../auth/AuthContext';
+import {
+  REGIMENES_FISCALES, estadoFiscal, faltantesFiscales,
+  validarCodigoPostal, esRFCExtranjero,
+} from '../../lib/datosFiscales';
 
 interface Props {
   cliente: ClienteVermur;
@@ -38,6 +43,8 @@ const withDefaults = (c: ClienteVermur): ClienteVermur => ({
   domicilio: c.domicilio ?? '',
   telefono: c.telefono ?? '',
   correo: c.correo ?? '',
+  codigoPostal: c.codigoPostal ?? '',
+  regimenFiscal: c.regimenFiscal ?? '',
   tipoCredito: c.tipoCredito ?? 'contado',
   monto: c.monto ?? 0,
   divisa: c.divisa ?? 'MXN',
@@ -139,13 +146,16 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
   const [draft, setDraft] = useState<ClienteVermur>(() => withDefaults(cliente));
   const checklistCompleto = Object.values(draft.docsAlta).every(Boolean);
   const [saving, setSaving] = useState(false);
-  // Feedback inline de formato del RFC (solo en pestaña Información).
+  // Feedback inline de formato del RFC y CP (solo en pestaña Información).
   const [rfcError, setRfcError] = useState('');
+  const [cpError, setCpError] = useState('');
+  const fiscal = estadoFiscal(draft);
 
   // Reset draft when Firestore confirms write (onSnapshot pushes fresh cliente)
   useEffect(() => {
     setDraft(withDefaults(cliente));
     setRfcError('');
+    setCpError('');
   }, [cliente]);
 
   /*
@@ -299,12 +309,17 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
             <BadgeEstado tono={estadoExp === 'sin_validar' ? 'espera' : 'exito'} title={etiquetaValidacion(cliente)}>
               {estadoExp === 'validado' ? 'Expediente validado' : estadoExp === 'heredado_magaya' ? 'Validado · heredado de Magaya' : 'Expediente sin validar'}
             </BadgeEstado>
-            {cliente.validadoFiscalmente !== true && (
+            {fiscal === 'incompleto' && (
               <BadgeEstado
                 tono="espera"
-                title="Sin validación fiscal no se debe operar un embarque de este cliente."
+                title={`Datos fiscales incompletos: falta ${faltantesFiscales(draft).join(', ')}. Sin estos datos no se puede timbrar.`}
               >
-                Sin validación fiscal
+                Fiscal incompleto
+              </BadgeEstado>
+            )}
+            {fiscal === 'completo' && (
+              <BadgeEstado tono="exito">
+                Fiscal completo
               </BadgeEstado>
             )}
           </>
@@ -398,23 +413,55 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                   <input className={INPUT} value={draft.representante}
                     onChange={e => set('representante', e.target.value)} />
                 </Field>
-                <Field label="RFC">
-                  <input
-                    className={`${INPUT} ${rfcError ? 'border-danger-text focus:border-danger-text focus:ring-danger-text' : ''}`}
-                    value={draft.rfc}
-                    onChange={e => { set('rfc', e.target.value.toUpperCase()); if (rfcError) setRfcError(''); }}
-                    onBlur={handleRfcBlur} />
-                  {rfcError && <p className="mt-1 text-[11px] text-danger-text">{rfcError}</p>}
-                </Field>
                 <Field label="Teléfono">
                   <input className={INPUT} value={draft.telefono}
                     onChange={e => set('telefono', e.target.value)} />
                 </Field>
-                <div className="sm:col-span-2">
-                  <Field label="Domicilio fiscal">
-                    <input className={INPUT} value={draft.domicilio}
-                      onChange={e => set('domicilio', e.target.value)} />
+
+                {/* ── Datos fiscales ─────────────────────────────────────── */}
+                <div className="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-5 border border-gray-150 rounded-lg p-4 bg-gray-50/40">
+                  <p className="sm:col-span-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    Datos fiscales
+                    {fiscal === 'incompleto' && (
+                      <span className="ml-2 text-amber-600 font-semibold normal-case tracking-normal">
+                        — Falta: {faltantesFiscales(draft).join(', ')}
+                      </span>
+                    )}
+                  </p>
+                  <Field label="RFC">
+                    <input
+                      className={`${INPUT} ${rfcError ? 'border-danger-text focus:border-danger-text focus:ring-danger-text' : ''}`}
+                      value={draft.rfc}
+                      onChange={e => { set('rfc', e.target.value.toUpperCase()); if (rfcError) setRfcError(''); }}
+                      onBlur={handleRfcBlur}
+                      placeholder="Ej. ILV190723FN1" />
+                    {rfcError && <p className="mt-1 text-[11px] text-danger-text">{rfcError}</p>}
                   </Field>
+                  <Field label="Código postal">
+                    <input
+                      className={`${INPUT} ${cpError ? 'border-danger-text focus:border-danger-text focus:ring-danger-text' : ''}`}
+                      value={draft.codigoPostal ?? ''}
+                      onChange={e => { set('codigoPostal', e.target.value); if (cpError) setCpError(''); }}
+                      onBlur={() => setCpError(validarCodigoPostal(draft.codigoPostal ?? ''))}
+                      placeholder="Ej. 76230"
+                      maxLength={5} />
+                    {cpError && <p className="mt-1 text-[11px] text-danger-text">{cpError}</p>}
+                  </Field>
+                  <Field label="Régimen fiscal">
+                    <select className={INPUT} value={draft.regimenFiscal ?? ''}
+                      onChange={e => set('regimenFiscal', e.target.value || null)}>
+                      <option value="">— Seleccionar —</option>
+                      {REGIMENES_FISCALES.map(r => (
+                        <option key={r.clave} value={r.clave}>{r.clave} — {r.descripcion}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <div className="sm:col-span-3">
+                    <Field label="Domicilio fiscal">
+                      <input className={INPUT} value={draft.domicilio}
+                        onChange={e => set('domicilio', e.target.value)} />
+                    </Field>
+                  </div>
                 </div>
                 <Field label="Correo electrónico">
                   <input className={INPUT} type="email" value={draft.correo}
@@ -448,6 +495,8 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                 domicilio: draft.domicilio, telefono: draft.telefono,
                 correo: draft.correo, statusOperativo: draft.statusOperativo,
                 fechaAlta: draft.fechaAlta, comentarios: draft.comentarios,
+                codigoPostal: draft.codigoPostal || null,
+                regimenFiscal: draft.regimenFiscal || null,
               })} />
             </div>
           )}
@@ -490,19 +539,46 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                       <input className={INPUT} type="number" min={0} value={draft.monto}
                         onChange={e => set('monto', Number(e.target.value))} />
                     </Field>
-                    <Field label="Plazo (días)">
-                      <select className={INPUT} value={draft.dias}
-                        onChange={e => set('dias', Number(e.target.value) as 0|15|20|30|45|60|90)}>
-                        {[0, 15, 20, 30, 45, 60, 90].map(d => (
-                          <option key={d} value={d}>{d === 0 ? 'Contado' : `${d} días`}</option>
-                        ))}
-                      </select>
-                    </Field>
                     <Field label="Interés moratorio (%)">
                       <input className={INPUT} type="number" min={0} step={0.5}
                         value={draft.interesMoratorio}
                         onChange={e => set('interesMoratorio', Number(e.target.value))} />
                     </Field>
+                    {/* ── Días de crédito por modalidad ──────────────────── */}
+                    <div className="sm:col-span-2 border border-gray-150 rounded-lg p-4 bg-gray-50/40">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-3">Días de crédito por modalidad</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        {([
+                          ['general', 'General'],
+                          ['maritimo', 'Marítimo'],
+                          ['aereo', 'Aéreo'],
+                          ['terrestre', 'Terrestre'],
+                        ] as const).map(([key, label]) => (
+                          <Field key={key} label={label}>
+                            <select className={INPUT}
+                              value={draft.diasCreditoPorTipo?.[key] ?? draft.dias}
+                              onChange={e => {
+                                const val = Number(e.target.value);
+                                const prev = draft.diasCreditoPorTipo ?? {
+                                  general: draft.dias, maritimo: draft.dias,
+                                  aereo: draft.dias, terrestre: draft.dias,
+                                };
+                                const next: DiasCredito = { ...prev, [key]: val };
+                                // Al cambiar general, dias se sincroniza
+                                setDraft(d => ({
+                                  ...d,
+                                  diasCreditoPorTipo: next,
+                                  dias: key === 'general' ? val : d.dias,
+                                }));
+                              }}>
+                              {[0, 7, 10, 15, 20, 30, 45, 60, 90, 120].map(d => (
+                                <option key={d} value={d}>{d === 0 ? 'Contado' : `${d} días`}</option>
+                              ))}
+                            </select>
+                          </Field>
+                        ))}
+                      </div>
+                    </div>
                   </>
                 )}
 
@@ -524,12 +600,20 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
                     onChange={e => set('montoAprobado', e.target.value)} />
                 </Field>
               </div>
-              <SaveBar oculta={soloConsulta} saving={saving} onSave={() => save({
-                tipoCredito: draft.tipoCredito, monto: draft.monto,
-                divisa: draft.divisa, dias: draft.dias,
-                interesMoratorio: draft.interesMoratorio,
-                atradius: draft.atradius, montoAprobado: draft.montoAprobado,
-              })} />
+              <SaveBar oculta={soloConsulta} saving={saving} onSave={() => {
+                const dct = draft.diasCreditoPorTipo ?? {
+                  general: draft.dias, maritimo: draft.dias,
+                  aereo: draft.dias, terrestre: draft.dias,
+                };
+                save({
+                  tipoCredito: draft.tipoCredito, monto: draft.monto,
+                  divisa: draft.divisa,
+                  dias: dct.general,
+                  diasCreditoPorTipo: dct,
+                  interesMoratorio: draft.interesMoratorio,
+                  atradius: draft.atradius, montoAprobado: draft.montoAprobado,
+                });
+              }} />
             </div>
           )}
 
