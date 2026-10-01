@@ -36,7 +36,9 @@ const BADGE_ROL: Record<UserRole, { bg: string; color: string }> = {
 
 export default function GestionUsuarios() {
   const { user } = useAuth();
-  const { usuarios, cargando, error, listar, invitar, cambiarRol, desactivar } = useGestionUsuarios();
+  const {
+    usuarios, cargando, error, listar, invitar, cambiarRol, desactivar, enviarInvitacion,
+  } = useGestionUsuarios();
   const [mostrarInvitar, setMostrarInvitar] = useState(false);
   const [feedback, setFeedback] = useState<{ tipo: 'ok' | 'error'; msg: string } | null>(null);
 
@@ -122,6 +124,14 @@ export default function GestionUsuarios() {
               setFeedback({ tipo: 'error', msg: err instanceof Error ? err.message : 'Error al desactivar.' });
             }
           }}
+          onReenviar={async (email) => {
+            try {
+              await enviarInvitacion(email);
+              setFeedback({ tipo: 'ok', msg: `Correo reenviado a ${email}.` });
+            } catch (err) {
+              setFeedback({ tipo: 'error', msg: err instanceof Error ? err.message : 'No se pudo reenviar el correo.' });
+            }
+          }}
         />
       )}
 
@@ -131,9 +141,16 @@ export default function GestionUsuarios() {
           onCerrar={() => setMostrarInvitar(false)}
           onInvitar={async (email, nombre, rol) => {
             try {
-              await invitar(email, nombre, rol);
+              const { correoEnviado, motivo } = await invitar(email, nombre, rol);
               setMostrarInvitar(false);
-              setFeedback({ tipo: 'ok', msg: `Se invitó a ${nombre} (${email}). Recibirá un correo para poner su contraseña.` });
+              /*
+               * La cuenta y el correo son dos cosas, y se dicen por separado.
+               * Si el envío falla, la cuenta YA existe: borrarla por un fallo
+               * de correo sería peor. Se avisa y queda «Reenviar invitación».
+               */
+              setFeedback(correoEnviado
+                ? { tipo: 'ok', msg: `Se invitó a ${nombre} (${email}). Le llegó un correo para poner su contraseña.` }
+                : { tipo: 'error', msg: `La cuenta de ${nombre} (${email}) quedó creada, pero el correo NO salió${motivo ? `: ${motivo}` : ''}. Usa «Reenviar invitación» en su renglón.` });
             } catch (err) {
               throw err; // El modal lo muestra
             }
@@ -151,11 +168,13 @@ function TablaUsuarios({
   usuarioActual,
   onCambiarRol,
   onDesactivar,
+  onReenviar,
 }: {
   usuarios: UsuarioRegistrado[];
   usuarioActual?: string;
   onCambiarRol: (uid: string, rol: UserRole) => Promise<void>;
   onDesactivar: (uid: string) => Promise<void>;
+  onReenviar: (email: string) => Promise<void>;
 }) {
   return (
     <div className="border border-card-border rounded-xl overflow-hidden bg-white">
@@ -177,6 +196,7 @@ function TablaUsuarios({
               esMismoUsuario={u.uid === usuarioActual}
               onCambiarRol={onCambiarRol}
               onDesactivar={onDesactivar}
+              onReenviar={onReenviar}
             />
           ))}
         </tbody>
@@ -190,11 +210,13 @@ function FilaUsuario({
   esMismoUsuario,
   onCambiarRol,
   onDesactivar,
+  onReenviar,
 }: {
   usuario: UsuarioRegistrado;
   esMismoUsuario: boolean;
   onCambiarRol: (uid: string, rol: UserRole) => Promise<void>;
   onDesactivar: (uid: string) => Promise<void>;
+  onReenviar: (email: string) => Promise<void>;
 }) {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [cambiando, setCambiando] = useState(false);

@@ -129,18 +129,26 @@ async function invitar(
   };
   await db().collection('usuarios').doc(uid).set(doc);
 
-  // Disparar correo de restablecimiento de contraseña
-  // El emulador lo captura en su endpoint de oobCodes; producción envía el correo.
-  try {
-    const link = await authAdmin().generatePasswordResetLink(email);
-    // El link queda disponible para el e2e en el emulador vía oobCodes.
-    // En producción, Firebase envía el correo automáticamente con generatePasswordResetLink.
-    // Lo registramos por si hace falta para diagnóstico.
-    console.log(`[GU] Enlace de restablecimiento generado para ${email} (${link.substring(0, 50)}…)`);
-  } catch (err) {
-    // No falla el alta: la cuenta ya se creó, el usuario puede pedir el enlace manualmente.
-    console.warn(`[GU] No se pudo generar el enlace de restablecimiento para ${email}:`, err);
-  }
+  /*
+   * El correo lo manda la APP, no esta Function.
+   *
+   * Aquí había un `generatePasswordResetLink`, con un comentario que decía
+   * que «en producción Firebase envía el correo automáticamente». Es falso:
+   * ese método GENERA el enlace y no manda nada. El Admin SDK no envía
+   * correos. Mau se invitó, la cuenta se creó en Auth y en `usuarios/{uid}`,
+   * y no llegó nada.
+   *
+   * El e2e no lo atrapaba porque el emulador registra el oobCode al generar
+   * el enlace, aunque nadie lo mande: el enlace existía y la prueba lo
+   * encontraba.
+   *
+   * Quien sí envía es `sendPasswordResetEmail` del SDK de cliente, que es lo
+   * que ya usa la pantalla de recuperar contraseña. Se llama desde la app al
+   * volver esta respuesta.
+   *
+   * Y no se registra el enlace en los logs: es una credencial de un solo uso
+   * para entrar a la cuenta de alguien más.
+   */
 
   return { uid, ...doc };
 }
