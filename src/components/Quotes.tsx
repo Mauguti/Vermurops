@@ -800,7 +800,7 @@ export default function Quotes() {
    */
   if (prospectoAbierto) {
     return (
-      <div className="animate-fade-in pb-12">
+      <div className="animate-fade-in h-full">
         <FichaProspecto
           prospecto={prospectoAbierto}
           onClose={() => setProspectoAbierto(null)}
@@ -826,7 +826,7 @@ export default function Quotes() {
     // El div raíz llamaba a setActiveMenu(null), una función que no existe en
     // este componente: cada clic dentro del módulo lanzaba un ReferenceError.
     // No hay ningún menú que cerrar, así que el handler se retira.
-    <div className={`space-y-[32px] animate-fade-in pb-12 ${chatOpen ? 'xl:pr-[320px]' : ''}`}>
+    <div className={`animate-fade-in ${selectedQuote || fichaAbierta ? 'h-full' : 'space-y-[32px] pb-12'} ${chatOpen ? 'xl:pr-[320px]' : ''}`}>
       {/* ── Header principal (oculto cuando hay una ficha abierta) ──── */}
       {!showForm && !selectedQuote && !fichaAbierta && (
         <div className="flex flex-col gap-4">
