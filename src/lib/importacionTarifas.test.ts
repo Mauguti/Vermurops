@@ -15,6 +15,7 @@ import {
   confirmarLinea, confirmarTodas, pendientesDeConfirmar, tieneQueConfirmar,
   vigenciasSeTraslapan, detectarColisiones,
   crearLineaManual,
+  esVigenciaVencida, estadoVigenciaGuardable,
   LineaEnRevision,
 } from './importacionTarifas';
 import { TarifaVermur } from '../components/tarifas/TarifasData';
@@ -680,5 +681,109 @@ describe('crearLineaManual: la línea que el extractor se saltó', () => {
     expect(r.total).toBe(2);
     expect(r.guardables).toBe(1); // solo la extraída completa
     expect(r.requierenRevision).toBe(1); // la manual sin completar
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Vigencia vencida: «till July 31» sin año → el extractor pone un año pasado
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('vigencia vencida', () => {
+  it('una fecha futura no está vencida', () => {
+    expect(esVigenciaVencida('2099-12-31')).toBe(false);
+  });
+
+  it('una fecha pasada sí está vencida', () => {
+    // El fixture de ONE: "2024-07-31" — la IA asumió 2024
+    expect(esVigenciaVencida('2024-07-31')).toBe(true);
+  });
+
+  it('null y undefined no están vencidas', () => {
+    expect(esVigenciaVencida(null)).toBe(false);
+    expect(esVigenciaVencida(undefined)).toBe(false);
+  });
+
+  it('sin confirmar, una vencida bloquea el guardado', () => {
+    const r = estadoVigenciaGuardable('2024-07-31', false);
+    expect(r.bloqueaGuardado).toBe(true);
+    expect(r.motivo).toContain('2024-07-31');
+    expect(r.motivo).toContain('año');
+  });
+
+  it('confirmada explícitamente, ya no bloquea', () => {
+    const r = estadoVigenciaGuardable('2024-07-31', true);
+    expect(r.bloqueaGuardado).toBe(false);
+  });
+
+  it('una fecha futura nunca bloquea, ni confirmada ni sin confirmar', () => {
+    expect(estadoVigenciaGuardable('2099-01-01', false).bloqueaGuardado).toBe(false);
+    expect(estadoVigenciaGuardable('2099-01-01', true).bloqueaGuardado).toBe(false);
+  });
+
+  it('sin fecha no bloquea', () => {
+    expect(estadoVigenciaGuardable(null, false).bloqueaGuardado).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Fixtures reales del extractor: las tres respuestas guardadas de ONE
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('fixture ONE: respuestas reales del extractor', () => {
+  it('el .txt falla con «Could not process image»', async () => {
+    const { default: fixture } = await import(
+      '../../docs/fixtures/respuestas-extractor/one-rates-txt.json'
+    );
+    const r = validarRespuestaN8N(fixture.body);
+    expect(r.valida).toBe(false);
+    expect(r.motivo).toContain('Could not process image');
+  });
+
+  it('el .png se valida y trae 12 líneas con freeTime', async () => {
+    const { default: fixture } = await import(
+      '../../docs/fixtures/respuestas-extractor/one-rates-png.json'
+    );
+    const r = validarRespuestaN8N(fixture.body);
+    expect(r.valida).toBe(true);
+    expect(r.datos?.tarifas).toHaveLength(12);
+    // Todas las líneas del PNG tienen freeTime: 21
+    expect(r.datos?.tarifas?.every(l => l.freeTime === 21)).toBe(true);
+    // La vigencia es "2024-07-31" — año dudoso
+    expect(r.datos?.fechaFin).toBe('2024-07-31');
+    expect(esVigenciaVencida(r.datos?.fechaFin)).toBe(true);
+  });
+
+  it('el .xlsx se valida y trae 14 líneas; confunde freeTime con tránsito', async () => {
+    const { default: fixture } = await import(
+      '../../docs/fixtures/respuestas-extractor/one-rates-xlsx.json'
+    );
+    const r = validarRespuestaN8N(fixture.body);
+    expect(r.valida).toBe(true);
+    expect(r.datos?.tarifas).toHaveLength(14);
+    // Bug documentado: el xlsx pone 21 en tiempoTransito en vez de freeTime
+    const flete = r.datos!.tarifas![0];
+    expect(flete.tiempoTransito).toBe(21);
+    expect(flete.freeTime).toBe(0);
+  });
+
+  it('el .png resuelve conceptos y puertos contra el catálogo', async () => {
+    const { default: fixture } = await import(
+      '../../docs/fixtures/respuestas-extractor/one-rates-png.json'
+    );
+    const datos = validarRespuestaN8N(fixture.body).datos!;
+    const lineas = construirLineasEnRevision(datos, {
+      conceptos: CONCEPTOS,
+      puertos: PUERTOS,
+    });
+    expect(lineas).toHaveLength(12);
+    // "Ocean Freight" no emparenta con "Flete marítimo": son idiomas distintos
+    // y matchConceptByName no es un traductor. Queda sin_match y Pricing elige.
+    expect(lineas[0].nivelConcepto).toBe('sin_match');
+    // "Manzanillo" se resuelve exacto
+    const mzo = lineas.find(l => l.extraida.puertoDestino === 'Manzanillo');
+    expect(mzo?.puertoDestinoId).toBe('PTO-001');
+    // "Lazaro Cardenas" se resuelve contra "Lázaro Cárdenas"
+    const lzc = lineas.find(l => l.extraida.puertoDestino === 'Lazaro Cardenas');
+    expect(lzc?.puertoDestinoId).toBe('PTO-003');
   });
 });

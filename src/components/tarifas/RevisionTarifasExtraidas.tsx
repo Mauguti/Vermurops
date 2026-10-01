@@ -1,15 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import {
   X, AlertTriangle, Sparkles, Trash2, Check, CheckCheck, Coins, Ruler,
-  Plus,
+  Plus, Calendar, Ship, Clock,
 } from 'lucide-react';
 import {
   validarRespuestaN8N, construirLineasEnRevision, motivosNoGuardable,
   esGuardable, resumenRevision, ordenarParaRevision, textoDeAviso, TEXTO_MOTIVO,
-  resolverProveedor, estadoGuardable,
+  resolverProveedor, estadoGuardable, esVigenciaVencida, estadoVigenciaGuardable,
   confirmarLinea, confirmarTodas, pendientesDeConfirmar, tieneQueConfirmar,
   crearLineaManual,
-  type LineaEnRevision, type NivelConfianza, type NivelMatch,
+  type LineaEnRevision, type NivelConfianza, type NivelMatch, type VigenciaRevisada,
 } from '../../lib/importacionTarifas';
 import type { ConceptoMatch } from './tarifaMatching';
 import type { PuertoMatch } from '../../lib/importacionTarifas';
@@ -63,8 +63,8 @@ interface Props {
    */
   proveedorElegidoId?: string | null;
   onCancelar: () => void;
-  /** El proveedor va como parámetro: es de todo el tarifario, no de cada línea. */
-  onGuardar: (lineas: LineaEnRevision[], proveedorId: string) => void | Promise<void>;
+  /** El proveedor y la vigencia van como parámetros: son de todo el tarifario. */
+  onGuardar: (lineas: LineaEnRevision[], proveedorId: string, vigencia: VigenciaRevisada) => void | Promise<void>;
 }
 
 export default function RevisionTarifasExtraidas({
@@ -110,9 +110,29 @@ export default function RevisionTarifasExtraidas({
   );
   const [guardando, setGuardando] = useState(false);
 
+  // ── Vigencia editable ───────────────────────────────────────────────────
+  const [fechaInicio, setFechaInicio] = useState<string>(
+    validacion.datos?.fechaInicio ?? '',
+  );
+  const [fechaFin, setFechaFin] = useState<string>(
+    validacion.datos?.fechaFin ?? '',
+  );
+  const [vigenciaConfirmada, setVigenciaConfirmada] = useState(false);
+
+  const vigenciaVencida = esVigenciaVencida(fechaFin || null);
+  const guardaVigencia = estadoVigenciaGuardable(
+    fechaFin || null, vigenciaConfirmada,
+  );
+
   const resumen = resumenRevision(lineas);
   const estado = estadoGuardable(proveedorId, nivelProveedor === 'exacto', lineas);
   const porConfirmar = pendientesDeConfirmar(lineas);
+
+  // La vigencia vencida sin confirmar bloquea igual que el proveedor
+  const puedeGuardarFinal = estado.puedeGuardar && !guardaVigencia.bloqueaGuardado;
+  const faltanteFinal = !estado.puedeGuardar
+    ? estado.faltantes[0]
+    : guardaVigencia.motivo ?? null;
 
   /*
    * El orden se calcula UNA VEZ, al abrir: primero lo que necesita atención.
@@ -207,6 +227,56 @@ export default function RevisionTarifasExtraidas({
           {proveedorId && nivelProveedor === 'exacto' && (
             <Check className="w-3.5 h-3.5 text-emerald-600" />
           )}
+        </div>
+
+        {/* ── Vigencia editable ──────────────────────────────────────── */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-[9px] font-bold text-gray-400 uppercase w-[70px] shrink-0">Vigencia</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="flex items-center gap-1 text-[11px] text-gray-600">
+              <Calendar className="w-3 h-3 text-gray-400" />
+              Desde
+              <input
+                type="date"
+                value={fechaInicio}
+                onChange={e => setFechaInicio(e.target.value)}
+                className="px-1.5 py-0.5 text-[11px] border border-gray-200 rounded outline-none focus:border-primario"
+              />
+            </label>
+            <label className={`flex items-center gap-1 text-[11px] ${
+              vigenciaVencida && !vigenciaConfirmada ? 'text-amber-800 font-semibold' : 'text-gray-600'
+            }`}>
+              Hasta
+              <input
+                type="date"
+                value={fechaFin}
+                onChange={e => { setFechaFin(e.target.value); setVigenciaConfirmada(false); }}
+                className={`px-1.5 py-0.5 text-[11px] border rounded outline-none focus:border-primario ${
+                  vigenciaVencida && !vigenciaConfirmada
+                    ? 'border-amber-400 bg-amber-50'
+                    : 'border-gray-200'
+                }`}
+              />
+            </label>
+            {vigenciaVencida && !vigenciaConfirmada && (
+              <>
+                <span className="text-[10px] text-amber-800 font-semibold">
+                  ⚠ Vigencia vencida: ¿el año es correcto?
+                </span>
+                <button
+                  onClick={() => setVigenciaConfirmada(true)}
+                  className="text-[10px] font-bold text-amber-700 bg-amber-100 hover:bg-amber-200 px-1.5 py-0.5 rounded"
+                >
+                  Sí, es correcto
+                </button>
+              </>
+            )}
+            {vigenciaVencida && vigenciaConfirmada && (
+              <span className="text-[10px] text-amber-600 flex items-center gap-0.5">
+                <Check className="w-3 h-3" /> Vigencia vencida confirmada
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -341,6 +411,26 @@ export default function RevisionTarifasExtraidas({
                     </Confirmable>
                   </div>
 
+                  {/* Tiempo de tránsito y free time — datos del extractor, con
+                      etiquetas claras para que no se confundan. En .xlsx el
+                      extractor puso free time en tránsito. */}
+                  {((l.extraida.tiempoTransito ?? 0) > 0 || (l.extraida.freeTime ?? 0) > 0) && (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {(l.extraida.tiempoTransito ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-gray-500">
+                          <Ship className="w-3 h-3" />
+                          Tránsito: {l.extraida.tiempoTransito} días
+                        </span>
+                      )}
+                      {(l.extraida.freeTime ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] text-gray-500">
+                          <Clock className="w-3 h-3" />
+                          Free time: {l.extraida.freeTime} días
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   {l.agregadaManual && (
                     <span className="inline-block text-[9px] font-bold text-primario bg-primario/10 px-1.5 py-0.5 rounded">
                       Agregada a mano
@@ -391,9 +481,9 @@ export default function RevisionTarifasExtraidas({
 
       <div className="px-5 py-3 border-t border-gray-150 bg-gray-50/50 flex items-center justify-between shrink-0">
         <p className="text-[11px] text-gray-500">
-          {estado.puedeGuardar
+          {puedeGuardarFinal
             ? `${resumen.guardables} de ${resumen.total} listas para guardar`
-            : estado.faltantes[0]}
+            : faltanteFinal}
         </p>
         <div className="flex items-center gap-2">
           <button
@@ -404,12 +494,19 @@ export default function RevisionTarifasExtraidas({
           </button>
           <button
             onClick={async () => {
-              if (!estado.puedeGuardar || !proveedorId) return;
+              if (!puedeGuardarFinal || !proveedorId) return;
               setGuardando(true);
-              try { await onGuardar(lineas.filter(esGuardable), proveedorId); }
+              try {
+                const vigencia: VigenciaRevisada = {
+                  fechaInicio: fechaInicio || null,
+                  fechaFin: fechaFin || null,
+                  vigenciaTexto: validacion.datos?.vigenciaTexto ?? '',
+                };
+                await onGuardar(lineas.filter(esGuardable), proveedorId, vigencia);
+              }
               finally { setGuardando(false); }
             }}
-            disabled={!estado.puedeGuardar || guardando}
+            disabled={!puedeGuardarFinal || guardando}
             className="bg-primario hover:bg-primario-hover text-white text-[11px] font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             {guardando ? 'Guardando…' : `Guardar ${resumen.guardables} tarifa${resumen.guardables !== 1 ? 's' : ''}`}
