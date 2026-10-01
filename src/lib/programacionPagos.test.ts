@@ -163,3 +163,25 @@ describe('resumen y comprobante', () => {
     expect(texto).toContain('8,000.00');
   });
 });
+
+// ─── D · El panel vacío ─────────────────────────────────────────────────────
+
+describe('panel vacío: sin autorizadas, el resumen queda en ceros', () => {
+  it('sin ninguna OC autorizada, programadas queda vacío', () => {
+    const r = ordenesProgramadas([
+      oc({ id: 'a', estado: 'solicitada' }),
+      oc({ id: 'b', estado: 'en_gestion' }),
+      oc({ id: 'c', estado: 'pagada' }),
+    ], HOY);
+    expect(r).toEqual([]);
+  });
+
+  it('el resumen de una lista vacía es todo ceros', () => {
+    const r = resumenDelDia([]);
+    expect(r).toEqual({ vencidas: 0, hoy: 0, proximas: 0, sinFecha: 0, bloqueadas: 0 });
+  });
+
+  it('sin autorizadas no hay transferencias', () => {
+    expect(transferenciasDelDia([], HOY)).toEqual([]);
+  });
+});
