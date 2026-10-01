@@ -1,99 +1,142 @@
-# Estado de VermurOps — 30 de septiembre de 2026
+# Estado de VermurOps — 1 de octubre de 2026
 
-Corte tras cerrar los pendientes de la publicación 17–24.
-Todo lo que dice «verificado» trae el comando que lo comprobó.
-
----
-
-## 1. Lo que cerró hoy
-
-**`tsc` bloquea el build** (`94d455b`, publicado). `npm run build` era
-`vite build` a secas y vite no hace typecheck: por eso los nueve errores de
-la línea base convivieron meses con builds «limpios». Ahora es
-`tsc --noEmit && vite build`, y está comprobado que bloquea: con un error de
-tipos metido a propósito el build sale con código 2 y vite no llega a correr.
-1752 tests, tsc 0, recorrido 6/6.
-
-**El correo de las reglas, corregido — sin desplegar** (rama
-`fix/correo-reglas`, `adc0ca7`). `esDelEquipo()` tenía `info@digsol.com`
-desde el Bloque 9. Y `tests/reglas/equipo.test.ts` lo fijaba como correcto:
-afirmaba que «INFO@DIGSOL.COM.MX» NO era del equipo. El test protegía el
-typo. Ahora el que queda fuera es el dominio equivocado. 13/13 en verde.
-
-**Sigue sin corregir `storage.rules:51`**, con el mismo typo. Ahí vive el
-expediente KYC. No se tocó por instrucción explícita.
+Corte tras publicar la cadena 27–34 y cerrar los pendientes de reglas,
+invitación y n8n.
 
 ---
 
-## 2. Reglas: qué está desplegado y qué no
+## 1. Lo que se publicó hoy
 
-**El parche del Bloque 9 nunca se ha desplegado.** Producción sigue con
-`allow read, write: if request.auth != null`: cualquier cuenta autenticada
-lee y escribe todo. `firestore.rules` no se toca desde `0f3ec79` (24-sep).
+**La cadena 27–34 completa**, cada merge su propio punto de regreso:
 
-No se puede leer el ruleset desplegado desde esta máquina: el CLI de Firebase
-no expone las reglas activas, `gcloud` no está instalado y la API de
-Firebase Rules pide un token que no hay. **Confírmalo en la consola** antes
-de dar por buena cualquier suposición.
+| # | Tarea | Merge |
+|---|---|---|
+| 27 | Edición en las dos vistas de la cotización | `42f5848` |
+| 28 | Ubicación por concepto, con IVA por fila | `f8f81a9` |
+| 29 | Programación de pagos: estado vacío con contexto | `1798455` |
+| 30 | Aduana precargada desde el puerto | `dbbd98b` |
+| 31 | Pegar correo y vigencias con bloqueo | `40425be` |
+| 32 | Scroll de las fichas de cotización y prospecto | `5cb954b` |
+| 33 | Inventario de datos de prueba | `1658309` |
+| 34 | PLAN-APROBACION | `60701c2` |
 
-Comando para publicarlas, con el equipo presente:
+Y cinco bloques sueltos: el scroll de la ficha de la orden (`02062a9`),
+`tsc` bloqueante (`94d455b`), el correo de las reglas (`74e2f1a` y
+`9b7953d`), la invitación que no mandaba correo (`b8336b1`) y el token de
+n8n por Header Auth (`1fe761b`).
 
-```bash
-npx firebase deploy --only firestore:rules
+**1811 tests · tsc 0 · recorrido 6/6.**
+
+### Lo que NO cuadró con el reporte 27
+
+Su reporte daba el recorrido en 2/6 y lo atribuía a un fallo preexistente.
+**No se reproduce**: parado en `sprint/27` da 6/6, y en `sprint/28` también.
+Así que la 27 no depende de la 28 y su punto de regreso es solo suyo.
+
+---
+
+## 2. Reglas: desplegadas, con una corrección en el camino
+
+`esDelEquipo()` está **vivo en producción** desde hoy: Firestore pasó de
+«cualquier autenticado lee y escribe todo» a los siete correos del equipo.
+
+Costó dos despliegues fallidos. El primero subió el archivo con
+`info@digsol.com` —el typo del Bloque 9— y dejó a Mau fuera de su propia
+base. El segundo no subió nada y lo dijo en una línea que parece éxito:
+
+```
+i  firestore: latest version of firestore.rules already up to date, skipping upload...
+✔  Deploy complete!
 ```
 
-Punto de regreso: `git revert` del commit y volver a desplegar; o desplegar
-la versión anterior del archivo (`git show 0f3ec79^:firestore.rules`). El
-despliegue de reglas es instantáneo y reversible en el mismo minuto.
+Los dos salieron de un worktree que estaba en otra rama. **La regla quedó
+escrita en CLAUDE.md §3**: todo `firebase deploy` lleva su `cd` al checkout
+principal, y `skipping upload` se lee como fallo.
+
+**Storage NO está desplegado.** Su archivo ya tiene el correo corregido
+(`9b7953d`) y espera a que el equipo pueda confirmar que sigue viendo sus
+documentos:
+
+```bash
+cd /Users/mauriciogutierrezmunoz/antigravity/Vermur-Logistics && npx firebase deploy --only storage
+```
+
+**Nada público se rompe al desplegarlo.** La landing no usa el SDK de
+Firebase, la pantalla de Usuarios pasa por el Admin SDK, `AuthContext` lee
+el rol de los claims, ningún flujo de n8n toca Firestore ni Storage, y los
+enlaces de descarga ya repartidos llevan token y saltan las reglas. Lo
+único que depende de la lista son las subidas y lecturas que hace la app
+como usuario con sesión.
 
 ---
 
-## 3. Usuarios y roles: el arranque en frío
+## 3. Usuarios y roles
 
-`gestionarUsuarios` está desplegada y exige `usuario.gestionar`, que **solo
-tiene admin**. Tanto el cliente como el servidor leen **primero el custom
-claim** y caen al mapa de correos como respaldo.
+`gestionarUsuarios` está desplegada. **La invitación ya manda el correo**:
+la Function llamaba a `generatePasswordResetLink`, que genera el enlace y
+no envía nada. Ahora lo manda la app con `sendPasswordResetEmail`, hay
+«Reenviar invitación» por renglón, y el e2e invita desde la pantalla —sin
+la llamada del Admin SDK, el único oobCode posible es el del envío del
+cliente, así que si alguien lo quita, la prueba se cae.
 
-**Mau no puede invitarse a sí mismo.** Su correo no está en ninguno de los
-dos mapas de roles —ni `AuthContext` ni `functions/comun/auth.ts`—, así que
-sin claim cae al fallback `ventas` y la Function lo rechaza con 403.
-
-Quien arranca la cadena: **Gabriela Huerta o Luis Rentería**, que sí son
-`admin` en los dos mapas. Uno de ellos invita a Mau; a partir de ahí Mau
-tiene claim propio y puede invitar al resto.
-
----
-
-## 4. Usuarios y roles: qué construyó la tarea 21
-
-La tarea 21 dejó el **paso 1**, y conviene saber qué es y qué no:
-
-- `usuarios/{uid}` con correo, nombre, rol, activo e invitadoPor.
-- El rol también en **custom claims**, puestos solo por `gestionarUsuarios`,
-  que exige `usuario.gestionar` — capacidad que **solo tiene admin**, tanto
-  en el mapa del cliente como en el del servidor.
-- Alta por invitación: crea la cuenta y dispara el correo de restablecimiento
-  que ya existía. Baja: `activo: false` + `disableUser`, nunca se borra.
-- Pantalla **Configuración → Usuarios y roles**, que un no-admin **no ve en
-  el menú**.
-- `AuthContext` lee **primero el claim** y cae al mapa de correos como
-  respaldo, así que nadie pierde acceso mientras no tenga claim.
-
-**Lo que NO cambia todavía:** las reglas de Firestore siguen siendo el parche
-por correo del Bloque 9. El borrador por rol está en `docs/reglas/`, sin
-desplegar. Hasta que se despliegue, los claims no protegen la base: solo
-alimentan la UI.
+**Mau no puede invitarse a sí mismo**: su correo no está en ninguno de los
+dos mapas de roles, así que sin claim cae a `ventas` y la Function lo
+rechaza con 403. **La cadena la arranca Gaby o Luis**, que sí son `admin`
+en los dos mapas.
 
 ---
 
-## 5. Qué hay en producción
+## 4. n8n
 
-Las 24 tareas del sprint, el arreglo de la ficha de la orden y la Function
-`gestionarUsuarios`. Ver la sección 1 para los hashes y la verificación.
+El token ya no se valida con un nodo Code que leía `process.env`: n8n nunca
+vio esa variable y respondía **401 a todo**, también con el token correcto.
+Ahora es la autenticación propia de n8n —Header Auth con la credencial
+**«X-Vermur-Token»**— y rechaza con **403** por su cuenta. El proxy trata
+401 y 403 igual y lo marca en el log como `rechazoDeToken`.
+
+Los dos JSON están en `docs/n8n/` y refieren la credencial **solo por
+nombre**: al importar hay que elegirla a mano. El flujo general de
+documentos (`generar-documento`) y las 13 plantillas de Vermur también
+entraron al repo.
 
 ---
 
-## 6. Entregables nuevos que no son código
+## 5. Administración
+
+La minuta validada de la sesión 1 está en
+`docs/levantamientos/LEVANTAMIENTO-ADMINISTRACION.md` y **desde hoy es la
+referencia del área**. Seis diferencias contra PLAN_OPERACION quedaron
+anotadas en el plan, sin reescribirlo.
+
+`docs/sprint-post-junta/PREVIA-JUNTA-ADMIN.md` prepara la junta con Julio:
+inventario de los siete reportes, Programación contra Cuentas por pagar en
+cinco líneas, el modelo de cliente y proveedor contra PLAN-APROBACION, y
+los días de crédito.
+
+**Lo que ese análisis encontró y conviene no perder:**
+
+- **El IVA acreditado no sale.** `ordenesCompra.facturaDatos` guarda `total`
+  y `subtotal`, y nada de IVA. Es el mismo hueco que obliga a Julio a
+  revisar a mano, todos los días, que el IVA de cada factura coincida.
+- **`regimenFiscal` no existe** en el modelo, y el SAT lo exige para
+  timbrar.
+- **El proveedor no tiene expediente**: `docsAlta` y `expedienteValidado`
+  son solo del cliente.
+- **`dias` es obligatorio y `diasCreditoPorTipo` opcional**, y el único
+  editor captura `dias`. Leer el nuevo sin poder capturarlo deja el campo
+  vacío para siempre.
+
+---
+
+## 6. Qué hay en producción
+
+Todo lo de la sección 1. Hosting en `index-Cyowerkz.js`; Functions
+`gestionarUsuarios`, `extraerTarifas` y `clasificarDocumento` al día; reglas
+de Firestore desplegadas, **Storage no**.
+
+---
+
+## 7. Entregables nuevos que no son código
 
 **Planes** (`docs/sprint-post-junta/`):
 - `PLAN-FUENTE-TARIFA.md` — un solo campo para la tarifa elegida, reconciliacion
@@ -117,7 +160,7 @@ Las 24 tareas del sprint, el arreglo de la ficha de la orden y la Function
 
 ---
 
-## 7. Pendientes, verificados contra el código
+## 8. Pendientes
 
 ### Cola restante
 
@@ -162,21 +205,15 @@ Y lo que arrastramos de antes:
 
 ---
 
-## 8. Orden propuesto
+## 9. Orden propuesto
 
-0. **La cadena 27–34 del sprint de anoche está sin publicar.** Ocho ramas
-   empujadas, ningún merge. Va antes que todo lo demás.
-1. **Validación del equipo** con la lista consolidada. Es lo único que
-   convierte «publicado» en «terminado».
-2. **Importar el JSON de n8n** del PDF y poner `VERMUR_N8N_TOKEN` como variable
-   de entorno en n8n, con el mismo valor que Secret Manager.
-3. **Invitar al equipo** desde Configuración → Usuarios y roles, empezando por
-   `info@digsol.com.mx`. Cada invitación dispara el correo de restablecimiento.
-4. **Corregir `info@digsol.com` → `.com.mx`** en `firestore.rules:36` y
-   `storage.rules:51`, y desplegar las reglas con el equipo presente.
-5. **Desplegar las reglas por rol** (borrador en `docs/reglas/`), que es lo que
-   convierte los claims en protección real.
-6. **Deshabilitar las tres cuentas de prueba** en el Auth de producción.
-7. ~~Volver `tsc` bloqueante~~ — hecho hoy (`94d455b`).
-8. Las Functions pendientes del 28-sep, cuando haya hueco:
-   `npx firebase deploy --only functions:extraerTarifas,functions:clasificarDocumento`
+1. **Junta con Julio**, con la minuta y `PREVIA-JUNTA-ADMIN.md`. De ahí salen
+   festivos, conciliación del fondeo, anticipos sin factura, complemento de
+   pago y pronto pago.
+2. **Que Gaby o Luis inviten a Mau** y confirmar el claim en el log.
+3. **Correr el inventario** con la llave, para tener los conteos reales de
+   expediente antes de decidir el flujo de aprobación.
+4. **Desplegar Storage**, con el equipo presente.
+5. **Validación del equipo** de la cadena 27–34.
+6. **Importar los dos JSON de n8n** y elegir la credencial «X-Vermur-Token».
+7. **Deshabilitar las tres cuentas de prueba** en el Auth de producción.
