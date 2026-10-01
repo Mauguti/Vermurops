@@ -20,7 +20,7 @@
       "webhookId": "vermur-generar-documento",
       "credentials": {
         "httpHeaderAuth": {
-          "name": "Token VermurOps"
+          "name": "X-Vermur-Token"
         }
       }
     },

@@ -16,7 +16,7 @@ repo y n8n solo convierte. Un payload de prueba, en `pruebas/`.
 ## El token: credencial de n8n, no variable de entorno
 
 Los dos webhooks usan la **autenticación propia de n8n**: `Header Auth` con
-la credencial **«Token VermurOps»** (nombre de cabecera `X-Vermur-Token`,
+la credencial **«X-Vermur-Token»** (nombre de cabecera `X-Vermur-Token`,
 valor = el secreto de Firebase). n8n la guarda cifrada y rechaza por su
 cuenta con **403** cuando falta o no coincide.
 
@@ -27,11 +27,12 @@ secreto no viva en git. n8n la deja marcada en rojo hasta que se selecciona.
 Crearla una vez, si no existe:
 
 1. n8n → **Credentials** → **New** → tipo **Header Auth**.
-2. Nombre de la credencial: `Token VermurOps`.
+2. Nombre de la credencial: `X-Vermur-Token` (igual que la cabecera, para
+   no tener dos nombres que recordar).
 3. *Name*: `X-Vermur-Token` · *Value*: el secreto.
    Para cotejarlo: `npx firebase functions:secrets:access VERMUR_N8N_TOKEN`.
 4. En cada webhook: *Authentication* → **Header Auth** → elegir
-   «Token VermurOps».
+   «X-Vermur-Token».
 
 ### Por qué se dejó de validar con `process.env` (1-oct-2026)
 

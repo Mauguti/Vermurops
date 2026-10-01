@@ -98,6 +98,35 @@ bloque, pedir la validación EXPLÍCITAMENTE como bloqueante y, validado,
 mergear y publicar en el momento. Un bloque validado sin publicar no está
 terminado, está estacionado.
 
+**Todo `firebase deploy` lleva su `cd` al checkout principal, y «skipping
+upload» se lee como FALLO.**
+El 1-oct costó dos despliegues de reglas: el primero subió el archivo
+equivocado y el segundo no subió nada. En los dos casos el comando se corrió
+desde un worktree que estaba en otra rama, con la versión vieja de
+`firestore.rules`. El CLI no avisa: compara el archivo local contra el
+desplegado y, si coinciden, informa
+
+```
+i  firestore: latest version of firestore.rules already up to date, skipping upload...
+✔  firestore: released rules firestore.rules to cloud.firestore
+```
+
+que termina en un ✔ verde y en «Deploy complete». Parece éxito y es
+«no hice nada». Lo que confirma que sí subió es:
+
+```
+i  firestore: uploading rules firestore.rules...
+```
+
+Por eso el comando se escribe siempre completo:
+
+```bash
+cd /Users/mauriciogutierrezmunoz/antigravity/Vermur-Logistics && npx firebase deploy --only <lo que toca>
+```
+
+Es la misma lección que la de abajo —«mira desde dónde corre»— en su versión
+de despliegue, y la primera vez dejó a Mau fuera de su propia base de datos.
+
 **Antes de diagnosticar una regresión en local, mira DESDE DÓNDE corre el dev
 server.** `lsof -ti:3000` y revisa la ruta del proceso. Si el trabajo está en un
 worktree y el server corre desde el checkout principal, se ve otra rama y

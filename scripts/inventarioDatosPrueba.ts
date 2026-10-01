@@ -720,6 +720,54 @@ async function main() {
   ], filasCruce);
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // EXPEDIENTE: QUÉ TAN LISTOS ESTÁN CLIENTES Y PROVEEDORES
+  // ═══════════════════════════════════════════════════════════════════════════
+  //
+  // Lo que la junta con Administración necesita saber antes de decidir el flujo
+  // de aprobación: cuántos registros podrían validarse hoy y cuántos están a
+  // medias. Solo lectura, como todo el script.
+
+  console.log('═'.repeat(90));
+  console.log('  EXPEDIENTE DE CLIENTES Y PROVEEDORES');
+  console.log('═'.repeat(90));
+
+  const cli = clientes as unknown as Array<Record<string, unknown>>;
+  const conRFC = cli.filter(c => String(c.rfc ?? '').trim().length >= 12);
+  const deMagaya = cli.filter(c => c.origenDatos === 'magaya' || c.numeroEntidadMagaya);
+  const validados = cli.filter(c => c.expedienteValidado);
+  const conCP = cli.filter(c => String(c.codigoPostal ?? '').trim());
+  const conDiasPorTipo = cli.filter(c => c.diasCreditoPorTipo);
+
+  console.log(`  Clientes: ${cli.length}`);
+  console.log(`    con RFC (≥12 caracteres):        ${conRFC.length}`);
+  console.log(`    sin RFC:                         ${cli.length - conRFC.length}`);
+  console.log(`    con código postal:               ${conCP.length}   ← el SAT lo exige para timbrar`);
+  console.log(`    importados de Magaya:            ${deMagaya.length}   ← cuentan como validados de origen`);
+  console.log(`    con expediente validado a mano:  ${validados.length}`);
+  console.log(`    con días de crédito POR MODALIDAD: ${conDiasPorTipo.length} de ${cli.length}`);
+  console.log(`      (el resto usa el número único \`dias\`, que es lo que lee la cotización)\n`);
+
+  const sinTipo = proveedores.filter(p => !p.tipos || p.tipos.length === 0);
+  const porTipo = new Map<string, number>();
+  proveedores.forEach(p => (p.tipos ?? []).forEach(t => porTipo.set(t, (porTipo.get(t) ?? 0) + 1)));
+
+  console.log(`  Proveedores: ${proveedores.length}`);
+  console.log(`    SIN ningún tipo asignado:        ${sinTipo.length}`);
+  [...porTipo.entries()].sort((a, b) => b[1] - a[1])
+    .forEach(([t, n]) => console.log(`    tipo «${t}»:${' '.repeat(Math.max(1, 26 - t.length))}${n}`));
+  console.log(`    sin RFC efectivo:                ${proveedores.filter(p => !rfcEfectivo(p)).length}\n`);
+
+  escribirCSV('inventario-5-expediente.csv',
+    ['entidad', 'id', 'nombre', 'rfc', 'codigoPostal', 'origenDatos', 'expedienteValidado', 'tipos', 'diasCreditoPorTipo'],
+    [
+      ...cli.map(c => ['cliente', String(c.id ?? ''), String(c.razonSocial ?? c.nombre ?? ''),
+        String(c.rfc ?? ''), String(c.codigoPostal ?? ''), String(c.origenDatos ?? ''),
+        c.expedienteValidado ? 'sí' : 'no', '', c.diasCreditoPorTipo ? 'sí' : 'no']),
+      ...proveedores.map(p => ['proveedor', p.id, p.nombre, rfcEfectivo(p) ?? '', '', '', '',
+        (p.tipos ?? []).join(';'), '']),
+    ]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // RESUMEN
   // ═══════════════════════════════════════════════════════════════════════════
 
