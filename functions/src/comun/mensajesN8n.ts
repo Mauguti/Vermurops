@@ -47,7 +47,7 @@ export function mensajeDeError(status: number, flujo: string): string {
     return `${agente} no está publicado: el flujo de n8n no está activo. Avisa a sistemas.`;
   }
   if (esRechazoDeToken(status)) {
-    return `${agente} rechazó nuestro token (${status}). Avisa a sistemas: hay que revisar la credencial «Token VermurOps» en n8n y que coincida con el secreto de Firebase.`;
+    return `${agente} rechazó nuestro token (${status}). Avisa a sistemas: hay que revisar la credencial «X-Vermur-Token» en n8n y que coincida con el secreto de Firebase.`;
   }
   if (status === 413) {
     return esPdf

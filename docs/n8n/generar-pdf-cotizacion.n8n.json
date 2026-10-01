@@ -20,7 +20,7 @@
       "webhookId": "vermur-pdf-cotizacion",
       "credentials": {
         "httpHeaderAuth": {
-          "name": "Token VermurOps"
+          "name": "X-Vermur-Token"
         }
       }
     },

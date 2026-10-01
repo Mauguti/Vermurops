@@ -148,6 +148,16 @@ Que la simulación sea evidente en la UI.
 
 # FASE C · Pago a proveedores
 
+> **Minuta de Administración (1-oct-2026).** Dos diferencias de ROL contra la matriz vigente, que conviene cerrar con Julio
+> antes de construir: la minuta pone **facturar al cliente como de Operaciones y
+> NO de Administración** (CLAUDE.md §4.1 se la da a las dos), y separa **cargar**
+> una factura de proveedor —Administración y Operaciones— de **validarla**, que
+> deja solo en Administración. Ese paso de validación no existe hoy: la
+> conciliación de la factura la hace Operaciones (§4.15).
+
+> **Nota.** También queda como PROPUESTA, no como regla: que Administración
+> reciba y valide las facturas de proveedor antes de que se suban.
+
 Retoma las órdenes de compra desde OC-1.
 
 ### C-1 · Hook, Firestore y folios
@@ -196,6 +206,10 @@ Textual: *«tenemos que esperar el dinero del cliente para pagarle al proveedor�
 **Regla dura:** no se financian impuestos.
 
 Requiere la colección `depositosCliente` para registrar los fondeos.
+> **Minuta de Administración (1-oct-2026).** La minuta reparte el flag entre DOS áreas y aquí no se dice: **Operaciones lo
+> marca, Administración lo libera** al confirmar que el fondeo está en firme en
+> la cuenta. El plan lo trata como una sola condición automática.
+
 
 ### C-5 · Cuentas bancarias por concepto
 
@@ -214,6 +228,10 @@ Los bancos de Vermur también están segmentados:
 | Banorte | Garantías y agencia aduanal |
 | Monex | Pagos en dólares |
 | PartnerPay | USD a agentes con la plataforma, mínimo 80 USD |
+> **Minuta de Administración (1-oct-2026).** Las cuentas del PROVEEDOR además se separan por moneda, no solo por concepto:
+> «en pesos y en dólares». La sugerencia automática tiene que mirar las dos
+> cosas.
+
 
 ### C-6 · Cruce de anticipos
 
@@ -228,11 +246,22 @@ otra. Ya está en el modelo de OC-0 con `montoAplicado` y `montoDisponible`.
   mensual
 - Agrupar facturas del mismo proveedor en un solo pago, con el comprobante detallando
   folios
+> **Minuta de Administración (1-oct-2026).** Faltan dos casos que rompen el cálculo por días de crédito: **el pago
+> anticipado pese a tener crédito** —hay proveedores que no liberan la mercancía
+> ni el BL sin pagar antes— y el **tiempo de reflejo bancario**, que a veces
+> obliga a pagar una semana antes para que el dinero se vea aplicado el día
+> necesario. La fecha calculada es una sugerencia, no un dato firme.
+
 
 ### C-8 · Panel de Administración
 
 Reemplaza el Excel de Julio. Vencimientos del día, agrupación, registro de pago,
 comprobante, y envío al proveedor sin salir del sistema.
+> **Minuta de Administración (1-oct-2026).** La programación NO es solo lo que baja del sistema: son **tres orígenes** —pagos
+> fijos, pagos capturados a mano por los ejecutivos, y lo que se descarga a
+> diario— y el horizonte llega hasta **febrero de 2027**. Un panel que solo
+> muestre los vencimientos del día no sustituye el Excel.
+
 
 ---
 
@@ -242,6 +271,10 @@ comprobante, y envío al proveedor sin salir del sistema.
 
 Facturas emitidas con su vencimiento según los días de crédito del cliente por
 modalidad.
+> **Minuta de Administración (1-oct-2026).** Coincide con la minuta («días de crédito por modalidad»), pero hoy la cotización
+> lee `clienteVinculado.dias` —un solo número— y no `diasCreditoPorTipo`. Ver
+> `PREVIA-JUNTA-ADMIN.md` §4.
+
 
 ### D-2 · Registro de cobros
 

@@ -21,7 +21,7 @@ describe('cuándo n8n rechazó el token', () => {
     const m = mensajeDeError(status, 'documento-general');
     expect(m).toContain('rechazó nuestro token');
     expect(m).toContain(String(status));
-    expect(m).toContain('Token VermurOps');
+    expect(m).toContain('X-Vermur-Token');
   });
 
   it('no se confunde con el flujo inactivo', () => {
