@@ -250,6 +250,8 @@ export function proponerParaOC(
        */
       subtotal: precarga.subtotal,
       iva: precarga.iva,
+      tasaIVA: precarga.tasaIVA,
+      retencion: precarga.retencion,
       moneda: precarga.moneda || oc.moneda,
       documentoId,
       cotejo: precarga.total === null ? 'sin_total' : cotejo.coincide ? 'coincide' : 'difiere',

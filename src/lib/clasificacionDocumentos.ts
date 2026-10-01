@@ -375,6 +375,10 @@ export interface PrecargaFactura {
   subtotal: number | null;
   /** Lo que el documento declara de impuesto. Informativo. */
   iva: number | null;
+  /** Tarea 36 · Tasa de IVA leída del documento (16, 0, 4…). */
+  tasaIVA: number | null;
+  /** Tarea 36 · Monto de retención leído del documento. */
+  retencion: number | null;
   moneda: string;
   conceptos: string[];
 }
@@ -393,6 +397,8 @@ export function precargaFacturaProveedor(datos: Record<string, unknown>): Precar
    */
   const subtotal = numero(datos.subtotal);
   const iva = typeof datos.iva === 'number' && Number.isFinite(datos.iva) ? datos.iva : null;
+  const tasaIVA = typeof datos.tasaIVA === 'number' && Number.isFinite(datos.tasaIVA) ? datos.tasaIVA : null;
+  const retencion = typeof datos.retencion === 'number' && Number.isFinite(datos.retencion) ? datos.retencion : null;
 
   return {
     emisor: texto(datos.emisor),
@@ -401,6 +407,8 @@ export function precargaFacturaProveedor(datos: Record<string, unknown>): Precar
     total,
     subtotal,
     iva,
+    tasaIVA,
+    retencion,
     moneda: texto(datos.moneda).toUpperCase(),
     conceptos: Array.isArray(datos.conceptos)
       ? datos.conceptos.filter((c): c is string => typeof c === 'string' && c.trim() !== '')
