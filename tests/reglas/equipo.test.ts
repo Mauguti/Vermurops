@@ -23,7 +23,15 @@ import { ref, uploadBytes, getBytes } from 'firebase/storage';
 let env: RulesTestEnvironment;
 
 const DEL_EQUIPO = 'julio.gutierrez@vermur.com';
-const NUEVO_ADMIN = 'info@digsol.com';
+/*
+ * El correo real de Mau. Iba escrito sin el `.mx` —tanto en la regla como
+ * aquí—, y este archivo lo fijaba: la lista de abajo afirmaba que
+ * «INFO@DIGSOL.COM.MX» NO era del equipo. O sea que el test protegía el typo.
+ * Ahora el que queda fuera es el dominio equivocado.
+ */
+const NUEVO_ADMIN = 'info@digsol.com.mx';
+/** El typo que estuvo en la regla hasta el 30-sep. Ya no debe entrar. */
+const DOMINIO_EQUIVOCADO = 'info@digsol.com';
 const INTRUSO = 'cualquiera@gmail.com';
 /** Una cuenta de prueba del emulador NO debe valer contra las reglas reales. */
 const DE_PRUEBA = 'ventas@vermur.com';
@@ -62,7 +70,7 @@ describe('Firestore · un correo del equipo', () => {
 });
 
 describe('Firestore · quien no es del equipo no toca nada', () => {
-  it.each([INTRUSO, DE_PRUEBA, 'INFO@DIGSOL.COM.MX'])('%s no lee ni escribe', async (email) => {
+  it.each([INTRUSO, DE_PRUEBA, DOMINIO_EQUIVOCADO])('%s no lee ni escribe', async (email) => {
     const db = como(email).firestore();
     for (const col of COLECCIONES) {
       await assertFails(getDoc(doc(db, col, 'x')));
