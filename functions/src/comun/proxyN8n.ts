@@ -19,48 +19,10 @@ import type { Request } from 'firebase-functions/v2/https';
 import type { Response } from 'express';
 import * as logger from 'firebase-functions/logger';
 import { verificarUsuario, exigirCapacidad, ErrorAuth } from './auth.js';
+import { nombreDelAgente, mensajeDeError, esRechazoDeToken } from './mensajesN8n.js';
 
 /** La IA sobre un PDF escaneado puede tardar. Más allá, algo se atoró. */
 const TIMEOUT_MS = 120_000;
-
-/** Cómo se llama el agente para quien está trabajando. */
-function nombreDelAgente(flujo: string): string {
-  return flujo === 'pdf-cotizacion' ? 'El generador de PDF' : 'El clasificador';
-}
-
-/**
- * Traduce el estado HTTP del agente a algo accionable. Un «error 404» no le
- * dice nada a quien está trabajando: necesita saber si se arregla solo, si
- * hay que avisarle a alguien, o si el documento es el que está mal.
- *
- * El nombre cambia con el flujo (23-sep-2026): a quien está cotizando, «el
- * clasificador no está disponible» le suena a otra pantalla. Y el 404 de
- * n8n tiene una causa concreta —el flujo no está activado— que se dice.
- */
-function mensajeDeError(status: number, flujo: string): string {
-  const agente = nombreDelAgente(flujo);
-  const esPdf = flujo === 'pdf-cotizacion';
-  if (status === 404) {
-    return `${agente} no está publicado: el flujo de n8n no está activo. Avisa a sistemas.`;
-  }
-  if (status === 401 || status === 403) {
-    return `${agente} rechazó la conexión. Avisa a sistemas: la credencial no está bien configurada.`;
-  }
-  if (status === 413) {
-    return esPdf
-      ? 'La cotización es demasiado grande para el generador de PDF.'
-      : 'El documento es demasiado grande para el clasificador.';
-  }
-  if (status === 429) {
-    return `${agente} está saturado. Espera un momento y vuelve a intentarlo.`;
-  }
-  if (status >= 500) {
-    return esPdf
-      ? 'El generador de PDF falló al armar el documento. Vuelve a intentarlo; si se repite, avisa a sistemas.'
-      : 'El clasificador falló al procesar el documento. Si se repite, avisa a sistemas.';
-  }
-  return `${agente} respondió con error ${status}.`;
-}
 
 /**
  * Hasta cuánto de la respuesta de n8n se guarda en el log cuando falla.
@@ -71,7 +33,10 @@ const MAX_LOG_RESPUESTA = 4000;
 
 /** Todo lo que hace falta para depurar un fallo del agente sin volver a reproducirlo. */
 function registrarFalloN8n(mensaje: string, flujo: string, url: string, respuesta: globalThis.Response, texto: string): void {
-  logger.error(mensaje, {
+  // Un rechazo de token se busca distinto que un fallo del flujo: se marca
+  // para poder filtrarlo en `firebase functions:log`.
+  logger.error(esRechazoDeToken(respuesta.status) ? `${mensaje} — n8n RECHAZÓ EL TOKEN` : mensaje, {
+    rechazoDeToken: esRechazoDeToken(respuesta.status),
     flujo,
     url,
     status: respuesta.status,

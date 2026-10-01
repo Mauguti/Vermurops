@@ -1,0 +1,5 @@
+{
+  "tipo": "prueba",
+  "nombreArchivo": "prueba-generar-documento.pdf",
+  "html": "<!doctype html><html lang='es'><head><meta charset='utf-8'><style>@page{size:Letter;margin:20mm}body{font-family:sans-serif;color:#1F2937}h1{color:#B4232A}</style></head><body><h1>Prueba del generador de documentos</h1><p>Importaciones y Logística Vermur, S. de R.L. de C.V. · Querétaro · Ñandú · «comillas» · USD 5,992.75</p><p>Si ves esto con acentos y en tamaño carta, el flujo quedó.</p></body></html>"
+}
