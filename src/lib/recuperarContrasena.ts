@@ -81,3 +81,45 @@ export function validarNuevaContrasena(a: string, b: string): string | null {
   if (a !== b) return 'Las dos contraseñas no coinciden.';
   return null;
 }
+
+
+// ─── Enviar el correo de acceso ──────────────────────────────────────────────
+
+/**
+ * Lo mínimo de `Auth` que hace falta: así se puede probar sin Firebase.
+ */
+export interface EnvioCorreo {
+  (auth: unknown, email: string, opciones?: { url: string }): Promise<void>;
+}
+
+/**
+ * Manda el correo para que alguien ponga su contraseña.
+ *
+ * Es el MISMO envío de «¿Olvidaste tu contraseña?» y de la invitación desde
+ * Usuarios y roles: una cuenta recién creada no tiene contraseña, así que
+ * entrar por primera vez y recuperarla son el mismo trámite.
+ *
+ * ── Por qué vive aquí y no en la Cloud Function (1-oct-2026) ───────────────
+ * La Function llamaba a `generatePasswordResetLink` del Admin SDK creyendo
+ * que enviaba el correo. GENERA el enlace y no manda nada; el Admin SDK no
+ * envía correos. Quien envía es este método del SDK de cliente.
+ *
+ * ── El reintento ───────────────────────────────────────────────────────────
+ * La URL de regreso trae al usuario de vuelta a la app. Si el dominio no
+ * estuviera autorizado en Firebase, se reintenta sin ella: mejor un correo
+ * sin botón de regreso que ningún correo.
+ */
+export async function enviarCorreoDeAcceso(
+  enviar: EnvioCorreo,
+  auth: unknown,
+  email: string,
+  origen: string,
+): Promise<void> {
+  const limpio = email.trim();
+  try {
+    await enviar(auth, limpio, { url: `${origen}/` });
+  } catch (err) {
+    if ((err as { code?: string }).code !== 'auth/unauthorized-continue-uri') throw err;
+    await enviar(auth, limpio);
+  }
+}

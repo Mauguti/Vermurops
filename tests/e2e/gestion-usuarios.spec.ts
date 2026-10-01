@@ -84,23 +84,50 @@ async function entrar(browser: Browser, email: string, password = PW): Promise<{
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-test('1. Admin invita a un usuario nuevo vía la Function', async () => {
+test('1. Admin invita desde la PANTALLA, no por la Function', async ({ browser }) => {
+  /*
+   * La invitación va por la interfaz a propósito.
+   *
+   * Antes este paso llamaba a la Function directo, y el oobCode que
+   * comprobaba el paso 3 lo producía `generatePasswordResetLink` del Admin
+   * SDK. Ese método GENERA el enlace y no manda nada: la prueba pasaba
+   * mientras el correo no llegaba a nadie. Mau se invitó y no recibió nada.
+   *
+   * Quitada esa llamada, el ÚNICO oobCode posible es el del envío que hace
+   * la app con `sendPasswordResetEmail`. Si alguien quita ese envío, el
+   * paso 3 se cae — que es justo lo que se quiere.
+   */
+  const { page, ctx } = await entrar(browser, 'admin@vermur.com');
+
+  await page.getByRole('button', { name: 'Configuración', exact: true }).first().click();
+  // Configuración abre en «Usuarios y roles»; si cambiara el default, el clic lo asegura.
+  const seccion = page.getByRole('button', { name: /Usuarios y roles/ }).first();
+  if (await seccion.count()) await seccion.click();
+
+  await page.getByRole('button', { name: 'Invitar usuario' }).click();
+  await page.getByPlaceholder('nombre@vermur.com').fill(NUEVO_EMAIL);
+  await page.getByPlaceholder('Luis Rentería').fill(NUEVO_NOMBRE);
+  await page.locator('select').first().selectOption(NUEVO_ROL);
+  await page.getByRole('button', { name: 'Invitar', exact: true }).click();
+
+  /*
+   * El aviso de éxito, no el renglón de la tabla: los dos traen el correo.
+   * «Le llegó un correo» solo aparece si el envío salió bien; si fallara, el
+   * mismo aviso diría que la cuenta quedó creada y el correo no salió.
+   */
+  await expect(page.getByText(/Le llegó un correo para poner su contraseña/))
+    .toBeVisible({ timeout: 20_000 });
+  await ctx.close();
+
+  // El uid se toma de la lista, que es lo que la pantalla acaba de refrescar.
   const token = await tokenDe('admin@vermur.com');
-  const res = await llamarGU(token, {
-    accion: 'invitar',
-    email: NUEVO_EMAIL,
-    nombre: NUEVO_NOMBRE,
-    rol: NUEVO_ROL,
-  });
-
-  expect(res.ok).toBe(true);
-  expect(res.datos.email).toBe(NUEVO_EMAIL);
-  expect(res.datos.nombre).toBe(NUEVO_NOMBRE);
-  expect(res.datos.rol).toBe(NUEVO_ROL);
-  expect(res.datos.activo).toBe(true);
-  expect(res.datos.uid).toBeTruthy();
-
-  S.nuevoUid = res.datos.uid;
+  const res = await llamarGU(token, { accion: 'listar' });
+  const nuevo = (res.datos as Array<{ uid: string; email: string; rol: string; activo: boolean }>)
+    .find(u => u.email === NUEVO_EMAIL);
+  expect(nuevo, 'la invitación desde la pantalla no creó la cuenta').toBeTruthy();
+  expect(nuevo!.rol).toBe(NUEVO_ROL);
+  expect(nuevo!.activo).toBe(true);
+  S.nuevoUid = nuevo!.uid;
 });
 
 test('2. La cuenta aparece en la lista de usuarios', async () => {
@@ -114,10 +141,17 @@ test('2. La cuenta aparece en la lista de usuarios', async () => {
   expect(nuevo!.uid).toBe(S.nuevoUid);
 });
 
-test('3. Se genera un oobCode para restablecer contraseña', async () => {
+test('3. El correo lo pidió la APP: hay oobCode', async () => {
+  /*
+   * Este es el paso que amarra el arreglo. La Function ya no genera ningún
+   * enlace, así que este oobCode solo puede venir de
+   * `sendPasswordResetEmail` llamado desde el navegador en el paso 1.
+   *
+   * Si alguien quita ese envío, aquí no hay código y el test falla.
+   */
   const codes = await obtenerOobCodes();
   const code = codes.find(c => c.email === NUEVO_EMAIL && c.requestType === 'PASSWORD_RESET');
-  expect(code).toBeTruthy();
+  expect(code, 'sin oobCode: la app no mandó el correo de invitación').toBeTruthy();
 });
 
 test('4. El nuevo usuario pone su contraseña y puede obtener token', async () => {

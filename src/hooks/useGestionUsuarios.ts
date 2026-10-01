@@ -6,8 +6,10 @@
  */
 
 import { useState, useCallback } from 'react';
+import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
 import { urlFuncion } from '../lib/urlFunciones';
+import { enviarCorreoDeAcceso } from '../lib/recuperarContrasena';
 import type { UserRole } from '../auth/users';
 import type { UsuarioRegistrado } from '../lib/usuarios';
 
@@ -56,16 +58,45 @@ export function useGestionUsuarios() {
     }
   }, [llamarFuncion]);
 
+  /**
+   * Manda el correo para poner la contraseña.
+   *
+   * Lo hace la APP, no la Function: el Admin SDK no envía correos, y creer
+   * que sí costó que Mau se invitara, se le creara la cuenta y no le llegara
+   * nada. Ver `enviarCorreoDeAcceso`.
+   */
+  const enviarInvitacion = useCallback(async (email: string): Promise<void> => {
+    await enviarCorreoDeAcceso(
+      sendPasswordResetEmail as never, auth, email, window.location.origin,
+    );
+  }, []);
+
+  /**
+   * Invitar = crear la cuenta Y mandar el correo.
+   *
+   * Si el correo falla, la cuenta YA está creada: no se deshace nada —sería
+   * borrar una cuenta por un fallo de envío— y se devuelve el aviso para que
+   * la pantalla lo diga y ofrezca reenviar.
+   */
   const invitar = useCallback(async (
     email: string,
     nombre: string,
     rol: UserRole,
-  ): Promise<UsuarioRegistrado> => {
+  ): Promise<{ usuario: UsuarioRegistrado; correoEnviado: boolean; motivo?: string }> => {
     setEstado(e => ({ ...e, error: null }));
     const nuevo = await llamarFuncion({ accion: 'invitar', email, nombre, rol });
     setEstado(e => ({ ...e, usuarios: [...e.usuarios, nuevo] }));
-    return nuevo;
-  }, [llamarFuncion]);
+    try {
+      await enviarInvitacion(email);
+      return { usuario: nuevo, correoEnviado: true };
+    } catch (err) {
+      return {
+        usuario: nuevo,
+        correoEnviado: false,
+        motivo: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }, [llamarFuncion, enviarInvitacion]);
 
   const cambiarRol = useCallback(async (
     uid: string,
@@ -91,6 +122,7 @@ export function useGestionUsuarios() {
   }, [llamarFuncion]);
 
   return {
+    enviarInvitacion,
     ...estado,
     listar,
     invitar,

@@ -43,7 +43,7 @@ export const CORREOS_EN_REGLAS: string[] = [
   'angel.luna@vermur.com',
   'gabriela.huerta@vermur.com',
   'luis.renteria@vermur.com',
-  'info@digsol.com',       // ⚠️ Debería ser info@digsol.com.mx — ver reporte
+  'info@digsol.com.mx',
 ];
 
 export function correoEnReglas(email: string): boolean {
