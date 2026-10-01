@@ -2078,7 +2078,7 @@ export default function FichaCotizacion({
               <ResumenFinancieroInline
                 lineas={lineasPlanas}
                 moneda={quote.moneda}
-                diasCredito={clienteVinculado?.dias ?? 0}
+                creditoCliente={clienteVinculado}
               />
             )}
 
