@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { exigirExpediente } from '../lib/frenoExpediente';
 import { initialQuotes, initialClients, initialProspectos, Prospecto } from '../data';
 import { X, Plus, Search, Filter, Download, Upload, List, LayoutGrid, MessageSquare } from 'lucide-react';
+import { contiene } from '../lib/texto';
 import { useAuth } from '../auth/AuthContext';
 import { UserRole } from '../auth/users';
 import KanbanCotizaciones from './quotes/KanbanCotizaciones';
@@ -398,7 +399,7 @@ export default function Quotes() {
   }, [eliminarVista, vistaActivaId, vistaDefault]);
 
   const coincide = (texto: string) =>
-    busqueda.trim() === '' || texto.toLowerCase().includes(busqueda.trim().toLowerCase());
+    busqueda.trim() === '' || contiene(texto, busqueda);
 
   // Cotizaciones filtradas para la vista de tabla (SpreadsheetTable)
   const filteredTableQuotes = useMemo(() => {
