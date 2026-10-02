@@ -167,7 +167,7 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
         <CheckCircle className="w-[32px] h-[32px] text-text-muted mb-[16px]" />
         <p className="text-[14px] font-medium text-text-primary mb-[4px]">Sin órdenes de compra</p>
         <p className="text-[13px] text-text-secondary text-center max-w-[300px]">
-          Las órdenes de compra aparecerán aquí cuando Pricing las solicite desde una cotización o embarque.
+          Las órdenes de compra aparecerán aquí cuando Operaciones las solicite desde un embarque o Administración cargue un gasto de oficina.
         </p>
       </div>
     );

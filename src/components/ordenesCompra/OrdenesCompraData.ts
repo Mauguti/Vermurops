@@ -3,7 +3,7 @@
 //
 // OC-0: Interfaces, tipos, catálogo ESTADOS_OC con labels/colores, helpers.
 //
-// Flujo: PRICING solicita → OPERACIONES gestiona → ADMIN autoriza y paga.
+// Flujo: OPERACIONES solicita y gestiona → ADMINISTRACIÓN autoriza y paga.
 // Dos orígenes: desde un embarque (hereda contexto) o suelta (gastos oficina).
 // ============================================================
 

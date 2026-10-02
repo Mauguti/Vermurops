@@ -62,7 +62,7 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
   //    Consecuencia para el Bloque 4: la conversión cotización → embarque
   //    tendrá que arrancar desde Embarques, no desde la ficha de cotización.
   //  - 'finance' se AGREGA (C-2): en el flujo de las órdenes de compra
-  //    Operaciones GESTIONA lo que Pricing solicita, y la bandeja vive dentro
+  //    Operaciones SOLICITA y gestiona las OC, y la bandeja vive dentro
   //    de Finanzas por decisión del cliente («una OC autorizada ES una cuenta
   //    por pagar»). Sin el módulo, el paso del medio del flujo no tenía
   //    pantalla: la orden se quedaba en «solicitada» para siempre.
