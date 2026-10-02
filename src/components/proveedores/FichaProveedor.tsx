@@ -9,6 +9,7 @@ import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import { useTarifas } from '../../hooks/useTarifas';
 import { useOrdenesCompra } from '../../hooks/useOrdenesCompra';
 import { useAuth } from '../../auth/AuthContext';
+import { estadoValidacion, etiquetaValidacion } from '../../lib/estadoValidacion';
 
 interface Props {
   proveedor: ProveedorVermur;
@@ -72,14 +73,25 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit }: Pr
             <BadgeEstado tono={proveedor.activo === false ? 'peligro' : 'exito'}>
               {proveedor.activo === false ? 'Inactivo' : 'Activo'}
             </BadgeEstado>
-            {!proveedor.rfc?.trim() && (
-              <BadgeEstado
-                tono="espera"
-                title="Sin RFC: es un probable proveedor, pendiente de que Administración lo valide."
-              >
-                Sin validar
-              </BadgeEstado>
-            )}
+            {(() => {
+              const estado = estadoValidacion(proveedor);
+              if (estado === 'sin_validar') return (
+                <BadgeEstado tono="espera" title={etiquetaValidacion(proveedor)}>
+                  En revisión
+                </BadgeEstado>
+              );
+              if (estado === 'heredado_magaya') return (
+                <BadgeEstado tono="neutro" title={etiquetaValidacion(proveedor)}>
+                  Heredado Magaya
+                </BadgeEstado>
+              );
+              if (estado === 'validado') return (
+                <BadgeEstado tono="exito" title={etiquetaValidacion(proveedor)}>
+                  Aprobado
+                </BadgeEstado>
+              );
+              return null;
+            })()}
             {(proveedor.tipos ?? []).map(t => (
               <BadgeEstado key={t} tono="neutro">{getTransportLabel(t)}</BadgeEstado>
             ))}

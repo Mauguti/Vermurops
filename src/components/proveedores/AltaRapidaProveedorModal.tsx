@@ -75,16 +75,20 @@ export default function AltaRapidaProveedorModal({ onClose, onCreate, modalidadC
         direccion: { calle: null, ciudad: null, estado: null, pais: 'Mexico', codigoPostal: null },
         codigoIATA: null,
         referenciaMagaya: null,
-        numeroEntidadMagaya: rfcVal.toUpperCase() || null,
-        validadoFiscalmente: !!rfcVal,
+        // numeroEntidadMagaya es SOLO para entidades importadas de Magaya.
+        // El RFC capturado aquí va en el campo `rfc` (legacy).
+        numeroEntidadMagaya: null,
+        validadoFiscalmente: false,
         tuvoTransacciones: false,
         multiRegistroEnMagaya: false,
         activo: true,
         origenDatos: 'manual',
         fechaAlta: now.split('T')[0],
         updatedAt: now,
+        // El proveedor de alta rápida nace sin validación de expediente.
+        expedienteValidado: null,
         // Legacy fields
-        rfc: rfcVal.toUpperCase(),
+        rfc: rfcVal ? rfcVal.toUpperCase() : undefined,
         modalidades,
       };
       await onCreate(nuevo);
@@ -154,7 +158,9 @@ export default function AltaRapidaProveedorModal({ onClose, onCreate, modalidadC
             </div>
           </div>
 
-          <p className="text-[11px] text-text-muted">Los demás datos se pueden completar después desde Directorio &gt; Proveedores &gt; Editar Datos.</p>
+          <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-[6px] px-3 py-2">
+            Este proveedor queda <strong>en revisión</strong>. Administración lo aprueba en Altas.
+          </p>
 
           {error && (
             <p className="text-[12px] text-danger-text bg-danger-bg rounded-[6px] px-3 py-2">{error}</p>

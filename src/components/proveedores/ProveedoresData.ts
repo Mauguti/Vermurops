@@ -9,6 +9,7 @@
 // ============================================================
 
 import type { CambioEnLista } from '../../lib/edicionEnLista';
+import type { ValidacionExpediente } from '../../lib/estadoValidacion';
 import seedData from '../../data/seeds/proveedores.json';
 
 // ─── Sub-objetos ──────────────────────────────────────────────────────────────
@@ -126,6 +127,14 @@ export interface ProveedorVermur {
   validadoFiscalmente: boolean;
   tuvoTransacciones: boolean;
   multiRegistroEnMagaya: boolean;
+
+  // ── Validación de expediente (PLAN-APROBACION, paso 1) ──────────────────
+  /**
+   * Validación formal del proveedor por Administración. Mismo tipo que el
+   * del cliente. null / undefined = sin validar. Los de Magaya cuentan como
+   * validados de origen sin necesidad de este campo.
+   */
+  expedienteValidado?: ValidacionExpediente | null;
 
   // ── Estado ───────────────────────────────────────────────────────────────
   activo: boolean;
