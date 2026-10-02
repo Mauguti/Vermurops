@@ -477,6 +477,12 @@ export interface EmbarqueCompleto {
   eventos: EmbarqueEvento[];
   /** Lo interno del equipo. Ver EntradaBitacora. Ausente en los anteriores. */
   bitacora?: EntradaBitacora[];
+  /**
+   * Documentos operativos generados desde plantillas (tarea 40). Se agregan
+   * con `arrayUnion` desde la Cloud Function. Inmutables: corregir = generar
+   * la versión siguiente.
+   */
+  documentosGenerados?: import('../../lib/documentosOperativos').DocumentoGenerado[];
   createdAt: string;
   updatedAt: string;
 
