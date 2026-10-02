@@ -21,5 +21,8 @@ export { extraerTarifas } from './tarifas/extraerTarifas.js';
 // ── Clasificación de documentos (tarifas + expediente KYC + embarque) ────────
 export { clasificarDocumento } from './documentos/clasificarDocumento.js';
 
+// ── Generación de documentos operativos (tarea 40) ──────────────────────────
+export { generarDocumento } from './documentos/generarDocumento.js';
+
 // ── Gestión de usuarios ─────────────────────────────────────────────────────
 export { gestionarUsuarios } from './usuarios/gestionarUsuarios.js';

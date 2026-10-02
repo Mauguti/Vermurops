@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @page { size: letter; margin: 2cm; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11pt; color: #222; }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #4B2A8C; padding-bottom: 12px; margin-bottom: 20px; }
+    .header h1 { font-size: 16pt; color: #4B2A8C; margin: 0; }
+    .empresa { text-align: right; font-size: 9pt; color: #666; }
+    .datos { margin: 16px 0; }
+    .datos dt { font-weight: bold; color: #4B2A8C; font-size: 9pt; text-transform: uppercase; margin-top: 10px; }
+    .datos dd { margin: 2px 0 0 0; }
+    .footer { border-top: 1px solid #ccc; margin-top: 30px; padding-top: 8px; font-size: 8pt; color: #999; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Documento de Prueba</h1>
+    <div class="empresa">
+      <strong>{{empresa.razonSocial}}</strong><br>
+      RFC: {{empresa.rfc}}<br>
+      {{empresa.direccion}}
+    </div>
+  </div>
+
+  <p>Este documento verifica que el pipeline de generacion funciona correctamente.</p>
+
+  <dl class="datos">
+    <dt>Embarque</dt>
+    <dd>{{embarque.folio}}</dd>
+
+    <dt>Modalidad</dt>
+    <dd>{{embarque.modalidad}}</dd>
+
+    <dt>Consignatario</dt>
+    <dd>{{embarque.consignatario}}</dd>
+
+    <dt>Puerto de carga</dt>
+    <dd>{{embarque.puertoCarga}}</dd>
+
+    <dt>Puerto de descarga</dt>
+    <dd>{{embarque.puertoDescarga}}</dd>
+
+    <dt>Fecha de generacion</dt>
+    <dd>{{fechaGeneracion}}</dd>
+
+    <dt>Generado por</dt>
+    <dd>{{generadoPorNombre}}</dd>
+  </dl>
+
+  <div class="footer">
+    Generado por VermurOps &mdash; {{empresa.razonSocial}}
+  </div>
+</body>
+</html>
