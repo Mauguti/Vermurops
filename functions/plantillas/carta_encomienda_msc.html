@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @page { size: letter; margin: 1.8cm 2cm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 10pt; color: #222; line-height: 1.4; }
+    .header { text-align: right; margin-bottom: 20px; }
+    .header .empresa { font-size: 11pt; font-weight: bold; color: #4B2A8C; }
+    .header .datos { font-size: 8pt; color: #555; }
+    .fecha { text-align: right; margin-bottom: 15px; font-size: 9pt; }
+    .destinatario { margin-bottom: 15px; font-size: 9pt; }
+    .destinatario strong { display: block; font-size: 10pt; }
+    .titulo { text-align: center; font-size: 11pt; font-weight: bold; color: #4B2A8C; margin: 15px 0; text-transform: uppercase; letter-spacing: 1px; }
+    .subtitulo { text-align: center; font-size: 10pt; font-weight: bold; color: #4B2A8C; margin: 20px 0 10px; text-transform: uppercase; }
+    .cuerpo { font-size: 9pt; text-align: justify; margin-bottom: 10px; }
+    .datos-embarque { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 9pt; }
+    .datos-embarque td { padding: 3px 6px; vertical-align: top; }
+    .datos-embarque .label { font-weight: bold; width: 170px; color: #333; }
+    .nota-cargo { font-size: 8.5pt; background: #f9f5ff; border: 1px solid #e0d4f5; padding: 8px 10px; margin: 10px 0; }
+    .nota-cargo strong { color: #4B2A8C; }
+    .separador { border: none; border-top: 2px solid #4B2A8C; margin: 25px 0 15px; }
+    .firma { margin-top: 30px; text-align: center; }
+    .firma .linea { border-top: 1px solid #333; width: 220px; margin: 0 auto; padding-top: 4px; }
+    .firma .nombre { font-weight: bold; font-size: 9pt; }
+    .firma .cargo { font-size: 8pt; color: #555; }
+    .firma .empresa-firma { font-size: 8pt; color: #555; }
+    .pie { margin-top: 20px; border-top: 1px solid #ccc; padding-top: 6px; font-size: 7pt; color: #999; text-align: center; }
+  </style>
+</head>
+<body>
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- PÁGINA 1: CARTA DE ENCOMIENDA                                -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <div class="header">
+    <div class="empresa">{{empresa.razonSocial}}</div>
+    <div class="datos">
+      RFC: {{empresa.rfc}}<br>
+      {{empresa.direccion}}<br>
+      {{empresa.telefono}}
+    </div>
+  </div>
+
+  <div class="fecha">{{fechaGeneracion}}</div>
+
+  <div class="destinatario">
+    <strong>{{naviera.razonSocial}}</strong>
+    AT'N: {{naviera.atencion}}
+  </div>
+
+  <div class="titulo">Carta de Encomienda</div>
+
+  <p class="cuerpo">
+    Por medio de la presente, la empresa <strong>{{empresa.razonSocial}}</strong>,
+    con RFC <strong>{{empresa.rfc}}</strong>, otorga amplio poder conforme a derecho
+    al Agente Aduanal <strong>{{embarque.agenteAduanal}}</strong>,
+    Patente No. <strong>{{parametros.patente}}</strong>, para que en nuestro nombre
+    y representación lleve a cabo los trámites de despacho aduanero de la mercancía
+    amparada bajo el siguiente conocimiento de embarque:
+  </p>
+
+  <table class="datos-embarque">
+    <tr>
+      <td class="label">B/L NÚMERO:</td>
+      <td>{{embarque.numeroGuia}}</td>
+    </tr>
+    <tr>
+      <td class="label">BUQUE:</td>
+      <td>{{embarque.buque}}</td>
+    </tr>
+    <tr>
+      <td class="label">VIAJE:</td>
+      <td>{{embarque.viaje}}</td>
+    </tr>
+    <tr>
+      <td class="label">PUERTO DE CARGA:</td>
+      <td>{{embarque.puertoCarga}}</td>
+    </tr>
+    <tr>
+      <td class="label">PUERTO DE DESCARGA:</td>
+      <td>{{embarque.puertoDescarga}}</td>
+    </tr>
+    <tr>
+      <td class="label">FECHA DE ARRIBO:</td>
+      <td>{{embarque.eta}}</td>
+    </tr>
+    <tr>
+      <td class="label">CONTENEDORES:</td>
+      <td>{{!contenedores}}</td>
+    </tr>
+  </table>
+
+  <p class="cuerpo">
+    Lo anterior, con la finalidad de que se lleve a cabo la liberación y
+    despacho aduanero de la mercancía descrita, conforme a las disposiciones
+    legales aplicables.
+  </p>
+
+  <div class="nota-cargo">
+    <strong>Nota:</strong> MSC cobra un cargo de USD $174.00 por cambio de agente
+    aduanal. Este cargo se mantiene conforme al tarifario vigente de la naviera.
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <!-- PÁGINA 2: CARTA DE GARANTÍA                                  -->
+  <!-- ══════════════════════════════════════════════════════════════ -->
+  <hr class="separador" style="page-break-before: always;">
+
+  <div class="subtitulo">Carta de Garantía</div>
+
+  <p class="cuerpo">
+    Por medio de la presente, <strong>{{empresa.razonSocial}}</strong>,
+    con RFC <strong>{{empresa.rfc}}</strong>, y domicilio en
+    <strong>{{empresa.direccion}}</strong>, se compromete irrevocablemente
+    a liquidar las demoras que se generen por el uso de los contenedores
+    y/o equipos propiedad o en arrendamiento de
+    <strong>MEDITERRANEAN SHIPPING COMPANY</strong> y/o sus agentes en
+    México, derivados del embarque arriba referenciado.
+  </p>
+
+  <table class="datos-embarque">
+    <tr>
+      <td class="label">B/L NÚMERO:</td>
+      <td>{{embarque.numeroGuia}}</td>
+    </tr>
+    <tr>
+      <td class="label">CONTENEDORES:</td>
+      <td>{{!contenedores}}</td>
+    </tr>
+    <tr>
+      <td class="label">DÍAS LIBRES DE DEMORA:</td>
+      <td>{{embarque.diasLibresDemora}}</td>
+    </tr>
+  </table>
+
+  <p class="cuerpo">
+    Nos comprometemos a devolver los contenedores vacíos y en buen estado
+    dentro del período de días libres otorgado. En caso de exceder dicho
+    período, cubriremos las demoras correspondientes conforme a las tarifas
+    vigentes de MSC aplicables al puerto de destino.
+  </p>
+
+  <p class="cuerpo">
+    La presente carta de garantía tiene carácter irrevocable y se otorga
+    como obligación de pago por los conceptos antes mencionados, sin
+    necesidad de requerimiento previo.
+  </p>
+
+  <div class="firma">
+    <div class="linea">
+      <div class="nombre">{{empresa.apoderadoLegal}}</div>
+      <div class="cargo">Apoderado Legal</div>
+      <div class="empresa-firma">{{empresa.razonSocial}}</div>
+    </div>
+  </div>
+
+  <div class="pie">
+    {{empresa.razonSocial}} &mdash; RFC: {{empresa.rfc}} &mdash; {{empresa.direccion}}
+  </div>
+</body>
+</html>

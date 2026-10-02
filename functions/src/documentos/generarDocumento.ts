@@ -114,6 +114,65 @@ async function leerEmpresa(): Promise<ConfiguracionEmpresa> {
   return { ...EMPRESA_DEFAULT, ...(snap.data() as Partial<ConfiguracionEmpresa>) };
 }
 
+// ── Mapa de navieras → plantilla (carta de encomienda / garantía) ────────────
+
+interface NavieraInfo {
+  clave: string;
+  razonSocial: string;
+  atencion: string;
+  variantes: string[];
+}
+
+/**
+ * Cada naviera tiene su propia plantilla HTML. Las variantes se comparan
+ * contra `ruta.origen.transportista` en mayúsculas y sin acentos.
+ */
+const NAVIERAS: NavieraInfo[] = [
+  { clave: 'carta_encomienda_cosco', razonSocial: 'COSCO SHIPPING LINES CO., LTD', atencion: 'DEPARTAMENTO DE IMPORTACIÓN', variantes: ['COSCO'] },
+  { clave: 'carta_encomienda_hamburg_sud', razonSocial: 'HAMBURG SÜD', atencion: 'DEPARTAMENTO DE IMPORTACIÓN', variantes: ['HAMBURG', 'HAMBURG SUD', 'HAMBURG SÜD'] },
+  { clave: 'carta_encomienda_cma_cgm', razonSocial: 'CMA CGM', atencion: 'DEPARTAMENTO DE IMPORTACIÓN', variantes: ['CMA CGM', 'CMA'] },
+  { clave: 'carta_encomienda_evergreen', razonSocial: 'EVERGREEN LINE', atencion: 'DEPARTAMENTO DE IMPORTACIÓN', variantes: ['EVERGREEN'] },
+  { clave: 'carta_encomienda_sealand', razonSocial: 'SEALAND', atencion: 'DEPARTAMENTO DE IMPORTACIÓN', variantes: ['SEALAND', 'SEA LAND'] },
+  { clave: 'carta_encomienda_agunsa', razonSocial: 'AGUNSA', atencion: 'DEPARTAMENTO DE IMPORTACIÓN', variantes: ['AGUNSA'] },
+  { clave: 'carta_encomienda_one', razonSocial: 'OCEAN NETWORK EXPRESS', atencion: 'DEPARTAMENTO DE IMPORTACIÓN', variantes: ['OCEAN NETWORK', 'ONE'] },
+  { clave: 'carta_encomienda_pil', razonSocial: 'Representaciones Marítimas S.A. DE C.V. as agent of Pacific International Lines Pte LTD', atencion: 'DEPARTAMENTO DE IMPORTACIÓN', variantes: ['PIL', 'PACIFIC INTERNATIONAL'] },
+  { clave: 'carta_encomienda_maersk', razonSocial: 'MAERSK A/S', atencion: 'DEPARTAMENTO DE IMPORTACIÓN', variantes: ['MAERSK'] },
+  { clave: 'carta_garantia_hmm', razonSocial: 'HMM COMPANY LIMITED Y/O NORTON LILLY SHIPPING MEXICO, S.A. DE C.V.', atencion: '', variantes: ['HMM', 'HYUNDAI', 'NORTON LILLY'] },
+  { clave: 'carta_encomienda_msc', razonSocial: 'MEDITERRANEAN SHIPPING COMPANY MEXICO S.A DE C.V.', atencion: 'DEPARTAMENTO DE IMPORTACIÓN', variantes: ['MSC', 'MEDITERRANEAN'] },
+];
+
+function normalizarTexto(texto: string): string {
+  return texto.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function buscarNaviera(transportista: string): NavieraInfo | null {
+  if (!transportista?.trim()) return null;
+  const norm = normalizarTexto(transportista);
+  const ordenadas = [...NAVIERAS].sort((a, b) => {
+    const maxA = Math.max(...a.variantes.map(v => v.length));
+    const maxB = Math.max(...b.variantes.map(v => v.length));
+    return maxB - maxA;
+  });
+  for (const nav of ordenadas) {
+    for (const variante of nav.variantes) {
+      if (norm.includes(normalizarTexto(variante))) return nav;
+    }
+  }
+  return null;
+}
+
+/**
+ * Extrae la lista de contenedores del embarque como texto HTML.
+ */
+function generarTextoContenedores(productos: ProductoRaw[]): string {
+  const nums: string[] = [];
+  for (const p of productos) {
+    const num = p.datosContenedor?.numeroContenedor?.trim();
+    if (num) nums.push(escaparHtml(num));
+  }
+  return nums.length > 0 ? nums.join(', ') : '(sin contenedores registrados)';
+}
+
 // ── Helpers para armar HTML de la notificación de arribo ─────────────────────
 
 interface CargoRaw {
@@ -281,6 +340,22 @@ function armarDatos(
     datos.totalPorMoneda = totalPorMoneda;
   }
 
+  // Datos específicos de la carta de encomienda / garantía
+  if (tipo === 'carta_encomienda') {
+    const transportista = ruta.origen?.transportista ?? '';
+    const naviera = buscarNaviera(transportista);
+    if (naviera) {
+      datos.naviera = {
+        razonSocial: naviera.razonSocial,
+        atencion: naviera.atencion,
+      };
+    }
+    datos.contenedores = generarTextoContenedores(productos);
+    // Días libres de demora (para HMM y MSC)
+    (datos.embarque as Record<string, unknown>).diasLibresDemora =
+      embarque.diasLibresDemora ?? '';
+  }
+
   return datos;
 }
 
@@ -383,18 +458,35 @@ export const generarDocumento = onRequest(
     const nombreUsuario = usuario.email;
     const version = siguienteVersion(documentosExistentes, tipo);
 
+    // ── Resolver plantilla ────────────────────────────────────────────
+    // Para carta_encomienda, la plantilla depende de la naviera del embarque.
+    let nombrePlantilla = tipo as string;
+    if (tipo === 'carta_encomienda') {
+      const ruta = (embarqueData.ruta ?? {}) as Record<string, Record<string, string>>;
+      const transportista = ruta.origen?.transportista ?? '';
+      const naviera = buscarNaviera(transportista);
+      if (!naviera) {
+        res.status(400).json({
+          ok: false,
+          error: `La naviera «${transportista || '(vacía)'}» no tiene plantilla de carta encomienda disponible.`,
+        });
+        return;
+      }
+      nombrePlantilla = naviera.clave;
+    }
+
     let html: string;
     try {
-      const plantilla = leerPlantilla(tipo);
+      const plantilla = leerPlantilla(nombrePlantilla);
       const datos = armarDatos(tipo, embarqueData, empresa, fechaGen, nombreUsuario);
       // Los parámetros de la carta de encomienda (aduana, patente) se mezclan
       if (parametros) Object.assign(datos, { parametros });
       html = renderizar(plantilla, datos);
     } catch (err) {
-      logger.error('Error renderizando plantilla', { tipo, err: String(err) });
+      logger.error('Error renderizando plantilla', { tipo, nombrePlantilla, err: String(err) });
       res.status(500).json({
         ok: false,
-        error: `No se pudo renderizar la plantilla «${tipo}». Verifica que exista en el repo.`,
+        error: `No se pudo renderizar la plantilla «${nombrePlantilla}». Verifica que exista en el repo.`,
       });
       return;
     }
