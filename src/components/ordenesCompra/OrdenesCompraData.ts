@@ -9,6 +9,15 @@
 
 // ─── Sub-objetos ──────────────────────────────────────────────────────────────
 
+/** Archivo subido (PDF o XML de la factura del proveedor). */
+export interface ArchivoFacturaOC {
+  storagePath: string;
+  url: string;
+  nombre: string;
+  subidoPor: string;
+  fecha: string;  // ISO timestamp
+}
+
 /** Registro en el historial de cambios de estado de una OC. */
 export interface RegistroEstadoOC {
   estado: EstadoOC;
@@ -190,6 +199,22 @@ export interface OrdenCompra {
     /** Resultado del cotejo contra el monto de la OC al asociarla. */
     cotejo: 'coincide' | 'difiere' | 'sin_total';
   } | null;
+  /**
+   * Tarea 55 · Archivos de la factura del proveedor subidos directamente a la OC.
+   * En OCs de oficina es la única vía; en las de embarque complementa el flujo
+   * del clasificador. Solo PDF y XML, sin borrar (se sube otra versión).
+   */
+  facturaArchivos?: {
+    pdf?: ArchivoFacturaOC | null;
+    xml?: ArchivoFacturaOC | null;
+  };
+  /**
+   * Tarea 55 · UUID del CFDI extraído del XML, para detectar duplicados.
+   * Se guarda aparte de facturaDatos para indexar sin bajar el objeto entero.
+   */
+  facturaUUID?: string | null;
+  /** Tarea 55 · RFC del emisor extraído del XML. */
+  facturaRfcEmisor?: string | null;
   /** Referencia o URL del comprobante de pago. */
   comprobantePago: string | null;
 
