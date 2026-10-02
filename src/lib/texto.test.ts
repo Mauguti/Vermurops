@@ -17,6 +17,19 @@ describe('normalizarTexto / contiene', () => {
     expect(contiene(undefined, 'x')).toBe(false);
     expect(contiene(null, '')).toBe(true);
   });
+
+  it('encuentra nombres mexicanos con y sin acentos', () => {
+    // Tarea 46: estos casos antes fallaban con .toLowerCase().includes()
+    expect(contiene('García Hernández', 'garcia')).toBe(true);
+    expect(contiene('Álvarez López', 'alvarez')).toBe(true);
+    expect(contiene('Pérez Muñoz', 'perez')).toBe(true);
+    expect(contiene('Pérez Muñoz', 'munoz')).toBe(true);
+    // Y al revés: buscar con acento en dato sin acento
+    expect(contiene('Alvarez Lopez', 'Álvarez')).toBe(true);
+    // RFC y folios (sin acento, pero verificamos que no truena)
+    expect(contiene('XAXX010101000', 'XAXX')).toBe(true);
+    expect(contiene('COT-2026-0003', '0003')).toBe(true);
+  });
 });
 
 describe('compararTexto', () => {
