@@ -248,6 +248,29 @@ service cloud.firestore {
                     && resource.data.usuarioId == request.auth.uid;
     }
 
+    // ── Configuración de la empresa (tarea 40) ───────────────────────
+    // Los datos que encabezan los documentos operativos: razón social,
+    // RFC, domicilio, logo. Los edita Administración desde «Mi empresa».
+    match /configuracion/empresa {
+      allow read, write: if esDelEquipo();
+    }
+
+    // ── Tipo de cambio: se LEE, no se escribe desde el navegador ──────
+    //
+    // Lo escribe `actualizarTipoCambio` con el Admin SDK, que no pasa por
+    // estas reglas. Dejarlo abierto al cliente permitiría que cualquiera
+    // del equipo moviera la tasa con la que se cotiza y se factura, desde
+    // la consola del navegador y sin dejar rastro.
+    match /configuracion/tipoCambio {
+      allow read:  if esDelEquipo();
+      allow write: if false;
+    }
+
+    match /tiposCambio/{fecha} {
+      allow read:  if esDelEquipo();
+      allow write: if false;
+    }
+
     // ── Notificaciones ────────────────────────────────────────────────────
     // Lectura: solo el destinatario nombrado en el documento.
     //   Alinea con la query de NotificationsContext:
