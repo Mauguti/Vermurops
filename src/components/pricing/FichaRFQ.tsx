@@ -5,7 +5,7 @@ import { Modalidad } from '../proveedores/ProveedoresData';
 import AltaRapidaProveedorModal from '../proveedores/AltaRapidaProveedorModal';
 import { ChevronRight, ChevronDown, Check, X, Plane, Ship, Truck, FileText, Plus, DollarSign, Send, ArrowLeft, Paperclip, File as FileIcon, HelpCircle } from 'lucide-react';
 import { useServicios, renderIcon } from '../../config/serviciosStore';
-import { FichaHeader, BadgeEstado } from '../ui/ficha/FichaLayout';
+import { FichaHeader, BadgeEstado, AccionesHeader } from '../ui/ficha/FichaLayout';
 
 interface FichaRFQProps {
   rfq: RFQ;
@@ -147,6 +147,20 @@ export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
             <span className="text-divider">•</span>
             <span>Límite: <span className="text-danger-text">{rfq.deadline}</span></span>
           </div>
+        }
+        acciones={
+          rfq.status !== 'Completado' ? (
+            <AccionesHeader>
+              <button
+                onClick={handleSendToSales}
+                disabled={finalTotal === 0}
+                className="px-3 py-1.5 bg-primario hover:bg-primario-hover disabled:opacity-40 disabled:cursor-not-allowed text-white text-[10px] font-bold uppercase tracking-wider rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap"
+              >
+                <Send className="w-3.5 h-3.5" />
+                Enviar a Ventas
+              </button>
+            </AccionesHeader>
+          ) : undefined
         }
       />
 
@@ -398,14 +412,7 @@ export default function FichaRFQ({ rfq, onClose, onUpdate }: FichaRFQProps) {
                   <span className="text-[28px] font-bold text-white tabular-nums leading-none">${finalTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                 </div>
 
-                <button 
-                  onClick={handleSendToSales}
-                  disabled={finalTotal === 0}
-                  className="w-full bg-brand hover:bg-brand-hover disabled:bg-surface-border disabled:text-text-inverse-muted text-white font-semibold py-[12px] rounded-[8px] flex items-center justify-center transition-colors shadow-sm"
-                >
-                  <Send className="w-4 h-4 mr-2" />
-                  Enviar a Ventas
-                </button>
+                {/* Tarea 50: «Enviar a Ventas» subió al encabezado. */}
               </div>
             </div>
           </div>

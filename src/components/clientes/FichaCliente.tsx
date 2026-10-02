@@ -11,7 +11,7 @@ import {
 } from '../../lib/clasificacionDocumentos';
 import { useExpedienteCliente, type ArchivoSubido } from '../../hooks/useExpedienteCliente';
 import RevisionDocumentoClasificado, { EnlaceArchivo, type RevisionConfirmada } from '../documentos/RevisionDocumentoClasificado';
-import { FichaHeader, BadgeEstado } from '../ui/ficha/FichaLayout';
+import { FichaHeader, BadgeEstado, AccionesHeader } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import { useCotizaciones } from '../../hooks/useCotizaciones';
 import { useEmbarques } from '../../hooks/useEmbarques';
@@ -96,22 +96,6 @@ function BoolCheck({
       </div>
       <span className={`text-[13px] ${checked ? 'text-text-primary' : 'text-text-secondary'}`}>{label}</span>
     </label>
-  );
-}
-
-function SaveBar({ onSave, saving, oculta }: { onSave: () => void; saving: boolean; oculta?: boolean }) {
-  if (oculta) return null;
-  return (
-    <div className="mt-8 pt-6 border-t border-divider flex justify-end">
-      <button
-        onClick={onSave}
-        disabled={saving}
-        className="flex items-center gap-2 bg-brand text-white px-5 py-2 rounded-[8px] text-[13px] font-medium hover:bg-brand-hover disabled:opacity-60 transition-colors shadow-sm"
-      >
-        {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-        {saving ? 'Guardando…' : 'Guardar cambios'}
-      </button>
-    </div>
   );
 }
 
@@ -293,6 +277,50 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
     ['fisico',  'Físico archivado en oficina'],
   ];
 
+  /*
+   * Tarea 50: «Guardar cambios» sube al encabezado. Delega al guardado de
+   * cada pestaña para que un solo botón sirva a las cuatro.
+   */
+  const handleSaveTab = () => {
+    if (tab === 'informacion') {
+      saveInformacion({
+        nombre: draft.nombre, comercial: draft.comercial,
+        representante: draft.representante, rfc: draft.rfc,
+        domicilio: draft.domicilio, telefono: draft.telefono,
+        correo: draft.correo, statusOperativo: draft.statusOperativo,
+        fechaAlta: draft.fechaAlta, comentarios: draft.comentarios,
+        codigoPostal: draft.codigoPostal || null,
+        regimenFiscal: draft.regimenFiscal || null,
+        responsableVentas: draft.responsableVentas || null,
+        responsablePricing: draft.responsablePricing || null,
+        responsableOperativo: draft.responsableOperativo || null,
+      });
+    } else if (tab === 'credito') {
+      const dct = draft.diasCreditoPorTipo ?? {
+        general: draft.dias, maritimo: draft.dias,
+        aereo: draft.dias, terrestre: draft.dias,
+      };
+      save({
+        tipoCredito: draft.tipoCredito, monto: draft.monto,
+        divisa: draft.divisa,
+        dias: dct.general,
+        diasCreditoPorTipo: dct,
+        interesMoratorio: draft.interesMoratorio,
+        atradius: draft.atradius, montoAprobado: draft.montoAprobado,
+      });
+    } else if (tab === 'expediente') {
+      save({
+        docsAlta: draft.docsAlta,
+        expedienteDrive: draft.expedienteDrive,
+      });
+    } else if (tab === 'contrato') {
+      save({
+        contrato: draft.contrato,
+        pagare: draft.pagare,
+      });
+    }
+  };
+
   return (
     <div className="space-y-[24px]">
       {/* U-3 · Mismo encabezado que la ficha de cotización. Antes eran tres
@@ -332,6 +360,20 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
             {cliente.comercial && <span className="mr-3">{cliente.comercial}</span>}
             <span className="font-mono text-[11px]">RFC: {cliente.rfc || '—'}</span>
           </div>
+        }
+        acciones={
+          !soloConsulta ? (
+            <AccionesHeader>
+              <button
+                onClick={handleSaveTab}
+                disabled={saving}
+                className="flex items-center gap-1.5 bg-primario text-white px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-primario-hover disabled:opacity-60 transition-colors whitespace-nowrap"
+              >
+                {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {saving ? 'Guardando…' : 'Guardar cambios'}
+              </button>
+            </AccionesHeader>
+          ) : undefined
         }
       />
 
@@ -492,15 +534,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
                   </Field>
                 </div>
               </div>
-              <SaveBar oculta={soloConsulta} saving={saving} onSave={() => saveInformacion({
-                nombre: draft.nombre, comercial: draft.comercial,
-                representante: draft.representante, rfc: draft.rfc,
-                domicilio: draft.domicilio, telefono: draft.telefono,
-                correo: draft.correo, statusOperativo: draft.statusOperativo,
-                fechaAlta: draft.fechaAlta, comentarios: draft.comentarios,
-                codigoPostal: draft.codigoPostal || null,
-                regimenFiscal: draft.regimenFiscal || null,
-              })} />
+              {/* Tarea 50: «Guardar cambios» subió al encabezado. */}
             </div>
           )}
 
@@ -603,20 +637,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
                     onChange={e => set('montoAprobado', e.target.value)} />
                 </Field>
               </div>
-              <SaveBar oculta={soloConsulta} saving={saving} onSave={() => {
-                const dct = draft.diasCreditoPorTipo ?? {
-                  general: draft.dias, maritimo: draft.dias,
-                  aereo: draft.dias, terrestre: draft.dias,
-                };
-                save({
-                  tipoCredito: draft.tipoCredito, monto: draft.monto,
-                  divisa: draft.divisa,
-                  dias: dct.general,
-                  diasCreditoPorTipo: dct,
-                  interesMoratorio: draft.interesMoratorio,
-                  atradius: draft.atradius, montoAprobado: draft.montoAprobado,
-                });
-              }} />
+              {/* Tarea 50: «Guardar cambios» subió al encabezado. */}
             </div>
           )}
 
@@ -782,12 +803,9 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
                 </div>
               </div>
 
-              {/* La subida guarda sola al confirmar la revisión; esta barra es
-                  para las marcas manuales y el checkbox de Drive. */}
-              <SaveBar oculta={soloConsulta} saving={saving} onSave={() => save({
-                docsAlta: draft.docsAlta,
-                expedienteDrive: draft.expedienteDrive,
-              })} />
+              {/* Tarea 50: «Guardar cambios» subió al encabezado. La subida
+                  guarda sola al confirmar la revisión; el botón del header
+                  guarda las marcas manuales y el checkbox de Drive. */}
             </div>
           )}
 
@@ -905,10 +923,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
                 )}
               </div>
 
-              <SaveBar oculta={soloConsulta} saving={saving} onSave={() => save({
-                contrato: draft.contrato,
-                pagare: draft.pagare,
-              })} />
+              {/* Tarea 50: «Guardar cambios» subió al encabezado. */}
             </div>
           )}
 

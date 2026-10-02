@@ -32,7 +32,7 @@ import { fechaLimite, diasVencidos, ALMACENAJE_SUGERIDO } from '../../lib/diasLi
 import { margenDelEmbarque, TEXTO_SIN_COMPARAR, type ContextoMargen } from '../../lib/margenRealConcepto';
 import { construirOCDesdeCargo, marcarCargoConOrden, puedeConvertirse } from '../../lib/ocDesdeCargo';
 import { generateFolioEmbarque, parseFolioNumero } from '../../lib/folioService';
-import { FichaHeader, FichaTabs, BadgeEstado } from '../ui/ficha/FichaLayout';
+import { FichaHeader, FichaTabs, BadgeEstado, AccionesHeader, type AccionMenu } from '../ui/ficha/FichaLayout';
 import { EnlaceEntidad, BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import LineaTiempo from '../ui/ficha/LineaTiempo';
 import { ETAPAS_EMBARQUE, estadoDe, patchParaEtapa, type EstadoEmbarque } from '../../lib/estadoEmbarque';
@@ -604,14 +604,24 @@ export default function FichaEmbarque({
           ) : undefined
         }
         acciones={
-          <button
-            onClick={() => setVistaCliente(true)}
-            className="flex items-center gap-1.5 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors"
-            title="Ver el embarque como lo vería el cliente, sin costos ni proveedores"
-          >
-            <Eye className="w-3.5 h-3.5" />
-            Ver como cliente
-          </button>
+          /* Tarea 50: «Guardar Cambios» sube al encabezado junto con «Ver
+             como cliente». Solo se muestra en la pestaña Información, que es
+             donde viven los campos generales. */
+          <AccionesHeader items={[{
+            id: 'ver-cliente',
+            label: 'Ver como cliente',
+            onClick: () => setVistaCliente(true),
+            icono: <Eye className="w-3.5 h-3.5" />,
+          }]}>
+            {activeTab === 'informacion' && (
+              <button
+                onClick={handleSaveGeneral}
+                className="bg-primario hover:bg-primario-hover text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap"
+              >
+                <Save className="w-3.5 h-3.5" /> Guardar Cambios
+              </button>
+            )}
+          </AccionesHeader>
         }
       />
 
@@ -811,14 +821,7 @@ export default function FichaEmbarque({
                 />
               </div>
 
-              <div className="flex justify-end pt-2 border-t border-gray-100">
-                <button
-                  onClick={handleSaveGeneral}
-                  className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
-                >
-                  <Save className="w-4 h-4" /> Guardar Cambios
-                </button>
-              </div>
+              {/* Tarea 50: «Guardar Cambios» subió al encabezado. */}
             </div>
 
             {/* Fechas y Cierres */}
