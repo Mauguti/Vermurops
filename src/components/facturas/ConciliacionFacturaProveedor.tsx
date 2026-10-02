@@ -178,6 +178,23 @@ function ModalConciliar({ subida, embarque, ordenes, nombreProveedor, autor, onC
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Tarea 36 · Desglose fiscal editable ─────────────────────────────────
+  const [editSubtotal, setEditSubtotal] = useState<string>(precarga.subtotal !== null ? String(precarga.subtotal) : '');
+  const [editIVA, setEditIVA] = useState<string>(precarga.iva !== null ? String(precarga.iva) : '');
+  const [editRetencion, setEditRetencion] = useState<string>(precarga.retencion !== null ? String(precarga.retencion) : '');
+  const [editTotal, setEditTotal] = useState<string>(precarga.total !== null ? String(precarga.total) : '');
+  const [editTasaIVA, setEditTasaIVA] = useState<string>(precarga.tasaIVA !== null ? String(precarga.tasaIVA) : '');
+
+  /** Precarga corregida con lo que el usuario editó. */
+  const precargaCorregida = useMemo((): typeof precarga => ({
+    ...precarga,
+    subtotal: editSubtotal.trim() ? Number(editSubtotal) || null : null,
+    iva: editIVA.trim() ? Number(editIVA) : precarga.iva,
+    retencion: editRetencion.trim() ? Number(editRetencion) : null,
+    total: editTotal.trim() ? Number(editTotal) || null : null,
+    tasaIVA: editTasaIVA.trim() ? Number(editTasaIVA) : null,
+  }), [precarga, editSubtotal, editIVA, editRetencion, editTotal, editTasaIVA]);
+
   const cambiarProveedor = (id: string) => {
     setProveedorId(id);
     setEmparejamiento(proponerEmparejamiento(conceptos, cargosPendientesDe(detalles, id)));
@@ -188,11 +205,11 @@ function ModalConciliar({ subida, embarque, ordenes, nombreProveedor, autor, onC
       : e.cargoId === cargoId && cargoId ? { ...e, cargoId: null, motivo: null } : e));
 
   const resultado = useMemo(
-    () => resolverConciliacion(modo, conceptos, emparejamiento, pendientes, precarga),
-    [modo, conceptos, emparejamiento, pendientes, precarga],
+    () => resolverConciliacion(modo, conceptos, emparejamiento, pendientes, precargaCorregida),
+    [modo, conceptos, emparejamiento, pendientes, precargaCorregida],
   );
   const oc = proveedorId ? ocParaPrecargar(ordenes, embarque.id, proveedorId) : null;
-  const propuestaOC = oc ? proponerParaOC(precarga, oc, '(pendiente)') : null;
+  const propuestaOC = oc ? proponerParaOC(precargaCorregida, oc, '(pendiente)') : null;
   const esFactura = esTipoFactura(c.tipo) || c.destinoSugerido === 'facturas_proveedor';
 
   const confirmar = async () => {
@@ -266,6 +283,45 @@ function ModalConciliar({ subida, embarque, ordenes, nombreProveedor, autor, onC
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* ── Tarea 36 · Desglose fiscal ──────────────────────────────── */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="px-3 py-1.5 bg-gray-50 text-[9px] font-bold text-gray-500 uppercase tracking-wider">
+              Desglose fiscal de la factura
+            </div>
+            <div className="px-3 py-2.5 grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <label className="block">
+                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Subtotal</span>
+                <input type="number" step="0.01" value={editSubtotal} onChange={e => setEditSubtotal(e.target.value)}
+                  placeholder="—" className="w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-md outline-none focus:border-primario tabular-nums" />
+              </label>
+              <label className="block">
+                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">IVA</span>
+                <input type="number" step="0.01" value={editIVA} onChange={e => setEditIVA(e.target.value)}
+                  placeholder="—" className="w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-md outline-none focus:border-primario tabular-nums" />
+              </label>
+              <label className="block">
+                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Retención</span>
+                <input type="number" step="0.01" value={editRetencion} onChange={e => setEditRetencion(e.target.value)}
+                  placeholder="—" className="w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-md outline-none focus:border-primario tabular-nums" />
+              </label>
+              <label className="block">
+                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Total</span>
+                <input type="number" step="0.01" value={editTotal} onChange={e => setEditTotal(e.target.value)}
+                  placeholder="—" className="w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-md outline-none focus:border-primario tabular-nums" />
+              </label>
+              <label className="block">
+                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Tasa IVA %</span>
+                <input type="number" step="1" value={editTasaIVA} onChange={e => setEditTasaIVA(e.target.value)}
+                  placeholder="16, 0…" className="w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-md outline-none focus:border-primario tabular-nums" />
+              </label>
+            </div>
+            <p className="px-3 pb-2 text-[10px] text-gray-400">
+              {precarga.iva !== null || precarga.subtotal !== null
+                ? 'Precargado del clasificador. Corrige si no coincide con la factura.'
+                : 'El clasificador no extrajo el desglose fiscal. Captúralo de la factura.'}
+            </p>
           </div>
 
           {/* Dos columnas */}

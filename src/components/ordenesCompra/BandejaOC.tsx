@@ -11,6 +11,8 @@ import type { OrdenCompra, EstadoOC } from './OrdenesCompraData';
 import { ESTADOS_OC_MAP } from './OrdenesCompraData';
 import EstadoVacio from '../ui/EstadoVacio';
 import { sumarPorMoneda, formatearPorMoneda } from '../../lib/sumarPorMoneda';
+import type { ConceptoVermur } from '../conceptos/ConceptosData';
+import { compararIVAFactura, etiquetaIVA, type EtiquetaIVA } from '../../lib/ivaOrdenCompra';
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -19,6 +21,8 @@ interface BandejaOCProps {
   loading: boolean;
   conteosPorEstado: Record<EstadoOC, number>;
   onSelectOC?: (oc: OrdenCompra) => void;
+  /** Tarea 36 · Catálogo de conceptos para resolver la regla IVA de cada OC. */
+  conceptos?: ConceptoVermur[];
 }
 
 // ─── Íconos por estado ──────────────────────────────────────────────────────
@@ -46,12 +50,37 @@ const FILTROS: { id: FiltroEstado; label: string }[] = [
 
 // ─── Componente ─────────────────────────────────────────────────────────────
 
-export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelectOC }: BandejaOCProps) {
+type FiltroIVA = 'todos' | EtiquetaIVA;
+
+const FILTROS_IVA: { id: FiltroIVA; label: string }[] = [
+  { id: 'todos', label: 'Todos' },
+  { id: 'alerta', label: 'IVA no cuadra' },
+  { id: 'pendiente', label: 'IVA pendiente' },
+  { id: 'ok', label: 'IVA ok' },
+];
+
+export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelectOC, conceptos = [] }: BandejaOCProps) {
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todos');
+  const [filtroIVA, setFiltroIVA] = useState<FiltroIVA>('todos');
   const [searchTerm, setSearchTerm] = useState('');
 
+  /** Mapa de conceptoId → reglaIVA para resolución rápida. */
+  const reglasPorConcepto = useMemo(() => {
+    const m = new Map<string, ConceptoVermur['reglaIVA']>();
+    conceptos.forEach(c => { if (c.reglaIVA) m.set(c.id, c.reglaIVA); });
+    return m;
+  }, [conceptos]);
+
+  /** Calcula la etiqueta IVA de una OC. */
+  const etiquetaIVADeOC = (oc: OrdenCompra): EtiquetaIVA => {
+    if (!oc.facturaDatos) return null;
+    const regla = reglasPorConcepto.get(oc.conceptoId);
+    const r = compararIVAFactura(oc, regla);
+    return etiquetaIVA(r.estado);
+  };
+
   /** Para que el estado vacío diga cuál de los dos vacíos es. */
-  const hayFiltro = filtroEstado !== 'todos' || searchTerm.trim() !== '';
+  const hayFiltro = filtroEstado !== 'todos' || filtroIVA !== 'todos' || searchTerm.trim() !== '';
 
   // Filtrado
   const ordenesFiltradas = useMemo(() => {
@@ -60,6 +89,11 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
     // Filtro por estado
     if (filtroEstado !== 'todos') {
       resultado = resultado.filter(oc => oc.estado === filtroEstado);
+    }
+
+    // Tarea 36 · Filtro por IVA
+    if (filtroIVA !== 'todos') {
+      resultado = resultado.filter(oc => etiquetaIVADeOC(oc) === filtroIVA);
     }
 
     // Búsqueda
@@ -75,7 +109,8 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
     }
 
     return resultado;
-  }, [ordenes, filtroEstado, searchTerm]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ordenes, filtroEstado, filtroIVA, searchTerm, reglasPorConcepto]);
 
   const totalFiltrado = ordenesFiltradas.length;
 
@@ -167,6 +202,24 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
         })}
       </div>
 
+      {/* Tarea 36 · Filtro de IVA */}
+      <div className="flex flex-wrap gap-[6px]">
+        {FILTROS_IVA.map(f => (
+          <button
+            key={f.id ?? 'todos'}
+            onClick={() => setFiltroIVA(f.id)}
+            className={`px-[10px] py-[4px] rounded-[5px] text-[11px] font-medium transition-colors border ${
+              filtroIVA === f.id
+                ? f.id === 'alerta' ? 'bg-amber-100 text-amber-800 border-amber-300'
+                  : 'bg-brand text-white border-brand'
+                : 'bg-white text-text-secondary border-card-border hover:bg-neutral-bg'
+            }`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {/* Barra de búsqueda y acciones */}
       <div className="flex gap-[12px] items-center">
         <div className="relative max-w-[400px] flex-1">
@@ -200,12 +253,13 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
               <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Urgencia</th>
               <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Fecha requerida</th>
               <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Origen</th>
+              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">IVA</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-divider bg-white">
             {ordenesFiltradas.length === 0 ? (
               <tr>
-                <td colSpan={8}>
+                <td colSpan={9}>
                   {/* U-6 · El vacío explica cuál de los dos es: no hay ninguna,
                       o el filtro las escondió. Antes decía siempre lo segundo. */}
                   <EstadoVacio
@@ -267,6 +321,9 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
                         <span className="text-text-muted">Oficina</span>
                       )}
                     </td>
+                    <td className="px-[16px] py-[12px]">
+                      <BadgeIVA etiqueta={etiquetaIVADeOC(oc)} />
+                    </td>
                   </tr>
                 );
               })
@@ -291,5 +348,29 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Tarea 36 · Badge de IVA ─────────────────────────────────────────────────
+
+function BadgeIVA({ etiqueta }: { etiqueta: EtiquetaIVA }) {
+  if (!etiqueta) return <span className="text-[11px] text-text-muted">—</span>;
+
+  const estilos: Record<NonNullable<EtiquetaIVA>, string> = {
+    ok: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    alerta: 'bg-amber-100 text-amber-800 border-amber-300',
+    pendiente: 'bg-gray-100 text-gray-500 border-gray-200',
+  };
+  const textos: Record<NonNullable<EtiquetaIVA>, string> = {
+    ok: 'OK',
+    alerta: 'No cuadra',
+    pendiente: 'Pendiente',
+  };
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-[6px] py-[2px] rounded-[4px] text-[10px] font-bold border ${estilos[etiqueta]}`}>
+      {etiqueta === 'alerta' && <AlertTriangle className="w-3 h-3" />}
+      {textos[etiqueta]}
+    </span>
   );
 }

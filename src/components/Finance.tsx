@@ -223,6 +223,7 @@ export default function Finance() {
           todasLasOrdenes={ordenes}
           proveedor={proveedores.find(p => p.id === ocAbierta.proveedorId) ?? null}
           categoriaConcepto={conceptos.find(c => c.id === ocAbierta.conceptoId)?.categoria}
+          reglaIVA={conceptos.find(c => c.id === ocAbierta.conceptoId)?.reglaIVA}
           onRegistrarDeposito={puede('ordenCompra.autorizar') && ocAbierta.embarqueId ? async (d) => {
             await registrarDeposito({
               ...d,
@@ -383,6 +384,7 @@ export default function Finance() {
                        loading={loadingOC}
                        conteosPorEstado={conteosPorEstado}
                        onSelectOC={oc => setOcAbiertaId(oc.id)}
+                       conceptos={conceptos}
                      />
                    </div>
                 )}

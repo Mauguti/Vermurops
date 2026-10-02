@@ -174,6 +174,16 @@ export interface OrdenCompra {
     subtotal?: number | null;
     /** Lo que el documento declara de impuesto. Informativo. */
     iva?: number | null;
+    /**
+     * Tarea 36 · Tasa de IVA declarada o corregida en la conciliación.
+     * 16, 0, 4 (split aéreo), null = no se capturó. Es la TASA, no el monto.
+     */
+    tasaIVA?: number | null;
+    /**
+     * Tarea 36 · Retención declarada o corregida (monto, no tasa).
+     * El flete terrestre nacional retiene el 4% del subtotal.
+     */
+    retencion?: number | null;
     moneda: string;
     /** El documento del embarque del que salió. */
     documentoId: string;

@@ -22,6 +22,8 @@ import {
 } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import LineaTiempo from '../ui/ficha/LineaTiempo';
+import type { ReglaIVA } from '../conceptos/ConceptosData';
+import { compararIVAFactura, type ResultadoComparacionIVA } from '../../lib/ivaOrdenCompra';
 
 /**
  * C-2. La ficha de una orden de compra: el flujo de tres áreas.
@@ -83,6 +85,8 @@ interface Props {
   proveedor?: ProveedorVermur | null;
   /** Categoría del concepto, para decidir si el gasto es aduanal. */
   categoriaConcepto?: string;
+  /** Tarea 36 · Regla IVA del concepto, para calcular el IVA esperado. */
+  reglaIVA?: ReglaIVA | null;
   /** 1.3 · Todas las órdenes, para encontrar los anticipos cruzables. */
   todasLasOrdenes?: OrdenCompra[];
   /**
@@ -98,7 +102,7 @@ const money = (n: number) =>
 
 export default function FichaOC({
   oc, rol, onBack, onTransicionar, onActualizar, fondeo, proveedor, categoriaConcepto,
-  todasLasOrdenes = [], onRegistrarDeposito,
+  reglaIVA, todasLasOrdenes = [], onRegistrarDeposito,
 }: Props) {
   const [depMonto, setDepMonto] = useState('');
   const [depFecha, setDepFecha] = useState(new Date().toISOString().slice(0, 10));
@@ -162,6 +166,11 @@ export default function FichaOC({
   // 1.3 · Anticipos ya pagados a este proveedor que se pueden descontar.
   const cruzables = anticiposAplicables(oc, todasLasOrdenes);
   const aTransferir = montoATransferir(oc);
+
+  // Tarea 36 · IVA esperado vs. declarado en la factura del proveedor.
+  const ivaOC: ResultadoComparacionIVA | null = oc.facturaDatos
+    ? compararIVAFactura(oc, reglaIVA)
+    : null;
 
   return (
     <FichaLayout>
@@ -240,6 +249,42 @@ export default function FichaOC({
             )}
           </div>
       </div>
+
+      {/* ── Tarea 36 · Alerta de IVA ─────────────────────────────────────
+          Solo cuando hay facturaDatos: muestra si el IVA de la factura
+          cuadra con el esperado por la regla del concepto. Solo alerta,
+          no bloquea nada. */}
+      {ivaOC && ivaOC.estado !== 'sin_factura' && (
+        <div className="px-6 pt-3">
+          <div className={`rounded-lg border px-4 py-2.5 flex items-start gap-2 ${
+            ivaOC.estado === 'cuadra'
+              ? 'border-emerald-200 bg-emerald-50/40'
+              : ivaOC.estado === 'no_cuadra'
+                ? 'border-amber-300 bg-amber-50/60'
+                : 'border-gray-200 bg-gray-50/40'
+          }`}>
+            {ivaOC.estado === 'cuadra' ? (
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+            ) : ivaOC.estado === 'no_cuadra' ? (
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+            ) : (
+              <AlertTriangle className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+            )}
+            <div className="min-w-0 text-[12px]">
+              {ivaOC.estado === 'cuadra' ? (
+                <p className="text-emerald-800">
+                  IVA cuadra: esperado ${money(ivaOC.ivaEsperado!)} · factura ${money(ivaOC.ivaDeclarado!)}
+                  {ivaOC.retencionEsperada ? ` · retención esperada ${money(ivaOC.retencionEsperada)}` : ''}
+                </p>
+              ) : (
+                <p className={ivaOC.estado === 'no_cuadra' ? 'text-amber-900 font-semibold' : 'text-gray-600'}>
+                  {ivaOC.mensaje}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 1.1 · El fondeo del cliente ────────────────────────────────────
           «Tenemos que esperar el dinero del cliente para pagarle al
