@@ -1,0 +1,170 @@
+{
+  "fuente": "Excel regresado por Vermur el 30-sep-2026 (Conceptos_IVA_por_definir)",
+  "conceptos": [
+    {
+      "id": "CON-019",
+      "nombreNuevo": "Handling fee",
+      "nombreMagaya": "AGENT PROFIT SHARE",
+      "impoOrigen": "0%",
+      "impoDestino": "0%",
+      "expoOrigen": "0%",
+      "expoDestino": "0%",
+      "reglaIVA": "fijo0",
+      "nota": "Nombre cambiado por Vermur (antes: Agent Profit Share). Vermur lo renombró a «Handling fee». En Magaya era AGENT PROFIT SHARE (cuenta Agent Liquidation Income): confirmar que es el mismo concepto."
+    },
+    {
+      "id": "CON-022",
+      "nombreNuevo": "All In Expenses",
+      "nombreMagaya": "ALL IN DESTINATION EXPENSES",
+      "impoOrigen": "0%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "0%",
+      "reglaIVA": "espejo",
+      "nota": "Nombre cambiado por Vermur (antes: All In Destination Expenses). Vermur lo renombró a «All In Expenses» y quitó «All In Origin Expenses» (CON-024): ¿se unifican en uno solo?"
+    },
+    {
+      "id": "CON-029",
+      "nombreNuevo": "Consulting And Forwarding Fees",
+      "nombreMagaya": "CONSULTING AND FORWARDING FEES",
+      "impoOrigen": "16%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "16%",
+      "reglaIVA": "fijo16",
+      "nota": null
+    },
+    {
+      "id": "CON-033",
+      "nombreNuevo": "Container Repair",
+      "nombreMagaya": "CONTAINER REPAIR",
+      "impoOrigen": "0%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "0%",
+      "reglaIVA": "espejo",
+      "nota": null
+    },
+    {
+      "id": "CON-038",
+      "nombreNuevo": "Courier Fee",
+      "nombreMagaya": "COURIER FEE",
+      "impoOrigen": "0%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "0%",
+      "reglaIVA": "espejo",
+      "nota": null
+    },
+    {
+      "id": "CON-043",
+      "nombreNuevo": "Demurrages",
+      "nombreMagaya": "DEMURRAGES",
+      "impoOrigen": "0%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "0%",
+      "reglaIVA": "espejo",
+      "nota": null
+    },
+    {
+      "id": "CON-061",
+      "nombreNuevo": "Labels",
+      "nombreMagaya": "LABELS",
+      "impoOrigen": "0%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "0%",
+      "reglaIVA": "espejo",
+      "nota": null
+    },
+    {
+      "id": "CON-069",
+      "nombreNuevo": "Other Charges",
+      "nombreMagaya": "OTHER CHARGES",
+      "impoOrigen": "0%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "0%",
+      "reglaIVA": "espejo",
+      "nota": null
+    },
+    {
+      "id": "CON-078",
+      "nombreNuevo": "Overweight Surcharge",
+      "nombreMagaya": "OVERWEIGHT SURCHARGE FOR INTERNATIONAL FREIGHT",
+      "impoOrigen": "0%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "0%",
+      "reglaIVA": "espejo",
+      "nota": "Nombre cambiado por Vermur (antes: Overweight Surcharge For International Freight)."
+    },
+    {
+      "id": "CON-081",
+      "nombreNuevo": "PHCC - Other Charges",
+      "nombreMagaya": "PAT - OTHER CHARGES",
+      "impoOrigen": "0%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "0%",
+      "reglaIVA": "espejo",
+      "nota": "Nombre cambiado por Vermur (antes: Pat - Other Charges). En Magaya estaba como Exento; Vermur lo definió 0% / 16%: confirmar."
+    },
+    {
+      "id": "CON-099",
+      "nombreNuevo": "Transfer Fee",
+      "nombreMagaya": "TRANSFER FEE",
+      "impoOrigen": "0%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "0%",
+      "reglaIVA": "espejo",
+      "nota": null
+    },
+    {
+      "id": "CON-102",
+      "nombreNuevo": "Storage",
+      "nombreMagaya": "WAREHOUSE",
+      "impoOrigen": "0%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "0%",
+      "reglaIVA": "espejo",
+      "nota": "Nombre cambiado por Vermur (antes: Warehouse)."
+    },
+    {
+      "id": "CON-103",
+      "nombreNuevo": "Pallet In",
+      "nombreMagaya": "WAREHOUSE PALLET IN",
+      "impoOrigen": "0%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "0%",
+      "reglaIVA": "espejo",
+      "nota": "Nombre cambiado por Vermur (antes: Warehouse Pallet In)."
+    },
+    {
+      "id": "CON-104",
+      "nombreNuevo": "Pallet Out",
+      "nombreMagaya": "WAREHOUSE PALLET OUT",
+      "impoOrigen": "0%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "0%",
+      "reglaIVA": "espejo",
+      "nota": "Nombre cambiado por Vermur (antes: Warehouse Pallet Out)."
+    },
+    {
+      "id": "CON-105",
+      "nombreNuevo": "Wrapping",
+      "nombreMagaya": "WRAPPING",
+      "impoOrigen": "0%",
+      "impoDestino": "16%",
+      "expoOrigen": "16%",
+      "expoDestino": "0%",
+      "reglaIVA": "espejo",
+      "nota": null
+    }
+  ]
+}
