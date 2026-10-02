@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Coins, Check } from 'lucide-react';
+import { Coins, Check, ArrowDown } from 'lucide-react';
 import {
   ETIQUETA_FUENTE, aplicarReglaPricingRate, etiquetaTipoCambio, tasaUtilizable,
   type TipoCambioCotizacion, type FuenteTipoCambio, type ReglaPricingRate,
 } from '../../lib/monedaComparativa';
+import { useTipoCambioActual } from '../../hooks/useTipoCambio';
 
 /**
  * Captura del tipo de cambio de la cotización (MO-3).
@@ -12,10 +13,9 @@ import {
  * apertura, reabrir el documento el mes que viene podría reordenar a los
  * agentes de la comparativa y contradecir una decisión ya tomada.
  *
- * El «pricing rate» es una REGLA sobre otra tasa, no un número suelto: «el de
- * Pricing se puede poner que sea el de Banamex más cuatro pesos o más un
- * porcentaje». Por eso se captura la base y el colchón por separado, y queda
- * escrito de dónde salió el número.
+ * Cuando la fuente es Banxico o SAT, propone el valor guardado en
+ * `configuracion/tipoCambio` (tarea 51). Editable: el usuario puede
+ * aceptarlo o cambiarlo.
  */
 
 interface Props {
@@ -27,6 +27,9 @@ interface Props {
 const FUENTES_BASE: Exclude<FuenteTipoCambio, 'pricing_rate' | 'manual'>[] =
   ['sat', 'banxico', 'banamex_compra', 'banamex_venta'];
 
+/** ¿La fuente puede precargarse desde el dato de Banxico? */
+const FUENTE_CON_PRECARGA: FuenteTipoCambio[] = ['banxico', 'sat'];
+
 export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [modo, setModo] = useState<'directo' | 'regla'>('directo');
@@ -36,6 +39,8 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
   const [baseFuente, setBaseFuente] = useState<ReglaPricingRate['baseFuente']>('banamex_venta');
   const [colchonTipo, setColchonTipo] = useState<'monto' | 'porcentaje'>('monto');
   const [colchon, setColchon] = useState('');
+
+  const { config: tcBanxico } = useTipoCambioActual();
 
   const hoy = new Date().toISOString().slice(0, 10);
 
@@ -54,6 +59,18 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
   };
 
   const definido = tasaUtilizable(tipoCambio);
+
+  /** Precarga del valor de Banxico cuando la fuente lo admite. */
+  const precargaDisponible = modo === 'directo'
+    && FUENTE_CON_PRECARGA.includes(fuente)
+    && tcBanxico
+    && tcBanxico.valor > 0
+    && valor !== String(tcBanxico.valor);
+
+  const aplicarPrecarga = () => {
+    if (!tcBanxico) return;
+    setValor(String(tcBanxico.valor));
+  };
 
   if (!editable) {
     return (
@@ -120,6 +137,16 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
                     .map(f => <option key={f} value={f}>{ETIQUETA_FUENTE[f]}</option>)}
                 </select>
               </div>
+              {precargaDisponible && (
+                <button
+                  onClick={aplicarPrecarga}
+                  className="flex items-center gap-1.5 w-full text-[11px] text-primario bg-primario/5 border border-primario/20 rounded-lg px-2 py-1.5 hover:bg-primario/10 transition-colors"
+                >
+                  <ArrowDown className="w-3 h-3" />
+                  Usar el de Banxico: <strong className="tabular-nums">{tcBanxico!.valor}</strong>
+                  <span className="text-gray-400 ml-auto">{tcBanxico!.fechaDeterminacion}</span>
+                </button>
+              )}
             </>
           ) : (
             <>

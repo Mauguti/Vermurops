@@ -1,0 +1,209 @@
+{
+  "name": "Tipo de cambio Banxico",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tipo-cambio",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "7c1e0b10-0001-4a6b-9a10-000000000001",
+      "name": "Recibe consulta",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        0
+      ],
+      "webhookId": "vermur-tipo-cambio",
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "X-Vermur-Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Series a consultar. Por defecto las dos de dólar; la app puede mandar otras\n// en el body: { \"series\": [\"SF43718\"] }. Solo letras y números, máximo 10.\nconst body = $input.first().json.body || {};\nconst pedidas = Array.isArray(body.series) ? body.series : ['SF43718', 'SF60653'];\nconst series = pedidas.map(String).filter(s => /^[A-Z0-9]{3,20}$/.test(s)).slice(0, 10);\nif (!series.length) throw new Error('Ninguna serie válida en la petición.');\nreturn [{ json: { series: series.join(',') } }];"
+      },
+      "id": "7c1e0b10-0001-4a6b-9a10-000000000002",
+      "name": "Arma la consulta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -240,
+        0
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://www.banxico.org.mx/SieAPIRest/service/v1/series/{{ $json.series }}/datos/oportuno",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "7c1e0b10-0001-4a6b-9a10-000000000003",
+      "name": "Banxico SIE",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "Banxico SIE"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normaliza la respuesta del SIE de Banxico.\n// Devuelve una fila por serie con su título (para verificar que la serie es la\n// que creemos), la fecha en ISO y el valor como número.\nconst bmx = $input.first().json.bmx;\nif (!bmx || !Array.isArray(bmx.series)) {\n  throw new Error('Banxico no devolvió series. Respuesta: ' + JSON.stringify($input.first().json).slice(0, 300));\n}\nconst aISO = f => { const [d, m, a] = String(f).split('/'); return `${a}-${m}-${d}`; };\nconst series = bmx.series.map(s => {\n  const d = (s.datos || [])[0] || {};\n  const valor = Number(String(d.dato || '').replace(/,/g, ''));\n  return {\n    serie: s.idSerie,\n    titulo: s.titulo,\n    fecha: d.fecha ? aISO(d.fecha) : null,\n    valor: Number.isFinite(valor) && valor > 0 ? valor : null, // «N/E» = no existe dato\n  };\n});\nif (series.every(s => s.valor === null)) {\n  throw new Error('Banxico respondió sin datos (N/E) para todas las series.');\n}\nreturn [{ json: { ok: true, fuente: 'banxico', consultado: new Date().toISOString(), series } }];"
+      },
+      "id": "7c1e0b10-0001-4a6b-9a10-000000000004",
+      "name": "Normaliza",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "7c1e0b10-0001-4a6b-9a10-000000000005",
+      "name": "Devuelve el tipo de cambio",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst detalle = (item.json && (item.json.error && (item.json.error.message || item.json.error))) || item.json?.message || 'sin detalle';\nreturn [{ json: { ok: false, error: 'No se pudo consultar el tipo de cambio en Banxico.', detalle: String(detalle).slice(0, 500) } }];"
+      },
+      "id": "7c1e0b10-0001-4a6b-9a10-000000000006",
+      "name": "Arma el error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 502
+        }
+      },
+      "id": "7c1e0b10-0001-4a6b-9a10-000000000007",
+      "name": "Devuelve el error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        480,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "Recibe consulta": {
+      "main": [
+        [
+          {
+            "node": "Arma la consulta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Arma la consulta": {
+      "main": [
+        [
+          {
+            "node": "Banxico SIE",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Arma el error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Banxico SIE": {
+      "main": [
+        [
+          {
+            "node": "Normaliza",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Arma el error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliza": {
+      "main": [
+        [
+          {
+            "node": "Devuelve el tipo de cambio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Arma el error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Arma el error": {
+      "main": [
+        [
+          {
+            "node": "Devuelve el error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {}
+}

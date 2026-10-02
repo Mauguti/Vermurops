@@ -44,7 +44,9 @@ export type Capacidad =
   | 'ordenCompra.gestionar'   // Revisar la solicitud y prepararla para autorizar
   | 'ordenCompra.autorizar'   // Autorizar el pago y registrarlo
   // Gestión de usuarios (GU): solo admin
-  | 'usuario.gestionar';      // Invitar, cambiar rol, desactivar
+  | 'usuario.gestionar'       // Invitar, cambiar rol, desactivar
+  // Tipo de cambio (tarea 51)
+  | 'tipoCambio.actualizar';  // Forzar consulta a Banxico desde la app
 
 export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
   'lead.crear',
@@ -66,6 +68,7 @@ export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
   'ordenCompra.gestionar',
   'ordenCompra.autorizar',
   'usuario.gestionar',
+  'tipoCambio.actualizar',
 ];
 
 // ─── Matriz rol → capacidades ────────────────────────────────────────────────
@@ -127,6 +130,7 @@ export const CAPACIDADES_POR_ROL: Record<UserRole, Capacidad[]> = {
     'tarifa.gestionar',
     'tarifario.cargar',
     'proveedor.altaRapida',
+    'tipoCambio.actualizar',
   ],
   operaciones: [
     'embarque.generar',
@@ -146,6 +150,7 @@ export const CAPACIDADES_POR_ROL: Record<UserRole, Capacidad[]> = {
     'notaCredito.generar',
     'ordenCompra.solicitar',
     'ordenCompra.autorizar',
+    'tipoCambio.actualizar',
   ],
   // Superusuario técnico: todo, para poder dar soporte.
   admin: TODAS_LAS_CAPACIDADES,
