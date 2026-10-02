@@ -14,7 +14,7 @@ import NuevoClienteModal from './clientes/NuevoClienteModal';
 import ProveedorFormModal from './proveedores/ProveedorFormModal';
 import FichaProveedor from './proveedores/FichaProveedor';
 import { useAuth, usuariosPorRol, nombreDeUsuario } from '../auth/AuthContext';
-import { useDestinoPendiente } from '../navegacion/NavegacionContext';
+import { useDestinoPendiente, useRegistrarAbierta, useNavegacion, type Destino } from '../navegacion/NavegacionContext';
 import SpreadsheetTable, { type VistaConfig } from './table/SpreadsheetTable';
 import VistaSelector from './table/VistaSelector';
 import { useVistasUsuario } from '../hooks/useVistasUsuario';
@@ -81,8 +81,24 @@ export default function Clients() {
   const [pestanaProveedor, setPestanaProveedor] = useState<PestanaProveedor>('todos');
   const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
 
+  // ── Tarea 43 · Origen para «Regresar a <ficha anterior>» ────────────────
+  const irA = useNavegacion();
+  const registrarAbierta = useRegistrarAbierta();
+  const [origenNav, setOrigenNav] = useState<Destino | null>(null);
+
+  React.useEffect(() => {
+    if (selectedClientId) {
+      registrarAbierta({ tipo: 'cliente', id: selectedClientId });
+    } else if (selectedProviderId) {
+      registrarAbierta({ tipo: 'proveedor', id: selectedProviderId });
+    } else {
+      registrarAbierta(null);
+    }
+  }, [selectedClientId, selectedProviderId, registrarAbierta]);
+
   // U-4 · Alguien enlazó a un cliente o a un proveedor desde otro módulo.
-  useDestinoPendiente(['cliente', 'proveedor'], (d) => {
+  useDestinoPendiente(['cliente', 'proveedor'], (d, origen) => {
+    setOrigenNav(origen ?? null);
     if (d.tipo === 'cliente') {
       setViewType('Clientes');
       setSelectedProviderId(null);
@@ -416,7 +432,12 @@ export default function Clients() {
       {viewType === 'Clientes' && selectedClient && (
         <FichaCliente
           cliente={selectedClient}
-          onBack={() => setSelectedClientId(null)}
+          onBack={() => {
+            if (origenNav) { registrarAbierta(null); irA(origenNav); }
+            setSelectedClientId(null);
+            setOrigenNav(null);
+          }}
+          regresarLabel={origenNav?.id}
           onUpdate={updateCliente}
         />
       )}
@@ -518,7 +539,12 @@ export default function Clients() {
         <FichaProveedor
           proveedor={selectedProvider}
           quotes={quotes}
-          onBack={() => setSelectedProviderId(null)}
+          onBack={() => {
+            if (origenNav) { registrarAbierta(null); irA(origenNav); }
+            setSelectedProviderId(null);
+            setOrigenNav(null);
+          }}
+          regresarLabel={origenNav?.id}
           onEdit={() => setShowProvModal('editar')}
         />
       )}

@@ -33,6 +33,8 @@ interface FichaProspectoProps {
   onClose: () => void;
   onUpdate: (updated: Prospecto) => void;
   onConvert: (p: Prospecto) => void;
+  /** Etiqueta del botón regresar cuando se llegó desde otra ficha. */
+  regresarLabel?: string;
 }
 
 const PESTANAS = [
@@ -48,7 +50,7 @@ const STAGES = [
   { id: 'convertido', label: 'Convertido' }
 ] as const;
 
-export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUpdate, onConvert }: FichaProspectoProps) {
+export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUpdate, onConvert, regresarLabel }: FichaProspectoProps) {
   const [pestana, setPestana] = useState<PestanaProspecto>('info');
   const { user } = useAuth();
   const usuarioActual = user?.nombre ?? '';
@@ -109,6 +111,7 @@ export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUp
         modulo="Prospectos"
         onBack={onClose}
         folio={prospecto.folio}
+        regresarLabel={regresarLabel}
         titulo={
           <input
             value={prospecto.empresa}

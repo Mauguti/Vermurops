@@ -28,6 +28,8 @@ interface Props {
   cliente: ClienteVermur;
   onBack: () => void;
   onUpdate: (id: string, data: Partial<ClienteVermur>) => Promise<void>;
+  /** Etiqueta del botón regresar cuando se llegó desde otra ficha. */
+  regresarLabel?: string;
 }
 
 const DOCS_ALTA_DEFAULT: DocsAlta = { acta: false, poder: false, identificacion: false, csf: false, comprobante: false, bancaria: false };
@@ -115,7 +117,7 @@ function SaveBar({ onSave, saving, oculta }: { onSave: () => void; saving: boole
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
+export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel }: Props) {
   /*
    * B2 · Ver y editar son cosas distintas (§4.1). El expediente del cliente
    * —días de crédito, RFC, validación fiscal— es del alta, y el alta es de
@@ -301,6 +303,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate }: Props) {
         onBack={onBack}
         folio={cliente.id}
         titulo={cliente.nombre}
+        regresarLabel={regresarLabel}
         badges={
           <>
             <BadgeEstado tono={cliente.statusOperativo === 'ACTIVO' ? 'exito' : 'neutro'}>

@@ -95,6 +95,8 @@ interface Props {
    * y ninguna pantalla lo llamaba: el fondeo no se podía registrar.
    */
   onRegistrarDeposito?: (d: { monto: number; moneda: 'USD' | 'MXN'; fechaDeposito: string; referencia: string }) => Promise<void>;
+  /** Etiqueta del botón regresar cuando se llegó desde otra ficha. */
+  regresarLabel?: string;
 }
 
 const money = (n: number) =>
@@ -102,7 +104,7 @@ const money = (n: number) =>
 
 export default function FichaOC({
   oc, rol, onBack, onTransicionar, onActualizar, fondeo, proveedor, categoriaConcepto,
-  reglaIVA, todasLasOrdenes = [], onRegistrarDeposito,
+  reglaIVA, todasLasOrdenes = [], onRegistrarDeposito, regresarLabel,
 }: Props) {
   const [depMonto, setDepMonto] = useState('');
   const [depFecha, setDepFecha] = useState(new Date().toISOString().slice(0, 10));
@@ -179,6 +181,7 @@ export default function FichaOC({
         onBack={onBack}
         folio={oc.folio}
         titulo={oc.proveedorNombre}
+        regresarLabel={regresarLabel}
         badges={
           <>
             <BadgeEstado tono={TONO_ESTADO[oc.estado]}>

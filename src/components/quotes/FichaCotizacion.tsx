@@ -119,6 +119,8 @@ interface FichaCotizacionProps {
   onConvertToShipment: (quote: KanbanQuote) => void;
   /** Rol activo del usuario (Ventas o Pricing) */
   rolActivo: Rol;
+  /** Etiqueta del botón regresar cuando se llegó desde otra ficha. */
+  regresarLabel?: string;
 }
 
 // La tabla de avance (qué sigue desde cada etapa, cómo se llama el botón)
@@ -144,7 +146,7 @@ const PDF_DISPONIBLE = true;
 
 export default function FichaCotizacion({
   quote: quoteViva, onBack, onUpdateQuote: onUpdateQuoteViva,
-  onConvertToShipment: onConvertToShipmentViva, rolActivo,
+  onConvertToShipment: onConvertToShipmentViva, rolActivo, regresarLabel,
 }: FichaCotizacionProps) {
   const { user } = useAuth();
 
@@ -1575,6 +1577,7 @@ export default function FichaCotizacion({
         onBack={onBack}
         folio={quote.id}
         titulo={quote.prospecto.empresa}
+        regresarLabel={regresarLabel}
         badges={
           <>
             <BadgeEstado tono={

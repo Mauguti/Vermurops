@@ -16,6 +16,8 @@ interface Props {
   quotes: KanbanQuote[];
   onBack: () => void;
   onEdit: () => void;
+  /** Etiqueta del botón regresar cuando se llegó desde otra ficha. */
+  regresarLabel?: string;
 }
 
 const getTransportLabel = (type: string) => {
@@ -32,7 +34,7 @@ const getTransportLabel = (type: string) => {
   }
 };
 
-export default function FichaProveedor({ proveedor, quotes, onBack, onEdit }: Props) {
+export default function FichaProveedor({ proveedor, quotes, onBack, onEdit, regresarLabel }: Props) {
   const [fichaTab, setFichaTab] = useState<'historial' | 'notas'>('historial');
 
   const cp = contactoPrincipal(proveedor);
@@ -68,6 +70,7 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit }: Pr
         onBack={onBack}
         folio={proveedor.id}
         titulo={proveedor.nombre}
+        regresarLabel={regresarLabel}
         badges={
           <>
             <BadgeEstado tono={proveedor.activo === false ? 'peligro' : 'exito'}>

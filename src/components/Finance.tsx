@@ -20,7 +20,7 @@ import ModuloEnDesarrollo from './ui/ModuloEnDesarrollo';
 import PanelCuentasPorCobrar from './facturas/PanelCuentasPorCobrar';
 import { cartera, resumenCartera } from '../lib/cuentasPorCobrar';
 import { monedasConMonto } from '../lib/sumarPorMoneda';
-import { useDestinoPendiente } from '../navegacion/NavegacionContext';
+import { useDestinoPendiente, useRegistrarAbierta, useNavegacion, type Destino } from '../navegacion/NavegacionContext';
 
 export default function Finance() {
   const [activeTab, setActiveTab] = useState('Facturas (CFDI)');
@@ -34,13 +34,27 @@ export default function Finance() {
   const { proveedores } = useProveedores();
   const { conceptos } = useConceptos();
 
+  // ── Tarea 43 · Origen para «Regresar a <ficha anterior>» ────────────────
+  const irA = useNavegacion();
+  const registrarAbierta = useRegistrarAbierta();
+  const [origenNav, setOrigenNav] = useState<Destino | null>(null);
+
+  React.useEffect(() => {
+    if (ocAbiertaId) {
+      registrarAbierta({ tipo: 'ordenCompra', id: ocAbiertaId });
+    } else {
+      registrarAbierta(null);
+    }
+  }, [ocAbiertaId, registrarAbierta]);
+
   /*
    * U-4 · Alguien enlazó a una orden de compra desde un embarque o desde un
    * proveedor. La OC todavía no tiene ficha propia —se construye en el bloque
    * C del plan de operación— así que el salto deja al usuario en la bandeja
    * donde vive, que es lo más cerca que se puede llevar hoy.
    */
-  useDestinoPendiente(['ordenCompra'], (d) => {
+  useDestinoPendiente(['ordenCompra'], (d, origen) => {
+    setOrigenNav(origen ?? null);
     setSelectedInvoice(null);
     setShowForm(false);
     setActiveTab('Cuentas por pagar');
@@ -217,7 +231,12 @@ export default function Finance() {
         <FichaOC
           oc={ocAbierta}
           rol={rolOC}
-          onBack={() => setOcAbiertaId(null)}
+          onBack={() => {
+            if (origenNav) { registrarAbierta(null); irA(origenNav); }
+            setOcAbiertaId(null);
+            setOrigenNav(null);
+          }}
+          regresarLabel={origenNav?.id}
           onTransicionar={handleTransicionar}
           onActualizar={handleActualizarOC}
           todasLasOrdenes={ordenes}

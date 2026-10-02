@@ -61,6 +61,8 @@ interface FichaEmbarqueProps {
   onClose: () => void;
   onUpdateEmbarque: (updated: EmbarqueCompleto) => void;
   onSelectEmbarqueById: (id: string) => void;
+  /** Etiqueta del botón regresar cuando se llegó desde otra ficha. */
+  regresarLabel?: string;
 }
 
 export default function FichaEmbarque({
@@ -68,7 +70,8 @@ export default function FichaEmbarque({
   allEmbarques,
   onClose,
   onUpdateEmbarque,
-  onSelectEmbarqueById
+  onSelectEmbarqueById,
+  regresarLabel,
 }: FichaEmbarqueProps) {
   const { clientes } = useClientes();
   const { proveedores } = useProveedores();
@@ -557,6 +560,7 @@ export default function FichaEmbarque({
         onBack={onClose}
         folio={embarque.folio}
         titulo={embarque.entidades?.clienteCobrar || 'Sin cliente'}
+        regresarLabel={regresarLabel}
         badges={
           <>
             <BadgeEstado tono="neutro">{embarque.modalidad}</BadgeEstado>

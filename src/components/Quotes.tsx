@@ -23,7 +23,7 @@ import { generateFolio, generateFolioProspecto } from '../lib/folioService';
 import { crearEmbarquesDeCotizacionGanada } from '../lib/crearEmbarquesGanada';
 import { EMBARQUE_AUTOMATICO_DISPONIBLE } from '../config/banderas';
 import { visibleParaVentas } from '../lib/propiedadComercial';
-import { useDestinoPendiente } from '../navegacion/NavegacionContext';
+import { useDestinoPendiente, useRegistrarAbierta, useNavegacion, type Destino } from '../navegacion/NavegacionContext';
 import Toast, { TipoToast } from './ui/Toast';
 import SpreadsheetTable, { type VistaConfig } from './table/SpreadsheetTable';
 import { COTIZACION_COLUMNS, VISTA_DEFAULT_COTIZACIONES } from './quotes/cotizacionColumns';
@@ -237,12 +237,28 @@ export default function Quotes() {
   // Para que una empresa que ya es cliente no se recapture como texto libre.
   const { clientes } = useClientes();
 
+  // ── Tarea 43 · Origen para «Regresar a <ficha anterior>» ────────────────
+  const irA = useNavegacion();
+  const registrarAbierta = useRegistrarAbierta();
+  const [origenNav, setOrigenNav] = useState<Destino | null>(null);
+
+  useEffect(() => {
+    if (selectedQuote) {
+      registrarAbierta({ tipo: 'cotizacion', id: selectedQuote.id });
+    } else if (prospectoAbierto) {
+      registrarAbierta({ tipo: 'prospecto', id: prospectoAbierto.id });
+    } else {
+      registrarAbierta(null);
+    }
+  }, [selectedQuote, prospectoAbierto, registrarAbierta]);
+
   /*
    * U-4 · Alguien enlazó a una cotización o a un prospecto desde otro módulo.
    * Si el documento todavía no llegó del listener, el destino se vuelve a
    * evaluar cuando llegue: por eso depende de las listas y no solo del salto.
    */
-  useDestinoPendiente(['cotizacion', 'prospecto'], (d) => {
+  useDestinoPendiente(['cotizacion', 'prospecto'], (d, origen) => {
+    setOrigenNav(origen ?? null);
     /*
      * Se limpia la OTRA ficha, no solo se abre la pedida.
      *
@@ -803,7 +819,12 @@ export default function Quotes() {
       <div className="animate-fade-in h-full">
         <FichaProspecto
           prospecto={prospectoAbierto}
-          onClose={() => setProspectoAbierto(null)}
+          onClose={() => {
+            if (origenNav) { registrarAbierta(null); irA(origenNav); }
+            setProspectoAbierto(null);
+            setOrigenNav(null);
+          }}
+          regresarLabel={origenNav?.id}
           onUpdate={(actualizado) => {
             updateProspecto(actualizado.id, actualizado).catch(err =>
               setToast({ mensaje: `No se pudo guardar: ${err.message}`, tipo: 'error' }));
@@ -1330,7 +1351,12 @@ export default function Quotes() {
         selectedQuote ? (
           <FichaCotizacion
             quote={alDiaConVersion(selectedQuote, kanbanQuotes)}
-            onBack={() => setSelectedQuote(null)}
+            onBack={() => {
+              if (origenNav) { registrarAbierta(null); irA(origenNav); }
+              setSelectedQuote(null);
+              setOrigenNav(null);
+            }}
+            regresarLabel={origenNav?.id}
             onUpdateQuote={(updated) => {
               // El error se AVISA. Antes la promesa se rechazaba en silencio,
               // el estado local ya se había actualizado —así que en pantalla
