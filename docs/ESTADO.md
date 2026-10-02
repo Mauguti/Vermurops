@@ -9,6 +9,15 @@ Producción corre `index-By7gL9-J.js`, el mismo hash que el build local.
 **2028 tests · 90 archivos · tsc 0 · recorrido 6/6 (dos veces) ·
 45-filtros 34/34 · 47-barrido 95/95 sin hallazgos · reglas 26/26.**
 
+Las 15 reglas de IVA de la tarea 39 **ya se aplicaron** (2-oct, 10:27).
+Los 15 conceptos estaban en `reglaIVA: 'revisar'`; el punto de retorno es
+`docs/datos/respaldo-conceptos-iva-2026-10-02T16-27-38.json`:
+
+```bash
+SERVICE_ACCOUNT=/ruta/a/llave.json npx tsx scripts/revertirConceptosIVA.ts \
+  docs/datos/respaldo-conceptos-iva-2026-10-02T16-27-38.json
+```
+
 Lo que sigue es la **validación en navegador**:
 [VALIDACION-35-55.md](sprint-post-junta/VALIDACION-35-55.md).
 
@@ -115,7 +124,6 @@ Las colas 35–42, 43–48 y 49–55 quedaron vacías. Lo que sigue:
 |---|---|---|
 | Validar 35–55 en navegador (VALIDACION-35-55.md) | Validación | Cerrar el sprint |
 | Correr `actualizarTipoCambio` una vez desde la app y ver qué documento cae en `tiposCambio` | Validación | Confirmar la tasa |
-| Aplicar las 15 reglas de IVA (tarea 39) | Script | Confirmar CON-019, CON-022 y CON-081 con Julio |
 | Borrar o deshabilitar las tres cuentas de prueba del Auth de producción | Seguridad | — |
 | Deploy de `storage.rules` (expedientes + facturas OC) | Reglas | Subidas desde la app |
 | Script de carga fiscal fase 1 (minar `numeroEntidadMagaya`) | Script | Timbrado |
@@ -131,6 +139,29 @@ Y lo que arrastramos:
 - Barrido de reglas sin quien las llame (4 identificadas)
 - `tsc` bloqueante en el build
 - Deshabilitar cuentas de prueba en Auth de producción
+
+---
+
+## 3.1 Lo que espera a Julio
+
+Nada de esto se construye hasta tener su respuesta. Está junto porque son
+una sola conversación, no nueve pendientes sueltos.
+
+| Qué | Por qué está trabado |
+|---|---|
+| **Días festivos** | El vencimiento se recorre al lunes (§4.7), pero la lista de festivos tiene que ser suya y configurable, no una constante en el código |
+| **Fondeo** | Cuándo se considera fondeada una OC y quién lo declara |
+| **Anticipos** | Cómo se reparte un anticipo entre varias OC y qué pasa con el remanente |
+| **Complemento de pago** | Cuándo se emite y quién lo captura |
+| **Pronto pago** | Los 25 términos ya traen el descuento; falta cuándo se aplica y quién lo autoriza |
+| **Documentos del proveedor** | Qué exige el expediente de un proveedor extranjero frente a uno nacional |
+| **Primer reporte** | Cuál de los que hoy hacen a mano se automatiza primero |
+| **Regla del tipo de cambio en la factura** | La tasa ya sale de Banxico; falta si la factura usa esa misma o la del día de la operación |
+| **CON-019, CON-022, CON-081** | Las tres reglas de IVA que se aplicaron tal como vinieron, sin confirmar |
+
+Programación de pagos, bancos y anticipos **no se tocan** hasta esa junta.
+El material de preparación está en
+[PREVIA-JUNTA-ADMIN.md](sprint-post-junta/PREVIA-JUNTA-ADMIN.md).
 
 ---
 
