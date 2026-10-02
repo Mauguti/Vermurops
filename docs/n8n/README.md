@@ -9,6 +9,7 @@ a la derecha): la URL de producción `/webhook/...` solo responde activo.
 |---|---|---|
 | `generar-pdf-cotizacion.n8n.json` | `POST /webhook/generar-pdf-cotizacion` | Recibe el payload de `lib/pdfCotizacion.ts`, arma el HTML, Gotenberg lo convierte y devuelve `application/pdf`. Si algo falla, responde JSON `{ ok: false, error }` con 502. |
 | `generar-documento.n8n.json` | `POST /webhook/generar-documento` | Convertidor HTML→PDF para TODOS los documentos operativos. Recibe `{ html, nombreArchivo, tipo, pagina? }`, Gotenberg lo convierte con `preferCssPageSize` y `printBackground`, y devuelve `application/pdf`. Error: JSON 502. |
+| `tipo-cambio-banxico.n8n.json` | `POST /webhook/tipo-cambio` | Consulta el SIE de Banxico. Body opcional `{ "series": [...] }`. Responde `{ ok, fuente: 'banxico', consultado, series: [{ serie, titulo, fecha, valor }] }`. Series por defecto: SF43718 (FIX del DOF por fecha de determinación) y SF60653 (FIX por fecha de liquidación). `valor: null` cuando Banxico reporta «N/E». Probado activo el 1-oct-2026. |
 
 Las plantillas HTML NO viven en n8n: las llena una Cloud Function desde el
 repo y n8n solo convierte. Un payload de prueba, en `pruebas/`.

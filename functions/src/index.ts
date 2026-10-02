@@ -26,3 +26,6 @@ export { generarDocumento } from './documentos/generarDocumento.js';
 
 // ── Gestión de usuarios ─────────────────────────────────────────────────────
 export { gestionarUsuarios } from './usuarios/gestionarUsuarios.js';
+
+// ── Tipo de cambio (tarea 51) ───────────────────────────────────────────────
+export { tipoCambioProgramado, actualizarTipoCambio } from './tipoCambio/tipoCambio.js';
