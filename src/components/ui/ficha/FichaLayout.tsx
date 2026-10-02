@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { ArrowLeft, ChevronRight, MoreHorizontal } from 'lucide-react';
 
 /**
  * La anatomía única de las fichas.
@@ -14,11 +14,15 @@ import { ArrowLeft, ChevronRight } from 'lucide-react';
  * Aquí está extraída esa estructura, con el MISMO marcado que la cotización
  * ya usaba. No es un rediseño: es el diseño que ya existía, en un solo lugar.
  *
+ * Tarea 44 (1-oct-2026): las acciones suben al encabezado. El footer
+ * desaparece o queda solo con el indicador de auto-guardado. En pantalla
+ * angosta, las acciones secundarias van a un menú «Más».
+ *
  *     Breadcrumb          ← Módulo / FOLIO
- *     Título              ← folio · nombre · badges de estado
+ *     Título + acciones   ← izquierda: folio · nombre · badges
+ *                            derecha: acciones principales y «Más»
  *     Pestañas            ← ver → hacer → registrar
  *     Contenido
- *     Footer              ← acción principal de la etapa
  */
 
 // ─── Contenedor ───────────────────────────────────────────────────────────────
@@ -169,12 +173,105 @@ export function FichaContenido({ children }: { children: React.ReactNode }) {
   return <div className="flex-1 overflow-y-auto p-6">{children}</div>;
 }
 
-// ─── Footer ───────────────────────────────────────────────────────────────────
+// ─── Footer (solo auto-guardado) ─────────────────────────────────────────────
 
+/**
+ * Tarea 44: el footer pierde las acciones (subieron al encabezado) y queda
+ * solo para el indicador de auto-guardado u otra línea informativa.
+ */
 export function FichaFooter({ children }: { children: React.ReactNode }) {
   return (
-    <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 flex flex-col gap-3 shrink-0">
+    <div className="px-6 py-2 border-t border-gray-100 bg-gray-50/50 flex items-center justify-center gap-1.5 shrink-0">
       {children}
+    </div>
+  );
+}
+
+// ─── Menú «Más» para acciones secundarias en angosto ────────────────────────
+
+export interface AccionMenu {
+  id: string;
+  label: string;
+  onClick: () => void;
+  variante?: 'normal' | 'peligro';
+  icono?: React.ReactNode;
+}
+
+/**
+ * En desktop las acciones se ven sueltas; en angosto se colapsan en un menú
+ * «⋯» con dropdown. Recibe las acciones que SÍ se muestran siempre
+ * (`children`, visibles en todo ancho) y las que se colapsan en angosto
+ * (`items`, visibles solo en ≥md como botones y en <md como ítems del menú).
+ */
+export function AccionesHeader({
+  children,
+  items = [],
+}: {
+  children?: React.ReactNode;
+  items?: AccionMenu[];
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    const cerrar = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setAbierto(false);
+    };
+    document.addEventListener('mousedown', cerrar);
+    return () => document.removeEventListener('mousedown', cerrar);
+  }, [abierto]);
+
+  if (items.length === 0) return <>{children}</>;
+
+  return (
+    <div className="flex items-center gap-2" ref={ref}>
+      {children}
+      {/* Desktop: acciones sueltas */}
+      <div className="hidden md:flex items-center gap-2">
+        {items.map(item => (
+          <button
+            key={item.id}
+            onClick={item.onClick}
+            className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider rounded-lg border transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+              item.variante === 'peligro'
+                ? 'border-red-200 text-red-500 bg-white hover:bg-red-50'
+                : 'border-gray-200 text-gray-500 bg-white hover:bg-gray-50'
+            }`}
+          >
+            {item.icono}
+            {item.label}
+          </button>
+        ))}
+      </div>
+      {/* Angosto: dropdown */}
+      <div className="relative md:hidden">
+        <button
+          onClick={() => setAbierto(v => !v)}
+          className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          aria-label="Más acciones"
+        >
+          <MoreHorizontal className="w-5 h-5" />
+        </button>
+        {abierto && (
+          <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg min-w-[180px] py-1 z-50">
+            {items.map(item => (
+              <button
+                key={item.id}
+                onClick={() => { item.onClick(); setAbierto(false); }}
+                className={`w-full px-4 py-2.5 text-left text-[12px] font-semibold flex items-center gap-2 transition-colors ${
+                  item.variante === 'peligro'
+                    ? 'text-red-600 hover:bg-red-50'
+                    : 'text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {item.icono}
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

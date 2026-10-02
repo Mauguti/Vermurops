@@ -79,7 +79,8 @@ import {
 } from '../../lib/prontitudCotizacion';
 import TablaConceptos, { ServicioDeLaTabla, CapturaProveedor } from './TablaConceptos';
 import {
-  FichaLayout, FichaHeader, FichaTabs, FichaFooter, BadgeEstado,
+  FichaLayout, FichaHeader, FichaTabs, FichaFooter, BadgeEstado, AccionesHeader,
+  type AccionMenu,
 } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces, EnlaceEntidad } from '../ui/ficha/EnlaceEntidad';
 import ProximosPasos from './ProximosPasos';
@@ -1607,18 +1608,36 @@ export default function FichaCotizacion({
             Total: {totalEncabezado}
           </p>
         ) : undefined}
-        acciones={(opcionesVersion.length > 0 || (puedeHacerVersion && !viendoVersion)) ? (
-          <>
-            <SelectorVersiones
-              opciones={opcionesVersion}
-              numeroVisto={versionVista}
-              onElegir={setVersionVista}
-            />
-            {puedeHacerVersion && !viendoVersion && (
-              <BotonNuevaVersion onClick={() => setModalVersion({ modo: 'nueva' })} />
-            )}
-          </>
-        ) : undefined}
+        acciones={(() => {
+          const itemsSecundarios: AccionMenu[] = [];
+          if (!viendoVersion && puedeGenerarPDF)
+            itemsSecundarios.push({
+              id: 'pdf', label: 'Generar PDF', onClick: () => setModalPdf(true),
+              icono: <FileText className="w-3.5 h-3.5" />,
+            });
+          if (!viendoVersion && disponibles.includes('perdida') && !showLossReasonForm)
+            itemsSecundarios.push({
+              id: 'perdida', label: 'Marcar perdida',
+              onClick: () => { setShowLossReasonForm(true); setActiveTab('info'); },
+              variante: 'peligro',
+            });
+          const tieneVersiones = opcionesVersion.length > 0 || (puedeHacerVersion && !viendoVersion);
+          if (!tieneVersiones && itemsSecundarios.length === 0) return undefined;
+          return (
+            <AccionesHeader items={itemsSecundarios}>
+              {opcionesVersion.length > 0 && (
+                <SelectorVersiones
+                  opciones={opcionesVersion}
+                  numeroVisto={versionVista}
+                  onElegir={setVersionVista}
+                />
+              )}
+              {puedeHacerVersion && !viendoVersion && (
+                <BotonNuevaVersion onClick={() => setModalVersion({ modo: 'nueva' })} />
+              )}
+            </AccionesHeader>
+          );
+        })()}
       />
 
       {viendoVersion && (
@@ -2785,48 +2804,11 @@ export default function FichaCotizacion({
       </div>
       )}
 
-      {/* ── Footer de acciones (Pre-TA: jerarquía corregida) ─────────────────── */}
-      {/* Viendo una versión pasada no hay acciones: avanzar la etapa o
-          marcarla ganada desde una foto actuaría sobre la cotización viva. */}
-      {!viendoVersion && (
+      {/* ── Footer: solo indicador de auto-guardado (tarea 44) ──────────────── */}
       <FichaFooter>
-
-        {/* La acción principal, «Marcar ganada» y lo que falta subieron a la
-            franja de próximos pasos (23-sep-2026). Aquí queda lo secundario. */}
-        {/* ── Secundarios: PDF + Perdida ── */}
-        <div className="flex gap-3 max-w-3xl mx-auto w-full">
-          {/* Solo Pricing y Admin: un PDF lleva los costos implícitos en los
-              montos, y Ventas no ve costos (§ bloque 2). Y solo cuando la
-              cotización está completa: un PDF a medias es un documento que
-              sale al cliente con huecos.
-              ⚠️ PENDIENTE REAL: hoy este botón es un stub. Condicionarlo lo
-              esconde, pero el PDF sigue sin construirse. */}
-          {puedeGenerarPDF && (
-            <button
-              onClick={() => setModalPdf(true)}
-              className="flex-1 px-4 py-2.5 border border-gray-200 bg-white hover:bg-gray-50 text-gray-500 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2"
-            >
-              <FileText className="w-3.5 h-3.5 text-gray-400" /> Generar PDF
-            </button>
-          )}
-
-          {disponibles.includes('perdida') && !showLossReasonForm && (
-            <button
-              onClick={() => setShowLossReasonForm(true)}
-              className="flex-1 px-4 py-2.5 border border-red-200 bg-white hover:bg-red-50 text-red-500 text-[10px] font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2"
-            >
-              Marcar perdida
-            </button>
-          )}
-        </div>
-
-        {/* ── Indicador de auto-guardado ── */}
-        <div className="flex items-center justify-center gap-1.5 pt-1">
-          <CheckCircle2 className="w-3 h-3 text-green-500" />
-          <span className="text-[10px] text-gray-400">Guardado automáticamente</span>
-        </div>
+        <CheckCircle2 className="w-3 h-3 text-green-500" />
+        <span className="text-[10px] text-gray-400">Guardado automáticamente</span>
       </FichaFooter>
-      )}
 
       {/* Bloque 2b: la justificación del salto de expediente (solo admin). */}
       {modalSalto && (

@@ -19,6 +19,7 @@ import {
 import { formatearPorMoneda } from '../../lib/sumarPorMoneda';
 import {
   FichaLayout, FichaHeader, FichaContenido, FichaFooter, BadgeEstado, TonoBadge,
+  AccionesHeader, type AccionMenu,
 } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import LineaTiempo from '../ui/ficha/LineaTiempo';
@@ -199,6 +200,33 @@ export default function FichaOC({
             ${money(oc.monto)} <span className="text-sm font-medium text-gray-400">{oc.moneda}</span>
           </p>
         }
+        acciones={(() => {
+          if (terminada) return undefined;
+          const primarios = disponibles.filter(e => e !== 'rechazada');
+          const items: AccionMenu[] = [];
+          if (disponibles.includes('rechazada'))
+            items.push({
+              id: 'rechazar', label: 'Rechazar', variante: 'peligro',
+              icono: <XCircle className="w-3.5 h-3.5" />,
+              onClick: () => onTransicionar('rechazada', { motivoRechazo: motivo.trim() || null }),
+            });
+          return (
+            <AccionesHeader items={items}>
+              {primarios.map(estado => (
+                <button
+                  key={estado}
+                  onClick={() => onTransicionar(estado, {
+                    comprobantePago: comprobante.trim() || null,
+                    facturaAsociada: factura.trim() || null,
+                  })}
+                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-xs"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" /> {ACCION[estado]}
+                </button>
+              ))}
+            </AccionesHeader>
+          );
+        })()}
       />
 
       {/*
@@ -638,56 +666,29 @@ export default function FichaOC({
         </div>
       </div>
 
+      {/* ── Footer: solo avisos de bloqueo y estado terminal (tarea 44) ── */}
+      {(bloqueados.length > 0 || terminada) && (
       <FichaFooter>
-        {disponibles.filter(e => e !== 'rechazada').map(estado => (
-          <button
-            key={estado}
-            onClick={() => onTransicionar(estado, {
-              comprobantePago: comprobante.trim() || null,
-              facturaAsociada: factura.trim() || null,
-            })}
-            className="w-full max-w-3xl mx-auto px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2 shadow-xs"
-          >
-            <CheckCircle2 className="w-4 h-4" /> {ACCION[estado]}
-          </button>
-        ))}
-
-        {/*
-          * Qué falta, en vez de un botón que va a fallar.
-          *
-          * Era una TARJETA por transición bloqueada, del mismo alto que el
-          * botón principal. La franja es fija: cada tarjeta se descuenta del
-          * alto que le queda al contenido, y en una pantalla baja eso es lo
-          * que dejaba la ficha en una rendija. El aviso dice lo mismo en una
-          * línea.
-          */}
-        {bloqueados.map(({ estado, r }) => (
-          <p
-            key={estado}
-            className="w-full max-w-3xl mx-auto flex items-start gap-1.5 text-[11px] text-amber-800 leading-snug"
-          >
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-px" />
-            <span>
-              <span className="font-bold">Para «{ACCION[estado]}»:</span> {r.razon}
-            </span>
-          </p>
-        ))}
-
-        {disponibles.includes('rechazada') && (
-          <button
-            onClick={() => onTransicionar('rechazada', { motivoRechazo: motivo.trim() || null })}
-            className="w-full max-w-3xl mx-auto px-4 py-2.5 text-xs font-bold text-red-500 border border-red-200 bg-white hover:bg-red-50 rounded-xl transition-colors flex items-center justify-center gap-2"
-          >
-            <XCircle className="w-4 h-4" /> Rechazar
-          </button>
-        )}
-
-        {terminada && (
-          <p className="text-center text-[11px] text-gray-400">
-            Esta orden ya está {oc.estado === 'pagada' ? 'pagada' : 'rechazada'}: no admite más cambios.
-          </p>
-        )}
+        <div className="flex flex-col gap-1 max-w-3xl mx-auto w-full">
+          {bloqueados.map(({ estado, r }) => (
+            <p
+              key={estado}
+              className="flex items-start gap-1.5 text-[11px] text-amber-800 leading-snug"
+            >
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-px" />
+              <span>
+                <span className="font-bold">Para «{ACCION[estado]}»:</span> {r.razon}
+              </span>
+            </p>
+          ))}
+          {terminada && (
+            <p className="text-center text-[11px] text-gray-400">
+              Esta orden ya está {oc.estado === 'pagada' ? 'pagada' : 'rechazada'}: no admite más cambios.
+            </p>
+          )}
+        </div>
       </FichaFooter>
+      )}
     </FichaLayout>
   );
 }
