@@ -42,10 +42,14 @@ export function useTipoCambioActual() {
         }
       },
       err => {
+        // Si la regla de Firestore no permite leer configuracion/tipoCambio,
+        // no se muestra como error rojo: el dato simplemente no está disponible
+        // todavía. La regla la despliega Mau (ver reporte de la tarea 51).
+        const esPermisos = err.code === 'permission-denied';
         setEstado(prev => ({
           ...prev,
           cargando: false,
-          error: `No se pudo leer el tipo de cambio: ${err.message}`,
+          error: esPermisos ? null : `No se pudo leer el tipo de cambio: ${err.message}`,
         }));
       },
     );
