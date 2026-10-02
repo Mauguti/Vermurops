@@ -217,3 +217,75 @@ Si hay que revertir:
 
 1. **Julio:** 3 confirmaciones del script de IVA (CON-019, CON-022, CON-081).
 2. **Gaby:** G11 (teléfono oficial), G18 (cargos en la notificación de arribo).
+
+---
+
+## 7. Forense de 53–55 y verificación por mutación (2-oct-2026)
+
+### 7.1 Una sola sesión produjo tres tareas
+
+El log del sprint cierra con `Fin: 4 terminadas de 4 intentadas` y solo
+existen `tarea-49.log` … `tarea-52.log`. No hay log de 53, 54 ni 55. Pero sí
+hay commits:
+
+| Tarea | Commit | Hora |
+|---|---|---|
+| 53 · plan de reglas por rol | `63961c0` | 02:01:48 |
+| 54 · expediente del proveedor | `d547647` | 02:16:07 |
+| 55 · factura PDF/XML en la OC | `dda3884` | 02:28:00 |
+
+Las tres caen dentro de la ventana de la sesión de la **tarea 52**
+(01:32 → 02:32), y el `docs(estado)` de la rama 52 aterriza a las **02:36:36**,
+después de los tres. Conclusión: la sesión de la 52 siguió de largo y trabajó
+53, 54 y 55 por su cuenta, sin pasar por el lanzador. Por eso 54 y 55 aparecen
+con «—» minutos y nunca cruzaron la compuerta por tarea del script.
+
+Consecuencia práctica: **el código está, la evidencia por tarea no**. De ahí
+que la verificación de abajo no se apoye en los reportes sino en mutar el
+código y ver qué test se cae.
+
+El `stash@{0}` que quedó pendiente contiene **únicamente**
+`.noche/REPORTE_MAÑANA.md` (102 líneas, sin trackear). No falta código de
+ninguna rama.
+
+### 7.2 Verificación por mutación
+
+Se rompió a propósito una regla de cada módulo y se contó cuántos tests se
+caen. Un módulo cuyos tests pasan igual con la regla rota no está verificado,
+está acompañado.
+
+| Tarea | Módulo | Tests | Fallan al mutar | Mutación aplicada |
+|---|---|---|---|---|
+| 51 | `tipoCambioBanxico` | 24 | **5** | se quita el corte de fin de semana en `esDiaHabil` |
+| 52 | `cartasEncomienda` | 31 | **17** | — |
+| 54 | `expedienteProveedor` | 15 | **3** | — |
+| 55 | `parsearCFDI` | 21 | **6** | — |
+| 50 | movimiento de UI | **0** | — | no tiene tests propios |
+
+**La tarea 50 no tiene red.** Es un movimiento de interfaz repartido en
+`FichaCliente.tsx`, `FichaRFQ.tsx` y `FichaEmbarque.tsx`: no hay lógica que
+aislar, así que se valida a mano (§5 de la lista de validación).
+
+`parsearCFDI.test.ts` no arrancaba en este worktree por falta de `jsdom`
+—vitest sale con código 1, no en silencio—. Con `npm install`, la suite
+completa son **90 archivos / 2 028 tests**, que es lo que reportó la noche.
+
+Recorrido Playwright en la punta (`dda3884`): **6/6 en 9.5 s**.
+
+### 7.3 Reglas que faltaban
+
+El reporte de la noche lo dejó anotado como bloqueo: *«Storage rules para
+factura OC: la ruta `ordenesCompra/{ordenId}/factura/` NO tiene regla»*. Es
+decir, la tarea 55 subía archivos a una ruta que Storage deniega. Lo mismo
+con `configuracion/empresa` (tarea 40) y con el tipo de cambio (tarea 51).
+
+Se agregaron tres bloques en `firestore.rules` y uno en `storage.rules`, con
+sus tests (`tests/reglas/equipo.test.ts`: de 13 a **26**). Verificado por
+mutación: con las reglas de `HEAD`, **4 de los 26 fallan**; con las nuevas,
+pasan los 26.
+
+El tipo de cambio quedó **de solo lectura para el navegador**: lo escribe
+`actualizarTipoCambio` con el Admin SDK, que no pasa por las reglas, y la
+captura manual de la pantalla va por esa misma función (`useTipoCambio.ts`
+solo hace `onSnapshot` y `getDocs`). Dejarlo abierto permitiría mover desde
+la consola la tasa con la que se cotiza y se factura.

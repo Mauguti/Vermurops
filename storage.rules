@@ -86,6 +86,24 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    // La factura del proveedor que ampara una orden de compra (tarea 55).
+    //
+    // Solo PDF y XML: el XML es el CFDI del que se extraen UUID, RFC y
+    // montos, y el PDF es su representación impresa. Cualquier otra cosa
+    // ahí es un error de captura, no un documento fiscal.
+    //
+    // Inmutable como el resto de la evidencia: una factura corregida es una
+    // factura nueva, con su propio folio.
+    match /ordenesCompra/{ordenId}/factura/{archivo} {
+      allow read: if esDelEquipo();
+      allow create: if esDelEquipo()
+                    && request.resource.size < 10 * 1024 * 1024
+                    && (request.resource.contentType == 'application/pdf'
+                        || request.resource.contentType == 'text/xml'
+                        || request.resource.contentType == 'application/xml');
+      allow update, delete: if false;
+    }
+
     // Documentos del embarque. Un BL o un pedimento con otra versión se sube
     // como archivo nuevo; el original queda para la trazabilidad.
     match /embarques/{embarqueId}/docs/{archivo} {

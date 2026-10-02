@@ -137,3 +137,74 @@ describe('Lo que el parche NO cambia', () => {
     await assertSucceeds(getDoc(doc(db, 'notificaciones', 'n2')));
   });
 });
+
+
+// ─── Lo que se agregó el 2-oct: configuración, tipo de cambio y factura de OC ──
+
+describe('configuración de la empresa', () => {
+  it('el equipo lee y escribe «Mi empresa»', async () => {
+    const db = como(DEL_EQUIPO).firestore();
+    await assertSucceeds(getDoc(doc(db, 'configuracion', 'empresa')));
+    await assertSucceeds(setDoc(doc(db, 'configuracion', 'empresa'), { razonSocial: 'Vermur' }));
+  });
+
+  it.each([INTRUSO, DE_PRUEBA, DOMINIO_EQUIVOCADO])('%s no la toca', async (email) => {
+    const db = como(email).firestore();
+    await assertFails(getDoc(doc(db, 'configuracion', 'empresa')));
+    await assertFails(setDoc(doc(db, 'configuracion', 'empresa'), { razonSocial: 'X' }));
+  });
+});
+
+describe('el tipo de cambio se lee, no se escribe', () => {
+  /*
+   * Lo escribe `actualizarTipoCambio` con el Admin SDK, que no pasa por las
+   * reglas. Si el navegador pudiera escribirlo, cualquiera del equipo movería
+   * desde la consola la tasa con la que se cotiza y se factura.
+   */
+  it('el equipo LEE la tasa vigente y la del día', async () => {
+    const db = como(DEL_EQUIPO).firestore();
+    await assertSucceeds(getDoc(doc(db, 'configuracion', 'tipoCambio')));
+    await assertSucceeds(getDoc(doc(db, 'tiposCambio', '2026-10-02')));
+  });
+
+  it('el equipo NO la escribe, ni siquiera siendo del equipo', async () => {
+    const db = como(DEL_EQUIPO).firestore();
+    await assertFails(setDoc(doc(db, 'configuracion', 'tipoCambio'), { valor: 1 }));
+    await assertFails(setDoc(doc(db, 'tiposCambio', '2026-10-02'), { valor: 1 }));
+  });
+
+  it.each([INTRUSO, DE_PRUEBA])('%s ni lee ni escribe', async (email) => {
+    const db = como(email).firestore();
+    await assertFails(getDoc(doc(db, 'configuracion', 'tipoCambio')));
+    await assertFails(setDoc(doc(db, 'tiposCambio', '2026-10-02'), { valor: 1 }));
+  });
+});
+
+describe('Storage · la factura del proveedor en la orden de compra', () => {
+  const RUTA = 'ordenesCompra/OC-2026-0009/factura/cfdi.xml';
+
+  it('el equipo sube un XML y lo lee', async () => {
+    const st = como(DEL_EQUIPO).storage();
+    await assertSucceeds(uploadBytes(ref(st, RUTA), new Uint8Array([1, 2, 3]),
+      { contentType: 'application/xml' }));
+  });
+
+  it('el equipo sube un PDF', async () => {
+    const st = como(DEL_EQUIPO).storage();
+    await assertSucceeds(uploadBytes(ref(st, 'ordenesCompra/OC-2026-0009/factura/f.pdf'),
+      new Uint8Array([1]), { contentType: 'application/pdf' }));
+  });
+
+  it('un formato que no es PDF ni XML se rechaza', async () => {
+    // Ahí solo van documentos fiscales; cualquier otra cosa es error de captura.
+    const st = como(DEL_EQUIPO).storage();
+    await assertFails(uploadBytes(ref(st, 'ordenesCompra/OC-2026-0009/factura/foto.jpg'),
+      new Uint8Array([1]), { contentType: 'image/jpeg' }));
+  });
+
+  it.each([INTRUSO, DE_PRUEBA])('%s no sube ni lee', async (email) => {
+    const st = como(email).storage();
+    await assertFails(uploadBytes(ref(st, RUTA), new Uint8Array([1]),
+      { contentType: 'application/xml' }));
+  });
+});
