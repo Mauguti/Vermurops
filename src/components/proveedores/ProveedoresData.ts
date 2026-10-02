@@ -10,6 +10,8 @@
 
 import type { CambioEnLista } from '../../lib/edicionEnLista';
 import type { ValidacionExpediente } from '../../lib/estadoValidacion';
+import type { DocsAlta } from '../clientes/ClientesData';
+import type { ArchivoExpediente } from '../expediente/ExpedientePanel';
 import seedData from '../../data/seeds/proveedores.json';
 
 // ─── Sub-objetos ──────────────────────────────────────────────────────────────
@@ -128,13 +130,26 @@ export interface ProveedorVermur {
   tuvoTransacciones: boolean;
   multiRegistroEnMagaya: boolean;
 
-  // ── Validación de expediente (PLAN-APROBACION, paso 1) ──────────────────
+  // ── Validación de expediente (PLAN-APROBACION, paso 1; tarea 54) ────────
   /**
    * Validación formal del proveedor por Administración. Mismo tipo que el
    * del cliente. null / undefined = sin validar. Los de Magaya cuentan como
    * validados de origen sin necesidad de este campo.
    */
   expedienteValidado?: ValidacionExpediente | null;
+
+  /**
+   * Checklist de documentos del expediente, misma forma que el del cliente.
+   * Opcional: los proveedores existentes no lo tienen y se lee como todo
+   * en false.
+   */
+  docsAlta?: DocsAlta;
+
+  /**
+   * Archivos del expediente subidos, indexados por campo de DocsAlta.
+   * Cada entrada tiene la ruta en Storage, la URL y quién lo subió.
+   */
+  archivosExpediente?: Partial<Record<keyof DocsAlta, ArchivoExpediente>>;
 
   // ── Estado ───────────────────────────────────────────────────────────────
   activo: boolean;

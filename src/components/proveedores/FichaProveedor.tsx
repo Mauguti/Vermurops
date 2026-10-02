@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Phone, Mail, Check, BookOpen } from 'lucide-react';
 import { ProveedorVermur, contactoPrincipal } from './ProveedoresData';
+import type { DocsAlta } from '../clientes/ClientesData';
 import { PIPELINE_STAGES } from '../quotes/QuotesData';
 import type { KanbanQuote } from '../quotes/QuotesData';
 import { extraerHistorialProveedor, calcularResumenProveedor, formatTotalesPorMoneda } from '../../lib/historialProveedor';
@@ -10,12 +11,15 @@ import { useTarifas } from '../../hooks/useTarifas';
 import { useOrdenesCompra } from '../../hooks/useOrdenesCompra';
 import { useAuth } from '../../auth/AuthContext';
 import { estadoValidacion, etiquetaValidacion } from '../../lib/estadoValidacion';
+import { docsParaProveedor, esProveedorExtranjero, DOCS_ALTA_PROVEEDOR_DEFAULT } from '../../lib/expedienteProveedor';
+import ExpedientePanel, { type ArchivoExpediente } from '../expediente/ExpedientePanel';
 
 interface Props {
   proveedor: ProveedorVermur;
   quotes: KanbanQuote[];
   onBack: () => void;
   onEdit: () => void;
+  onUpdate: (id: string, data: Partial<ProveedorVermur>) => Promise<void>;
   /** Etiqueta del botón regresar cuando se llegó desde otra ficha. */
   regresarLabel?: string;
 }
@@ -34,11 +38,11 @@ const getTransportLabel = (type: string) => {
   }
 };
 
-export default function FichaProveedor({ proveedor, quotes, onBack, onEdit, regresarLabel }: Props) {
-  const [fichaTab, setFichaTab] = useState<'historial' | 'notas'>('historial');
+export default function FichaProveedor({ proveedor, quotes, onBack, onEdit, onUpdate, regresarLabel }: Props) {
+  const [fichaTab, setFichaTab] = useState<'historial' | 'notas' | 'expediente'>('historial');
 
   const cp = contactoPrincipal(proveedor);
-  const { puede } = useAuth();
+  const { puede, user } = useAuth();
   const puedeEditar = puede('proveedor.alta');
 
   // U-4 · Lo que cuelga de este proveedor.
@@ -214,7 +218,7 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit, regr
           {/* Internal Tabs Provider */}
           <div className="px-[32px] border-b border-divider bg-canvas">
             <nav className="-mb-px flex space-x-[24px]">
-              {([['historial', 'Historial de Cotizaciones'], ['notas', 'Notas Internas']] as const).map(([key, label]) => (
+              {([['historial', 'Historial de Cotizaciones'], ['expediente', 'Expediente'], ['notas', 'Notas Internas']] as const).map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setFichaTab(key)}
@@ -283,6 +287,36 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit, regr
                   </div>
                 )}
               </>
+            )}
+
+            {/* Tab: Expediente */}
+            {fichaTab === 'expediente' && (
+              <ExpedientePanel
+                entidad={proveedor}
+                documentos={docsParaProveedor(proveedor)}
+                docsAlta={proveedor.docsAlta ?? DOCS_ALTA_PROVEEDOR_DEFAULT}
+                archivos={proveedor.archivosExpediente}
+                nombreUsuario={user?.email ?? ''}
+                puedeValidar={puedeEditar}
+                puedeEditar={puedeEditar}
+                storageBasePath={`expedientes/${proveedor.id}`}
+                esExtranjero={esProveedorExtranjero(proveedor)}
+                tipoEntidad="proveedor"
+                onToggleDoc={async (campo, valor) => {
+                  const da = { ...(proveedor.docsAlta ?? DOCS_ALTA_PROVEEDOR_DEFAULT), [campo]: valor };
+                  await onUpdate(proveedor.id, { docsAlta: da });
+                }}
+                onValidar={async (datos) => {
+                  await onUpdate(proveedor.id, { expedienteValidado: datos });
+                }}
+                onArchivoSubido={async (campo, archivo) => {
+                  const prev = proveedor.archivosExpediente ?? {};
+                  await onUpdate(proveedor.id, {
+                    docsAlta: { ...(proveedor.docsAlta ?? DOCS_ALTA_PROVEEDOR_DEFAULT), [campo]: true },
+                    archivosExpediente: { ...prev, [campo]: archivo },
+                  });
+                }}
+              />
             )}
 
             {/* Tab: Notas Internas */}

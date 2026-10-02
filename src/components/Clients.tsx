@@ -546,6 +546,7 @@ export default function Clients() {
           }}
           regresarLabel={origenNav?.id}
           onEdit={() => setShowProvModal('editar')}
+          onUpdate={updateProveedor}
         />
       )}
 
