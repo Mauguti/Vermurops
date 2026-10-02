@@ -24,6 +24,7 @@ import { calcularIVA, type ContextoIVA } from './calcularIVA';
 import { montoIVA, montoRetencion } from './ivaCotizacion';
 import { TASA_DE_OPCION } from './impuestoLinea';
 import { programarPago } from './calendarioPagos';
+import { diasCreditoDeModalidad } from './diasCreditoServicio';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1 · El IVA de una línea del embarque
@@ -213,16 +214,13 @@ export interface CreditoCliente {
  *
  * «No es un número por cliente: varían por tipo de operación. Un mismo
  * cliente puede tener 45 días en marítimo, 20 en aéreo y 15 en terrestre.»
- * Se lee el desglose si existe y se cae al plano, que es lo que hoy tiene
- * `ClienteVermur.dias`.
+ *
+ * Delega a `diasCreditoDeModalidad` (tarea 37): una sola función compartida
+ * para cotización y embarque.
  */
 export function diasCreditoDe(credito: CreditoCliente | null | undefined, modalidad: string): number {
   if (!credito) return 0;
-  const porModalidad = modalidad === 'maritimo' ? credito.maritimo
-    : modalidad === 'terrestre' ? credito.terrestre
-    : modalidad === 'aereo' ? credito.aereo
-    : undefined;
-  return porModalidad ?? credito.general ?? 0;
+  return diasCreditoDeModalidad({ diasCreditoPorTipo: credito }, modalidad);
 }
 
 /**

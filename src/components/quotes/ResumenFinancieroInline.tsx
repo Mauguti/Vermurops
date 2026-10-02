@@ -3,6 +3,11 @@ import { TrendingUp } from 'lucide-react';
 import { calcTotales, COSTO_OPE_DEFAULT } from '../../lib/cotizacionCalculator';
 import type { LineaPlana } from '../../lib/lineasCotizacion';
 import { mezclaMonedas } from '../../lib/sumarPorMoneda';
+import {
+  calcFinanciamientoPorServicio,
+  etiquetaDiasCredito,
+  type DatosCreditoCliente,
+} from '../../lib/diasCreditoServicio';
 
 /**
  * Resumen financiero DENTRO de la ficha, no en una sección aparte.
@@ -13,12 +18,17 @@ import { mezclaMonedas } from '../../lib/sumarPorMoneda';
  * Muestra el margen de la OPERACIÓN COMPLETA porque Pricing juega con los
  * profits entre conceptos: «ese profit se lo pongo en otro concepto. El margen
  * de mi concepto no va a ser bueno, pero el margen de mi operación sí».
+ *
+ * Tarea 37: el financiamiento se calcula POR SERVICIO con los días de crédito
+ * de cada modalidad, y se suma. El resumen dice de dónde salieron los días
+ * («Marítimo 45 días · Terrestre 15 días»).
  */
 
 interface Props {
   lineas: LineaPlana[];
   moneda: string;
-  diasCredito: number;
+  /** Datos de crédito del cliente vinculado (tarea 37). */
+  creditoCliente?: DatosCreditoCliente | null;
   costoOperacion?: number;
 }
 
@@ -41,13 +51,23 @@ function Dato({ label, valor, destacado, negativo }: {
 }
 
 export default function ResumenFinancieroInline({
-  lineas, moneda, diasCredito, costoOperacion = COSTO_OPE_DEFAULT,
+  lineas, moneda, creditoCliente, costoOperacion = COSTO_OPE_DEFAULT,
 }: Props) {
+  // Tarea 37: financiamiento por servicio, cada uno con sus días de crédito.
+  const fin = calcFinanciamientoPorServicio(lineas, creditoCliente);
+  const etiqueta = etiquetaDiasCredito(fin.desglose);
+
+  // calcTotales con 0 días: el financiamiento por servicio lo reemplaza.
   const t = calcTotales(
     lineas.map(l => ({ costo: l.costo, profit: l.profit })),
-    diasCredito,
+    0,
     costoOperacion,
   );
+
+  // Sobreescribir lo que depende del financiamiento
+  const financiamiento_monto = fin.monto;
+  const profit_real_monto = t.profit_total - t.comision_monto - financiamiento_monto;
+  const ganancia_real = profit_real_monto - costoOperacion;
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden sticky bottom-0">
@@ -57,7 +77,7 @@ export default function ResumenFinancieroInline({
           Resumen de la operación
         </h4>
         <span className="text-[10px] text-gray-400 ml-auto">
-          {diasCredito} días de crédito · costo de operación ${money(costoOperacion)}
+          {etiqueta} · costo de operación ${money(costoOperacion)}
         </span>
       </div>
 
@@ -78,11 +98,11 @@ export default function ResumenFinancieroInline({
               destacado negativo={t.margen_real < 0} />
 
         <Dato label="Comisión (10%)"  valor={`-$${money(t.comision_monto)}`} />
-        <Dato label="Financiamiento"  valor={`-$${money(t.financiamiento_monto)}`} />
-        <Dato label="Profit real"     valor={`$${money(t.profit_real_monto)}`}
-              negativo={t.profit_real_monto < 0} />
-        <Dato label="Ganancia real"   valor={`$${money(t.ganancia_real)}`}
-              destacado negativo={t.ganancia_real < 0} />
+        <Dato label="Financiamiento"  valor={`-$${money(financiamiento_monto)}`} />
+        <Dato label="Profit real"     valor={`$${money(profit_real_monto)}`}
+              negativo={profit_real_monto < 0} />
+        <Dato label="Ganancia real"   valor={`$${money(ganancia_real)}`}
+              destacado negativo={ganancia_real < 0} />
       </div>
     </div>
   );
