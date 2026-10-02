@@ -9,6 +9,7 @@ import { useServicios, renderIcon, CategoriaServicio } from '../config/servicios
 import ContadoresFolio from './settings/ContadoresFolio';
 import GestionUsuarios from './settings/GestionUsuarios';
 import CatalogoConceptos from './conceptos/CatalogoConceptos';
+import ConfiguracionEmpresaForm from './settings/ConfiguracionEmpresa';
 
 export default function Settings() {
   const { user, logout } = useAuth();
@@ -207,47 +208,7 @@ export default function Settings() {
 
         {/* Right Content Area */}
         <div className="flex-1 p-[32px] overflow-y-auto">
-           {activeSection === 'company' && (
-              <div className="max-w-[600px]">
-                 <h3 className="text-[18px] font-semibold text-text-primary mb-[24px] pb-[16px] border-b border-divider">Mi Empresa</h3>
-                 <div className="space-y-[20px]">
-                    <div className="flex items-center space-x-[24px]">
-                       <div className="bg-white border border-dashed border-card-border p-2 rounded-[12px] flex items-center justify-center shadow-sm">
-                          <img src="https://firebasestorage.googleapis.com/v0/b/digsol-academy.firebasestorage.app/o/LOGOTIPO%20(1).png?alt=media&token=702db209-5869-4471-acb6-ac7740e5453b" alt="Logo de la Empresa" className="h-[48px] object-contain" />
-                       </div>
-                       <div>
-                          <button className="bg-white border border-card-border px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium text-text-primary shadow-sm hover:bg-neutral-bg transition-colors">Subir nuevo logo</button>
-                          <p className="text-[11px] text-text-muted mt-[8px]">PNG, JPG hasta 2MB (Para portal y PDFs)</p>
-                       </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-[16px]">
-                       <div className="col-span-2">
-                          <label className="block text-[12px] font-medium text-text-primary mb-[6px]">Razón Social</label>
-                          <input type="text" defaultValue="Vermur Logistics S.A. de C.V." className="w-full bg-white border border-card-border rounded-[8px] px-[12px] py-[8px] text-[13px] focus:outline-none focus:border-brand shadow-sm" />
-                       </div>
-                       <div>
-                          <label className="block text-[12px] font-medium text-text-primary mb-[6px]">RFC / Tax ID</label>
-                          <input type="text" defaultValue="VLO210415XYZ" className="w-full bg-white border border-card-border rounded-[8px] px-[12px] py-[8px] text-[13px] focus:outline-none focus:border-brand shadow-sm" />
-                       </div>
-                       <div>
-                          <label className="block text-[12px] font-medium text-text-primary mb-[6px]">Moneda Base</label>
-                          <select className="w-full bg-white border border-card-border rounded-[8px] px-[12px] py-[8px] text-[13px] focus:outline-none focus:border-brand shadow-sm">
-                             <option>USD ($)</option>
-                             <option>MXN ($)</option>
-                          </select>
-                       </div>
-                       <div className="col-span-2">
-                          <label className="block text-[12px] font-medium text-text-primary mb-[6px]">Dirección Fiscal</label>
-                          <textarea rows={2} defaultValue="Av. Paseo de la Reforma 250, Col. Juárez, Cuauhtémoc, 06600 Ciudad de México, CDMX" className="w-full bg-white border border-card-border rounded-[8px] px-[12px] py-[8px] text-[13px] focus:outline-none focus:border-brand shadow-sm"></textarea>
-                       </div>
-                    </div>
-                 </div>
-                 <div className="mt-[32px] pt-[24px] border-t border-divider flex justify-end">
-                    <button className="bg-brand text-white px-[16px] py-[8px] rounded-[8px] text-[13px] font-medium shadow-sm hover:bg-brand-hover transition-colors">Guardar cambios</button>
-                 </div>
-              </div>
-           )}
+           {activeSection === 'company' && <ConfiguracionEmpresaForm />}
 
            {activeSection === 'users' && <GestionUsuarios />}
 
