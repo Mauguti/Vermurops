@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @page { size: letter; margin: 2cm 2.5cm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11pt; color: #222; line-height: 1.5; }
+    .header { text-align: right; margin-bottom: 30px; }
+    .header .empresa { font-size: 12pt; font-weight: bold; color: #4B2A8C; }
+    .header .datos { font-size: 9pt; color: #555; }
+    .fecha { text-align: right; margin-bottom: 20px; font-size: 10pt; }
+    .destinatario { margin-bottom: 20px; font-size: 10pt; }
+    .destinatario strong { display: block; font-size: 11pt; }
+    .titulo { text-align: center; font-size: 12pt; font-weight: bold; color: #4B2A8C; margin: 20px 0; text-transform: uppercase; letter-spacing: 1px; }
+    .cuerpo { font-size: 10pt; text-align: justify; margin-bottom: 15px; }
+    .datos-embarque { width: 100%; border-collapse: collapse; margin: 15px 0; font-size: 10pt; }
+    .datos-embarque td { padding: 4px 8px; vertical-align: top; }
+    .datos-embarque .label { font-weight: bold; width: 180px; color: #333; }
+    .firma { margin-top: 50px; text-align: center; }
+    .firma .linea { border-top: 1px solid #333; width: 250px; margin: 0 auto; padding-top: 5px; }
+    .firma .nombre { font-weight: bold; font-size: 10pt; }
+    .firma .cargo { font-size: 9pt; color: #555; }
+    .firma .empresa-firma { font-size: 9pt; color: #555; }
+    .pie { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 8px; font-size: 7.5pt; color: #999; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="empresa">{{empresa.razonSocial}}</div>
+    <div class="datos">
+      RFC: {{empresa.rfc}}<br>
+      {{empresa.direccion}}<br>
+      {{empresa.telefono}}
+    </div>
+  </div>
+
+  <div class="fecha">{{fechaGeneracion}}</div>
+
+  <div class="destinatario">
+    <strong>{{naviera.razonSocial}}</strong>
+    AT'N: {{naviera.atencion}}
+  </div>
+
+  <div class="titulo">Carta de Encomienda</div>
+
+  <p class="cuerpo">
+    Por este medio damos amplio poder conforme a derecho corresponda al
+    Agente Aduanal <strong>{{embarque.agenteAduanal}}</strong>,
+    Patente No. <strong>{{parametros.patente}}</strong>, para que en nombre
+    y representación de <strong>{{empresa.razonSocial}}</strong>
+    lleve a cabo los trámites necesarios ante la Aduana de
+    <strong>{{parametros.aduana}}</strong> para la liberación y despacho
+    de la siguiente mercancía:
+  </p>
+
+  <table class="datos-embarque">
+    <tr>
+      <td class="label">B/L NÚMERO:</td>
+      <td>{{embarque.numeroGuia}}</td>
+    </tr>
+    <tr>
+      <td class="label">CONTENEDORES:</td>
+      <td>{{!contenedores}}</td>
+    </tr>
+    <tr>
+      <td class="label">PUERTO DE ORIGEN:</td>
+      <td>{{embarque.puertoCarga}}</td>
+    </tr>
+    <tr>
+      <td class="label">PUERTO DE DESTINO:</td>
+      <td>{{embarque.puertoDescarga}}</td>
+    </tr>
+    <tr>
+      <td class="label">BUQUE / VIAJE:</td>
+      <td>{{embarque.buque}} / {{embarque.viaje}}</td>
+    </tr>
+    <tr>
+      <td class="label">FECHA DE ARRIBO:</td>
+      <td>{{embarque.eta}}</td>
+    </tr>
+  </table>
+
+  <p class="cuerpo">
+    Se otorga la presente carta de encomienda para los efectos legales
+    correspondientes, en cumplimiento a lo dispuesto por la Ley Aduanera
+    y demás disposiciones aplicables.
+  </p>
+
+  <div class="firma">
+    <div class="linea">
+      <div class="nombre">{{empresa.apoderadoLegal}}</div>
+      <div class="cargo">Apoderado Legal</div>
+      <div class="empresa-firma">{{empresa.razonSocial}}</div>
+    </div>
+  </div>
+
+  <div class="pie">
+    {{empresa.razonSocial}} &mdash; RFC: {{empresa.rfc}} &mdash; {{empresa.direccion}}
+  </div>
+</body>
+</html>
