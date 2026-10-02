@@ -227,8 +227,8 @@ Archivo: `src/components/conceptos/CatalogoConceptos.tsx`
 1. **Kanban de prospectos sin búsqueda ni filtros** — cuando crezca la base
    será difícil encontrar uno. Considerar agregar búsqueda.
 
-2. **Bandeja Pricing: «Mis cotizaciones» filtra por nombre, no por correo** —
-   funciona con el mapa hardcodeado pero se romperá con Usuarios y Roles.
+2. ~~**Bandeja Pricing: «Mis cotizaciones» filtra por nombre, no por correo**~~ —
+   **ARREGLADO** en la tarea 46: ahora compara contra uid y nombre.
 
 3. **No hay filtro dedicado para la columna Fiscal en Clientes** (tarea 35
    agregó la columna pero no un filtro para ella).
@@ -237,8 +237,10 @@ Archivo: `src/components/conceptos/CatalogoConceptos.tsx`
    filtros se probaron verificando que existen y no causan errores. La
    cobertura real de esos filtros la da el recorrido e2e que crea datos.
 
-5. **Ninguno de los filtros que fallan** — todos los 43 filtros inventariados
-   funcionan correctamente. No hay `test.fixme` que pasar a la tarea 46.
+5. ~~**Ninguno de los filtros que fallan**~~ — la tarea 46 encontró que 10
+   componentes usaban `.toLowerCase().includes()` sin normalizar acentos.
+   Búsquedas como «garcia» no encontraban «García». **ARREGLADO**: todos
+   usan `contiene()` de `lib/texto.ts`.
 
 ---
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { initialClients } from '../data';
 import { Scale, Plus, Search, Filter, ChevronRight, FileCheck, Landmark, CheckCircle2, Circle, AlertCircle, ArrowRight, DollarSign, MapPin, Receipt } from 'lucide-react';
+import { contiene } from '../lib/texto';
 
 export default function Customs() {
   const [selectedCustoms, setSelectedCustoms] = useState<any>(null);
@@ -118,10 +119,10 @@ export default function Customs() {
     }
   };
 
-  const filteredCustoms = initialCustoms.filter(c => 
-    c.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.shipmentId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.client.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredCustoms = initialCustoms.filter(c =>
+    contiene(c.id, searchTerm) ||
+    contiene(c.shipmentId, searchTerm) ||
+    contiene(c.client, searchTerm)
   );
 
   return (

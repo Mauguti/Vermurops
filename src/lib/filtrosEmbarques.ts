@@ -14,6 +14,7 @@
 import type { EmbarqueCompleto, ModalidadEmbarque } from '../components/shipments/EmbarquesData';
 import { estadoDe, type EstadoEmbarque } from './estadoEmbarque';
 import { clienteDelEmbarque } from './entidadesEmbarque';
+import { normalizarTexto } from './texto';
 
 export interface FiltrosEmbarques {
   /** Correo del responsable operativo. '' = todos. */
@@ -70,7 +71,7 @@ export interface ContextoFiltro {
   clientes: readonly { id: string; nombre: string }[];
 }
 
-const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+const norm = normalizarTexto;
 
 /**
  * Aplica los filtros. Un embarque sin responsable NO aparece en «los de

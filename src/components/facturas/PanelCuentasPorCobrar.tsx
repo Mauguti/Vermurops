@@ -21,6 +21,7 @@ import {
 import { formatearPorMoneda, type TotalPorMoneda } from '../../lib/sumarPorMoneda';
 import { BANCOS_VERMUR } from '../../lib/cuentasPago';
 import { EnlaceEntidad } from '../ui/ficha/EnlaceEntidad';
+import { contiene } from '../../lib/texto';
 import EstadoVacio from '../ui/EstadoVacio';
 
 interface Props {
@@ -55,11 +56,11 @@ export default function PanelCuentasPorCobrar({ facturas, cobros, puedeCobrar, o
   const resumen = useMemo(() => resumenCartera(items, cobros, fecha), [items, cobros, fecha]);
 
   const visibles = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
+    const q = busqueda.trim();
     return items.filter(i => {
       if (filtro === 'abiertas' && i.estado === 'cobrado') return false;
       if (filtro !== 'abiertas' && filtro !== 'todas' && i.estado !== filtro) return false;
-      if (q && !`${i.factura.numero} ${i.factura.clienteNombre} ${i.factura.embarqueFolio}`.toLowerCase().includes(q)) return false;
+      if (q && !contiene(`${i.factura.numero} ${i.factura.clienteNombre} ${i.factura.embarqueFolio}`, q)) return false;
       return true;
     });
   }, [items, filtro, busqueda]);

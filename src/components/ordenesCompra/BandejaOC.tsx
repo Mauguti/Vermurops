@@ -7,6 +7,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Search, Filter, Download, Clock, Settings, CheckCircle, CheckCircle2, XCircle, AlertTriangle, FileText } from 'lucide-react';
+import { contiene } from '../../lib/texto';
 import type { OrdenCompra, EstadoOC } from './OrdenesCompraData';
 import { ESTADOS_OC_MAP } from './OrdenesCompraData';
 import EstadoVacio from '../ui/EstadoVacio';
@@ -98,13 +99,13 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
 
     // Búsqueda
     if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
+      const term = searchTerm.trim();
       resultado = resultado.filter(oc =>
-        oc.folio.toLowerCase().includes(term) ||
-        oc.proveedorNombre.toLowerCase().includes(term) ||
-        oc.conceptoNombre.toLowerCase().includes(term) ||
-        (oc.clienteNombre && oc.clienteNombre.toLowerCase().includes(term)) ||
-        (oc.embarqueFolio && oc.embarqueFolio.toLowerCase().includes(term))
+        contiene(oc.folio, term) ||
+        contiene(oc.proveedorNombre, term) ||
+        contiene(oc.conceptoNombre, term) ||
+        contiene(oc.clienteNombre, term) ||
+        contiene(oc.embarqueFolio, term)
       );
     }
 

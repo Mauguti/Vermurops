@@ -290,8 +290,12 @@ export default function BandejaPricing({
   const clasificacion = useMemo(() => clasificarBandeja(quotes), [quotes]);
 
   // ── Aplicar filtro de usuario ───────────────────────────────────────────
+  // pricingId se guarda como uid (producción) o como nombre (seed/legacy):
+  // comparar contra ambos para no romper ningún camino.
+  const esMia = (q: KanbanQuote) =>
+    q.pricingId === user?.uid || q.pricingId === user?.nombre;
   const filtrar = (arr: KanbanQuote[]): KanbanQuote[] => {
-    if (filtro === 'mias') return arr.filter(q => q.pricingId === user?.nombre);
+    if (filtro === 'mias') return arr.filter(esMia);
     if (filtro === 'sin_asignar') return arr.filter(q => !q.pricingId);
     return arr;
   };
@@ -303,7 +307,7 @@ export default function BandejaPricing({
 
   // ── Conteos para las tarjetas resumen (sin filtro) ──────────────────────
   const totalMias = [...clasificacion.teCotizar, ...clasificacion.esperando, ...clasificacion.listasConsolidar]
-    .filter(q => q.pricingId === user?.nombre).length;
+    .filter(esMia).length;
   const totalEquipo = clasificacion.teCotizar.length + clasificacion.esperando.length + clasificacion.listasConsolidar.length;
 
   // ── Precalcular datos por cotización ────────────────────────────────────
