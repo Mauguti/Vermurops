@@ -23,7 +23,7 @@ import { monedasConMonto } from '../lib/sumarPorMoneda';
 import { useDestinoPendiente, useRegistrarAbierta, useNavegacion, type Destino } from '../navegacion/NavegacionContext';
 
 export default function Finance() {
-  const [activeTab, setActiveTab] = useState('Facturas (CFDI)');
+  const [activeTab, setActiveTab] = useState('Cuentas por pagar');
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null);

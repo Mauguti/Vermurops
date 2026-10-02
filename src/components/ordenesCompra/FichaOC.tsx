@@ -27,9 +27,9 @@ import type { ReglaIVA } from '../conceptos/ConceptosData';
 import { compararIVAFactura, type ResultadoComparacionIVA } from '../../lib/ivaOrdenCompra';
 
 /**
- * C-2. La ficha de una orden de compra: el flujo de tres áreas.
+ * C-2. La ficha de una orden de compra: el flujo de dos áreas.
  *
- *     PRICING solicita → OPERACIONES gestiona → ADMIN autoriza y paga
+ *     OPERACIONES solicita y gestiona → ADMINISTRACIÓN autoriza y paga
  *
  * ── Qué decide qué se puede hacer ──────────────────────────────────────────
  * Nada de esto lo decide la pantalla: `transicionesDisponiblesOC` devuelve a
