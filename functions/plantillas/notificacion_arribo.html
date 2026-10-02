@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @page { size: letter; margin: 1.2cm 1.5cm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 9pt; color: #222; }
+
+    /* ── Encabezado ────────────────────────────────────────────── */
+    .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 8px; border-bottom: 2px solid #4B2A8C; margin-bottom: 10px; }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .header-left h1 { font-size: 13pt; color: #4B2A8C; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px; }
+    .empresa-info { text-align: right; font-size: 8pt; color: #555; line-height: 1.4; }
+    .empresa-info strong { color: #222; font-size: 9pt; }
+
+    /* ── Fila de folio y fecha ─────────────────────────────────── */
+    .meta-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 8.5pt; }
+    .meta-row .item { }
+    .meta-row .label { font-weight: bold; color: #4B2A8C; text-transform: uppercase; font-size: 7.5pt; }
+
+    /* ── Cuadros de entidades ──────────────────────────────────── */
+    .entities { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+    .entity-box { border: 1px solid #ccc; padding: 6px 8px; min-height: 52px; }
+    .entity-box .entity-label { font-size: 7pt; font-weight: bold; color: #4B2A8C; text-transform: uppercase; margin-bottom: 2px; }
+    .entity-box .entity-value { font-size: 9pt; line-height: 1.3; }
+
+    /* ── Tabla de detalles del envío ───────────────────────────── */
+    .details-grid { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 8pt; }
+    .details-grid td { border: 1px solid #ccc; padding: 4px 6px; vertical-align: top; }
+    .details-grid .dl { font-size: 7pt; font-weight: bold; color: #4B2A8C; text-transform: uppercase; display: block; margin-bottom: 1px; }
+    .details-grid .dv { font-size: 9pt; }
+
+    /* ── Tabla de carga (marks and numbers) ────────────────────── */
+    .cargo-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+    .cargo-table th { background: #4B2A8C; color: white; font-size: 7pt; font-weight: bold; text-transform: uppercase; padding: 5px 6px; text-align: left; border: 1px solid #4B2A8C; }
+    .cargo-table td { border: 1px solid #ccc; padding: 4px 6px; font-size: 8.5pt; vertical-align: top; }
+    .cargo-table .right { text-align: right; }
+
+    /* ── Sección de cargos ─────────────────────────────────────── */
+    .charges-section { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-bottom: 8px; }
+    .charges-left { border: 1px solid #ccc; padding: 6px 8px; }
+    .charges-left .cl { font-size: 7pt; font-weight: bold; color: #4B2A8C; text-transform: uppercase; margin-bottom: 2px; }
+    .charges-right { border: 1px solid #ccc; border-left: none; }
+    .charges-table { width: 100%; border-collapse: collapse; }
+    .charges-table th { background: #f5f5f5; font-size: 7pt; font-weight: bold; text-transform: uppercase; color: #4B2A8C; padding: 4px 6px; text-align: left; border-bottom: 1px solid #ccc; }
+    .charges-table td { padding: 3px 6px; font-size: 8.5pt; border-bottom: 1px solid #eee; }
+    .charges-table .right { text-align: right; }
+    .charges-table .total-row td { border-top: 2px solid #4B2A8C; font-weight: bold; font-size: 9pt; }
+
+    /* ── Notas y pie ──────────────────────────────────────────── */
+    .notes { font-size: 8pt; margin-bottom: 6px; }
+    .notes .notes-label { font-weight: bold; color: #4B2A8C; text-transform: uppercase; font-size: 7pt; }
+    .release-note { font-size: 8pt; font-style: italic; color: #555; margin: 8px 0; }
+    .pay-total { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin: 10px 0; padding: 6px 10px; background: #f9f9f9; border: 1px solid #ccc; }
+    .pay-total .pay-label { font-size: 8pt; font-weight: bold; color: #4B2A8C; text-transform: uppercase; }
+    .pay-total .pay-amount { font-size: 12pt; font-weight: bold; color: #222; }
+    .footer { border-top: 1px solid #ccc; margin-top: 12px; padding-top: 6px; font-size: 7pt; color: #999; text-align: center; }
+  </style>
+</head>
+<body>
+  <!-- ── Encabezado ──────────────────────────────────────────── -->
+  <div class="header">
+    <div class="header-left">
+      <h1>Arrival Notice</h1>
+    </div>
+    <div class="empresa-info">
+      <strong>{{empresa.razonSocial}}</strong><br>
+      RFC: {{empresa.rfc}}<br>
+      {{empresa.direccion}}<br>
+      {{empresa.telefono}}
+    </div>
+  </div>
+
+  <!-- ── Folio y fecha ───────────────────────────────────────── -->
+  <div class="meta-row">
+    <div class="item">
+      <span class="label">Invoice Number</span><br>
+      <strong>{{embarque.folio}}</strong>
+    </div>
+    <div class="item">
+      <span class="label">Invoice Date</span><br>
+      {{fechaGeneracion}}
+    </div>
+    <div class="item">
+      <span class="label">Reference Number</span><br>
+      {{embarque.referenciaCliente}}
+    </div>
+  </div>
+
+  <!-- ── Entidades ───────────────────────────────────────────── -->
+  <div class="entities">
+    <div class="entity-box">
+      <div class="entity-label">Consignee</div>
+      <div class="entity-value">{{embarque.consignatario}}</div>
+    </div>
+    <div class="entity-box">
+      <div class="entity-label">Bill To</div>
+      <div class="entity-value">{{embarque.clienteCobrar}}</div>
+    </div>
+    <div class="entity-box">
+      <div class="entity-label">Notify Party</div>
+      <div class="entity-value">{{embarque.notificar}}</div>
+    </div>
+    <div class="entity-box">
+      <div class="entity-label">Shipper</div>
+      <div class="entity-value">{{embarque.expedidor}}</div>
+    </div>
+  </div>
+
+  <!-- ── Detalles del envío ──────────────────────────────────── -->
+  <table class="details-grid">
+    <tr>
+      <td style="width:25%"><span class="dl">Departure Date</span><span class="dv">{{embarque.etdCorta}}</span></td>
+      <td style="width:25%"><span class="dl">Arrival Date</span><span class="dv">{{embarque.etaCorta}}</span></td>
+      <td style="width:25%"><span class="dl">Port of Loading</span><span class="dv">{{embarque.puertoCarga}}</span></td>
+      <td style="width:25%"><span class="dl">Port of Unloading</span><span class="dv">{{embarque.puertoDescarga}}</span></td>
+    </tr>
+    <tr>
+      <td colspan="2"><span class="dl">Vessel / Voyage</span><span class="dv">{{embarque.buque}} {{embarque.viaje}}</span></td>
+      <td colspan="2"><span class="dl">Master Bill of Lading</span><span class="dv">{{embarque.numeroGuia}}</span></td>
+    </tr>
+    <tr>
+      <td colspan="2"><span class="dl">Place of Delivery</span><span class="dv">{{embarque.lugarEntrega}}</span></td>
+      <td colspan="2"><span class="dl">Type of Move</span><span class="dv">{{embarque.tipoConsolidacion}}</span></td>
+    </tr>
+  </table>
+
+  <!-- ── Tabla de carga ──────────────────────────────────────── -->
+  <table class="cargo-table">
+    <thead>
+      <tr>
+        <th>Container / Seal</th>
+        <th>Number of Packages</th>
+        <th>Description of Commodities</th>
+        <th class="right">Gross Weight (Kg)</th>
+        <th class="right">Gross Weight (Lb)</th>
+        <th class="right">Measurement (m&sup3;)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{!tablaContenedores}}
+    </tbody>
+  </table>
+
+  <!-- ── Cargos ──────────────────────────────────────────────── -->
+  <div class="charges-section">
+    <div class="charges-left">
+      <div class="cl">Cargo Location</div>
+      <div>{{embarque.puertoDescarga}}</div>
+    </div>
+    <div class="charges-right">
+      <table class="charges-table">
+        <thead>
+          <tr>
+            <th>Description of Charges</th>
+            <th class="right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{!tablaCargos}}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── Notas ───────────────────────────────────────────────── -->
+  <p class="release-note">Cargo will be released against payment of above charges.</p>
+
+  {{!totalPorMoneda}}
+
+  <div class="footer">
+    Generado por VermurOps &mdash; {{empresa.razonSocial}}
+  </div>
+</body>
+</html>

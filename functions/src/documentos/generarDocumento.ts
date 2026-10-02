@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 
 import { verificarUsuario, exigirCapacidad, ErrorAuth } from '../comun/auth.js';
 import { nombreDelAgente, mensajeDeError, esRechazoDeToken } from '../comun/mensajesN8n.js';
-import { renderizar, formatearFecha } from './motorPlantillas.js';
+import { renderizar, formatearFecha, formatearFechaCorta, formatearMonto, escaparHtml } from './motorPlantillas.js';
 
 // ── Parámetros ───────────────────────────────────────────────────────────────
 
@@ -114,11 +114,117 @@ async function leerEmpresa(): Promise<ConfiguracionEmpresa> {
   return { ...EMPRESA_DEFAULT, ...(snap.data() as Partial<ConfiguracionEmpresa>) };
 }
 
+// ── Helpers para armar HTML de la notificación de arribo ─────────────────────
+
+interface CargoRaw {
+  concepto?: string;
+  tipo?: string;
+  monto?: number;
+  moneda?: string;
+}
+
+interface ProductoRaw {
+  descripcion?: string;
+  tipoEmbalaje?: string;
+  piezas?: number;
+  peso?: number;
+  volumen?: number;
+  datosContenedor?: {
+    numeroContenedor?: string;
+    numeroSello?: string;
+  };
+}
+
+const KG_A_LB = 2.20462;
+
+/**
+ * Genera las filas HTML de la tabla de contenedores/productos para la plantilla.
+ *
+ * Cada producto del embarque genera una fila: contenedor y sello (si existe),
+ * bultos, descripción, peso en kg y lb, y volumen.
+ */
+function generarTablaContenedores(productos: ProductoRaw[]): string {
+  if (!productos.length) {
+    return '<tr><td colspan="6" style="text-align:center;color:#999;padding:10px;">Sin productos registrados</td></tr>';
+  }
+  return productos.map(p => {
+    const cont = p.datosContenedor;
+    const contSello = cont?.numeroContenedor
+      ? `${escaparHtml(cont.numeroContenedor)}${cont.numeroSello ? ` / ${escaparHtml(cont.numeroSello)}` : ''}`
+      : '';
+    const pesoKg = p.peso ?? 0;
+    const pesoLb = Math.round(pesoKg * KG_A_LB * 100) / 100;
+    return `<tr>
+      <td>${contSello}</td>
+      <td>${p.piezas ?? ''} ${escaparHtml(p.tipoEmbalaje ?? '')}</td>
+      <td>${escaparHtml(p.descripcion ?? '')}</td>
+      <td class="right">${formatearMonto(pesoKg)}</td>
+      <td class="right">${formatearMonto(pesoLb)}</td>
+      <td class="right">${p.volumen ? formatearMonto(p.volumen) : ''}</td>
+    </tr>`;
+  }).join('\n');
+}
+
+/**
+ * Genera las filas HTML de la tabla de cargos de venta y los totales por moneda.
+ *
+ * §4.3: los totales nunca se mezclan. Un total por cada moneda presente.
+ *
+ * NOTA: por defecto se incluyen TODOS los cargos de venta (tipo === 'ingreso').
+ * Vermur está por confirmar cuáles van (pregunta G18). La función
+ * `cargosParaArribo` en el frontend filtra de la misma forma; si hay que
+ * cambiar el filtro, se cambia en un solo lugar.
+ */
+function generarTablaCargos(
+  cargos: CargoRaw[],
+): { tablaCargos: string; totalPorMoneda: string } {
+  // Solo cargos de venta
+  const ingresos = cargos.filter(c => c.tipo === 'ingreso' && (c.monto ?? 0) > 0);
+
+  if (!ingresos.length) {
+    return {
+      tablaCargos: '<tr><td colspan="2" style="text-align:center;color:#999;padding:8px;">Sin cargos de venta</td></tr>',
+      totalPorMoneda: '',
+    };
+  }
+
+  // Agrupar totales por moneda
+  const totales: Record<string, number> = {};
+  const filas = ingresos.map(c => {
+    const moneda = c.moneda ?? 'USD';
+    totales[moneda] = (totales[moneda] ?? 0) + (c.monto ?? 0);
+    return `<tr>
+      <td>${escaparHtml(c.concepto ?? '')}</td>
+      <td class="right">${moneda} ${formatearMonto(c.monto ?? 0)}</td>
+    </tr>`;
+  });
+
+  // Fila de total por moneda
+  const monedas = Object.keys(totales).sort();
+  for (const mon of monedas) {
+    filas.push(`<tr class="total-row">
+      <td>TOTAL ${mon}</td>
+      <td class="right">${mon} ${formatearMonto(totales[mon])}</td>
+    </tr>`);
+  }
+
+  // Bloque de "PLEASE PAY THIS AMOUNT"
+  const bloqueTotal = monedas.map(mon =>
+    `<div class="pay-total">
+      <span class="pay-label">Please Pay This Amount (${mon})</span>
+      <span class="pay-amount">${mon} ${formatearMonto(totales[mon])}</span>
+    </div>`,
+  ).join('\n');
+
+  return { tablaCargos: filas.join('\n'), totalPorMoneda: bloqueTotal };
+}
+
 /**
  * Arma el payload de datos para la plantilla a partir del embarque.
  * Cada tipo de documento usará campos distintos; la plantilla decide cuáles.
  */
 function armarDatos(
+  tipo: TipoDocEmbarque,
   embarque: Record<string, unknown>,
   empresa: ConfiguracionEmpresa,
   fechaGen: string,
@@ -127,8 +233,13 @@ function armarDatos(
   const entidades = (embarque.entidades ?? {}) as Record<string, string>;
   const ruta = (embarque.ruta ?? {}) as Record<string, Record<string, string>>;
   const fechas = (embarque.fechas ?? {}) as Record<string, string>;
+  const productos = (embarque.productos ?? []) as ProductoRaw[];
 
-  return {
+  // Inferir tipo de consolidación del primer producto
+  const primerProducto = productos[0] as (ProductoRaw & { tipoConsolidacion?: string }) | undefined;
+  const tipoConsolidacion = primerProducto?.tipoConsolidacion ?? '';
+
+  const datos: Record<string, unknown> = {
     empresa,
     embarque: {
       id: embarque.id,
@@ -137,6 +248,7 @@ function armarDatos(
       tipo: embarque.tipo ?? '',
       numeroGuia: embarque.numeroGuia ?? '',
       numeroReservacion: embarque.numeroReservacion ?? '',
+      referenciaCliente: embarque.referenciaCliente ?? '',
       descripcionCarga: embarque.descripcionCarga ?? '',
       consignatario: entidades.consignatario ?? '',
       expedidor: entidades.expedidor ?? '',
@@ -149,14 +261,27 @@ function armarDatos(
       transportista: ruta.origen?.transportista ?? '',
       buque: ruta.origen?.buque ?? '',
       viaje: ruta.origen?.viaje ?? '',
+      lugarEntrega: ruta.destino?.lugarEntrega ?? '',
+      tipoConsolidacion,
       etd: formatearFecha(fechas.salida),
       eta: formatearFecha(fechas.arribo),
-      etdCorta: fechas.salida ?? '',
-      etaCorta: fechas.arribo ?? '',
+      etdCorta: formatearFechaCorta(fechas.salida),
+      etaCorta: formatearFechaCorta(fechas.arribo),
     },
-    fechaGeneracion: formatearFecha(fechaGen),
+    fechaGeneracion: formatearFechaCorta(fechaGen),
     generadoPorNombre: nombreUsuario,
   };
+
+  // Datos específicos de la notificación de arribo
+  if (tipo === 'notificacion_arribo') {
+    const cargosRaw = ((embarque.cargos as Record<string, unknown>)?.detalles ?? []) as CargoRaw[];
+    datos.tablaContenedores = generarTablaContenedores(productos);
+    const { tablaCargos, totalPorMoneda } = generarTablaCargos(cargosRaw);
+    datos.tablaCargos = tablaCargos;
+    datos.totalPorMoneda = totalPorMoneda;
+  }
+
+  return datos;
 }
 
 /**
@@ -261,7 +386,7 @@ export const generarDocumento = onRequest(
     let html: string;
     try {
       const plantilla = leerPlantilla(tipo);
-      const datos = armarDatos(embarqueData, empresa, fechaGen, nombreUsuario);
+      const datos = armarDatos(tipo, embarqueData, empresa, fechaGen, nombreUsuario);
       // Los parámetros de la carta de encomienda (aduana, patente) se mezclan
       if (parametros) Object.assign(datos, { parametros });
       html = renderizar(plantilla, datos);

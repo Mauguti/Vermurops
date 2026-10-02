@@ -5,6 +5,7 @@ import { EmbarqueCompleto, TIPOS_DOCUMENTO, EVENT_TYPES, CargoDetalle, EmbarqueE
 import EntidadesEmbarque from './EntidadesEmbarque';
 import RutaEmbarque from './RutaEmbarque';
 import DocumentosEmbarque from './DocumentosEmbarque';
+import DocumentosGeneradosPanel from './DocumentosGeneradosPanel';
 import ProductosEmbarque from './ProductosEmbarque';
 import { useClientes } from '../../hooks/useClientes';
 import { useConceptos } from '../../hooks/useConceptos';
@@ -1592,14 +1593,29 @@ export default function FichaEmbarque({
         )}
 
         {activeTab === 'documentos' && (
-          <DocumentosEmbarque
-            embarque={embarque}
-            puedeSubir={puede('embarque.generar')}
-            onAddDocumento={handleAddDocumento}
-            onDeleteDocumento={handleDeleteDocumento}
-            onVisibilidadDocumento={handleVisibilidadDocumento}
-            onAviso={(mensaje, tipo) => setAvisoOC({ mensaje, tipo })}
-          />
+          <>
+            <DocumentosGeneradosPanel
+              embarque={embarque}
+              puedeGenerar={puede('embarque.generar')}
+              onDocumentoGenerado={(doc) => {
+                // La Function ya escribió en Firestore con arrayUnion. Actualizamos
+                // el estado local para que el panel se actualice sin recargar.
+                guardar({
+                  ...embarque,
+                  documentosGenerados: [...(embarque.documentosGenerados ?? []), doc],
+                });
+              }}
+              onAviso={(mensaje, tipo) => setAvisoOC({ mensaje, tipo })}
+            />
+            <DocumentosEmbarque
+              embarque={embarque}
+              puedeSubir={puede('embarque.generar')}
+              onAddDocumento={handleAddDocumento}
+              onDeleteDocumento={handleDeleteDocumento}
+              onVisibilidadDocumento={handleVisibilidadDocumento}
+              onAviso={(mensaje, tipo) => setAvisoOC({ mensaje, tipo })}
+            />
+          </>
         )}
 
         {/* Bitácora se movió dentro de Información (tarea 13). */}
