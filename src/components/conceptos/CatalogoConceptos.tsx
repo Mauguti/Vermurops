@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Search, AlertTriangle, X, Check } from 'lucide-react';
+import { contiene } from '../../lib/texto';
 import type { ConceptoVermur, ReglaIVA, CategoriaConcepto } from './ConceptosData';
 import {
   derivarTablaIVA, resumenCatalogo, pendientesDeConcepto, impactoConcepto, NOTA_REGLA,
@@ -71,15 +72,15 @@ export default function CatalogoConceptos() {
   const resumen = useMemo(() => resumenCatalogo(conceptos), [conceptos]);
 
   const visibles = useMemo(() => {
-    const q = busqueda.trim().toLowerCase();
+    const q = busqueda.trim();
     return conceptos
       .filter(c => !categoria || c.categoria === categoria)
       .filter(c => !soloPendientes || pendientesDeConcepto(c).length > 0)
       .filter(c => !q
-        || c.nombre.toLowerCase().includes(q)
-        || c.nombreOriginal.toLowerCase().includes(q)
-        || c.id.toLowerCase().includes(q)
-        || (c.cuentaContable ?? '').toLowerCase().includes(q))
+        || contiene(c.nombre, q)
+        || contiene(c.nombreOriginal, q)
+        || contiene(c.id, q)
+        || contiene(c.cuentaContable, q))
       .sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [conceptos, busqueda, categoria, soloPendientes]);
 

@@ -295,13 +295,13 @@ export default function Clients() {
   const filteredClients = clientes.filter(c => {
     // Filtro por estatus: por default solo activos
     if (!showInactivos && c.statusOperativo !== 'ACTIVO') return false;
-    const q = searchTerm.toLowerCase();
+    const q = searchTerm.trim();
     if (!q) return true;
     return contiene(c.nombre, q) ||
-      (c.rfc ?? '').toLowerCase().includes(q) ||
-      (c.representante ?? '').toLowerCase().includes(q) ||
-      (c.idSemantico ?? '').toLowerCase().includes(q) ||
-      (c.comercial ?? '').toLowerCase().includes(q);
+      contiene(c.rfc, q) ||
+      contiene(c.representante, q) ||
+      contiene(c.idSemantico, q) ||
+      contiene(c.comercial, q);
   });
 
   const filteredProviders = filtrarProveedores(proveedores, {

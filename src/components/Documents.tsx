@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FileText, Plus, Search, Filter, Download, ArrowRight, FileSignature, FileKey, Copy, Box, Anchor, BookOpen, Layers, Edit, Trash2 } from 'lucide-react';
+import { contiene } from '../lib/texto';
 
 export default function Documents() {
   const [activeTab, setActiveTab] = useState('Documentos de operaciones');
@@ -33,10 +34,10 @@ export default function Documents() {
     }
   };
 
-  const filteredDocs = documents.filter(doc => 
-    doc.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    doc.shipment.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    doc.client.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredDocs = documents.filter(doc =>
+    contiene(doc.name, searchTerm) ||
+    contiene(doc.shipment, searchTerm) ||
+    contiene(doc.client, searchTerm)
   );
 
   return (

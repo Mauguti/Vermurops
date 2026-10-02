@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Search, Pencil, DollarSign, AlertTriangle, Clock, CheckCircle2, Upload, Sparkles } from 'lucide-react';
+import { contiene } from '../lib/texto';
 import { useTarifas } from '../hooks/useTarifas';
 import { useProveedores } from '../hooks/useProveedores';
 import { useConceptos } from '../hooks/useConceptos';
@@ -106,15 +107,15 @@ export default function RatesManagement() {
     if (filterVigencia !== 'todas') list = list.filter(t => estadoVigencia(t) === filterVigencia);
 
     if (search.trim()) {
-      const q = search.trim().toLowerCase();
+      const q = search.trim();
       list = list.filter(t => {
         const concepto = concMap.get(t.conceptoId) ?? '';
         const prov = provMap.get(t.proveedorId) ?? '';
         const ruta = buildRuta(t);
-        return concepto.toLowerCase().includes(q)
-          || prov.toLowerCase().includes(q)
-          || ruta.toLowerCase().includes(q)
-          || t.vigenciaTexto.toLowerCase().includes(q);
+        return contiene(concepto, q)
+          || contiene(prov, q)
+          || contiene(ruta, q)
+          || contiene(t.vigenciaTexto, q);
       });
     }
 

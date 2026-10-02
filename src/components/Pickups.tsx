@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Truck, Plus, Search, Filter, ChevronRight, Printer, Package, MapPin, User, Clock, FileText } from 'lucide-react';
+import { contiene } from '../lib/texto';
 
 export default function Pickups() {
   const [selectedPickup, setSelectedPickup] = useState<any>(null);
@@ -68,9 +69,9 @@ export default function Pickups() {
     }
   };
 
-  const filteredPickups = initialPickups.filter(pk => 
-    pk.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    pk.client.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredPickups = initialPickups.filter(pk =>
+    contiene(pk.id, searchTerm) ||
+    contiene(pk.client, searchTerm)
   );
 
   return (

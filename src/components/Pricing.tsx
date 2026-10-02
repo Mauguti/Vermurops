@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { initialRFQs, RFQ, Modality } from './pricing/PricingData';
 import { Search, Filter, Plane, Ship, Truck, FileText, ChevronRight } from 'lucide-react';
+import { contiene } from '../lib/texto';
 import FichaRFQ from './pricing/FichaRFQ';
 import EstadoVacio from './ui/EstadoVacio';
 
@@ -33,8 +34,7 @@ export default function Pricing() {
   }
 
   const filteredRFQs = rfqs.filter(r => {
-    const matchesSearch = r.quoteRef.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          r.client.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = contiene(r.quoteRef, searchTerm) || contiene(r.client, searchTerm);
     const matchesStatus = statusFilter ? r.status === statusFilter : true;
     return matchesSearch && matchesStatus;
   });
