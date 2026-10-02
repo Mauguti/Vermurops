@@ -21,11 +21,25 @@
  * automática y la ruta manual de «Abrir embarque»— llaman a
  * `exigirExpediente`; la máquina de estados y la franja llaman a
  * `razonExpediente` para explicar antes de intentar.
+ *
+ * La lógica de estado de validación (validado / heredado_magaya /
+ * sin_validar) vive en estadoValidacion.ts y se comparte con proveedores.
+ * Se re-exporta aquí para no romper los consumidores existentes.
  */
 
 import type { ClienteVermur } from '../components/clientes/ClientesData';
 import type { UserRole } from '../auth/users';
 import { razonSinCliente } from './frenoCliente';
+import {
+  estadoValidacion,
+  etiquetaValidacion,
+  esEntidadDeMagaya,
+  type EstadoValidacion,
+  type ValidacionExpediente,
+} from './estadoValidacion';
+
+// Re-exportar para que los consumidores existentes no cambien sus imports.
+export { estadoValidacion, etiquetaValidacion, type EstadoValidacion, type ValidacionExpediente };
 
 export interface SaltoExpediente {
   por: string;
@@ -34,40 +48,9 @@ export interface SaltoExpediente {
   justificacion: string;
 }
 
-export interface ValidacionExpediente {
-  por: string;
-  /** ISO. */
-  fecha: string;
-  notas?: string;
-}
-
-export type EstadoValidacion = 'validado' | 'heredado_magaya' | 'sin_validar';
-
-/** ¿Este cliente vino de Magaya? Se lee, no se escribe. */
+/** ¿Este cliente vino de Magaya? Se lee, no se escribe. Alias de esEntidadDeMagaya. */
 export function esClienteDeMagaya(c: Pick<ClienteVermur, 'origenDatos' | 'numeroEntidadMagaya'>): boolean {
-  return c.origenDatos === 'magaya' || !!c.numeroEntidadMagaya;
-}
-
-export function estadoValidacion(
-  c: Pick<ClienteVermur, 'origenDatos' | 'numeroEntidadMagaya' | 'expedienteValidado'> | null | undefined,
-): EstadoValidacion {
-  if (!c) return 'sin_validar';
-  if (c.expedienteValidado) return 'validado';
-  if (esClienteDeMagaya(c)) return 'heredado_magaya';
-  return 'sin_validar';
-}
-
-export function etiquetaValidacion(
-  c: Pick<ClienteVermur, 'origenDatos' | 'numeroEntidadMagaya' | 'expedienteValidado'> | null | undefined,
-): string {
-  switch (estadoValidacion(c)) {
-    case 'validado': {
-      const v = c!.expedienteValidado!;
-      return `Validado por ${v.por} el ${v.fecha.slice(0, 10)}`;
-    }
-    case 'heredado_magaya': return 'Validado · heredado de Magaya';
-    default: return 'Expediente sin validar';
-  }
+  return esEntidadDeMagaya(c);
 }
 
 export const RAZON_CLIENTE_NO_ENCONTRADO =

@@ -3,7 +3,8 @@ import {
   filtrarProveedores, conteoPorPestana, PESTANAS_PROVEEDOR, type PestanaProveedor,
 } from '../lib/filtrarProveedores';
 import { contiene } from '../lib/texto';
-import { Search, Database, Loader2, SlidersHorizontal } from 'lucide-react';
+import { Search, Database, Loader2, SlidersHorizontal, AlertCircle } from 'lucide-react';
+import { esEntidadDeMagaya } from '../lib/estadoValidacion';
 import { useClientes } from '../hooks/useClientes';
 import { useProveedores } from '../hooks/useProveedores';
 import { useCotizaciones } from '../hooks/useCotizaciones';
@@ -245,6 +246,17 @@ export default function Clients() {
     },
   }), [editable, handleCambiarEstadoProveedor, handleCambiarEjecutivoProveedor, opcionesEjecutivo]);
 
+  // PLAN-APROBACION paso 5A: contar proveedores en revisión para el badge.
+  // ANTES de los early returns: React exige que los hooks se llamen siempre.
+  const proveedoresEnRevision = useMemo(
+    () => proveedores.filter(p =>
+      p.activo !== false &&
+      !p.expedienteValidado &&
+      !esEntidadDeMagaya(p)
+    ).length,
+    [proveedores],
+  );
+
   if (loading || loadingProv) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
@@ -302,9 +314,14 @@ export default function Clients() {
             </button>
             <button
               onClick={() => setViewType('Proveedores')}
-              className={`px-4 py-1.5 rounded-md text-[13px] font-medium transition-colors ${viewType === 'Proveedores' ? 'bg-white text-text-primary shadow-sm border border-card-border' : 'text-text-muted hover:text-text-secondary'}`}
+              className={`px-4 py-1.5 rounded-md text-[13px] font-medium transition-colors flex items-center gap-1.5 ${viewType === 'Proveedores' ? 'bg-white text-text-primary shadow-sm border border-card-border' : 'text-text-muted hover:text-text-secondary'}`}
             >
               Proveedores
+              {proveedoresEnRevision > 0 && (
+                <span className="inline-flex items-center gap-0.5 bg-amber-100 text-amber-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full" title={`${proveedoresEnRevision} proveedor${proveedoresEnRevision !== 1 ? 'es' : ''} en revisión`}>
+                  {proveedoresEnRevision}
+                </span>
+              )}
             </button>
           </div>
         </div>
@@ -410,6 +427,14 @@ export default function Clients() {
 
       {viewType === 'Proveedores' && !selectedProvider ? (
         <>
+          {proveedoresEnRevision > 0 && puedeAltaProveedor && (
+            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 mb-2">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span className="text-[13px] text-amber-800">
+                <strong>{proveedoresEnRevision}</strong> proveedor{proveedoresEnRevision !== 1 ? 'es' : ''} en revisión, pendiente{proveedoresEnRevision !== 1 ? 's' : ''} de aprobación.
+              </span>
+            </div>
+          )}
           <div className="border-b border-divider mb-[24px]">
             <nav className="-mb-px flex space-x-[32px]">
               {PESTANAS_PROVEEDOR.map(({ id, label }) => (
