@@ -16,6 +16,7 @@ import type { VistaConfig } from '../table/SpreadsheetTable';
 import { nombreDeUsuario } from '../../auth/AuthContext';
 import type { EdicionEnListaMeta } from './edicionMeta';
 import { CeldaEstado, CeldaEjecutivoEditable } from '../table/CeldaEditable';
+import { estadoFiscal } from '../../lib/datosFiscales';
 
 const col = createColumnHelper<ClienteVermur>();
 
@@ -91,6 +92,25 @@ export const CLIENTE_COLUMNS = [
       return <span className="tabular-nums text-gray-700">{v > 0 ? `${(v / 1000).toFixed(0)}k` : '—'}</span>;
     },
   }),
+  col.accessor(c => estadoFiscal(c), {
+    id: 'fiscal', header: 'Fiscal', size: 110,
+    meta: { align: 'center' },
+    cell: info => {
+      const estado = info.getValue();
+      return (
+        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+          estado === 'completo'
+            ? 'bg-green-50 text-green-700 border-green-200'
+            : 'bg-amber-50 text-amber-700 border-amber-200'
+        }`}>
+          {estado === 'completo' ? 'Completo' : 'Incompleto'}
+        </span>
+      );
+    },
+    filterFn: (row, _colId, filterValue) => {
+      return estadoFiscal(row.original) === filterValue;
+    },
+  }),
   col.accessor(c => c.responsableVentas ?? '', {
     id: 'responsableVentas', header: 'Ejecutivo Ventas', size: 150,
     cell: info => {
@@ -149,7 +169,7 @@ export const CLIENTE_COLUMNS = [
 
 export const VISTA_DEFAULT_CLIENTES: VistaConfig = {
   columnas: [
-    { id: 'nombre' }, { id: 'rfc' }, { id: 'statusOperativo' },
+    { id: 'nombre' }, { id: 'rfc' }, { id: 'fiscal' }, { id: 'statusOperativo' },
     { id: 'correo' }, { id: 'credito' }, { id: 'divisa' },
     { id: 'responsableVentas' }, { id: 'responsablePricing' }, { id: 'responsableOperativo' },
   ],

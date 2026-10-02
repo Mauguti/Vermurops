@@ -123,6 +123,12 @@ export interface ClienteVermur {
   codigoPostal?: string | null;
   validadoFiscalmente?: boolean;
   /**
+   * Clave del catálogo c_RegimenFiscal del SAT (ej. '601', '612', '626').
+   * Obligatorio para timbrar CFDI; opcional en el modelo para clientes
+   * legacy que aún no lo tienen capturado. Aditivo (tarea 35).
+   */
+  regimenFiscal?: string | null;
+  /**
    * Validación formal del expediente (Bloque 2b, 25-sep-2026): quién y
    * cuándo. Los importados de Magaya cuentan como validados de origen sin
    * este campo (lib/frenoExpediente.ts). Aditivo.
