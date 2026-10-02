@@ -17,7 +17,7 @@ import { mapearCotizacionAEmbarque } from '../lib/cotizacionAEmbarque';
 import { construirEmbarqueDesdeCotizacion } from '../lib/generacionEmbarque';
 import { EMBARQUE_AUTOMATICO_DISPONIBLE } from '../config/banderas';
 import { useServicios } from '../config/serviciosStore';
-import { useDestinoPendiente } from '../navegacion/NavegacionContext';
+import { useDestinoPendiente, useRegistrarAbierta, useNavegacion, type Destino } from '../navegacion/NavegacionContext';
 import { useAuth } from '../auth/AuthContext';
 import { reservarFoliosSerie, generateFolioEmbarque } from '../lib/folioService';
 import { db } from '../firebase';
@@ -40,8 +40,22 @@ export default function Shipments() {
   const [toast, setToast] = useState<{ mensaje: string; tipo: TipoToast } | null>(null);
   const [creando, setCreando] = useState(false);
 
+  // ── Tarea 43 · Origen para «Regresar a <ficha anterior>» ────────────────
+  const irA = useNavegacion();
+  const registrarAbierta = useRegistrarAbierta();
+  const [origenNav, setOrigenNav] = useState<Destino | null>(null);
+
+  React.useEffect(() => {
+    if (selectedEmbarqueId) {
+      registrarAbierta({ tipo: 'embarque', id: selectedEmbarqueId });
+    } else {
+      registrarAbierta(null);
+    }
+  }, [selectedEmbarqueId, registrarAbierta]);
+
   // U-4 · Alguien enlazó a un embarque desde otro módulo.
-  useDestinoPendiente(['embarque'], (d) => {
+  useDestinoPendiente(['embarque'], (d, origen) => {
+    setOrigenNav(origen ?? null);
     setSelectedEmbarqueId(d.id);
     setVista('lista');
   });
@@ -425,7 +439,12 @@ export default function Shipments() {
         <FichaEmbarque
           embarque={selectedEmbarque}
           allEmbarques={embarques}
-          onClose={() => setSelectedEmbarqueId(null)}
+          onClose={() => {
+            if (origenNav) { registrarAbierta(null); irA(origenNav); }
+            setSelectedEmbarqueId(null);
+            setOrigenNav(null);
+          }}
+          regresarLabel={origenNav?.id}
           onUpdateEmbarque={handleUpdateEmbarque}
           onSelectEmbarqueById={setSelectedEmbarqueId}
         />

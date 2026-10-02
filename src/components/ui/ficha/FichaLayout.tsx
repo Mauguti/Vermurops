@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronRight } from 'lucide-react';
 
 /**
  * La anatomía única de las fichas.
@@ -32,7 +32,7 @@ export function FichaLayout({ children }: { children: React.ReactNode }) {
 export interface FichaHeaderProps {
   /** Nombre del módulo en el breadcrumb: «Cotizaciones», «Embarques». */
   modulo: string;
-  /** Vuelve a la lista del módulo. */
+  /** Vuelve a la lista del módulo o a la ficha de origen. */
   onBack: () => void;
   /** Folio o identificador. Segundo tramo del breadcrumb. */
   folio: string;
@@ -49,17 +49,27 @@ export interface FichaHeaderProps {
   subtitulo?: React.ReactNode;
   /** Acciones a la derecha del encabezado. */
   acciones?: React.ReactNode;
+  /**
+   * Etiqueta del botón de regresar. Por defecto: el nombre del módulo.
+   * Cuando se llegó desde otra ficha se muestra el folio de origen,
+   * p. ej. «EMB-0001» en vez de «Cotizaciones».
+   */
+  regresarLabel?: string;
 }
 
 export function FichaHeader({
-  modulo, onBack, folio, titulo, badges, subtitulo, acciones,
+  modulo, onBack, folio, titulo, badges, subtitulo, acciones, regresarLabel,
 }: FichaHeaderProps) {
   return (
     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50/50 shrink-0 gap-4">
       <div className="min-w-0">
         <div className="flex items-center gap-2 text-[13px] text-gray-500 mb-1">
-          <button onClick={onBack} className="hover:text-[#18181B] transition-colors">
-            {modulo}
+          <button
+            onClick={onBack}
+            className="flex items-center gap-1.5 hover:text-primario hover:bg-primario/5 rounded-md px-2 py-0.5 -ml-2 transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            {regresarLabel ?? modulo}
           </button>
           <ChevronRight className="w-3.5 h-3.5 text-gray-300" />
           <span className="text-[#18181B] font-medium">{folio}</span>

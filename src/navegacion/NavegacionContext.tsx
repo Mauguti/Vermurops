@@ -16,6 +16,12 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
  * vez — si se quedara, cerrar la ficha volvería a abrirla en el siguiente
  * render y no habría forma de salir.
  *
+ * ── Origen (tarea 43) ──────────────────────────────────────────────────────
+ * Cuando se salta de una ficha a otra (p. ej. del embarque a su cotización),
+ * el salto captura la entidad abierta como «origen». El módulo destino
+ * recibe el origen en `useDestinoPendiente` y puede ofrecer «Regresar a
+ * EMB-0001» en vez de «Regresar a la lista».
+ *
  * No guarda historial ni URL: es un salto, no un enrutador. Cuando la app
  * tenga rutas de verdad, esto se reemplaza por ellas.
  */
@@ -38,17 +44,24 @@ const MODULO: Record<TipoEntidad, string> = {
   ordenCompra: 'finance',
 };
 
+interface DestinoPendiente extends Destino {
+  origen?: Destino;
+}
+
 interface Contexto {
   irA: (destino: Destino) => void;
   /** No usar directo: es lo que consume `useDestinoPendiente`. */
-  pendiente: Destino | null;
+  pendiente: DestinoPendiente | null;
   consumir: () => void;
+  /** Registra la entidad actualmente abierta, para capturar el origen al saltar. */
+  registrarAbierta: (entidad: Destino | null) => void;
 }
 
 const Ctx = createContext<Contexto>({
   irA: () => {},
   pendiente: null,
   consumir: () => {},
+  registrarAbierta: () => {},
 });
 
 export function NavegacionProvider({
@@ -63,10 +76,19 @@ export function NavegacionProvider({
    */
   destinoInicial?: Destino | null;
 }) {
-  const [pendiente, setPendiente] = useState<Destino | null>(null);
+  const [pendiente, setPendiente] = useState<DestinoPendiente | null>(null);
+  const abiertaRef = useRef<Destino | null>(null);
+
+  const registrarAbierta = useCallback((entidad: Destino | null) => {
+    abiertaRef.current = entidad;
+  }, []);
 
   const irA = useCallback((destino: Destino) => {
-    setPendiente(destino);
+    const conOrigen: DestinoPendiente = {
+      ...destino,
+      origen: abiertaRef.current ?? undefined,
+    };
+    setPendiente(conOrigen);
     onCambiarVista(MODULO[destino.tipo]);
   }, [onCambiarVista]);
 
@@ -88,7 +110,7 @@ export function NavegacionProvider({
   const consumir = useCallback(() => setPendiente(null), []);
 
   return (
-    <Ctx.Provider value={{ irA, pendiente, consumir }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ irA, pendiente, consumir, registrarAbierta }}>{children}</Ctx.Provider>
   );
 }
 
@@ -98,16 +120,25 @@ export function useNavegacion() {
   return irA;
 }
 
+/** Para registrar la entidad abierta (el origen del próximo salto). */
+export function useRegistrarAbierta() {
+  const { registrarAbierta } = useContext(Ctx);
+  return registrarAbierta;
+}
+
 /**
  * Para los módulos: «¿alguien me mandó a abrir algo?».
  *
  * Llama a `abrir` una sola vez por destino y lo consume. El módulo decide qué
  * hacer con cada tipo; los que no le tocan los ignora y el destino se queda
  * para quien sí lo entienda.
+ *
+ * El segundo parámetro de `abrir` es el origen: la ficha desde la que se
+ * saltó. Cuando existe, «Regresar» debería llevar ahí, no a la lista.
  */
 export function useDestinoPendiente(
   tipos: TipoEntidad[],
-  abrir: (destino: Destino) => void,
+  abrir: (destino: Destino, origen?: Destino) => void,
 ) {
   const { pendiente, consumir } = useContext(Ctx);
   const atendido = useRef<string | null>(null);
@@ -120,7 +151,7 @@ export function useDestinoPendiente(
     if (atendido.current === clave) return;
     atendido.current = clave;
 
-    abrir(pendiente);
+    abrir(pendiente, pendiente.origen);
     consumir();
     // `abrir` y `tipos` se recrean en cada render de quien llama; depender de
     // ellos volvería a disparar el salto. La guarda es `pendiente`.
