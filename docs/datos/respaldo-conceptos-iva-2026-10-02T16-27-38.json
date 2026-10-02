@@ -1,0 +1,82 @@
+{
+  "fecha": "2026-10-02T16:27:35.851Z",
+  "script": "scripts/aplicarConceptosIVA.ts",
+  "conceptos": {
+    "CON-019": {
+      "nombre": "Agent Profit Share",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-022": {
+      "nombre": "All In Destination Expenses",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-029": {
+      "nombre": "Consulting And Forwarding Fees",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-033": {
+      "nombre": "Container Repair",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-038": {
+      "nombre": "Courier Fee",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-043": {
+      "nombre": "Demurrages",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-061": {
+      "nombre": "Labels",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-069": {
+      "nombre": "Other Charges",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-078": {
+      "nombre": "Overweight Surcharge For International Freight",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-081": {
+      "nombre": "Pat - Other Charges",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-099": {
+      "nombre": "Transfer Fee",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-102": {
+      "nombre": "Warehouse",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-103": {
+      "nombre": "Warehouse Pallet In",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-104": {
+      "nombre": "Warehouse Pallet Out",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    },
+    "CON-105": {
+      "nombre": "Wrapping",
+      "reglaIVA": "revisar",
+      "notaIVA": "Por confirmar con Administracion"
+    }
+  },
+  "comandoRevertir": "SERVICE_ACCOUNT=ruta/a/llave.json npx tsx scripts/revertirConceptosIVA.ts /Users/mauriciogutierrezmunoz/antigravity/Vermur-Logistics/docs/datos/respaldo-conceptos-iva-2026-10-02T16-27-38.json"
+}
