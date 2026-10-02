@@ -1,219 +1,153 @@
-# Estado de VermurOps — 1 de octubre de 2026
+# Estado de VermurOps — 2 de octubre de 2026
 
-Corte tras publicar la cadena 27–34 y cerrar los pendientes de reglas,
-invitación y n8n.
-
----
-
-## 1. Lo que se publicó hoy
-
-**La cadena 27–34 completa**, cada merge su propio punto de regreso:
-
-| # | Tarea | Merge |
-|---|---|---|
-| 27 | Edición en las dos vistas de la cotización | `42f5848` |
-| 28 | Ubicación por concepto, con IVA por fila | `f8f81a9` |
-| 29 | Programación de pagos: estado vacío con contexto | `1798455` |
-| 30 | Aduana precargada desde el puerto | `dbbd98b` |
-| 31 | Pegar correo y vigencias con bloqueo | `40425be` |
-| 32 | Scroll de las fichas de cotización y prospecto | `5cb954b` |
-| 33 | Inventario de datos de prueba | `1658309` |
-| 34 | PLAN-APROBACION | `60701c2` |
-
-Y cinco bloques sueltos: el scroll de la ficha de la orden (`02062a9`),
-`tsc` bloqueante (`94d455b`), el correo de las reglas (`74e2f1a` y
-`9b7953d`), la invitación que no mandaba correo (`b8336b1`) y el token de
-n8n por Header Auth (`1fe761b`).
-
-**1811 tests · tsc 0 · recorrido 6/6.**
-
-### Lo que NO cuadró con el reporte 27
-
-Su reporte daba el recorrido en 2/6 y lo atribuía a un fallo preexistente.
-**No se reproduce**: parado en `sprint/27` da 6/6, y en `sprint/28` también.
-Así que la 27 no depende de la 28 y su punto de regreso es solo suyo.
+Corte del sprint nocturno del 1-oct. 8 tareas terminadas (35–42), cadena
+lista para publicar. Nada se mergeó ni se desplegó.
 
 ---
 
-## 2. Reglas: desplegadas, con una corrección en el camino
+## 1. Lo que hay en la cadena (sin publicar)
 
-`esDelEquipo()` está **vivo en producción** desde hoy: Firestore pasó de
-«cualquier autenticado lee y escribe todo» a los siete correos del equipo.
+**Cadena sprint/35 → 42**, cada rama sale de la anterior. Todas [x].
 
-Costó dos despliegues fallidos. El primero subió el archivo con
-`info@digsol.com` —el typo del Bloque 9— y dejó a Mau fuera de su propia
-base. El segundo no subió nada y lo dijo en una línea que parece éxito:
-
-```
-i  firestore: latest version of firestore.rules already up to date, skipping upload...
-✔  Deploy complete!
-```
-
-Los dos salieron de un worktree que estaba en otra rama. **La regla quedó
-escrita en CLAUDE.md §3**: todo `firebase deploy` lleva su `cd` al checkout
-principal, y `skipping upload` se lee como fallo.
-
-**Storage NO está desplegado.** Su archivo ya tiene el correo corregido
-(`9b7953d`) y espera a que el equipo pueda confirmar que sigue viendo sus
-documentos:
-
-```bash
-cd /Users/mauriciogutierrezmunoz/antigravity/Vermur-Logistics && npx firebase deploy --only storage
-```
-
-**Nada público se rompe al desplegarlo.** La landing no usa el SDK de
-Firebase, la pantalla de Usuarios pasa por el Admin SDK, `AuthContext` lee
-el rol de los claims, ningún flujo de n8n toca Firestore ni Storage, y los
-enlaces de descarga ya repartidos llevan token y saltan las reglas. Lo
-único que depende de la lista son las subidas y lecturas que hace la app
-como usuario con sesión.
-
----
-
-## 3. Usuarios y roles
-
-`gestionarUsuarios` está desplegada. **La invitación ya manda el correo**:
-la Function llamaba a `generatePasswordResetLink`, que genera el enlace y
-no envía nada. Ahora lo manda la app con `sendPasswordResetEmail`, hay
-«Reenviar invitación» por renglón, y el e2e invita desde la pantalla —sin
-la llamada del Admin SDK, el único oobCode posible es el del envío del
-cliente, así que si alguien lo quita, la prueba se cae.
-
-**Mau no puede invitarse a sí mismo**: su correo no está en ninguno de los
-dos mapas de roles, así que sin claim cae a `ventas` y la Function lo
-rechaza con 403. **La cadena la arranca Gaby o Luis**, que sí son `admin`
-en los dos mapas.
-
----
-
-## 4. n8n
-
-El token ya no se valida con un nodo Code que leía `process.env`: n8n nunca
-vio esa variable y respondía **401 a todo**, también con el token correcto.
-Ahora es la autenticación propia de n8n —Header Auth con la credencial
-**«X-Vermur-Token»**— y rechaza con **403** por su cuenta. El proxy trata
-401 y 403 igual y lo marca en el log como `rechazoDeToken`.
-
-Los dos JSON están en `docs/n8n/` y refieren la credencial **solo por
-nombre**: al importar hay que elegirla a mano. El flujo general de
-documentos (`generar-documento`) y las 13 plantillas de Vermur también
-entraron al repo.
-
----
-
-## 5. Administración
-
-La minuta validada de la sesión 1 está en
-`docs/levantamientos/LEVANTAMIENTO-ADMINISTRACION.md` y **desde hoy es la
-referencia del área**. Seis diferencias contra PLAN_OPERACION quedaron
-anotadas en el plan, sin reescribirlo.
-
-`docs/sprint-post-junta/PREVIA-JUNTA-ADMIN.md` prepara la junta con Julio:
-inventario de los siete reportes, Programación contra Cuentas por pagar en
-cinco líneas, el modelo de cliente y proveedor contra PLAN-APROBACION, y
-los días de crédito.
-
-**Lo que ese análisis encontró y conviene no perder:**
-
-- **El IVA acreditado no sale.** `ordenesCompra.facturaDatos` guarda `total`
-  y `subtotal`, y nada de IVA. Es el mismo hueco que obliga a Julio a
-  revisar a mano, todos los días, que el IVA de cada factura coincida.
-- **`regimenFiscal` no existe** en el modelo, y el SAT lo exige para
-  timbrar.
-- **El proveedor no tiene expediente**: `docsAlta` y `expedienteValidado`
-  son solo del cliente.
-- **`dias` es obligatorio y `diasCreditoPorTipo` opcional**, y el único
-  editor captura `dias`. Leer el nuevo sin poder capturarlo deja el campo
-  vacío para siempre.
-
----
-
-## 6. Qué hay en producción
-
-Todo lo de la sección 1. Hosting en `index-Cyowerkz.js`; Functions
-`gestionarUsuarios`, `extraerTarifas` y `clasificarDocumento` al día; reglas
-de Firestore desplegadas, **Storage no**.
-
----
-
-## 7. Entregables nuevos que no son código
-
-**Planes** (`docs/sprint-post-junta/`):
-- `PLAN-FUENTE-TARIFA.md` — un solo campo para la tarifa elegida, reconciliacion
-  silenciosa, 5 pasos publicables.
-- `PLAN-EQUIPOS-MINIMO.md` — CRM en solo lectura para Operaciones, equipos
-  reales en selectores, cliente de oficina. 3 pasos.
-- `PLAN-RECICLAR.md` — copiar cotizacion previa con tarifas vencidas marcadas,
-  orden configurable de la bandeja. 5 pasos.
-- `PLAN-C.md` — 6 documentos operativos, talonario de HBL con transaccion
-  atomica, impresion sobre hoja preimpresa. 800 lineas, 10 preguntas para Gaby.
-
-**Codigo:**
-- `gestionarUsuarios` — Cloud Function completa (listar, invitar, cambiarRol,
-  desactivar). Custom claims, AuthContext con fallback al mapa viejo. Pantalla
-  en Configuracion → Usuarios y roles. 24 tests unitarios + 11 e2e.
-- Borrador de reglas por rol en `docs/reglas/borrador-por-rol.rules`.
-
-**JSON de n8n:**
-- `docs/n8n/generar-pdf-cotizacion.n8n.json` — nodo de validacion de token
-  agregado al inicio del flujo.
-
----
-
-## 8. Pendientes
-
-### Cola restante
-
-La cola del sprint quedó VACÍA: las 24 tareas están publicadas. Lo que
-queda es lo que los planes de esta noche proponen y todavía no se construye.
-
-| # | Qué | Tipo | Estado |
+| # | Tarea | Rama | Despliega |
 |---|---|---|---|
-| 25 | Revisión de tarifas: el correo como imagen | código | No se intentó |
+| 35 | Datos fiscales del cliente (RFC, CP, régimen, días crédito) | sprint/35-datos-fiscales | Hosting |
+| 36 | IVA de la factura del proveedor y alerta | sprint/36-iva-factura-proveedor | Hosting |
+| 37 | Cotización usa días de crédito por modalidad | sprint/37-dias-credito-modalidad | Hosting |
+| 38 | Aprobación de proveedores (pasos 1, 4, 5A) | sprint/38-aprobacion-proveedores | Hosting |
+| 39 | Script conceptos IVA de Vermur | sprint/39-conceptos-iva | Nada (script) |
+| 40 | Documentos operativos: config empresa + Function | sprint/40-documentos-base | Hosting + Functions + Reglas |
+| 41 | Notificación de arribo desde el embarque | sprint/41-notificacion-arribo | Hosting + Functions |
+| 42 | PLAN: carga fiscal desde Magaya | sprint/42-plan-carga-fiscal | Nada (plan) |
 
-Y lo que arrastramos de antes:
+**1936 tests · tsc 0 · e2e 6/6** en la punta de la cadena.
 
-- **Barrido de reglas sin quien las llame.** Van cuatro: `calcularIVA`,
-  `camposBloqueados`, `registrarDeposito` y `useImportacionesTarifas` —un hook
-  completo, con su colección, que nadie escribe ni lee—. El barrido va en los
-  dos sentidos: lógica con tests que nadie invoca, y campos que se escriben y
-  nadie lee.
-- **`tsc` ya está en cero**: falta volverlo bloqueante en el build, que era la
-  razón de la tarea 24.
+### Lo nuevo en la cadena
 
-### Decisiones pendientes (de los planes de esta noche)
+- **Datos fiscales (35):** sección fiscal en la ficha del cliente (RFC, CP,
+  régimen SAT), columna «Fiscal» filtrable en la tabla, 28 tests. Hallazgo:
+  el RFC no vino de Magaya — el seed tiene 0 con `rfc`; los Tax IDs están en
+  `numeroEntidadMagaya`.
+- **IVA de factura del proveedor (36):** desglose fiscal editable en la
+  conciliación, alerta en la OC y badge + filtro en la bandeja. 28 tests.
+  Hallazgo: `facturaDatos.iva` ya existía (la previa lo negaba).
+- **Días de crédito por modalidad (37):** función compartida con cadena de
+  respaldo, financiamiento por servicio en el resumen. 21 tests.
+- **Aprobación de proveedores (38):** `estadoValidacion()` compartido, fix
+  del alta rápida (RFC no va en `numeroEntidadMagaya`), badge en Altas.
+  15 tests.
+- **Script de IVA (39):** aplica los 15 conceptos de Vermur del 30-sep. Seco
+  por defecto, con respaldo y reversa. 3 conceptos pendientes de Julio.
+- **Documentos operativos (40):** pantalla «Mi empresa», Function
+  `generarDocumento`, motor de plantillas HTML. 22 tests. **Necesita regla
+  de `configuracion` en `firestore.rules`.**
+- **Notificación de arribo (41):** plantilla HTML fiel a la original, botón
+  con validación, panel de versiones. 11 tests.
+- **Plan de carga fiscal (42):** hallazgo de 318 Tax IDs en
+  `numeroEntidadMagaya`, plan de 3 fases, pregunta para Luis redactada.
 
-**Para Mau (bloquean implementacion):**
-1. ¿Correr `auditarCotizacionesVivas.ts` contra produccion? (plan 17)
-2. ¿Agentes de carga son siempre clientes de oficina? (plan 18)
-3. ¿Operaciones ve Bandeja de Pricing o solo la lista? (plan 18)
-4. ¿Bloquear envio por tarifas vencidas al reciclar? (plan 19)
-5. ¿Gaby y Luis ambos admin? (tarea 21)
-6. Confirmar `VERMUR_N8N_TOKEN` como variable de entorno en n8n (tarea 22)
-7. Corregir `info@digsol.com` → `.com.mx` en reglas al desplegar (tarea 21)
+---
 
-**Para Vermur (Gaby):**
-- 10 preguntas del PLAN-C sobre documentos y HBL (seccion 9 del plan)
-- Las tres criticas: anio del HBL, hoja FBL escaneada, folios de Magaya
+## 2. Lo que hay en producción
 
-### Deuda critica que no se movio
+Todo lo de la cadena 27–34 (publicada el 1-oct). Hosting en
+`index-Cyowerkz.js`; Functions `gestionarUsuarios`, `extraerTarifas` y
+`clasificarDocumento`; reglas de Firestore con `esDelEquipo()`.
+**Storage NO está desplegado.**
 
-- Reglas de Firestore no distinguen roles (el borrador de la 21 es el primer paso)
-- `localhost` sin emuladores escribe en produccion
-- Tres cuentas de prueba en Auth de produccion
+**1811 tests · tsc 0 · recorrido 6/6** en main.
+
+---
+
+## 3. Cola restante
+
+La cola del sprint 35–42 quedó vacía. Lo que sigue:
+
+| Qué | Tipo | Bloquea |
+|---|---|---|
+| Regla de `configuracion` en `firestore.rules` | Reglas | Tarea 40 en prod |
+| Deploy de `storage.rules` | Reglas | Subidas desde la app |
+| Script de carga fiscal fase 1 (minar `numeroEntidadMagaya`) | Script | Timbrado |
+| Export de Magaya con datos fiscales (fase 2) | Dato externo | Timbrado |
+| Confirmaciones de Julio (3 conceptos IVA) | Decisión | Script 39 |
+| Freno de facturación por datos fiscales incompletos | Código | Timbrado |
+| Pasos 2 y 3 de aprobación de proveedores | Código | Julio define docs |
+| Documentos operativos restantes (BL, booking…) | Código | Preguntas de Gaby |
+| Tarea 25: correo como imagen en revisión de tarifas | Código | No se intentó |
+
+Y lo que arrastramos:
+- Barrido de reglas sin quien las llame (4 identificadas)
+- `tsc` bloqueante en el build
+- Deshabilitar cuentas de prueba en Auth de producción
+
+---
+
+## 4. Decisiones pendientes
+
+### Para Mau (del sprint de esta noche)
+
+1. ¿Correr la fase 1 del plan fiscal (minar `numeroEntidadMagaya` → `rfc`)?
+   Recomendación: sí, inmediato.
+2. ¿Freno de facturación por datos fiscales incompletos? Recomendación: sí,
+   pero no en este sprint.
+3. ¿Tolerancia del IVA configurable? Recomendación: dejar fija.
+4. ¿Quién agrega la regla de `configuracion` a `firestore.rules`?
+
+### Para Mau (pendientes anteriores)
+
+5. ¿Correr `auditarCotizacionesVivas.ts` contra producción? (plan 17)
+6. ¿Agentes de carga son siempre clientes de oficina? (plan 18)
+7. ¿Operaciones ve Bandeja de Pricing o solo la lista? (plan 18)
+8. ¿Bloquear envío por tarifas vencidas al reciclar? (plan 19)
+9. ¿Gaby y Luis ambos admin? (tarea 21)
+10. Confirmar `VERMUR_N8N_TOKEN` como variable de entorno en n8n (tarea 22)
+
+### Para Vermur
+
+**Luis:** export de Magaya con Entity Number, Name, Tax ID, Zip Code,
+Country, Address (clientes y proveedores).
+
+**Julio:** 3 confirmaciones del script de IVA (CON-019, CON-022, CON-081).
+
+**Gaby:** 10 preguntas del PLAN-C sobre documentos y HBL. G11 (teléfono
+oficial). G18 (cargos en la notificación de arribo).
+
+---
+
+## 5. Deuda crítica que no se movió
+
+- Reglas de Firestore no distinguen roles (el borrador de la 21 es el
+  primer paso)
+- `localhost` sin emuladores escribe en producción
+- Tres cuentas de prueba en Auth de producción
 - `getCostoOficial` suma sin mirar moneda
 
 ---
 
-## 9. Orden propuesto
+## 6. Entregables vigentes que no son código
 
-1. **Junta con Julio**, con la minuta y `PREVIA-JUNTA-ADMIN.md`. De ahí salen
-   festivos, conciliación del fondeo, anticipos sin factura, complemento de
-   pago y pronto pago.
-2. **Que Gaby o Luis inviten a Mau** y confirmar el claim en el log.
-3. **Correr el inventario** con la llave, para tener los conteos reales de
-   expediente antes de decidir el flujo de aprobación.
-4. **Desplegar Storage**, con el equipo presente.
-5. **Validación del equipo** de la cadena 27–34.
-6. **Importar los dos JSON de n8n** y elegir la credencial «X-Vermur-Token».
-7. **Deshabilitar las tres cuentas de prueba** en el Auth de producción.
+**Planes** (`docs/sprint-post-junta/`):
+- `PLAN-CARGA-FISCAL.md` — minar Tax IDs, pedir export, script de carga.
+  **Nuevo esta noche.**
+- `PLAN-FUENTE-TARIFA.md` — tarifa elegida, reconciliación silenciosa.
+- `PLAN-EQUIPOS-MINIMO.md` — CRM readonly para Ops, equipos reales.
+- `PLAN-RECICLAR.md` — copiar cotización previa, tarifas vencidas.
+- `PLAN-C.md` — 6 documentos operativos, talonario de HBL.
+- `PLAN-APROBACION.md` — expediente de proveedores.
+
+**JSON de n8n** (`docs/n8n/`):
+- `generar-pdf-cotizacion.n8n.json` — con nodo de validación de token.
+
+---
+
+## 7. Orden propuesto para la mañana
+
+1. Leer `sprint/reportes/RESUMEN.md` y los reportes que interesen.
+2. Validar la cadena en el preview o en el emulador.
+3. Mergear y desplegar en orden: hosting hasta la 38, reglas de
+   `configuracion`, Functions, hosting final.
+4. Correr el script de IVA en seco contra producción.
+5. Mandar las preguntas a Luis (export fiscal) y a Julio (3 conceptos).
+6. Leer el plan de carga fiscal y decidir la fase 1.
+7. Desplegar Storage (pendiente del 1-oct).
+8. Deshabilitar las tres cuentas de prueba en Auth.
