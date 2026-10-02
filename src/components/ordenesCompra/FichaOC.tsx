@@ -25,6 +25,7 @@ import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import LineaTiempo from '../ui/ficha/LineaTiempo';
 import type { ReglaIVA } from '../conceptos/ConceptosData';
 import { compararIVAFactura, type ResultadoComparacionIVA } from '../../lib/ivaOrdenCompra';
+import CargarFacturaOC from './CargarFacturaOC';
 
 /**
  * C-2. La ficha de una orden de compra: el flujo de dos áreas.
@@ -152,6 +153,8 @@ export default function FichaOC({
     : { puedeAutorizar: true } as ReturnType<typeof evaluarFondeo>;
   const esImpuestos = esPagoDeImpuestos(ocLocal);
   const puedeMarcarNoPagar = rol === 'administracion' || rol === 'admin';
+  // Tarea 55 · admin, administracion y operaciones pueden cargar la factura.
+  const puedeCargarFactura = rol === 'admin' || rol === 'administracion' || rol === 'operaciones';
 
   // 1.2 · De dónde sale y a dónde entra el dinero. Se sugiere; decide quien
   // autoriza — la segmentación de abajo es lo que Vermur hace hoy, no una ley.
@@ -587,18 +590,34 @@ export default function FichaOC({
 
           {/* ── Papeles: la factura del proveedor y el comprobante ─────── */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-4">
-            <h4 className="text-[10px] font-bold text-primario uppercase tracking-widest border-b border-gray-100 pb-2">
-              Documentos
-            </h4>
-
-            <Campo
-              rotulo="Factura del proveedor"
-              ayuda="Puede llegar después de autorizar. No bloquea nada."
-              valor={factura}
-              onChange={setFactura}
-              onGuardar={() => onActualizar({ facturaAsociada: factura.trim() || null })}
-              soloLectura={terminada}
+            {/* Tarea 55 · Subida de PDF y XML de la factura */}
+            <CargarFacturaOC
+              oc={oc}
+              rfcProveedor={proveedor?.rfc ?? proveedor?.numeroEntidadMagaya}
+              uuidsExistentes={
+                todasLasOrdenes
+                  .filter(o => o.id !== oc.id && o.facturaUUID)
+                  .map(o => o.facturaUUID!)
+              }
+              puedeCargar={puedeCargarFactura}
+              terminada={terminada}
+              onFacturaCargada={(cambios) => {
+                onActualizar(cambios);
+                if (cambios.facturaAsociada) setFactura(cambios.facturaAsociada);
+              }}
             />
+
+            {/* Campo de texto legacy: se sigue mostrando si tiene algo o si no hay archivos */}
+            {(factura || !oc.facturaArchivos?.pdf) && (
+              <Campo
+                rotulo={oc.facturaArchivos?.pdf ? 'Referencia de la factura' : 'Factura del proveedor'}
+                ayuda="Puede llegar después de autorizar. No bloquea nada."
+                valor={factura}
+                onChange={setFactura}
+                onGuardar={() => onActualizar({ facturaAsociada: factura.trim() || null })}
+                soloLectura={terminada}
+              />
+            )}
 
             <Campo
               rotulo="Comprobante de pago"
