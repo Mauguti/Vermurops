@@ -1,14 +1,22 @@
 # Estado de VermurOps — 2 de octubre de 2026
 
-Corte del sprint nocturno del 1-oct (tercera cola). 7 tareas terminadas
-(49–55), cadena lista para publicar encima de la 43–48. Nada se mergeó ni
-se desplegó.
+**La cadena 35 → 55 está PUBLICADA.** 21 ramas mergeadas con `--no-ff` en
+orden, main == origin/main == `e411298`, y los cuatro despliegues hechos:
+reglas de Firestore, Storage, las tres Functions nuevas y hosting.
+
+Producción corre `index-By7gL9-J.js`, el mismo hash que el build local.
+
+**2028 tests · 90 archivos · tsc 0 · recorrido 6/6 (dos veces) ·
+45-filtros 34/34 · 47-barrido 95/95 sin hallazgos · reglas 26/26.**
+
+Lo que sigue es la **validación en navegador**:
+[VALIDACION-35-55.md](sprint-post-junta/VALIDACION-35-55.md).
 
 ---
 
-## 1. Lo que hay en la cadena (sin publicar)
+## 1. Lo que se publicó
 
-### Cadena 35–42 (sprint del 30-sep, aún sin publicar)
+### Cadena 35–42
 
 | # | Tarea | Rama | Despliega |
 |---|---|---|---|
@@ -75,12 +83,27 @@ se desplegó.
 
 ## 2. Lo que hay en producción
 
-Todo lo de la cadena 27–34 (publicada el 1-oct). Hosting en
-`index-Cyowerkz.js`; Functions `gestionarUsuarios`, `extraerTarifas` y
-`clasificarDocumento`; reglas de Firestore con `esDelEquipo()`.
-**Storage NO está desplegado.**
+Todo hasta la 55. Hosting en `index-By7gL9-J.js` (2-oct, 16:2x).
 
-**1811 tests · tsc 0 · recorrido 6/6** en main.
+**Functions, las seis, Node 22 en us-central1:** `extraerTarifas`,
+`clasificarDocumento`, `gestionarUsuarios`, y las tres del 2-oct —
+`generarDocumento`, `tipoCambioProgramado` (0 8,10,12,14,16,18 L-V,
+hora de la Ciudad de México) y `actualizarTipoCambio` (401 sin token:
+pública en la red, cerrada en el código). Log sin un solo error.
+
+**Reglas de Firestore Y de Storage desplegadas**, las dos con
+`uploading rules` —no `skipping upload`— incluyendo las tres rutas que
+el sprint usaba y que estaban denegadas: `configuracion/empresa`,
+`configuracion/tipoCambio` + `tiposCambio/{fecha}` (solo lectura desde
+el navegador) y `ordenesCompra/{id}/factura/` en Storage.
+
+El deploy de Functions pidió dos parámetros nuevos
+(`N8N_WEBHOOK_URL_GENERAR_DOC` y `N8N_WEBHOOK_URL_TIPO_CAMBIO`): las
+tareas 40 y 51 los declararon con `defineString` y `functions/.env` está
+en .gitignore, así que el sprint no podía escribirlos. Quedaron en
+`functions/.env.vermur-logistics-app` y ya no vuelve a preguntar.
+
+**2028 tests · 90 archivos · tsc 0 · recorrido 6/6** en main.
 
 ---
 
@@ -90,9 +113,10 @@ Las colas 35–42, 43–48 y 49–55 quedaron vacías. Lo que sigue:
 
 | Qué | Tipo | Bloquea |
 |---|---|---|
-| Publicar cadena 35–42 (reglas de `configuracion`, Functions, hosting) | Deploy | Todo lo de la 43–55 |
-| Publicar cadena 43–48 (hosting) | Deploy | Cadena 49–55 |
-| Publicar cadena 49–55 (reglas Firestore, Functions, Storage, hosting) | Deploy | — |
+| Validar 35–55 en navegador (VALIDACION-35-55.md) | Validación | Cerrar el sprint |
+| Correr `actualizarTipoCambio` una vez desde la app y ver qué documento cae en `tiposCambio` | Validación | Confirmar la tasa |
+| Aplicar las 15 reglas de IVA (tarea 39) | Script | Confirmar CON-019, CON-022 y CON-081 con Julio |
+| Borrar o deshabilitar las tres cuentas de prueba del Auth de producción | Seguridad | — |
 | Deploy de `storage.rules` (expedientes + facturas OC) | Reglas | Subidas desde la app |
 | Script de carga fiscal fase 1 (minar `numeroEntidadMagaya`) | Script | Timbrado |
 | Export de Magaya con datos fiscales (fase 2) | Dato externo | Timbrado |
