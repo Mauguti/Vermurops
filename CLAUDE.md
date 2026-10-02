@@ -127,6 +127,16 @@ cd /Users/mauriciogutierrezmunoz/antigravity/Vermur-Logistics && npx firebase de
 Es la misma lección que la de abajo —«mira desde dónde corre»— en su versión
 de despliegue, y la primera vez dejó a Mau fuera de su propia base de datos.
 
+**Un `defineString` nuevo detiene el deploy de Functions preguntando.**
+Las tareas 40 y 51 declararon `N8N_WEBHOOK_URL_GENERAR_DOC` y
+`N8N_WEBHOOK_URL_TIPO_CAMBIO` con `defineString`. `functions/.env` está en
+.gitignore, así que una sesión automática NO puede escribirlos — y el deploy
+se queda esperando a que alguien teclee el valor, con el default correcto
+mostrado entre paréntesis. Firebase los guarda al terminar en
+`functions/.env.vermur-logistics-app` y no vuelve a preguntar.
+Al agregar un parámetro, decirlo en el reporte: el deploy deja de ser
+desatendido.
+
 **Antes de diagnosticar una regresión en local, mira DESDE DÓNDE corre el dev
 server.** `lsof -ti:3000` y revisa la ruta del proceso. Si el trabajo está en un
 worktree y el server corre desde el checkout principal, se ve otra rama y
@@ -935,6 +945,71 @@ actas y RFC.
   - **Una cuenta recién invitada que no esté en la lista no entra.** Hasta
     que existan los claims, invitar a alguien implica agregar su correo
     aquí y desplegar las reglas.
+
+## 4.22 Lo que agregó la cadena 35 → 55 (2-oct-2026)
+
+Publicada completa: reglas de Firestore y Storage, tres Functions nuevas y
+hosting. Lo que cambia de cómo se trabaja:
+
+**El tipo de cambio ya no se inventa.** `tipoCambioProgramado` consulta el
+SIE de Banxico por n8n seis veces al día en días hábiles (8, 10, 12, 14, 16
+y 18, hora de la Ciudad de México) y guarda `tiposCambio/{YYYY-MM-DD}` más
+`configuracion/tipoCambio` con la vigente. `actualizarTipoCambio` es la
+misma lógica a mano desde la pantalla.
+  - **El navegador LEE, no escribe.** Las dos rutas tienen `allow write: if
+    false`: lo escribe el Admin SDK, que no pasa por reglas, y la captura
+    manual va por la Function. Abierto al cliente, cualquiera del equipo
+    movería desde la consola la tasa con la que se cotiza y se factura.
+  - Responde el pendiente 4 de §4.8 en su parte de fuente; falta confirmar
+    si Pricing le carga un diferencial.
+
+**Documentos operativos (40 y 41).** `configuracion/empresa` guarda lo que
+encabeza cada documento (razón social, RFC, domicilio, logo), editable en
+Configuración → Mi empresa. `generarDocumento` llena una plantilla HTML,
+la manda al flujo `generar-documento` de n8n (Gotenberg) y guarda el PDF en
+Storage. El primero es la **notificación de arribo**, con los cargos
+separados por moneda (§4.3). Es el arranque del motor de plantillas.
+
+**La factura del proveedor se lee en el navegador (55).** `parsearCFDI` usa
+`DOMParser` para sacar UUID, RFC, montos e IVA de un CFDI 4.0 o 3.3, sin
+n8n y sin servidor. Tres avisos: RFC que no coincide, total que difiere de
+la OC, UUID duplicado. Storage acepta en
+`ordenesCompra/{id}/factura/` **solo PDF y XML**, máximo 10 MB, sin update
+ni delete: ahí solo van documentos fiscales y una factura corregida es una
+factura nueva.
+
+**El expediente KYC ahora es de los dos lados (38 y 54).**
+`lib/estadoValidacion.ts` es la función compartida (validado /
+heredado_magaya / sin_validar) y `frenoExpediente.ts` delega en ella. El
+proveedor tiene su pestaña Expediente con el mismo `ExpedientePanel` que el
+cliente.
+
+**Días de crédito por modalidad, de punta a punta (35 y 37).** En una
+cotización multimodal el financiamiento se calcula **por servicio**, con los
+días de la modalidad de ese servicio, y se suma; el resumen dice de dónde
+salieron (`lib/diasCreditoServicio.ts`). Es §4.6 aterrizado. El cliente
+suma `regimenFiscal` (catálogo del SAT) y la columna «Fiscal» en Altas.
+
+**Las acciones de las fichas viven arriba (44 y 50).** PDF, Marcar perdida,
+Autorizar, Pagar, Guardar — todo lo que estaba en el pie subió al
+`FichaHeader`; en angosto las secundarias se colapsan. El pie se quedó con
+el auto-guardado.
+
+**Barridos como red (43, 45, 47).** 34 tests e2e de los 43 filtros de las 14
+pantallas con listas, y 95 que entran con cada rol a cada pantalla buscando
+errores de consola, peticiones fallidas, textos rotos, permisos fuera de
+§4.1 y desbordes a 390 px. Los dos en verde. Si tocas una lista o una
+pantalla, córrelos:
+```bash
+npx playwright test tests/e2e/45-filtros.spec.ts tests/e2e/47-barrido-general.spec.ts --workers=1
+```
+
+**Una sesión del sprint hizo el trabajo de tres tareas.** La de la 52
+produjo también 53, 54 y 55, sin pasar por el lanzador: hay commits y no hay
+logs. Por eso esa cadena se verificó **mutando el código** —romper una regla
+y contar cuántos tests se caen— en vez de confiar en el reporte. Está en §7
+de `docs/sprint-post-junta/AUDITORIA-35-48.md`. Un sprint autónomo puede
+entregar código correcto sin entregar evidencia; son cosas distintas.
 
 ## 5. Estado de los módulos
 
