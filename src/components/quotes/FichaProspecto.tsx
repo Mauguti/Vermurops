@@ -4,6 +4,7 @@ import { Prospecto, ProspectoActivity } from '../../data';
 import ModalMotivoPerdida from './ModalMotivoPerdida';
 import {
   FichaLayout, FichaHeader, FichaTabs, FichaContenido, FichaFooter, BadgeEstado,
+  AccionesHeader, type AccionMenu,
 } from '../ui/ficha/FichaLayout';
 import EstadoVacio from '../ui/EstadoVacio';
 import LineaTiempo from '../ui/ficha/LineaTiempo';
@@ -138,6 +139,29 @@ export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUp
             Valor estimado: ${prospecto.valorEstimado.toLocaleString()} USD
           </p>
         ) : undefined}
+        acciones={(() => {
+          const items: AccionMenu[] = [];
+          if (prospecto.etapa !== 'perdido')
+            items.push({
+              id: 'perdido', label: 'Marcar perdido', variante: 'peligro',
+              onClick: () => setPidiendoMotivo(true),
+            });
+          const primario = prospecto.etapa === 'convertido' ? (
+            <button
+              key="convertir"
+              onClick={() => onConvert(prospecto)}
+              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-xs"
+            >
+              Convertir a cotización <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          ) : null;
+          if (!primario && items.length === 0) return undefined;
+          return (
+            <AccionesHeader items={items}>
+              {primario}
+            </AccionesHeader>
+          );
+        })()}
       />
 
       {/* U-8 · A qué cotización llevó. Los prospectos convertidos antes de que
@@ -366,42 +390,14 @@ export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUp
         )}
       </FichaContenido>
 
-      {/* Footer: la acción de la etapa arriba, la salida abajo — misma
-          jerarquía que la ficha de cotización. Antes «Convertir a cotización»
-          vivía escondido en el encabezado del cajón. */}
+      {/* ── Footer: solo auto-guardado y fecha (tarea 44) ── */}
       <FichaFooter>
-        {prospecto.etapa === 'convertido' && (
-          <button
-            onClick={() => onConvert(prospecto)}
-            className="w-full max-w-3xl mx-auto px-4 py-3 bg-green-600 hover:bg-green-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-colors flex items-center justify-center gap-2 shadow-xs"
-          >
-            Convertir a cotización <ArrowRight className="w-4 h-4" />
-          </button>
-        )}
-
-        <div className="flex items-center justify-between max-w-3xl mx-auto w-full gap-4">
-          <p className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">
-            Creado: {prospecto.fechaCreacion}
-          </p>
-          {prospecto.etapa === 'perdido' ? (
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-red-500 uppercase tracking-wider">Perdido</p>
-              <p className="text-[11px] text-gray-500 max-w-[280px]">{prospecto.motivoPerdida}</p>
-            </div>
-          ) : (
-            <button
-              onClick={() => setPidiendoMotivo(true)}
-              className="text-xs font-bold text-red-500 border border-red-200 bg-white hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              Marcar como perdido
-            </button>
-          )}
-        </div>
-
-        <div className="flex items-center justify-center gap-1.5 pt-1">
-          <CheckCircle2 className="w-3 h-3 text-green-500" />
-          <span className="text-[10px] text-gray-400">Guardado automáticamente</span>
-        </div>
+        <span className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">
+          Creado: {prospecto.fechaCreacion}
+        </span>
+        <span className="mx-2 text-gray-200">·</span>
+        <CheckCircle2 className="w-3 h-3 text-green-500" />
+        <span className="text-[10px] text-gray-400">Guardado automáticamente</span>
       </FichaFooter>
 
       {pidiendoMotivo && prospecto && (
