@@ -1,17 +1,18 @@
 # Estado de VermurOps — 2 de octubre de 2026
 
-Corte del sprint nocturno del 1-oct. 8 tareas terminadas (35–42), cadena
-lista para publicar. Nada se mergeó ni se desplegó.
+Corte del sprint nocturno del 1-oct (segunda cola). 6 tareas terminadas
+(43–48), cadena lista para publicar encima de la 35–42. Nada se mergeó ni
+se desplegó.
 
 ---
 
 ## 1. Lo que hay en la cadena (sin publicar)
 
-**Cadena sprint/35 → 42**, cada rama sale de la anterior. Todas [x].
+### Cadena 35–42 (sprint anterior, aún sin publicar)
 
 | # | Tarea | Rama | Despliega |
 |---|---|---|---|
-| 35 | Datos fiscales del cliente (RFC, CP, régimen, días crédito) | sprint/35-datos-fiscales | Hosting |
+| 35 | Datos fiscales del cliente | sprint/35-datos-fiscales | Hosting |
 | 36 | IVA de la factura del proveedor y alerta | sprint/36-iva-factura-proveedor | Hosting |
 | 37 | Cotización usa días de crédito por modalidad | sprint/37-dias-credito-modalidad | Hosting |
 | 38 | Aprobación de proveedores (pasos 1, 4, 5A) | sprint/38-aprobacion-proveedores | Hosting |
@@ -20,31 +21,34 @@ lista para publicar. Nada se mergeó ni se desplegó.
 | 41 | Notificación de arribo desde el embarque | sprint/41-notificacion-arribo | Hosting + Functions |
 | 42 | PLAN: carga fiscal desde Magaya | sprint/42-plan-carga-fiscal | Nada (plan) |
 
-**1936 tests · tsc 0 · e2e 6/6** en la punta de la cadena.
+### Cadena 43–48 (esta noche, encima de la anterior)
 
-### Lo nuevo en la cadena
+| # | Tarea | Rama | Despliega |
+|---|---|---|---|
+| 43 | Botón «Regresar» en todas las fichas | sprint/43-boton-regresar | Hosting |
+| 44 | Acciones de las fichas arriba | sprint/44-acciones-arriba | Hosting |
+| 45 | Barrido de filtros: inventario y prueba | sprint/45-barrido-filtros | Hosting |
+| 46 | Barrido de filtros: arreglos | sprint/46-barrido-filtros-arreglos | Hosting |
+| 47 | Barrido general: consola y permisos por rol | sprint/47-barrido-consola-roles | Hosting |
+| 48 | Textos pendientes y pestaña inicial de Finanzas | sprint/48-textos-finanzas | Hosting |
 
-- **Datos fiscales (35):** sección fiscal en la ficha del cliente (RFC, CP,
-  régimen SAT), columna «Fiscal» filtrable en la tabla, 28 tests. Hallazgo:
-  el RFC no vino de Magaya — el seed tiene 0 con `rfc`; los Tax IDs están en
-  `numeroEntidadMagaya`.
-- **IVA de factura del proveedor (36):** desglose fiscal editable en la
-  conciliación, alerta en la OC y badge + filtro en la bandeja. 28 tests.
-  Hallazgo: `facturaDatos.iva` ya existía (la previa lo negaba).
-- **Días de crédito por modalidad (37):** función compartida con cadena de
-  respaldo, financiamiento por servicio en el resumen. 21 tests.
-- **Aprobación de proveedores (38):** `estadoValidacion()` compartido, fix
-  del alta rápida (RFC no va en `numeroEntidadMagaya`), badge en Altas.
-  15 tests.
-- **Script de IVA (39):** aplica los 15 conceptos de Vermur del 30-sep. Seco
-  por defecto, con respaldo y reversa. 3 conceptos pendientes de Julio.
-- **Documentos operativos (40):** pantalla «Mi empresa», Function
-  `generarDocumento`, motor de plantillas HTML. 22 tests. **Necesita regla
-  de `configuracion` en `firestore.rules`.**
-- **Notificación de arribo (41):** plantilla HTML fiel a la original, botón
-  con validación, panel de versiones. 11 tests.
-- **Plan de carga fiscal (42):** hallazgo de 318 Tax IDs en
-  `numeroEntidadMagaya`, plan de 3 fases, pregunta para Luis redactada.
+**1937 tests · tsc 0 · e2e 6/6** en la punta de la cadena (sprint/48).
+
+### Lo nuevo en la cadena 43–48
+
+- **Regresar (43):** todas las fichas con flecha ← en el encabezado.
+  NavegacionContext rastrea el origen para regresar a ficha anterior cuando
+  se llegó de otra ficha.
+- **Acciones arriba (44):** botones de workflow subieron al header fijo.
+  AccionesHeader con menú «⋯» en angosto. Footer solo con auto-guardado.
+- **Filtros (45–46):** 34 e2e cubren los 43 filtros de la plataforma.
+  10 componentes corregidos para buscar con acentos (contiene() de
+  lib/texto.ts). «Solo mías» de Bandeja Pricing arreglado.
+- **Barrido (47):** 95 e2e por 5 roles × todas las pantallas. Cero errores
+  de consola, cero textos rotos, cero permisos violados, cero desbordes.
+  Documento BARRIDO-GENERAL.md.
+- **Textos y Finanzas (48):** BandejaOC dice «Operaciones» (no «Pricing»).
+  Finanzas abre en «Cuentas por pagar».
 
 ---
 
@@ -61,11 +65,12 @@ Todo lo de la cadena 27–34 (publicada el 1-oct). Hosting en
 
 ## 3. Cola restante
 
-La cola del sprint 35–42 quedó vacía. Lo que sigue:
+Las colas 35–42 y 43–48 quedaron vacías. Lo que sigue:
 
 | Qué | Tipo | Bloquea |
 |---|---|---|
-| Regla de `configuracion` en `firestore.rules` | Reglas | Tarea 40 en prod |
+| Publicar cadena 35–42 (reglas de `configuracion`, Functions, hosting) | Deploy | Todo lo de la 43–48 |
+| Publicar cadena 43–48 (hosting) | Deploy | — |
 | Deploy de `storage.rules` | Reglas | Subidas desde la app |
 | Script de carga fiscal fase 1 (minar `numeroEntidadMagaya`) | Script | Timbrado |
 | Export de Magaya con datos fiscales (fase 2) | Dato externo | Timbrado |
@@ -84,7 +89,7 @@ Y lo que arrastramos:
 
 ## 4. Decisiones pendientes
 
-### Para Mau (del sprint de esta noche)
+### Para Mau (del sprint 35–42)
 
 1. ¿Correr la fase 1 del plan fiscal (minar `numeroEntidadMagaya` → `rfc`)?
    Recomendación: sí, inmediato.
@@ -128,12 +133,15 @@ oficial). G18 (cargos en la notificación de arribo).
 
 **Planes** (`docs/sprint-post-junta/`):
 - `PLAN-CARGA-FISCAL.md` — minar Tax IDs, pedir export, script de carga.
-  **Nuevo esta noche.**
 - `PLAN-FUENTE-TARIFA.md` — tarifa elegida, reconciliación silenciosa.
 - `PLAN-EQUIPOS-MINIMO.md` — CRM readonly para Ops, equipos reales.
 - `PLAN-RECICLAR.md` — copiar cotización previa, tarifas vencidas.
 - `PLAN-C.md` — 6 documentos operativos, talonario de HBL.
 - `PLAN-APROBACION.md` — expediente de proveedores.
+
+**Diagnósticos** (`docs/sprint-post-junta/`):
+- `BARRIDO-FILTROS.md` — inventario de 43 filtros, estado de cada uno.
+- `BARRIDO-GENERAL.md` — recorrido de 95 pantallas × 5 roles, limpio.
 
 **JSON de n8n** (`docs/n8n/`):
 - `generar-pdf-cotizacion.n8n.json` — con nodo de validación de token.
@@ -143,11 +151,11 @@ oficial). G18 (cargos en la notificación de arribo).
 ## 7. Orden propuesto para la mañana
 
 1. Leer `sprint/reportes/RESUMEN.md` y los reportes que interesen.
-2. Validar la cadena en el preview o en el emulador.
-3. Mergear y desplegar en orden: hosting hasta la 38, reglas de
-   `configuracion`, Functions, hosting final.
-4. Correr el script de IVA en seco contra producción.
-5. Mandar las preguntas a Luis (export fiscal) y a Julio (3 conceptos).
-6. Leer el plan de carga fiscal y decidir la fase 1.
+2. Publicar la cadena 35–42 primero (reglas, Functions, hosting).
+3. Publicar la cadena 43–48 (solo hosting).
+4. Validar en producción: regresar, acciones arriba, búsqueda con acentos,
+   Finanzas abre en CxP, texto de OC.
+5. Correr el script de IVA en seco contra producción.
+6. Mandar las preguntas a Luis (export fiscal) y a Julio (3 conceptos).
 7. Desplegar Storage (pendiente del 1-oct).
 8. Deshabilitar las tres cuentas de prueba en Auth.
