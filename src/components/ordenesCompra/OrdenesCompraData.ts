@@ -18,6 +18,38 @@ export interface ArchivoFacturaOC {
   fecha: string;  // ISO timestamp
 }
 
+/**
+ * Tarea 63 · Documento de la orden de compra, clasificado por el agente.
+ *
+ * Es una LISTA y no un mapa por tipo —como el expediente del cliente—
+ * porque de un mismo tipo puede haber varios: un pago en dos
+ * transferencias son dos comprobantes, y un complemento por cada uno.
+ * Indexar por tipo haría que el segundo pisara al primero.
+ *
+ * El complemento de pago es el que no tenía dónde cargarse: el proveedor lo
+ * emite DESPUÉS de cobrar y hoy se quedaba en el correo de Administración.
+ */
+export interface DocumentoOC {
+  /** Id local del renglón, para poder quitar uno sin ambigüedad. */
+  id: string;
+  /** Tipo confirmado: ver `TipoDocOC` en lib/loteDocumentos.ts. */
+  tipo: string;
+  nombre: string;
+  storagePath: string;
+  url: string;
+  /** Lo que dijo el agente, literal. Vacío = no contestó. */
+  tipoCrudo?: string;
+  confianza?: 'alta' | 'media' | 'baja';
+  avisos?: string[];
+  /**
+   * Observaciones del agente y, si alguien corrigió el tipo a mano, el
+   * registro de quién y cuándo (`textoCorreccionTipo`).
+   */
+  observaciones?: string;
+  subidoPor: string;
+  fecha: string;  // ISO timestamp
+}
+
 /** Registro en el historial de cambios de estado de una OC. */
 export interface RegistroEstadoOC {
   estado: EstadoOC;
@@ -217,6 +249,13 @@ export interface OrdenCompra {
   facturaRfcEmisor?: string | null;
   /** Referencia o URL del comprobante de pago. */
   comprobantePago: string | null;
+  /**
+   * Tarea 63 · Documentos de la orden, con su tipo. Opcional y aditivo: las
+   * órdenes que ya existen no lo traen y se leen igual. `facturaArchivos`
+   * (55) se queda donde está: es la vía del PDF y el XML con parseo de CFDI,
+   * y lo que llega por aquí no lo reemplaza.
+   */
+  documentos?: DocumentoOC[];
 
   // ── Fondeo del cliente (1.1) ───────────────────────────────────────────────
   /**

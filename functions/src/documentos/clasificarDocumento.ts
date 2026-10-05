@@ -46,6 +46,20 @@ const N8N_WEBHOOK_URL_DOC_EMBARQUE = defineString('N8N_WEBHOOK_URL_DOC_EMBARQUE'
   default: 'https://n8n.vermur.mx/webhook/clasificar-documento-embarque',
   description: 'Webhook de n8n que clasifica documentos del embarque.',
 });
+/**
+ * Tarea 63 · Documentos de la orden de compra: factura, complemento de pago,
+ * comprobante de pago y cotización del proveedor.
+ *
+ * ⚠️ El flujo `clasificar-documento-oc` NO existe todavía en n8n. Mientras no
+ * se importe, este destino contesta 404 y la app lo trata como «Sin
+ * clasificar»: el archivo SÍ queda subido y la persona elige el tipo. Está
+ * así a propósito — un botón que se cae porque la IA no contestó es peor que
+ * uno que pide el tipo a mano. El cambio exacto está en el reporte de la 63.
+ */
+const N8N_WEBHOOK_URL_DOC_OC = defineString('N8N_WEBHOOK_URL_DOC_OC', {
+  default: 'https://n8n.vermur.mx/webhook/clasificar-documento-oc',
+  description: 'Webhook de n8n que clasifica documentos de la orden de compra.',
+});
 const N8N_WEBHOOK_URL_PDF_COTIZACION = defineString('N8N_WEBHOOK_URL_PDF_COTIZACION', {
   default: 'https://n8n.vermur.mx/webhook/generar-pdf-cotizacion',
   description: 'Webhook de n8n que genera el PDF de la cotización (devuelve application/pdf).',
@@ -70,6 +84,11 @@ export const clasificarDocumento = onRequest(
       'tarifas': { capacidad: 'tarifario.cargar', url: N8N_WEBHOOK_URL.value() },
       'expediente': { capacidad: 'cliente.alta', url: N8N_WEBHOOK_URL_EXPEDIENTE.value() },
       'documento-embarque': { capacidad: 'embarque.generar', url: N8N_WEBHOOK_URL_DOC_EMBARQUE.value() },
+      // La capacidad es `ordenCompra.solicitar` porque la tienen las TRES
+      // áreas que tocan una orden: Operaciones la pide, Administración la
+      // autoriza y paga, y las dos suben documentos. `gestionar` dejaría
+      // fuera a Administración y `autorizar` a Operaciones.
+      'documento-oc': { capacidad: 'ordenCompra.solicitar', url: N8N_WEBHOOK_URL_DOC_OC.value() },
       // No clasifica: GENERA. Va por aquí porque el webhook no se llama desde
       // el navegador y el proxy ya resuelve auth, capacidad y secreto.
       'pdf-cotizacion': { capacidad: 'cotizacion.crear', url: N8N_WEBHOOK_URL_PDF_COTIZACION.value(), respuesta: 'binario' },

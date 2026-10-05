@@ -25,6 +25,7 @@ import LineaTiempo from '../ui/ficha/LineaTiempo';
 import type { ReglaIVA } from '../conceptos/ConceptosData';
 import { compararIVAFactura, type ResultadoComparacionIVA } from '../../lib/ivaOrdenCompra';
 import CargarFacturaOC from './CargarFacturaOC';
+import DocumentosOC from './DocumentosOC';
 
 /**
  * C-2. La ficha de una orden de compra: el flujo de dos áreas.
@@ -643,6 +644,14 @@ export default function FichaOC({
               soloLectura={terminada}
             />
           </div>
+
+          {/* ── Tarea 63 · Documentos de la orden, con un solo botón ───── */}
+          <DocumentosOC
+            oc={oc}
+            puedeCargar={puedeCargarFactura}
+            terminada={terminada}
+            onActualizar={onActualizar}
+          />
 
           {/* ── Historial: quién movió qué y cuándo ────────────────────── */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm space-y-3">
