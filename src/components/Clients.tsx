@@ -73,6 +73,10 @@ export default function Clients() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [showInactivos, setShowInactivos] = useState(false);
+  /* Tarea 57 · «Sacar los que no tienen carpeta» es la razón de ser de este
+     filtro, así que vive en la barra junto a la búsqueda y no dentro de la
+     tabla: SpreadsheetTable todavía no tiene filtros por columna. */
+  const [filtroOneDrive, setFiltroOneDrive] = useState<'todos' | 'si' | 'no'>('todos');
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
 
@@ -295,6 +299,8 @@ export default function Clients() {
   const filteredClients = clientes.filter(c => {
     // Filtro por estatus: por default solo activos
     if (!showInactivos && c.statusOperativo !== 'ACTIVO') return false;
+    // `expedienteDrive` ausente cuenta como «no»: el cliente no tiene carpeta.
+    if (filtroOneDrive !== 'todos' && (c.expedienteDrive ? 'si' : 'no') !== filtroOneDrive) return false;
     const q = searchTerm.trim();
     if (!q) return true;
     return contiene(c.nombre, q) ||
@@ -365,6 +371,19 @@ export default function Clients() {
                   className="accent-brand w-3.5 h-3.5"
                 />
                 Mostrar inactivos
+              </label>
+              <label className="flex items-center gap-2 text-[12px] text-text-secondary whitespace-nowrap">
+                OneDrive
+                <select
+                  value={filtroOneDrive}
+                  onChange={e => setFiltroOneDrive(e.target.value as 'todos' | 'si' | 'no')}
+                  title="Clientes con o sin carpeta de expediente en OneDrive"
+                  className="px-2 py-1.5 text-[12px] bg-card border border-card-border rounded-[6px] outline-none focus:border-brand text-text-primary"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="si">Con carpeta</option>
+                  <option value="no">Sin carpeta</option>
+                </select>
               </label>
               <span className="text-[11px] text-text-muted tabular-nums">{filteredClients.length} de {clientes.length}</span>
             </div>

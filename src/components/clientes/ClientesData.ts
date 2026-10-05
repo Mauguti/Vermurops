@@ -108,7 +108,13 @@ export interface ClienteVermur {
   montoAprobado?: string;
 
   // ── Administrativo ────────────────────────────────────────────────────────
-  /** ¿Tiene carpeta de expediente en Google Drive? */
+  /**
+   * ¿Tiene carpeta de expediente en OneDrive?
+   *
+   * El nombre del campo se quedó de cuando se creyó que era Google Drive
+   * (tarea 57, 5-oct-2026). No se renombra: 817 clientes ya lo traen y
+   * migrarlo solo cambiaría la etiqueta interna.
+   */
   expedienteDrive?: boolean;
   comentarios?: string;
   /** Fecha de alta del cliente. Formato 'YYYY-MM-DD'. */

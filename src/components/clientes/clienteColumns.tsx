@@ -111,6 +111,25 @@ export const CLIENTE_COLUMNS = [
       return estadoFiscal(row.original) === filterValue;
     },
   }),
+  /*
+   * Tarea 57 · «Carpeta en OneDrive». El campo de la base se sigue llamando
+   * `expedienteDrive` (nació creyendo que era Google Drive); solo cambia la
+   * etiqueta. El filtro de la pantalla es lo que sirve para sacar la lista
+   * de los que NO tienen carpeta.
+   */
+  col.accessor(c => (c.expedienteDrive ? 'si' : 'no'), {
+    id: 'expedienteDrive', header: 'OneDrive', size: 100,
+    meta: { align: 'center' },
+    cell: info => (
+      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+        info.getValue() === 'si'
+          ? 'bg-green-50 text-green-700 border-green-200'
+          : 'bg-gray-100 text-gray-500 border-gray-200'
+      }`}>
+        {info.getValue() === 'si' ? 'Sí' : 'No'}
+      </span>
+    ),
+  }),
   col.accessor(c => c.responsableVentas ?? '', {
     id: 'responsableVentas', header: 'Ejecutivo Ventas', size: 150,
     cell: info => {
@@ -170,7 +189,7 @@ export const CLIENTE_COLUMNS = [
 export const VISTA_DEFAULT_CLIENTES: VistaConfig = {
   columnas: [
     { id: 'nombre' }, { id: 'rfc' }, { id: 'fiscal' }, { id: 'statusOperativo' },
-    { id: 'correo' }, { id: 'credito' }, { id: 'divisa' },
+    { id: 'correo' }, { id: 'credito' }, { id: 'divisa' }, { id: 'expedienteDrive' },
     { id: 'responsableVentas' }, { id: 'responsablePricing' }, { id: 'responsableOperativo' },
   ],
   ordenamiento: { columnaId: 'nombre', direccion: 'asc' },
