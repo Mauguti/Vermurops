@@ -12,7 +12,15 @@ import type { ColumnaVista } from './SpreadsheetTable';
 
 // ─── Módulos soportados ─────────────────────────────────────────────────────
 
-export type ModuloVista = 'cotizaciones' | 'clientes' | 'proveedores' | 'embarques';
+/**
+ * Tarea 61 · Las dos pantallas de Finanzas se suman: Julio opera con filtros
+ * en Cuentas por pagar y arma el mes con columnas distintas a las de la
+ * bandeja. Los ids son NUEVOS, así que ninguna vista guardada cambia de
+ * módulo: las de `embarques` siguen siendo de embarques.
+ */
+export type ModuloVista =
+  | 'cotizaciones' | 'clientes' | 'proveedores' | 'embarques'
+  | 'cuentasPorPagar' | 'cuentasPorCobrar';
 
 // ─── Modelo Firestore ───────────────────────────────────────────────────────
 

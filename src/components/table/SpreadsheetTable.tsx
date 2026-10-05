@@ -45,8 +45,17 @@ export interface VistaConfig {
 }
 
 /** Extensión de meta para alineación. */
-export interface SpreadsheetColumnMeta {
+export interface SpreadsheetColumnMeta<T = any> {
   align?: 'left' | 'right' | 'center';
+  /**
+   * Tarea 61 · El valor PLANO de la celda para el CSV de la vista. El `cell`
+   * devuelve JSX (badges, enlaces, iconos) y un CSV no puede llevarlo; sin
+   * esto la columna se exportaría vacía o con «[object Object]».
+   *
+   * Opcional: `csvDeVista` cae al accessor de la columna cuando no está, que
+   * es lo correcto para texto y números.
+   */
+  csv?: (fila: T) => string | number;
 }
 
 // ─── Props ───────────────────────────────────────────────────────────────────

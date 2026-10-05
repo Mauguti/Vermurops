@@ -1219,6 +1219,53 @@ primer activo. `vaciosComoNull: false` para el proveedor, cuyo modelo declara
 (Administración y admin). Los demás leen, con el fieldset deshabilitado que
 ya tenía la ficha. La pestaña dice cuántos ACTIVOS hay: «Contactos (3)».
 
+## 4.27 Finanzas con vistas guardadas, y el CSV que sale de la vista (tarea 61, 5-oct-2026)
+
+Julio opera Cuentas por pagar con filtros y arma el cierre con columnas
+distintas a las de la bandeja. `SpreadsheetTable` —el de Altas y Embarques—
+entra a las dos pantallas de Finanzas, con el mismo selector de vistas:
+columnas que se eligen, reordenan y ajustan, vistas con nombre, una
+predeterminada y compartibles.
+
+**Los filtros se guardan CON la vista** (`VistaUsuario.filtros`, como §4.12),
+en `lib/filtrosFinanzas.ts`. «Lo autorizado en pesos que todavía no se paga»
+deja de ser tres clics cada mañana. Un valor basura guardado se **descarta al
+leer la vista** en vez de dejar la lista vacía sin explicación — misma regla
+que los filtros de Embarques (§4.25).
+  - Módulos nuevos de `vistasUsuario`: `cuentasPorPagar` y `cuentasPorCobrar`.
+    Son ids NUEVOS: ninguna vista ya guardada cambia de módulo.
+  - En Cuentas por cobrar **«Abiertas» es el default, no «vacío»**: si contara
+    como filtro puesto, la pantalla diría «1 filtro» al entrar sin que nadie
+    tocara nada.
+
+**El CSV sale con las columnas DE LA VISTA** (`lib/exportarVista.ts`, 9
+tests). Antes cada pantalla llevaba su lista de encabezados escrita a mano al
+lado de la tabla, así que **agregar una columna la dejaba fuera del archivo**
+— y el cierre de mes se arma con ese archivo. Ahora el catálogo de columnas es
+la única fuente. Una columna que pinta badges, enlaces o iconos declara su
+valor plano en `meta.csv`; sin eso se usa el accessor. Una columna que la
+vista nombra y el catálogo ya no tiene se ignora, igual que hace la tabla: el
+export no puede tronar justo para quien tiene la vista más vieja.
+
+**Lo que había no se perdió.** Filtros por estado con su conteo, badge de IVA
+(36), enlaces a la orden y al embarque, el pie por moneda. **«No pagar» sube
+de badge a columna Y filtro**: es la razón por la que una orden autorizada no
+aparece en Programación de pagos, y poder aislarla es poder destrabarla.
+  - **Monto y moneda son DOS columnas** (§4.3). Una sola «$12,000» ordenada de
+    mayor a menor pone 900 USD debajo de 12,000 MXN, y el renglón se lee como
+    si fuera menos dinero.
+
+**Lo que NO cabe en la tabla genérica se dejó como está**, dicho:
+  - **El agrupado por cliente de Cuentas por cobrar**, con su total por cliente
+    y por moneda: una tabla plana no tiene encabezado de grupo. Se conserva tal
+    cual y **sigue siendo el default**; la tabla es la otra mitad del toggle
+    «Por cliente | Por factura».
+  - **La vista por proveedor de Cuentas por pagar** (§4.24), por lo mismo.
+  - Las dos preferencias de toggle viven en `preferenciasUsuario/{uid}`
+    (`vistaCuentasPorPagar`, `vistaCuentasPorCobrar`), como la de cargos.
+  - El selector de vistas **solo aparece en el modo tabla**: en el agrupado no
+    hay columnas que elegir y ofrecerlo prometería lo que esa vista no cumple.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
