@@ -18,7 +18,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getBytes } from 'firebase/storage';
+import { ref, uploadBytes, getBytes, deleteObject } from 'firebase/storage';
 
 let env: RulesTestEnvironment;
 
@@ -206,5 +206,66 @@ describe('Storage · la factura del proveedor en la orden de compra', () => {
     const st = como(email).storage();
     await assertFails(uploadBytes(ref(st, RUTA), new Uint8Array([1]),
       { contentType: 'application/xml' }));
+  });
+});
+
+
+// ─── Los demás documentos de la orden de compra (tarea 63, 5-oct) ────────────
+
+describe('Storage · ordenesCompra/{id}/documentos/', () => {
+  /*
+   * Esta carpeta existe aparte de `factura/` por UN motivo: admite foto.
+   * Un comprobante de transferencia llega como captura del teléfono, y la
+   * regla de la factura —solo PDF y XML— dejaba fuera al documento más
+   * común de la orden.
+   */
+  const RUTA = 'ordenesCompra/OC-2026-0009/documentos/comprobante';
+
+  const SE_ACEPTAN = [
+    ['PDF',  'application/pdf'],
+    ['XML',  'application/xml'],
+    ['XML (text)', 'text/xml'],
+    ['JPG',  'image/jpeg'],
+    ['PNG',  'image/png'],
+    ['HEIC', 'image/heic'],
+  ] as const;
+
+  it.each(SE_ACEPTAN)('el equipo sube un %s', async (_etiqueta, tipo) => {
+    const st = como(DEL_EQUIPO).storage();
+    await assertSucceeds(uploadBytes(ref(st, `${RUTA}-${tipo.replace('/', '-')}`),
+      new Uint8Array([1, 2, 3]), { contentType: tipo }));
+  });
+
+  it('el equipo lee lo que subió', async () => {
+    const st = como(DEL_EQUIPO).storage();
+    await assertSucceeds(uploadBytes(ref(st, RUTA), new Uint8Array([1]),
+      { contentType: 'image/jpeg' }));
+    await assertSucceeds(getBytes(ref(st, RUTA)));
+  });
+
+  it('un ejecutable NO entra, aunque sea del equipo', async () => {
+    const st = como(DEL_EQUIPO).storage();
+    await assertFails(uploadBytes(ref(st, `${RUTA}.exe`), new Uint8Array([1]),
+      { contentType: 'application/x-msdownload' }));
+  });
+
+  it('no se puede BORRAR: la evidencia de un pago no se edita', async () => {
+    const st = como(DEL_EQUIPO).storage();
+    await assertSucceeds(uploadBytes(ref(st, RUTA), new Uint8Array([1]),
+      { contentType: 'application/pdf' }));
+    await assertFails(deleteObject(ref(st, RUTA)));
+  });
+
+  it.each([INTRUSO, DE_PRUEBA])('%s no sube ni lee', async (email) => {
+    const st = como(email).storage();
+    await assertFails(uploadBytes(ref(st, RUTA), new Uint8Array([1]),
+      { contentType: 'image/jpeg' }));
+    await assertFails(getBytes(ref(st, RUTA)));
+  });
+
+  it('sin sesión, nada', async () => {
+    const st = como(null).storage();
+    await assertFails(uploadBytes(ref(st, RUTA), new Uint8Array([1]),
+      { contentType: 'image/jpeg' }));
   });
 });

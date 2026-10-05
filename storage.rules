@@ -104,6 +104,34 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    // Los DEMÁS documentos de la orden: complemento de pago, comprobante de
+    // pago y cotización del proveedor (tarea 63).
+    //
+    // Van aparte de `factura/` porque admiten FOTO. Un comprobante de
+    // transferencia llega como captura de pantalla del teléfono, y
+    // obligarlo a PDF significa que no se sube: la regla de la factura, con
+    // solo PDF y XML, dejaba fuera justo al documento más común.
+    // HEIC entra porque es lo que manda un iPhone sin convertir.
+    //
+    // 20 MB en vez de los 10 de `factura/`: una foto de documento sin
+    // comprimir de un teléfono reciente pasa de 10 con facilidad.
+    //
+    // Inmutable igual que `factura/`: un comprobante corregido es un archivo
+    // nuevo. La evidencia de un pago no se edita.
+    match /ordenesCompra/{ordenId}/documentos/{archivo} {
+      allow read: if esDelEquipo();
+      allow create: if esDelEquipo()
+                    && request.resource.size < 20 * 1024 * 1024
+                    && (request.resource.contentType == 'application/pdf'
+                        || request.resource.contentType == 'text/xml'
+                        || request.resource.contentType == 'application/xml'
+                        || request.resource.contentType == 'image/jpeg'
+                        || request.resource.contentType == 'image/png'
+                        || request.resource.contentType == 'image/heic'
+                        || request.resource.contentType == 'image/heif');
+      allow update, delete: if false;
+    }
+
     // Documentos del embarque. Un BL o un pedimento con otra versión se sube
     // como archivo nuevo; el original queda para la trazabilidad.
     match /embarques/{embarqueId}/docs/{archivo} {
