@@ -29,3 +29,9 @@ export { gestionarUsuarios } from './usuarios/gestionarUsuarios.js';
 
 // ── Tipo de cambio (tarea 51) ───────────────────────────────────────────────
 export { tipoCambioProgramado, actualizarTipoCambio } from './tipoCambio/tipoCambio.js';
+
+// ── Correo saliente por Exchange / Microsoft 365 (tarea 64) ─────────────────
+// `enviarCorreoInterno` y `SECRETOS_CORREO` NO se exportan aquí: son para que
+// otras Functions los importen, no endpoints. Exportarlos haría que Firebase
+// intentara desplegarlos como funciones.
+export { enviarCorreo } from './correo/enviarCorreo.js';
