@@ -305,6 +305,26 @@ tomada. Fuentes: SAT, Banxico, Banamex compra/venta, manual, y el **pricing
 rate** — que no es un número suelto sino una REGLA sobre otra tasa, con el
 colchón de Pricing: «el de Banamex más cuatro pesos o más un porcentaje».
 
+**Hay DOS tipos de cambio y no compiten (tarea 56, 5-oct-2026).** Gaby: «que
+no se use el TC del SAT o de Banamex, que se use el de pricing».
+  - **El OPERATIVO es el de Pricing.** Con él se cotiza y se mide el profit.
+    Es la fuente **por defecto** de una cotización nueva (`pricing_rate`, en
+    sus dos formas: valor directo o regla sobre otra tasa). Se captura en la
+    cotización, se congela ahí y el embarque lo hereda.
+  - **El FISCAL es el FIX del DOF de Banxico**, y será el de la **factura**
+    cuando exista el timbrado: el CFDI exige el publicado en el DOF, no el de
+    Pricing. Hoy solo se **muestra como referencia** al lado de la captura
+    («FIX Banxico del 2 oct 2026: 18.1903») y en el módulo Tipo de cambio.
+    **No precarga ningún campo ni entra en ningún cálculo**; quien lo quiera,
+    lo teclea. Un botón que precarga se aprieta por reflejo, y 18.19 se ve
+    idéntico a 20.50 en el renglón del total: la diferencia aparece en el
+    margen, semanas después.
+  - La consulta automática **sí funciona** —el log del 2-oct guardó 18.3688
+    (1-oct) y 18.1903 (2-oct)—; lo que no funcionaba era su PAPEL.
+  - **Las cotizaciones viejas no se tocan**: una capturada con fuente Banxico
+    o SAT conserva su tasa congelada, y al abrir la captura se dice.
+  - Ver `lib/tipoCambioPricing.ts`.
+
 ### 4.4 Un concepto, no cuatro
 
 Magaya duplica el mismo servicio por impo/expo × origen/destino (hasta 8 registros por servicio).
