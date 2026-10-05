@@ -210,7 +210,9 @@ export default function EmbarquesList({ embarques, onSelectEmbarque, onCrearEmba
             title="Mes de cierre: fecha de arribo en importación, de salida en exportación"
           >
             <option value="">Mes de cierre: todos</option>
-            {mesesCierre.map(m => <option key={m} value={m}>{etiquetaMes(m)}</option>)}
+            {/* El prefijo se queda en la opción elegida: junto al rango de
+                fechas de abajo, un «septiembre 2026» a secas se lee como ETA. */}
+            {mesesCierre.map(m => <option key={m} value={m}>Cierre: {etiquetaMes(m)}</option>)}
           </select>
 
           <select value={filtros.clienteId} onChange={e => set('clienteId', e.target.value)} className={`${SELECT} max-w-[220px]`}>
