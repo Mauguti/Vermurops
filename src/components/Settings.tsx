@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Building2, Users, Database, Link as LinkIcon, FileCheck, 
-  Settings2, Plus, Search, Shield, Zap, Mail, MessageSquare, 
+  Settings2, Plus, Search, Shield, Zap, MessageSquare,
   Table2, Terminal, CheckCircle2, AlertCircle, LogOut, Package, Trash2, Hash
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -10,6 +10,7 @@ import ContadoresFolio from './settings/ContadoresFolio';
 import GestionUsuarios from './settings/GestionUsuarios';
 import CatalogoConceptos from './conceptos/CatalogoConceptos';
 import ConfiguracionEmpresaForm from './settings/ConfiguracionEmpresa';
+import CorreoSaliente from './settings/CorreoSaliente';
 
 export default function Settings() {
   const { user, logout } = useAuth();
@@ -160,12 +161,24 @@ export default function Settings() {
   ];
 
 
+  /**
+   * Integraciones que todavía NO existen.
+   *
+   * Tres de estas tarjetas decían «Conectado» con el estado escrito en el
+   * código —Gmail Workspace, Slack y la API REST— y ninguna está conectada a
+   * nada. Con la tarjeta real de correo saliente arriba (tarea 64), un «Gmail
+   * Workspace · Conectado» al lado se lee como que el correo ya salía por
+   * Gmail, que es justo lo contrario de lo que pasa: Vermur usa Exchange.
+   *
+   * Quedan como catálogo de lo que se ha pedido, con su estado honesto y sin
+   * botón que prometa un flujo que no existe. Para revertir: volver a poner
+   * `status` en cada entrada.
+   */
   const integrations = [
-    { id: 'gmail', name: 'Gmail Workspace', desc: 'Sincroniza correos con expedientes de embarques.', icon: <Mail className="w-[24px] h-[24px] text-[#EA4335]" />, status: 'Conectado' },
-    { id: 'whatsapp', name: 'WhatsApp Business API', desc: 'Envío de notificaciones automáticas y ETAs a clientes.', icon: <MessageSquare className="w-[24px] h-[24px] text-[#25D366]" />, status: 'Desconectado' },
-    { id: 'slack', name: 'Slack', desc: 'Recibe alertas operativas y de aduanas en canales.', icon: <span className="text-[24px] font-black tracking-tighter text-[#E01E5A]">#</span>, status: 'Conectado' },
-    { id: 'sheets', name: 'Google Sheets', desc: 'Exportación en tiempo real de data para análisis externo.', icon: <Table2 className="w-[24px] h-[24px] text-[#0F9D58]" />, status: 'Desconectado' },
-    { id: 'api', name: 'API REST Vermur', desc: 'Conecta tu ERP (SAP, Oracle) o sistemas a la medida.', icon: <Terminal className="w-[24px] h-[24px] text-text-primary" />, status: 'Conectado' },
+    { id: 'whatsapp', name: 'WhatsApp Business API', desc: 'Envío de notificaciones automáticas y ETAs a clientes.', icon: <MessageSquare className="w-[24px] h-[24px] text-[#25D366]" /> },
+    { id: 'slack', name: 'Slack', desc: 'Recibe alertas operativas y de aduanas en canales.', icon: <span className="text-[24px] font-black tracking-tighter text-[#E01E5A]">#</span> },
+    { id: 'sheets', name: 'Google Sheets', desc: 'Exportación en tiempo real de datos para análisis externo.', icon: <Table2 className="w-[24px] h-[24px] text-[#0F9D58]" /> },
+    { id: 'api', name: 'API REST Vermur', desc: 'Conecta tu ERP (SAP, Oracle) o sistemas a la medida.', icon: <Terminal className="w-[24px] h-[24px] text-text-primary" /> },
   ];
 
   const catalogs = [
@@ -400,31 +413,27 @@ export default function Settings() {
            {activeSection === 'integrations' && (
               <div>
                  <h3 className="text-[18px] font-semibold text-text-primary mb-[24px]">Integraciones</h3>
-                 <p className="text-[13px] text-text-secondary mb-[24px] max-w-[600px]">Conecta tus herramientas favoritas para sincronizar datos, recibir notificaciones y automatizar flujos operativos en Vermur.</p>
+
+                 {/* Tarea 64: el único canal construido. Va arriba y aparte. */}
+                 <CorreoSaliente />
+
+                 <p className="text-[13px] text-text-secondary mb-[16px] max-w-[600px]">
+                    Lo que sigue son integraciones <strong>pedidas y todavía no construidas</strong>.
+                    Ninguna está conectada ni manda ni recibe nada.
+                 </p>
 
                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-[16px]">
                     {integrations.map(integ => (
                        <div key={integ.id} className="bg-white border border-card-border rounded-[12px] p-[20px] shadow-sm flex items-start gap-[16px]">
-                          <div className="w-[48px] h-[48px] bg-canvas rounded-[12px] border border-card-border flex items-center justify-center shrink-0">
+                          <div className="w-[48px] h-[48px] bg-canvas rounded-[12px] border border-card-border flex items-center justify-center shrink-0 opacity-60">
                              {integ.icon}
                           </div>
                           <div className="flex-1">
-                             <div className="flex justify-between items-start mb-[4px]">
+                             <div className="flex justify-between items-start gap-[8px] mb-[4px]">
                                 <h4 className="text-[14px] font-semibold text-text-primary leading-tight">{integ.name}</h4>
-                                {integ.status === 'Conectado' ? (
-                                   <span className="flex items-center text-[10px] font-bold text-success-text uppercase tracking-wider bg-success-bg/30 px-[6px] py-[2px] rounded-[4px]"><CheckCircle2 className="w-[10px] h-[10px] mr-[4px]" /> Conectado</span>
-                                ) : (
-                                   <span className="flex items-center text-[10px] font-bold text-text-muted uppercase tracking-wider bg-neutral-bg px-[6px] py-[2px] rounded-[4px]">Desconectado</span>
-                                )}
+                                <span className="shrink-0 text-[10px] font-bold text-text-muted uppercase tracking-wider bg-neutral-bg px-[6px] py-[2px] rounded-[4px]">Sin construir</span>
                              </div>
-                             <p className="text-[12px] text-text-secondary leading-relaxed mb-[16px] min-h-[36px]">{integ.desc}</p>
-                             <div className="flex border-t border-divider pt-[12px]">
-                                {integ.status === 'Conectado' ? (
-                                   <button className="text-[12px] font-medium text-text-muted hover:text-error-text transition-colors">Desconectar</button>
-                                ) : (
-                                   <button className="text-[12px] font-medium text-brand hover:text-brand-hover transition-colors">Conectar ahora</button>
-                                )}
-                             </div>
+                             <p className="text-[12px] text-text-secondary leading-relaxed">{integ.desc}</p>
                           </div>
                        </div>
                     ))}
