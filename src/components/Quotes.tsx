@@ -22,7 +22,7 @@ import { useProspectos } from '../hooks/useProspectos';
 import { useClientes } from '../hooks/useClientes';
 import { generateFolio, generateFolioProspecto } from '../lib/folioService';
 import { crearEmbarquesDeCotizacionGanada } from '../lib/crearEmbarquesGanada';
-import { EMBARQUE_AUTOMATICO_DISPONIBLE } from '../config/banderas';
+import { useEmbarqueAutomatico } from '../hooks/useEmbarqueAutomatico';
 import { visibleParaVentas } from '../lib/propiedadComercial';
 import { useDestinoPendiente, useRegistrarAbierta, useNavegacion, type Destino } from '../navegacion/NavegacionContext';
 import Toast, { TipoToast } from './ui/Toast';
@@ -51,6 +51,8 @@ import {
 
 export default function Quotes() {
   const { user, puede } = useAuth();
+  // Tarea 66: el interruptor vive en Firestore y arranca apagado.
+  const { activo: embarqueAutomatico } = useEmbarqueAutomatico();
   const [showForm, setShowForm] = useState(false);
   const [showProspectForm, setShowProspectForm] = useState(false);
   const { serviciosActivos } = useServicios();
@@ -154,13 +156,14 @@ export default function Quotes() {
       return;
     }
     /*
-     * A-1 apagado: marcar ganada solo marca ganada, como producción hoy.
+     * Interruptor de A-1 apagado: marcar ganada solo marca ganada, como
+     * producción hoy.
      * La cotización SÍ se guarda —este handler recibe la versión ya
      * actualizada y es el único que la persiste en esta ruta— y el embarque
-     * se abre a mano desde Embarques, con folio SHP- del contador sembrado.
-     * Ver config/banderas.ts.
+     * se abre a mano desde Embarques, eligiendo la serie.
+     * Se enciende en Configuración → Consecutivos de folio (tarea 66).
      */
-    if (!EMBARQUE_AUTOMATICO_DISPONIBLE) {
+    if (!embarqueAutomatico) {
       try {
         await updateCotizacion(ganada.id, ganada);
         setToast({ mensaje: `${ganada.id} marcada como ganada. Abre su embarque desde el módulo de Embarques.`, tipo: 'exito' });
