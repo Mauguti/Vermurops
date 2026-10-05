@@ -1476,6 +1476,61 @@ delimitador se detecta solo fuera de comillas — Excel en es-MX exporta con
 `;` y una razón social con coma haría ganar a la coma. Un Excel se convierte a
 CSV antes: el script lee texto delimitado y lo dice con los pasos.
 
+## 4.31 La creación automática de embarques: interruptor, apagado (tarea 66, 5-oct-2026)
+
+**La ruta automática está completa desde A-1 y nunca ha corrido en
+producción.** Lo que faltaba no era código: era el DATO. Se verificó en
+emulador encendiéndola a propósito — con VLIM sembrado en 40, marcar
+COT-2026-0009 como ganada creó **VLIM-26-041** sola, con `origen:
+'automatico'`, `requiereCaptura: true`, el contador en 41 y `embarqueIds` de
+vuelta en la cotización, que con eso queda congelada (§4.8). Se apagó después.
+
+**Lo que la separaba de operar era una constante** —
+`EMBARQUE_AUTOMATICO_DISPONIBLE` en `config/banderas.ts`— y encenderla pedía un
+deploy. Ahora es un **interruptor en Configuración → Consecutivos de folio,
+solo admin y apagado**, en `contadores/configuracionEmbarques`
+(`embarqueAutomatico`). Lo lee `useEmbarqueAutomatico()`.
+  - **Falla cerrado.** Sin documento, mientras carga y si la lectura falla:
+    apagado. Marcar ganada solo marca ganada, que es lo que producción hace
+    hoy, y el embarque se abre a mano desde Embarques eligiendo la serie
+    (§4.15). Encendido por un parpadeo de carga emitiría folios que van
+    impresos en el BL y en el pedimento y que no se pueden recoger.
+  - Vive en `contadores/` y no en `configuracion/` **por las reglas**: el
+    catch-all de `firestore.rules` niega todo lo que no esté nombrado, y
+    `contadores/{id}` ya tiene escritura publicada. Mudarlo a
+    `configuracion/foliosEmbarque` cuesta tres líneas de reglas y un deploy.
+  - `banderas.ts` conserva el valor por omisión
+    (`EMBARQUE_AUTOMATICO_PREDETERMINADO`), que nadie debe comparar
+    directamente o el interruptor no serviría de nada.
+
+**El formato del folio también se configura, por serie** (`prefijo`,
+`separador`, `digitosAnio` 0/2/4, `digitos`), en `lib/formatoFolioSerie.ts`.
+Vive en el MISMO documento que el consecutivo, así que la transacción que
+reserva el folio ya lo tiene en la mano: ni una lectura más ni una colección
+nueva. Sin nada guardado rige `VLIM-26-001`, que es lo que ya se imprimió, y el
+campo se BORRA cuando el formato vuelve a ser el predeterminado.
+  - **Por qué configurable:** la sesión del 2-oct dejó anotado «BLIM + año +
+    tres dígitos… para enero va el 27, así que arrancamos en 2701», y la
+    plataforma emite `VLIM-26-001`. Las dos lecturas están en los tests y la
+    pregunta, en el reporte 66. Un folio mal formado no truena: se imprime.
+  - **El consecutivo NO reinicia en enero.** Es un entero por serie que no se
+    toca al cambiar de año: 2026 cierra en `VLIM-26-014` y enero de 2027 abre
+    en `VLIM-27-015`. Si Vermur quiere `VLIM-27-001` hay que volver a fijarlo en
+    cero a mano, y hacerlo solo exigiría un contador por año y serie. Es
+    decisión de negocio, no de interfaz.
+  - **Cambiar el formato no renumera lo emitido**: afecta a los siguientes, así
+    que a media serie deja dos formatos en el mismo año. La pantalla lo dice.
+
+**`traficoDeFolio` ya no supone que el prefijo es el primer segmento partido
+por guion.** Con el separador configurable, un folio `VLIM26001` dejaba el
+tráfico en null —y con él el IVA (§4.2) y la columna Tráfico (§4.25)—; ahora se
+busca el prefijo al principio, con `(?![A-Za-z])` para no casar `VLIMEX`.
+  - **Un prefijo fuera de la familia VL sigue sin decir el tráfico**, y por eso
+    el editor avisa antes de guardar: con `BLIM`, los embarques nuevos caerían
+    a la ruta. No se prohíbe —si Vermur confirma BLIM, el prefijo es el
+    correcto—; lo que tiene que aprenderlo es `traficoDeFolio`, y eso es otra
+    tarea. Adivinarlo sería clasificar un embarque en el mes equivocado.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

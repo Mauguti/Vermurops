@@ -15,7 +15,7 @@ import { anotarBitacora } from '../hooks/anotarBitacora';
 import type { UserRole } from '../auth/users';
 import { mapearCotizacionAEmbarque } from '../lib/cotizacionAEmbarque';
 import { construirEmbarqueDesdeCotizacion } from '../lib/generacionEmbarque';
-import { EMBARQUE_AUTOMATICO_DISPONIBLE } from '../config/banderas';
+import { useEmbarqueAutomatico } from '../hooks/useEmbarqueAutomatico';
 import { useServicios } from '../config/serviciosStore';
 import { useDestinoPendiente, useRegistrarAbierta, useNavegacion, type Destino } from '../navegacion/NavegacionContext';
 import { useAuth } from '../auth/AuthContext';
@@ -33,6 +33,8 @@ export default function Shipments() {
   /** Para resolver la ubicación de cada cargo por su concepto (regla espejo). */
   const { conceptos: conceptosCatalogo } = useConceptos();
   const { user, puede } = useAuth();
+  // Tarea 66: el interruptor vive en Firestore y arranca apagado.
+  const { activo: embarqueAutomatico } = useEmbarqueAutomatico();
   const { serviciosActivos } = useServicios();
   const [selectedEmbarqueId, setSelectedEmbarqueId] = useState<string | null>(null);
   /** 5.3 · Vista del módulo: lista, kanban por estado, o cotizaciones por abrir. */
@@ -228,12 +230,13 @@ export default function Shipments() {
     setCreando(true);
 
     /*
-     * Bandera de A-1 apagada: el camino manual usa el folio SHP-, cuyo
-     * contador SÍ está sembrado. Los folios por serie (VLIM, VLIT…) esperan
-     * los consecutivos de Magaya: sin sembrar, el primero duplicaría uno
-     * histórico que va impreso en documentos. Ver config/banderas.ts.
+     * Interruptor de A-1 apagado: el embarque se abre desde aquí con la serie
+     * que Operaciones elige. Los contadores por serie (VLIM, VLIT…) esperan
+     * los consecutivos de Magaya: sin sembrar, el primer folio duplicaría uno
+     * histórico que va impreso en documentos — se avisa, no se bloquea.
+     * Se enciende en Configuración → Consecutivos de folio (tarea 66).
      */
-    if (!EMBARQUE_AUTOMATICO_DISPONIBLE) {
+    if (!embarqueAutomatico) {
       try {
         const cliente = clientes.find(c => c.id === quote.clienteId) ?? null;
         /*
@@ -253,8 +256,8 @@ export default function Shipments() {
         /*
          * B3 (21-sep-2026): la ruta manual ya usa la SERIE que Operaciones
          * elige (VLIM, VLIT…), no el SHP- genérico. Del prefijo sale el
-         * tráfico y del tráfico el IVA de las facturas. La bandera automática
-         * sigue apagada; el contador sin sembrar se avisa, no bloquea.
+         * tráfico y del tráfico el IVA de las facturas. El interruptor
+         * automático sigue apagado; el contador sin sembrar se avisa.
          */
         const reserva = await runTransaction(db, tx => reservarFoliosSerie(tx, serie, 1));
         const folio = reserva.folios[0];

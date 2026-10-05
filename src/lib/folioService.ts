@@ -14,6 +14,7 @@
 
 import { db } from '../firebase';
 import { doc, runTransaction } from 'firebase/firestore';
+import { armarFolioSerie, type FormatoFolioSerie } from './formatoFolioSerie';
 
 // ─── Configuración del folio ──────────────────────────────────────────────────
 //
@@ -162,11 +163,17 @@ export async function generateFolioEmbarque(): Promise<string> {
 //
 // Formato: PREFIJO-YY-NNN  →  VLIT-26-001
 //
-const PADDING_EMBARQUE = 3;
-
-export function formatFolioSerie(prefijo: string, n: number, anio = new Date().getFullYear()): string {
-  const yy = String(anio).slice(-2);
-  return `${prefijo}-${yy}-${String(n).padStart(PADDING_EMBARQUE, '0')}`;
+// Tarea 66: el formato dejó de ser una constante. Cada serie puede guardar el
+// suyo en su propio documento contador (`formato`), y mientras no lo haga rige
+// el predeterminado, que es exactamente esta cadena. Ver `formatoFolioSerie.ts`.
+//
+export function formatFolioSerie(
+  prefijo: string,
+  n: number,
+  anio = new Date().getFullYear(),
+  formato?: Partial<FormatoFolioSerie> | null,
+): string {
+  return armarFolioSerie(prefijo, n, anio, formato);
 }
 
 /** Documento contador de una serie. Uno por prefijo: contadores/embarques_VLIM. */
@@ -191,6 +198,13 @@ export interface EstadoContadorSerie {
   sembrado: boolean;
   fechaSiembra?: string;
   sembradoPor?: string;
+  /**
+   * Formato del folio de esta serie (tarea 66). Ausente = el predeterminado
+   * de la plataforma, `VLIM-26-001`. Vive en el MISMO documento que el
+   * consecutivo: el folio se arma dentro de la transacción que lo reserva, y
+   * así no hace falta una lectura más ni una colección nueva.
+   */
+  formato?: Partial<FormatoFolioSerie>;
 }
 
 export interface ResultadoReserva {
@@ -225,15 +239,62 @@ export async function reservarFoliosSerie(
 
   const ultimo = (data?.ultimo as number) ?? 0;
   const sembrado = (data?.sembrado as boolean) ?? false;
+  const formato = data?.formato as Partial<FormatoFolioSerie> | undefined;
 
   const folios: string[] = [];
   for (let i = 1; i <= cuantos; i++) {
-    folios.push(formatFolioSerie(prefijo, ultimo + i, anio));
+    folios.push(formatFolioSerie(prefijo, ultimo + i, anio, formato));
   }
 
   // merge: true conserva `sembrado` y los datos de auditoría de la siembra.
   tx.set(ref, { ultimo: ultimo + cuantos }, { merge: true });
   return { folios, sembrado };
+}
+
+// ─── El interruptor de la creación automática (tarea 66) ─────────────────────
+//
+// Vive en `contadores/configuracionEmbarques`, al lado de los consecutivos que
+// gobierna y en la única colección cuya regla ya está publicada para escribir
+// desde el navegador (`contadores/{id}`: read, write si esDelEquipo()). Un
+// documento nuevo en `configuracion/` sería DENEGADO —el catch-all de
+// `firestore.rules` niega todo lo que no esté nombrado— y publicar reglas no
+// se hace en un sprint nocturno. Moverlo a `configuracion/foliosEmbarque`
+// cuesta tres líneas de reglas y está anotado en el reporte 66.
+//
+// `useContadoresSerie` filtra los documentos por `embarques_`, así que este no
+// se confunde con una serie.
+//
+export const DOC_CONFIG_EMBARQUES = 'configuracionEmbarques';
+
+export function docConfiguracionEmbarques() {
+  return doc(db, 'contadores', DOC_CONFIG_EMBARQUES);
+}
+
+export interface InterruptorEmbarqueAutomatico {
+  /** true = marcar una cotización ganada abre su embarque sola. */
+  activo: boolean;
+  fecha?: string;
+  por?: string;
+}
+
+/**
+ * Lee el interruptor. **Falla cerrado**: cualquier cosa que no sea `true`
+ * exacto deja la creación automática apagada.
+ *
+ * Importa el sentido del default. Apagado, marcar ganada solo marca ganada y
+ * el embarque se abre a mano —lo que producción hace hoy—; encendido por error
+ * (documento ausente mientras carga, un valor basura, una lectura que falló)
+ * abriría embarques con folios que van impresos. Lo barato es tener que dar un
+ * clic de más; lo caro es un folio emitido de menos.
+ */
+export function leerInterruptorEmbarque(
+  data: Record<string, unknown> | undefined | null,
+): InterruptorEmbarqueAutomatico {
+  return {
+    activo: data?.embarqueAutomatico === true,
+    fecha: typeof data?.fechaCambio === 'string' ? data.fechaCambio : undefined,
+    por: typeof data?.cambiadoPor === 'string' ? data.cambiadoPor : undefined,
+  };
 }
 
 /**
@@ -265,13 +326,16 @@ export async function reservarFoliosMultiSerie(
   });
 
   // ── Fase 1: todas las lecturas ────────────────────────────────────────────
-  const estado = new Map<string, { ultimo: number; sembrado: boolean }>();
+  const estado = new Map<string, {
+    ultimo: number; sembrado: boolean; formato?: Partial<FormatoFolioSerie>;
+  }>();
   for (const prefijo of totalPorPrefijo.keys()) {
     const snap = await tx.get(docContadorSerie(prefijo));
     const data = snap.exists() ? snap.data() : undefined;
     estado.set(prefijo, {
       ultimo: (data?.ultimo as number) ?? 0,
       sembrado: (data?.sembrado as boolean) ?? false,
+      formato: data?.formato as Partial<FormatoFolioSerie> | undefined,
     });
   }
 
@@ -285,7 +349,9 @@ export async function reservarFoliosMultiSerie(
     }
     const desde = cursor.get(prefijo) ?? est.ultimo;
     const folios: string[] = [];
-    for (let i = 1; i <= cuantos; i++) folios.push(formatFolioSerie(prefijo, desde + i, anio));
+    for (let i = 1; i <= cuantos; i++) {
+      folios.push(formatFolioSerie(prefijo, desde + i, anio, est.formato));
+    }
     cursor.set(prefijo, desde + cuantos);
 
     const previo = resultado.get(prefijo);
