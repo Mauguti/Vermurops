@@ -48,6 +48,18 @@ export interface ExpedientePanelProps {
   onValidar: (datos: { por: string; fecha: string; notas?: string }) => Promise<void>;
   /** Callback al subir un archivo. */
   onArchivoSubido?: (campo: keyof DocsAlta, archivo: ArchivoExpediente) => void;
+  /**
+   * Tarea 63 · El botón único «Subir documentos», armado por el contexto
+   * (trae su catálogo, su flujo de clasificación y su guardado).
+   *
+   * Cuando viene, reemplaza al botón por casilla: ese obligaba a acertar la
+   * casilla ANTES de abrir el archivo, que es de donde salió «puse la
+   * constancia en el acta». «Reemplazar» se queda en las casillas que ya
+   * tienen archivo, porque ahí el destino no se adivina.
+   *
+   * Cuando no viene, el panel se comporta como antes.
+   */
+  botonLote?: React.ReactNode;
   /** Si la entidad es un proveedor extranjero, se muestra un aviso. */
   esExtranjero?: boolean;
   /** Etiqueta para el tipo de entidad: "cliente" o "proveedor". */
@@ -70,6 +82,7 @@ export default function ExpedientePanel({
   onArchivoSubido,
   esExtranjero,
   tipoEntidad = 'proveedor',
+  botonLote,
 }: ExpedientePanelProps) {
   const estadoExp = estadoValidacion(entidad);
   const [notasValidacion, setNotasValidacion] = useState('');
@@ -197,6 +210,9 @@ export default function ExpedientePanel({
         )}
       </div>
 
+      {/* ── Tarea 63 · Un solo botón, varios archivos ────────────────── */}
+      {puedeEditar && botonLote && <div className="mb-5">{botonLote}</div>}
+
       {/* ── Checklist de documentos ──────────────────────────────────── */}
       <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500">
         Documentos de alta
@@ -254,17 +270,21 @@ export default function ExpedientePanel({
 
               {puedeEditar && (
                 <div className="mt-2.5 flex items-center gap-3">
-                  <button
-                    type="button"
-                    disabled={!!subiendo}
-                    onClick={() => pedirArchivo(campo)}
-                    className="flex items-center gap-1.5 text-[11px] font-bold text-brand hover:text-brand-hover disabled:opacity-50"
-                  >
-                    {subiendoEste
-                      ? <Loader2 className="w-3 h-3 animate-spin" />
-                      : <Upload className="w-3 h-3" />}
-                    {subiendoEste ? 'Subiendo…' : archivo ? 'Reemplazar' : 'Subir documento'}
-                  </button>
+                  {/* Con el botón único arriba, por casilla solo queda
+                      «Reemplazar»: ahí el destino ya no se adivina. */}
+                  {(!botonLote || archivo) && (
+                    <button
+                      type="button"
+                      disabled={!!subiendo}
+                      onClick={() => pedirArchivo(campo)}
+                      className="flex items-center gap-1.5 text-[11px] font-bold text-brand hover:text-brand-hover disabled:opacity-50"
+                    >
+                      {subiendoEste
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : <Upload className="w-3 h-3" />}
+                      {subiendoEste ? 'Subiendo…' : archivo ? 'Reemplazar' : 'Subir documento'}
+                    </button>
+                  )}
                   {!archivo && (
                     <button
                       type="button"

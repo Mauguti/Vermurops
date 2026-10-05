@@ -13,6 +13,9 @@ import { useAuth } from '../../auth/AuthContext';
 import { estadoValidacion, etiquetaValidacion } from '../../lib/estadoValidacion';
 import { docsParaProveedor, esProveedorExtranjero, DOCS_ALTA_PROVEEDOR_DEFAULT } from '../../lib/expedienteProveedor';
 import ExpedientePanel, { type ArchivoExpediente } from '../expediente/ExpedientePanel';
+import SubirDocumentosLote from '../documentos/SubirDocumentosLote';
+import { useSubidaClasificada } from '../../hooks/useSubidaClasificada';
+import type { LineaLote, TipoDocLote } from '../../lib/loteDocumentos';
 
 interface Props {
   proveedor: ProveedorVermur;
@@ -44,6 +47,44 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit, onUp
   const cp = contactoPrincipal(proveedor);
   const { puede, user } = useAuth();
   const puedeEditar = puede('proveedor.alta');
+
+  /*
+   * ── Tarea 63 · Un solo botón de documentos, también en el proveedor ─────
+   * El catálogo del proveedor se indexa por CLAVE de DocsAlta ('csf'), no por
+   * el nombre largo que devuelve el agente ('constancia_situacion_fiscal'):
+   * `normalizarTipoClasificado` resuelve los dos con el mismo grupo.
+   *
+   * La capacidad que se exige es `cliente.alta` porque es la que el servidor
+   * pide para el flujo `expediente` (una sola Function, enrutada por header).
+   * Las dos las tiene Administración, así que en la práctica coinciden.
+   */
+  const { subirYClasificar } = useSubidaClasificada();
+  const docsProveedor = docsParaProveedor(proveedor);
+  const catalogoLote: TipoDocLote[] = docsProveedor.map(d => ({
+    tipo: d.campo, etiqueta: d.etiqueta,
+  }));
+  const etiquetaLote = useCallback(
+    (tipo: string) => docsProveedor.find(d => d.campo === tipo)?.etiqueta ?? tipo.replace(/_/g, ' '),
+    [docsProveedor],
+  );
+
+  const guardarLoteExpediente = async (lineas: LineaLote[]) => {
+    const prevArchivos = proveedor.archivosExpediente ?? {};
+    const archivos = { ...prevArchivos };
+    const docsAlta = { ...(proveedor.docsAlta ?? DOCS_ALTA_PROVEEDOR_DEFAULT) };
+    for (const l of lineas) {
+      const campo = l.tipoElegido as keyof DocsAlta;
+      archivos[campo] = {
+        storagePath: l.storagePath,
+        url: l.url,
+        nombre: l.nombreArchivo,
+        subidoPor: user?.email ?? '',
+        fecha: new Date().toISOString(),
+      };
+      docsAlta[campo] = true;
+    }
+    await onUpdate(proveedor.id, { docsAlta, archivosExpediente: archivos });
+  };
 
   // U-4 · Lo que cuelga de este proveedor.
   const { tarifas } = useTarifas();
@@ -293,7 +334,23 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit, onUp
             {fichaTab === 'expediente' && (
               <ExpedientePanel
                 entidad={proveedor}
-                documentos={docsParaProveedor(proveedor)}
+                documentos={docsProveedor}
+                botonLote={
+                  <SubirDocumentosLote
+                    catalogo={catalogoLote}
+                    etiqueta={etiquetaLote}
+                    procesar={file => subirYClasificar(file, {
+                      flujo: 'expediente',
+                      capacidad: 'cliente.alta',
+                      storageBasePath: `expedientes/${proveedor.id}`,
+                      campos: { clienteNombre: proveedor.nombre, clienteRfc: proveedor.rfc ?? '' },
+                    })}
+                    unoPorTipo
+                    puedeSubir={puedeEditar}
+                    onGuardar={guardarLoteExpediente}
+                    ayuda="Varios a la vez. El agente lee cada uno, propone el tipo y marca su casilla; tú confirmas antes de guardar."
+                  />
+                }
                 docsAlta={proveedor.docsAlta ?? DOCS_ALTA_PROVEEDOR_DEFAULT}
                 archivos={proveedor.archivosExpediente}
                 nombreUsuario={user?.email ?? ''}

@@ -11,6 +11,11 @@ import {
 } from '../../lib/clasificacionDocumentos';
 import { useExpedienteCliente, type ArchivoSubido } from '../../hooks/useExpedienteCliente';
 import RevisionDocumentoClasificado, { EnlaceArchivo, type RevisionConfirmada } from '../documentos/RevisionDocumentoClasificado';
+import SubirDocumentosLote from '../documentos/SubirDocumentosLote';
+import { useSubidaClasificada } from '../../hooks/useSubidaClasificada';
+import {
+  textoCorreccionTipo, observacionesConCorreccion, type LineaLote, type TipoDocLote,
+} from '../../lib/loteDocumentos';
 import { FichaHeader, BadgeEstado, AccionesHeader } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import { useCotizaciones } from '../../hooks/useCotizaciones';
@@ -151,7 +156,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
    * Subir → clasificar con IA → REVISIÓN → guardar. La revisión es la
    * frontera: nada de lo que propone n8n toca Firestore sin confirmarse ahí.
    */
-  const { procesando, subirYClasificar, guardarDocumento } = useExpedienteCliente();
+  const { procesando, subirYClasificar, guardarDocumento, guardarDocumentos } = useExpedienteCliente();
   const inputArchivo = useRef<HTMLInputElement>(null);
   const [tipoSubiendo, setTipoSubiendo] = useState<TipoDocExpediente | null>(null);
   const [errorExpediente, setErrorExpediente] = useState('');
@@ -214,6 +219,71 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
     } finally {
       setGuardandoDoc(false);
     }
+  };
+
+  /*
+   * ── Tarea 63 · Un solo botón para varios documentos ─────────────────────
+   * El botón por casilla obligaba a acertar la casilla ANTES de abrir el
+   * archivo: de ahí «puse la constancia en el acta». Ahora se suben todos de
+   * un jalón, el agente propone el tipo de cada uno y la lista del lote es la
+   * revisión. Los campos adoptables (RFC, domicilio…) se ofrecen DESPUÉS de
+   * guardar, con el mismo criterio de D-2: nada se escribe sin confirmación.
+   */
+  const { subirYClasificar: subirLote } = useSubidaClasificada();
+  const CATALOGO_EXPEDIENTE: TipoDocLote[] = DOCUMENTOS_EXPEDIENTE.map(d => ({
+    tipo: d.tipo, etiqueta: d.etiqueta,
+  }));
+  const [adoptables, setAdoptables] = useState<ReturnType<typeof camposAdoptablesExpediente>>([]);
+  const [adoptando, setAdoptando] = useState(false);
+
+  const procesarArchivoLote = (file: File) => subirLote(file, {
+    flujo: 'expediente',
+    capacidad: 'cliente.alta',
+    storageBasePath: `expedientes/${cliente.id}`,
+    campos: { clienteNombre: cliente.nombre, clienteRfc: cliente.rfc ?? '' },
+  });
+
+  const handleGuardarLote = async (lineas: LineaLote[]) => {
+    const autor = user?.email ?? user?.nombre ?? '';
+    const ahora = new Date().toISOString();
+    const documentos = lineas.map(l => {
+      const correccion = l.corregidoAMano
+        ? textoCorreccionTipo({
+            tipoCrudo: l.tipoCrudo,
+            tipoFinal: l.tipoElegido!,
+            por: autor,
+            fecha: ahora,
+            etiqueta: etiquetaDocExpediente,
+          })
+        : null;
+      const documento: DocExpediente = {
+        nombre: l.nombre,
+        nombreOriginal: l.nombreArchivo,
+        storagePath: l.storagePath,
+        url: l.url,
+        confianza: l.confianza ?? 'baja',
+        // Sin confianza del agente o con avisos, el documento queda marcado:
+        // está cargado, pero nadie afirmó que esté bien.
+        estado: l.avisos.length > 0 || !l.tipoPropuesto ? 'con_observaciones' : 'cargado',
+        datos: l.datos ?? {},
+        avisos: l.avisos,
+        observaciones: observacionesConCorreccion(l.observaciones, correccion),
+        subidoPor: autor,
+        fechaSubida: ahora,
+      };
+      return { tipo: l.tipoElegido as TipoDocExpediente, documento };
+    });
+
+    await guardarDocumentos(cliente, documentos);
+
+    // Lo que los documentos traen y la ficha no tiene. Se ofrece, no se escribe.
+    const porCampo = new Map<string, ReturnType<typeof camposAdoptablesExpediente>[number]>();
+    for (const l of lineas) {
+      for (const c of camposAdoptablesExpediente({ rfc: l.rfc ?? '', datos: l.datos ?? {} }, cliente)) {
+        if (!porCampo.has(c.campo)) porCampo.set(c.campo, c);
+      }
+    }
+    setAdoptables([...porCampo.values()]);
   };
 
   // ¿El usuario modificó el RFC respecto al valor guardado? Solo entonces se valida
@@ -740,6 +810,64 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
                 )}
               </div>
 
+              {/* ── Tarea 63 · Un solo botón, varios archivos ─────────── */}
+              {!soloConsulta && (
+                <div className="mb-5">
+                  <SubirDocumentosLote
+                    catalogo={CATALOGO_EXPEDIENTE}
+                    etiqueta={etiquetaDocExpediente}
+                    procesar={procesarArchivoLote}
+                    unoPorTipo
+                    puedeSubir
+                    onGuardar={handleGuardarLote}
+                    ayuda="Varios a la vez. El agente lee cada uno, propone el tipo y marca su casilla; tú confirmas antes de guardar."
+                  />
+                </div>
+              )}
+
+              {/* Lo que los documentos traen y la ficha no tiene. D-2: se
+                  ofrece con confirmación explícita, nunca se precarga. */}
+              {adoptables.length > 0 && (
+                <div className="mb-5 border border-primario/30 bg-primario/5 rounded-xl px-4 py-3">
+                  <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500">
+                    Datos que traen los documentos
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    {adoptables.map(c => (
+                      <div key={c.campo} className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-[12px] text-text-primary">
+                          <span className="font-semibold">{c.etiqueta}:</span> {c.valorDocumento}
+                          {c.enConflicto && (
+                            <span className="text-amber-700"> · la ficha dice «{c.valorActual}»</span>
+                          )}
+                        </p>
+                        <button
+                          type="button"
+                          disabled={adoptando}
+                          onClick={async () => {
+                            setAdoptando(true);
+                            try {
+                              await onUpdate(cliente.id, { [c.campo]: c.valorDocumento } as Partial<ClienteVermur>);
+                              setAdoptables(prev => prev.filter(x => x.campo !== c.campo));
+                            } finally { setAdoptando(false); }
+                          }}
+                          className="text-[11px] font-bold text-primario hover:underline disabled:opacity-40"
+                        >
+                          {c.enConflicto ? 'Reemplazar en la ficha' : 'Adoptar en la ficha'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAdoptables([])}
+                    className="mt-2 text-[10px] text-text-muted hover:text-text-secondary"
+                  >
+                    Descartar estos datos
+                  </button>
+                </div>
+              )}
+
               <p className={LABEL}>Documentos de alta (KYC)</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
                 {DOCUMENTOS_EXPEDIENTE.map(({ tipo, etiqueta }) => {
@@ -799,17 +927,24 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
 
                       {!soloConsulta && (
                         <div className="mt-2.5 flex items-center gap-3">
-                          <button
-                            type="button"
-                            disabled={procesando}
-                            onClick={() => pedirArchivo(tipo)}
-                            className="flex items-center gap-1.5 text-[11px] font-bold text-brand hover:text-brand-hover disabled:opacity-50"
-                          >
-                            {subiendoEste
-                              ? <Loader2 className="w-3 h-3 animate-spin" />
-                              : <Upload className="w-3 h-3" />}
-                            {subiendoEste ? 'Clasificando…' : docGuardado ? 'Reemplazar' : 'Subir documento'}
-                          </button>
+                          {/* Tarea 63 · Ya no hay «Subir documento» por
+                              casilla: para eso está el botón único de
+                              arriba. Reemplazar SÍ se queda, porque es
+                              dirigido a este documento y pasa por la
+                              revisión de uno, que ofrece adoptar sus datos. */}
+                          {docGuardado && (
+                            <button
+                              type="button"
+                              disabled={procesando}
+                              onClick={() => pedirArchivo(tipo)}
+                              className="flex items-center gap-1.5 text-[11px] font-bold text-brand hover:text-brand-hover disabled:opacity-50"
+                            >
+                              {subiendoEste
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : <Upload className="w-3 h-3" />}
+                              {subiendoEste ? 'Clasificando…' : 'Reemplazar'}
+                            </button>
+                          )}
                           {/* El documento físico en oficina sigue valiendo:
                               marcar a mano no exige digitalizar. */}
                           {!docGuardado && (

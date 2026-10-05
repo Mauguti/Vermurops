@@ -87,12 +87,15 @@ const ROL_FALLBACK: UserRole = 'ventas';
 const CAPACIDADES: Record<UserRole, string[]> = {
   ventas: ['lead.crear', 'cotizacion.solicitar', 'kanban.ver'],
   pricing: ['cotizacion.crear', 'cotizacion.solicitar', 'tarifa.gestionar', 'tarifario.cargar', 'proveedor.altaRapida', 'tipoCambio.actualizar'],
-  operaciones: ['embarque.generar', 'factura.generar', 'notaCredito.generar'],
-  administracion: ['cliente.alta', 'proveedor.alta', 'puerto.alta', 'factura.generar', 'notaCredito.generar', 'tipoCambio.actualizar'],
+  operaciones: ['embarque.generar', 'factura.generar', 'notaCredito.generar',
+                'ordenCompra.solicitar', 'ordenCompra.gestionar'],
+  administracion: ['cliente.alta', 'proveedor.alta', 'puerto.alta', 'factura.generar', 'notaCredito.generar',
+                   'ordenCompra.solicitar', 'ordenCompra.autorizar', 'tipoCambio.actualizar'],
   admin: ['lead.crear', 'cotizacion.solicitar', 'kanban.ver', 'cotizacion.crear',
           'tarifa.gestionar', 'tarifario.cargar', 'proveedor.altaRapida',
           'catalogo.importarMasivo', 'cliente.alta', 'proveedor.alta', 'puerto.alta',
           'embarque.generar', 'factura.generar', 'notaCredito.generar',
+          'ordenCompra.solicitar', 'ordenCompra.gestionar', 'ordenCompra.autorizar',
           'usuario.gestionar', 'tipoCambio.actualizar'],
 };
 
