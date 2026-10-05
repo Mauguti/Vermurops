@@ -1137,7 +1137,7 @@ cuyo folio viene de Magaya —`BOL 9016543`, `EASHA2406487`, `SHP-26-0001`— no
 está ni ahí.
 
 **No se agregó campo `trafico` al embarque: se DERIVA** (`lib/traficoEmbarque.ts`,
-29 tests), por la misma razón por la que `traficoDeFolio` ya existía en vez de
+18 tests, más 6 de los filtros), por la misma razón por la que `traficoDeFolio` ya existía en vez de
 duplicarlo — un dato duplicado es un dato que se desincroniza. Dos fuentes, en
 este orden:
   1. **El folio** (`traficoDeFolio`): es lo que reservó la serie al abrir el
