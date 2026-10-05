@@ -374,9 +374,11 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
       </div>
       )}
 
-      {/* Footer con total */}
+      {/* Footer con total. En la vista por proveedor no va: ahí el pie lo
+          pone VistaFacturasProveedor, que cuenta renglones y no órdenes. */}
+      {vista === 'orden' && (
       <div className="flex justify-between items-center text-[12px] text-text-muted px-[4px]">
-        <span>{totalFiltrado} orden{totalFiltrado !== 1 ? 'es' : ''} de compra</span>
+        <span>{totalFiltrado} {totalFiltrado === 1 ? 'orden' : 'órdenes'} de compra</span>
         {/* §4.3 · Por moneda. Este pie era la CUARTA aparición del mismo bug:
             un reduce sobre `monto` sin mirar `moneda`, con el resultado
             rotulado como si fuera una sola. */}
@@ -389,6 +391,7 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
           </span>
         )}
       </div>
+      )}
     </div>
   );
 }

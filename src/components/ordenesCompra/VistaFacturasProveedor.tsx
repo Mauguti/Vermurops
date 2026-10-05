@@ -66,7 +66,7 @@ export default function VistaFacturasProveedor({ ordenes, onSelectOC, hayFiltro 
               <p className="text-[13px] font-bold text-text-primary truncate">{p.proveedorNombre}</p>
               <p className="text-[11px] text-text-muted">
                 {p.facturas.length} factura{p.facturas.length !== 1 ? 's' : ''} ·{' '}
-                {p.totalOrdenes} orden{p.totalOrdenes !== 1 ? 'es' : ''}
+                {p.totalOrdenes} {p.totalOrdenes === 1 ? 'orden' : 'órdenes'}
               </p>
             </div>
             {/* §4.3 · un renglón por moneda, nunca un total revuelto. */}
@@ -97,12 +97,14 @@ export default function VistaFacturasProveedor({ ordenes, onSelectOC, hayFiltro 
 
       <div className="flex justify-between items-center text-[12px] text-text-muted px-[4px] gap-3 flex-wrap">
         <span>
-          {totalFacturas} renglón{totalFacturas !== 1 ? 'es' : ''} ·{' '}
+          {totalFacturas} {totalFacturas === 1 ? 'renglón' : 'renglones'} ·{' '}
           {proveedores.length} proveedor{proveedores.length !== 1 ? 'es' : ''}
         </span>
         {agrupadas > 0 && (
           <span>
-            {agrupadas} orden{agrupadas !== 1 ? 'es' : ''} se agruparon en la factura que las cubre.
+            {agrupadas === 1
+              ? '1 orden se agrupó en la factura que la cubre.'
+              : `${agrupadas} órdenes se agruparon en la factura que las cubre.`}
           </span>
         )}
       </div>
@@ -146,7 +148,7 @@ function RenglonFactura({
             {estadoCfg.label}
           </span>
           <span className="text-[11px] text-text-muted">
-            {factura.ordenes.length} orden{factura.ordenes.length !== 1 ? 'es' : ''}
+            {factura.ordenes.length} {factura.ordenes.length === 1 ? 'orden' : 'órdenes'}
             {factura.fechaPago && ` · se paga ${factura.fechaPago}`}
           </span>
           {factura.fechasDistintas && (
