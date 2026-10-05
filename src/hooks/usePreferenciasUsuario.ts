@@ -21,6 +21,9 @@ import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 export interface PreferenciasUsuario {
   /** Cómo ver los cargos de la cotización y del embarque. */
   vistaCargos?: 'proveedor' | 'concepto';
+  /** Tarea 58 · Cuentas por pagar: por proveedor (un renglón por factura) o
+   *  la tabla orden por orden. */
+  vistaCuentasPorPagar?: 'proveedor' | 'orden';
 }
 
 const COL = 'preferenciasUsuario';
