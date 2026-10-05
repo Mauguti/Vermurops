@@ -1238,7 +1238,7 @@ que los filtros de Embarques (§4.25).
     como filtro puesto, la pantalla diría «1 filtro» al entrar sin que nadie
     tocara nada.
 
-**El CSV sale con las columnas DE LA VISTA** (`lib/exportarVista.ts`, 14
+**El CSV sale con las columnas DE LA VISTA** (`lib/exportarVista.ts`, 9
 tests). Antes cada pantalla llevaba su lista de encabezados escrita a mano al
 lado de la tabla, así que **agregar una columna la dejaba fuera del archivo**
 — y el cierre de mes se arma con ese archivo. Ahora el catálogo de columnas es
