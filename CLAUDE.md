@@ -1337,6 +1337,70 @@ XML con parseo de CFDI y cotejo contra el monto.
     la orden con regla publicada, y **acepta solo PDF y XML**. Una carpeta
     `documentos/` que acepte imágenes necesita su propia regla de Storage.
 
+## 4.29 Correo saliente por Exchange, listo para credenciales (tarea 64, 5-oct-2026)
+
+**Vermur usa Exchange de Microsoft 365, no Gmail.** El canal es
+`smtp.office365.com:587` con STARTTLS, y es de **notificaciones del sistema**:
+un buzón, no el correo personal de quien aprieta un botón. Microsoft 365
+rechaza con 5.7.60 (SendAsDenied) un `From` que no sea el buzón autenticado,
+así que dejar que cada quien ponga el suyo daría un rechazo distinto por
+persona.
+
+**Nada está conectado todavía.** `enviarCorreo` existe, se prueba y no la
+llama ninguna notificación. Las de rol siguen sin llegar a nadie (§6);
+conectarlas es otra tarea, con su decisión de qué se avisa por correo.
+
+**Las credenciales son secretos de Secret Manager** (`defineSecret`):
+`CORREO_SMTP_USUARIO` y `CORREO_SMTP_PASSWORD`. **Hay que crearlos ANTES de
+desplegar**: una Function que declara un secreto inexistente no despliega.
+Host, puerto y nombre del remitente, en cambio, NO son `defineString`: tienen
+default en el código y override por variable de entorno, porque cada
+`defineString` nuevo detiene el deploy preguntando (§3) y las tareas 40 y 51
+ya pusieron dos. Ver `functions/src/correo/configuracionSmtp.ts`.
+
+**Dos puertas a la misma lógica**, como `tipoCambio.ts`:
+  - `enviarCorreoInterno(correo)` para otras Functions. Quien lo importe tiene
+    que declarar `SECRETOS_CORREO` en sus `secrets`: un secreto que la función
+    no declara no llega a su `process.env`. **No lanza cuando el envío falla**,
+    devuelve `ok: false` con el diagnóstico — que el flujo de una orden
+    autorizada se caiga porque el correo está mal sería peor que el aviso que
+    no llegó.
+  - `enviarCorreo` HTTP para el botón de Configuración → Integraciones, con
+    capacidad **`correo.probar`, solo admin**. Solo manda el correo de prueba:
+    el cuerpo libre no se acepta desde el navegador, o el buzón de Vermur
+    sería un relay para quien tenga sesión.
+
+**El modo `captura` es lo que hace probable el armado sin credenciales.** En el
+emulador el mensaje se construye completo y **no sale**; la pantalla lo pinta
+en AZUL y no en verde, porque verde haría creer que llegó.
+**Producción es siempre `smtp`**: sin credenciales falla con etapa
+«configuración» en vez de fingir un envío (§3). Se verifica con
+`npx tsx scripts/probarCorreo.ts` (con `CON_FUNCTIONS=1 ./scripts/dev-emuladores.sh`),
+que además comprueba los 403/401/400.
+
+**Las cuatro causas se distinguen, y una no la arreglamos nosotros.**
+`diagnosticoDeFalla` separa configuración · conexión · autenticación · envío.
+El caso que más va a aparecer la primera vez es **SMTP AUTH apagado**: en
+Microsoft 365 el envío por SMTP con usuario y contraseña viene APAGADO por
+omisión, contesta `535 5.7.139 … SmtpClientAuthentication is disabled for this
+mailbox`, **se lee como contraseña mala y no lo es**, y lo enciende el
+administrador de Exchange para ESE buzón. Se detecta antes que cualquier otro
+error de autenticación y la pantalla enseña los pasos del centro de
+administración. Un fallo genérico mandaría a cambiar una contraseña que está
+perfecta.
+
+**El texto plano se deriva del HTML** (`textoDesdeHtml`): un correo que solo
+trae HTML cae más seguido en correo no deseado. El `&rarr;` de «Configuración
+→ Integraciones» llegaba crudo al cuerpo, y lo atrapó el envío por el
+emulador, no un test — las entidades se resuelven con `&amp;` al final, para
+no decodificar dos veces.
+
+**Las otras cinco tarjetas de Integraciones decían «Conectado»** con el estado
+escrito en el código, y ninguna lo está. Es lo mismo que el folio inventado de
+la 57. Un «Gmail Workspace · Conectado» junto a la tarjeta nueva se lee como
+que el correo ya salía por Gmail. Quedan como catálogo de lo pedido, con
+estado «Sin construir» y sin botón que prometa un flujo inexistente.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
