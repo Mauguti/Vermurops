@@ -7,11 +7,18 @@
  * debe cada uno, y el registro de cobro desde aquí, sin entrar al embarque.
  * Los totales van POR MONEDA (§4.3). Un cobro registrado aquí alimenta el
  * fondeo que libera el pago al proveedor (1.1), igual que desde el embarque.
+ *
+ * Tarea 61 · Dos vistas sobre lo mismo: «Por cliente» —el agrupado de
+ * siempre, que es el default— y «Por factura», `SpreadsheetTable` con
+ * columnas configurables y vistas guardadas. El agrupado NO cabe en la tabla
+ * genérica (una tabla plana no tiene encabezado de grupo con su total por
+ * moneda), así que se conserva tal cual en vez de rehacerse peor.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown, ChevronRight, Search, AlertTriangle, Banknote, Clock, CheckCircle2, X,
+  Download, SlidersHorizontal,
 } from 'lucide-react';
 import type { FacturaCliente, CobroCliente } from './FacturasData';
 import {
@@ -21,8 +28,19 @@ import {
 import { formatearPorMoneda, type TotalPorMoneda } from '../../lib/sumarPorMoneda';
 import { BANCOS_VERMUR, BANCO_COBRO_DEFAULT } from '../../lib/cuentasPago';
 import { EnlaceEntidad } from '../ui/ficha/EnlaceEntidad';
-import { contiene } from '../../lib/texto';
 import EstadoVacio from '../ui/EstadoVacio';
+import SpreadsheetTable, { type VistaConfig } from '../table/SpreadsheetTable';
+import VistaSelector from '../table/VistaSelector';
+import { useVistasUsuario } from '../../hooks/useVistasUsuario';
+import { usePreferenciasUsuario } from '../../hooks/usePreferenciasUsuario';
+import { useAuth } from '../../auth/AuthContext';
+import { columnasCartera, VISTA_DEFAULT_POR_COBRAR } from './carteraColumns';
+import { csvDeVista, descargarCSV } from '../../lib/exportarVista';
+import {
+  FILTROS_POR_COBRAR_VACIOS, aplicarFiltrosPorCobrar, filtrosPorCobrarActivos,
+  filtrosPorCobrarDesdeVista, filtrosPorCobrarParaVista, mesesDeVencimiento,
+  type FiltrosPorCobrar,
+} from '../../lib/filtrosFinanzas';
 
 interface Props {
   facturas: FacturaCliente[];
@@ -42,30 +60,83 @@ const ESTADO_CLS: Record<EstadoCobro, string> = {
   cobrado: 'bg-emerald-50 text-emerald-700 border-emerald-200',
 };
 
-type Filtro = 'abiertas' | EstadoCobro | 'todas';
+const SELECT = 'bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-gray-700 outline-none focus:border-primario';
 
 export default function PanelCuentasPorCobrar({ facturas, cobros, puedeCobrar, onCobrar, hoy }: Props) {
   const fecha = hoy ?? new Date().toISOString().slice(0, 10);
-  const [filtro, setFiltro] = useState<Filtro>('abiertas');
-  const [busqueda, setBusqueda] = useState('');
+  const { user } = useAuth();
+  const [filtros, setFiltros] = useState<FiltrosPorCobrar>(FILTROS_POR_COBRAR_VACIOS);
+  const set = <K extends keyof FiltrosPorCobrar>(k: K, v: FiltrosPorCobrar[K]) =>
+    setFiltros(f => ({ ...f, [k]: v }));
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const [cobrando, setCobrando] = useState<FacturaEnCartera | null>(null);
+
+  /*
+   * Tarea 61 · «Por cliente» sigue siendo el default: es la vista con la que
+   * se pregunta «quién me debe», y es la que había. La preferencia se guarda
+   * por usuario, como la de Cuentas por pagar (§4.24).
+   */
+  const { prefs, guardar } = usePreferenciasUsuario();
+  const modo: 'cliente' | 'factura' = prefs.vistaCuentasPorCobrar ?? 'cliente';
 
   // La cartera completa (para los KPIs) y la filtrada (para la lista).
   const items = useMemo(() => cartera(facturas, cobros, fecha), [facturas, cobros, fecha]);
   const resumen = useMemo(() => resumenCartera(items, cobros, fecha), [items, cobros, fecha]);
 
-  const visibles = useMemo(() => {
-    const q = busqueda.trim();
-    return items.filter(i => {
-      if (filtro === 'abiertas' && i.estado === 'cobrado') return false;
-      if (filtro !== 'abiertas' && filtro !== 'todas' && i.estado !== filtro) return false;
-      if (q && !contiene(`${i.factura.numero} ${i.factura.clienteNombre} ${i.factura.embarqueFolio}`, q)) return false;
-      return true;
-    });
-  }, [items, filtro, busqueda]);
-
+  const visibles = useMemo(() => aplicarFiltrosPorCobrar(items, filtros), [items, filtros]);
   const grupos = useMemo(() => agruparPorCliente(visibles), [visibles]);
+  const activos = filtrosPorCobrarActivos(filtros);
+
+  /** Clientes y meses que existen en la cartera, para no ofrecer opciones vacías. */
+  const clientesPresentes = useMemo(() => {
+    const m = new Map<string, string>();
+    items.forEach(i => { if (i.factura.clienteId) m.set(i.factura.clienteId, i.factura.clienteNombre); });
+    return [...m.entries()].map(([id, nombre]) => ({ id, nombre }))
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  }, [items]);
+  const meses = useMemo(() => mesesDeVencimiento(items), [items]);
+
+  // ── Vistas guardadas (columnas + filtros) ─────────────────────────────────
+  const { vistas, crearVista, actualizarVista, eliminarVista, vistaDefault } = useVistasUsuario('cuentasPorCobrar');
+  const [vistaActivaId, setVistaActivaId] = useState<string | null>(null);
+  const [vistaTabla, setVistaTabla] = useState<VistaConfig>(VISTA_DEFAULT_POR_COBRAR);
+
+  const aplicarVista = useCallback((v: { columnas: VistaConfig['columnas']; ordenamiento?: VistaConfig['ordenamiento']; filtros?: Record<string, string | null> } | null) => {
+    if (!v) {
+      setVistaTabla(VISTA_DEFAULT_POR_COBRAR);
+      setFiltros(FILTROS_POR_COBRAR_VACIOS);
+      return;
+    }
+    setVistaTabla({ columnas: v.columnas, ordenamiento: v.ordenamiento ?? null });
+    setFiltros(filtrosPorCobrarDesdeVista(v.filtros));
+  }, []);
+
+  const defaultCargada = useRef(false);
+  useEffect(() => {
+    if (defaultCargada.current || !vistaDefault || vistaActivaId !== null) return;
+    defaultCargada.current = true;
+    setVistaActivaId(vistaDefault.id);
+    aplicarVista(vistaDefault);
+  }, [vistaDefault, vistaActivaId, aplicarVista]);
+
+  const seleccionarVista = (id: string | null) => {
+    setVistaActivaId(id);
+    aplicarVista(id ? vistas.find(v => v.id === id) ?? null : vistaDefault ?? null);
+  };
+
+  /*
+   * La columna de acción solo se arma si hay con qué cobrar: un botón
+   * «Registrar cobro» que no abre nada es peor que no tenerlo. Es la misma
+   * condición con la que la tabla agrupada esconde su columna.
+   */
+  const columnas = useMemo(
+    () => columnasCartera(puedeCobrar ? { onCobrar: setCobrando } : {}),
+    [puedeCobrar],
+  );
+
+  const exportarCSV = () => {
+    descargarCSV('cuentas_por_cobrar', csvDeVista(columnas, vistaTabla, visibles));
+  };
 
   const toggle = (clave: string) => setAbiertos(prev => {
     const n = new Set(prev);
@@ -96,12 +167,12 @@ export default function PanelCuentasPorCobrar({ facturas, cobros, puedeCobrar, o
           ['por_cobrar', 'Por cobrar', conteo('por_cobrar')],
           ['cobrado', 'Cobradas', conteo('cobrado')],
           ['todas', 'Todas', items.length],
-        ] as [Filtro, string, number][]).map(([id, label, n]) => (
+        ] as [FiltrosPorCobrar['estado'], string, number][]).map(([id, label, n]) => (
           <button
             key={id}
-            onClick={() => setFiltro(id)}
+            onClick={() => set('estado', id)}
             className={`px-3 py-1.5 rounded-lg text-[11px] font-bold border transition-colors ${
-              filtro === id ? 'bg-[#18181B] text-white border-[#18181B]' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+              filtros.estado === id ? 'bg-[#18181B] text-white border-[#18181B]' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
           >
             {label} <span className="opacity-60">{n}</span>
           </button>
@@ -109,16 +180,125 @@ export default function PanelCuentasPorCobrar({ facturas, cobros, puedeCobrar, o
         <div className="relative ml-auto w-full md:w-72">
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
-            value={busqueda}
-            onChange={e => setBusqueda(e.target.value)}
+            value={filtros.busqueda}
+            onChange={e => set('busqueda', e.target.value)}
             placeholder="Factura, cliente o embarque…"
             className="w-full pl-8 pr-3 py-2 bg-white border border-gray-200 focus:border-primario rounded-lg text-xs outline-none"
           />
         </div>
       </div>
 
+      {/* Tarea 61 · Los filtros que se guardan con la vista, el toggle de vista
+          y el export con las columnas de la vista. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <select value={filtros.clienteId} onChange={e => set('clienteId', e.target.value)} className={`${SELECT} max-w-[220px]`}>
+          <option value="">Cliente: todos</option>
+          {clientesPresentes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+        </select>
+
+        <select value={filtros.moneda} onChange={e => set('moneda', e.target.value as FiltrosPorCobrar['moneda'])} className={SELECT} title="Moneda de la factura">
+          <option value="">Moneda: todas</option>
+          <option value="MXN">MXN</option>
+          <option value="USD">USD</option>
+        </select>
+
+        <select value={filtros.mesVencimiento} onChange={e => set('mesVencimiento', e.target.value)} className={SELECT} title="Mes de vencimiento de la factura">
+          <option value="">Vence: cualquier mes</option>
+          {meses.map(m => <option key={m} value={m}>Vence: {m}</option>)}
+        </select>
+
+        {activos > 0 && (
+          <button
+            onClick={() => setFiltros(FILTROS_POR_COBRAR_VACIOS)}
+            className="text-[11px] font-bold text-gray-400 hover:text-primario flex items-center gap-1 px-2"
+          >
+            <X className="w-3 h-3" /> Limpiar
+          </button>
+        )}
+
+        <div className="flex items-center gap-2 ml-auto flex-wrap">
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden shrink-0">
+            {([['cliente', 'Por cliente'], ['factura', 'Por factura']] as const).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => guardar('vistaCuentasPorCobrar', id)}
+                aria-pressed={modo === id}
+                className={`text-[11px] font-bold px-3 py-1.5 transition-colors ${
+                  modo === id ? 'bg-primario text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Las columnas se eligen en la tabla; en el agrupado no hay columnas
+              que configurar y el selector prometería lo que no puede dar. */}
+          {modo === 'factura' && (
+            <>
+              <SlidersHorizontal className="w-3.5 h-3.5 text-gray-400" />
+              <VistaSelector
+                vistas={vistas}
+                vistaActivaId={vistaActivaId}
+                currentUserId={user?.uid || user?.id || ''}
+                vistaActual={vistaTabla}
+                filtrosActuales={filtrosPorCobrarParaVista(filtros)}
+                labelDefault="Vista por defecto"
+                onSeleccionar={seleccionarVista}
+                onGuardar={async (nombre) => {
+                  const id = await crearVista(nombre, vistaTabla.columnas, { filtros: filtrosPorCobrarParaVista(filtros) });
+                  setVistaActivaId(id);
+                }}
+                onActualizar={(id, cambios) => actualizarVista(id, cambios)}
+                onEliminar={async (id) => {
+                  await eliminarVista(id);
+                  if (vistaActivaId === id) seleccionarVista(null);
+                }}
+              />
+            </>
+          )}
+
+          <button
+            onClick={exportarCSV}
+            className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg border border-gray-200 shrink-0"
+            title="Exporta lo filtrado, con las columnas de la vista"
+          >
+            <Download className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Por factura: la tabla configurable */}
+      {modo === 'factura' && (
+        visibles.length === 0 ? (
+          <div className="bg-white rounded-xl border border-gray-150">
+            <EstadoVacio
+              variante="plano"
+              icono={<Banknote className="w-5 h-5" />}
+              titulo={items.length === 0 ? 'No hay facturas registradas' : 'Nada con ese filtro'}
+              detalle={items.length === 0
+                ? 'Las facturas se registran desde la pestaña Facturas del embarque. Al registrarlas aparecen aquí con su vencimiento.'
+                : 'Prueba con otro estado u otra búsqueda.'}
+            />
+          </div>
+        ) : (
+          <div className="pt-8">
+            <SpreadsheetTable<FacturaEnCartera>
+              data={visibles}
+              columns={columnas}
+              pinnedColumnIds={['numero']}
+              vista={vistaTabla}
+              onVistaChange={setVistaTabla}
+              maxHeight="calc(100vh - 460px)"
+            />
+            <p className="text-[10px] text-gray-400 mt-2 px-1">
+              {visibles.length} factura{visibles.length !== 1 ? 's' : ''} · los totales por cliente y por moneda están en «Por cliente»
+            </p>
+          </div>
+        )
+      )}
+
       {/* Por cliente */}
-      {grupos.length === 0 ? (
+      {modo === 'cliente' && (grupos.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-150">
           <EstadoVacio
             variante="plano"
@@ -142,7 +322,7 @@ export default function PanelCuentasPorCobrar({ facturas, cobros, puedeCobrar, o
             />
           ))}
         </div>
-      )}
+      ))}
 
       {cobrando && (
         <ModalCobro

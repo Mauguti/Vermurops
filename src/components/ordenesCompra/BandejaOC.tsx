@@ -2,20 +2,34 @@
  * BandejaOC.tsx
  *
  * Bandeja de Órdenes de Compra integrada en Finanzas → Cuentas por pagar.
- * Muestra las OCs con filtros por estado, búsqueda, y tabla interactiva.
+ *
+ * Dos vistas sobre los mismos datos filtrados (§4.24): «Por proveedor», un
+ * renglón por factura, y «Por orden», la tabla orden por orden — que desde la
+ * tarea 61 es `SpreadsheetTable`, con columnas configurables y vistas
+ * guardadas, igual que Altas y Embarques. Los filtros se guardan CON la
+ * vista: «lo autorizado en pesos que todavía no se paga» es un nombre, no
+ * tres clics cada mañana.
  */
 
-import React, { useState, useMemo } from 'react';
-import { Search, Filter, Download, Clock, Settings, CheckCircle, CheckCircle2, XCircle, AlertTriangle, FileText } from 'lucide-react';
-import { contiene } from '../../lib/texto';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Search, Download, CheckCircle, FileText, SlidersHorizontal, X } from 'lucide-react';
 import type { OrdenCompra, EstadoOC } from './OrdenesCompraData';
-import { ESTADOS_OC_MAP } from './OrdenesCompraData';
 import EstadoVacio from '../ui/EstadoVacio';
 import { sumarPorMoneda, formatearPorMoneda } from '../../lib/sumarPorMoneda';
 import type { ConceptoVermur } from '../conceptos/ConceptosData';
 import { compararIVAFactura, etiquetaIVA, type EtiquetaIVA } from '../../lib/ivaOrdenCompra';
 import VistaFacturasProveedor from './VistaFacturasProveedor';
 import { usePreferenciasUsuario } from '../../hooks/usePreferenciasUsuario';
+import SpreadsheetTable, { type VistaConfig } from '../table/SpreadsheetTable';
+import VistaSelector from '../table/VistaSelector';
+import { useVistasUsuario } from '../../hooks/useVistasUsuario';
+import { useAuth } from '../../auth/AuthContext';
+import { columnasOC, VISTA_DEFAULT_POR_PAGAR } from './ocColumns';
+import { csvDeVista, descargarCSV } from '../../lib/exportarVista';
+import {
+  FILTROS_POR_PAGAR_VACIOS, aplicarFiltrosPorPagar, filtrosPorPagarActivos,
+  filtrosPorPagarDesdeVista, filtrosPorPagarParaVista, type FiltrosPorPagar,
+} from '../../lib/filtrosFinanzas';
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -28,22 +42,10 @@ interface BandejaOCProps {
   conceptos?: ConceptoVermur[];
 }
 
-// ─── Íconos por estado ──────────────────────────────────────────────────────
-
-const ESTADO_ICON: Record<EstadoOC, React.ReactNode> = {
-  solicitada:  <Clock className="w-3.5 h-3.5" />,
-  en_gestion:  <Settings className="w-3.5 h-3.5" />,
-  autorizada:  <CheckCircle className="w-3.5 h-3.5" />,
-  pagada:      <CheckCircle2 className="w-3.5 h-3.5" />,
-  rechazada:   <XCircle className="w-3.5 h-3.5" />,
-};
-
 // ─── Filtros de estado ──────────────────────────────────────────────────────
 
-type FiltroEstado = 'todos' | EstadoOC;
-
-const FILTROS: { id: FiltroEstado; label: string }[] = [
-  { id: 'todos', label: 'Todas' },
+const FILTROS: { id: EstadoOC | ''; label: string }[] = [
+  { id: '', label: 'Todas' },
   { id: 'solicitada', label: 'Solicitadas' },
   { id: 'en_gestion', label: 'En gestión' },
   { id: 'autorizada', label: 'Autorizadas' },
@@ -51,21 +53,20 @@ const FILTROS: { id: FiltroEstado; label: string }[] = [
   { id: 'rechazada', label: 'Rechazadas' },
 ];
 
-// ─── Componente ─────────────────────────────────────────────────────────────
-
-type FiltroIVA = 'todos' | EtiquetaIVA;
-
-const FILTROS_IVA: { id: FiltroIVA; label: string }[] = [
-  { id: 'todos', label: 'Todos' },
+const FILTROS_IVA: { id: NonNullable<EtiquetaIVA> | ''; label: string }[] = [
+  { id: '', label: 'Todos' },
   { id: 'alerta', label: 'IVA no cuadra' },
   { id: 'pendiente', label: 'IVA pendiente' },
   { id: 'ok', label: 'IVA ok' },
 ];
 
+const SELECT = 'bg-white border border-card-border rounded-[8px] px-2 py-[7px] text-[11px] font-semibold text-text-secondary outline-none focus:border-primario';
+
 export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelectOC, conceptos = [] }: BandejaOCProps) {
-  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todos');
-  const [filtroIVA, setFiltroIVA] = useState<FiltroIVA>('todos');
-  const [searchTerm, setSearchTerm] = useState('');
+  const { user } = useAuth();
+  const [filtros, setFiltros] = useState<FiltrosPorPagar>(FILTROS_POR_PAGAR_VACIOS);
+  const set = <K extends keyof FiltrosPorPagar>(k: K, v: FiltrosPorPagar[K]) =>
+    setFiltros(f => ({ ...f, [k]: v }));
 
   /*
    * Tarea 58 · Cómo se ve lo que se debe. Por proveedor es el default: es
@@ -85,81 +86,74 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
   }, [conceptos]);
 
   /** Calcula la etiqueta IVA de una OC. */
-  const etiquetaIVADeOC = (oc: OrdenCompra): EtiquetaIVA => {
+  const etiquetaIVADeOC = useCallback((oc: OrdenCompra): EtiquetaIVA => {
     if (!oc.facturaDatos) return null;
     const regla = reglasPorConcepto.get(oc.conceptoId);
-    const r = compararIVAFactura(oc, regla);
-    return etiquetaIVA(r.estado);
+    return etiquetaIVA(compararIVAFactura(oc, regla).estado);
+  }, [reglasPorConcepto]);
+
+  // ── Tarea 61 · Vistas guardadas (columnas + filtros) ──────────────────────
+  const { vistas, crearVista, actualizarVista, eliminarVista, vistaDefault } = useVistasUsuario('cuentasPorPagar');
+  const [vistaActivaId, setVistaActivaId] = useState<string | null>(null);
+  const [vistaTabla, setVistaTabla] = useState<VistaConfig>(VISTA_DEFAULT_POR_PAGAR);
+
+  const aplicarVista = useCallback((v: { columnas: VistaConfig['columnas']; ordenamiento?: VistaConfig['ordenamiento']; filtros?: Record<string, string | null> } | null) => {
+    if (!v) {
+      setVistaTabla(VISTA_DEFAULT_POR_PAGAR);
+      setFiltros(FILTROS_POR_PAGAR_VACIOS);
+      return;
+    }
+    setVistaTabla({ columnas: v.columnas, ordenamiento: v.ordenamiento ?? null });
+    setFiltros(filtrosPorPagarDesdeVista(v.filtros));
+  }, []);
+
+  const defaultCargada = useRef(false);
+  useEffect(() => {
+    if (defaultCargada.current || !vistaDefault || vistaActivaId !== null) return;
+    defaultCargada.current = true;
+    setVistaActivaId(vistaDefault.id);
+    aplicarVista(vistaDefault);
+  }, [vistaDefault, vistaActivaId, aplicarVista]);
+
+  const seleccionarVista = (id: string | null) => {
+    setVistaActivaId(id);
+    aplicarVista(id ? vistas.find(v => v.id === id) ?? null : vistaDefault ?? null);
   };
 
+  /*
+   * El catálogo se ata a `etiquetaIVADeOC`, así que el badge de la columna y
+   * el valor del CSV salen de la misma función: no hay forma de que la hoja
+   * diga «OK» donde la pantalla dice «No cuadra».
+   */
+  const columnas = useMemo(() => columnasOC({ etiquetaIVA: etiquetaIVADeOC }), [etiquetaIVADeOC]);
+
   /** Para que el estado vacío diga cuál de los dos vacíos es. */
-  const hayFiltro = filtroEstado !== 'todos' || filtroIVA !== 'todos' || searchTerm.trim() !== '';
+  const activos = filtrosPorPagarActivos(filtros);
+  const hayFiltro = activos > 0;
 
-  // Filtrado
-  const ordenesFiltradas = useMemo(() => {
-    let resultado = ordenes;
-
-    // Filtro por estado
-    if (filtroEstado !== 'todos') {
-      resultado = resultado.filter(oc => oc.estado === filtroEstado);
-    }
-
-    // Tarea 36 · Filtro por IVA
-    if (filtroIVA !== 'todos') {
-      resultado = resultado.filter(oc => etiquetaIVADeOC(oc) === filtroIVA);
-    }
-
-    // Búsqueda
-    if (searchTerm.trim()) {
-      const term = searchTerm.trim();
-      resultado = resultado.filter(oc =>
-        contiene(oc.folio, term) ||
-        contiene(oc.proveedorNombre, term) ||
-        contiene(oc.conceptoNombre, term) ||
-        contiene(oc.clienteNombre, term) ||
-        contiene(oc.embarqueFolio, term)
-      );
-    }
-
-    return resultado;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ordenes, filtroEstado, filtroIVA, searchTerm, reglasPorConcepto]);
+  const ordenesFiltradas = useMemo(
+    () => aplicarFiltrosPorPagar(ordenes, filtros, { etiquetaIVA: etiquetaIVADeOC }),
+    [ordenes, filtros, etiquetaIVADeOC],
+  );
 
   const totalFiltrado = ordenesFiltradas.length;
 
   // Conteo para badges de filtro
-  const getConteo = (filtro: FiltroEstado): number => {
-    if (filtro === 'todos') return ordenes.length;
+  const getConteo = (filtro: EstadoOC | ''): number => {
+    if (filtro === '') return ordenes.length;
     return conteosPorEstado[filtro] || 0;
   };
 
-  // Export CSV
+  /*
+   * Tarea 61 · El CSV sale con las columnas DE LA VISTA, en su orden. Antes
+   * la lista de encabezados vivía escrita a mano aquí al lado, así que una
+   * columna nueva no llegaba al archivo con el que Julio cierra el mes.
+   *
+   * En la vista por proveedor se exporta igual la tabla por orden: el archivo
+   * es para trabajar en Excel, donde el agrupado se hace con un filtro.
+   */
   const handleExportCSV = () => {
-    const headers = ['Folio', 'Estado', 'Proveedor', 'Concepto', 'Monto', 'Moneda', 'Urgencia', 'Fecha requerida', 'Origen', 'Cliente'];
-    const rows = ordenesFiltradas.map(oc => [
-      oc.folio,
-      ESTADOS_OC_MAP[oc.estado].label,
-      oc.proveedorNombre,
-      oc.conceptoNombre,
-      oc.monto,
-      oc.moneda,
-      oc.urgencia,
-      oc.fechaRequerida,
-      oc.origen,
-      oc.clienteNombre || '',
-    ]);
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(r => r.map(f => `"${String(f).replace(/"/g, '""')}"`).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.setAttribute('download', `ordenes_compra_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    descargarCSV('cuentas_por_pagar', csvDeVista(columnas, vistaTabla, ordenesFiltradas));
   };
 
   // ── Loading ───────────────────────────────────────────────────────────────
@@ -191,11 +185,11 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
       <div className="flex flex-wrap gap-[8px]">
         {FILTROS.map(f => {
           const count = getConteo(f.id);
-          const isActive = filtroEstado === f.id;
+          const isActive = filtros.estado === f.id;
           return (
             <button
-              key={f.id}
-              onClick={() => setFiltroEstado(f.id)}
+              key={f.id || 'todos'}
+              onClick={() => set('estado', f.id)}
               className={`px-[12px] py-[6px] rounded-[6px] text-[12px] font-medium transition-colors border ${
                 isActive
                   ? 'bg-brand text-white border-brand'
@@ -215,14 +209,14 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
         })}
       </div>
 
-      {/* Tarea 36 · Filtro de IVA */}
-      <div className="flex flex-wrap gap-[6px]">
+      {/* Tarea 36 · Filtro de IVA · Tarea 61 · y los que se guardan con la vista */}
+      <div className="flex flex-wrap gap-[6px] items-center">
         {FILTROS_IVA.map(f => (
           <button
-            key={f.id ?? 'todos'}
-            onClick={() => setFiltroIVA(f.id)}
+            key={f.id || 'todos'}
+            onClick={() => set('iva', f.id)}
             className={`px-[10px] py-[4px] rounded-[5px] text-[11px] font-medium transition-colors border ${
-              filtroIVA === f.id
+              filtros.iva === f.id
                 ? f.id === 'alerta' ? 'bg-amber-100 text-amber-800 border-amber-300'
                   : 'bg-brand text-white border-brand'
                 : 'bg-white text-text-secondary border-card-border hover:bg-neutral-bg'
@@ -231,19 +225,50 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
             {f.label}
           </button>
         ))}
+
+        <span className="w-px h-5 bg-divider mx-1" />
+
+        <select value={filtros.moneda} onChange={e => set('moneda', e.target.value as FiltrosPorPagar['moneda'])} className={SELECT} title="Moneda de la orden">
+          <option value="">Moneda: todas</option>
+          <option value="MXN">MXN</option>
+          <option value="USD">USD</option>
+        </select>
+
+        <select value={filtros.origen} onChange={e => set('origen', e.target.value as FiltrosPorPagar['origen'])} className={SELECT} title="De dónde nació la orden">
+          <option value="">Origen: todos</option>
+          <option value="embarque">De embarque</option>
+          <option value="oficina">De oficina</option>
+        </select>
+
+        {/* §4.7 · «No pagar» es la razón por la que una autorizada no aparece
+            en Programación de pagos. Poder aislarlas es poder destrabarlas. */}
+        <select value={filtros.noPagar} onChange={e => set('noPagar', e.target.value as FiltrosPorPagar['noPagar'])} className={SELECT} title="Flag «No pagar»">
+          <option value="">No pagar: indistinto</option>
+          <option value="si">Solo las detenidas</option>
+          <option value="no">Sin «No pagar»</option>
+        </select>
+
+        {activos > 0 && (
+          <button
+            onClick={() => setFiltros(FILTROS_POR_PAGAR_VACIOS)}
+            className="text-[11px] font-bold text-text-muted hover:text-primario flex items-center gap-1 px-2"
+          >
+            <X className="w-3 h-3" /> Limpiar
+          </button>
+        )}
       </div>
 
       {/* Barra de búsqueda y acciones */}
       {/* Tarea 58 · `flex-wrap`: con el toggle nuevo, a 390 px la barra ya no
           cabe en un renglón y «Exportar» se salía del borde. */}
       <div className="flex gap-[12px] items-center flex-wrap">
-        <div className="relative max-w-[400px] flex-1">
+        <div className="relative max-w-[400px] flex-1 min-w-[200px]">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
             type="text"
-            placeholder="Buscar folio, proveedor, concepto, cliente..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Buscar folio, proveedor, concepto, cliente, factura..."
+            value={filtros.busqueda}
+            onChange={e => set('busqueda', e.target.value)}
             className="w-full pl-[36px] bg-white border border-card-border rounded-[8px] p-[8px] text-[13px] focus:outline-none focus:border-brand shadow-sm text-text-primary"
           />
         </div>
@@ -264,9 +289,39 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
             </button>
           ))}
         </div>
+
+        {/* Tarea 61 · Las vistas guardadas son de la tabla: en «Por proveedor»
+            no hay columnas que elegir, y ofrecer el selector ahí prometería
+            algo que esa vista no puede cumplir. Los filtros sí se conservan
+            al cambiar de vista. */}
+        {vista === 'orden' && (
+          <div className="flex items-center gap-2 shrink-0">
+            <SlidersHorizontal className="w-3.5 h-3.5 text-text-muted" />
+            <VistaSelector
+              vistas={vistas}
+              vistaActivaId={vistaActivaId}
+              currentUserId={user?.uid || user?.id || ''}
+              vistaActual={vistaTabla}
+              filtrosActuales={filtrosPorPagarParaVista(filtros)}
+              labelDefault="Vista por defecto"
+              onSeleccionar={seleccionarVista}
+              onGuardar={async (nombre) => {
+                const id = await crearVista(nombre, vistaTabla.columnas, { filtros: filtrosPorPagarParaVista(filtros) });
+                setVistaActivaId(id);
+              }}
+              onActualizar={(id, cambios) => actualizarVista(id, cambios)}
+              onEliminar={async (id) => {
+                await eliminarVista(id);
+                if (vistaActivaId === id) seleccionarVista(null);
+              }}
+            />
+          </div>
+        )}
+
         <button
           onClick={handleExportCSV}
-          className="flex items-center text-[13px] font-medium text-text-secondary bg-white border border-card-border rounded-[8px] px-[12px] py-[8px] hover:bg-neutral-bg transition-colors shadow-sm"
+          className="flex items-center text-[13px] font-medium text-text-secondary bg-white border border-card-border rounded-[8px] px-[12px] py-[8px] hover:bg-neutral-bg transition-colors shadow-sm shrink-0"
+          title="Exporta lo filtrado, con las columnas de la vista"
         >
           <Download className="w-4 h-4 mr-2" /> Exportar
         </button>
@@ -282,98 +337,36 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
         />
       )}
 
-      {/* Tabla */}
+      {/* Tarea 61 · La tabla orden por orden, configurable. */}
       {vista === 'orden' && (
-      <div className="overflow-x-auto border border-divider rounded-[8px]">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr>
-              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Folio</th>
-              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Estado</th>
-              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Proveedor</th>
-              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Concepto</th>
-              <th className="bg-canvas text-right px-[16px] py-[12px] text-[11px] font-medium text-text-muted border-b border-divider uppercase">Monto</th>
-              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Urgencia</th>
-              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Fecha requerida</th>
-              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">Origen</th>
-              <th className="bg-gray-50/70 text-left px-[16px] py-[12px] text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">IVA</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-divider bg-white">
-            {ordenesFiltradas.length === 0 ? (
-              <tr>
-                <td colSpan={9}>
-                  {/* U-6 · El vacío explica cuál de los dos es: no hay ninguna,
-                      o el filtro las escondió. Antes decía siempre lo segundo. */}
-                  <EstadoVacio
-                    variante="plano"
-                    icono={<FileText className="w-5 h-5" />}
-                    titulo={hayFiltro
-                      ? 'Ninguna orden coincide con los filtros'
-                      : 'Todavía no hay órdenes de compra'}
-                    detalle={hayFiltro
-                      ? 'Quita los filtros para ver todas las órdenes.'
-                      : 'Nacen del embarque cuando hay que pagarle a un proveedor, o se capturan sueltas para los gastos de oficina.'}
-                  />
-                </td>
-              </tr>
-            ) : (
-              ordenesFiltradas.map(oc => {
-                const estadoCfg = ESTADOS_OC_MAP[oc.estado];
-                return (
-                  <tr
-                    key={oc.id}
-                    onClick={() => onSelectOC?.(oc)}
-                    className="hover:bg-neutral-bg transition-colors cursor-pointer group"
-                  >
-                    <td className="px-[16px] py-[12px] text-[13px] font-medium text-text-primary whitespace-nowrap">
-                      {oc.folio}
-                    </td>
-                    <td className="px-[16px] py-[12px]">
-                      <span className={`inline-flex items-center gap-1.5 px-[8px] py-[3px] rounded-[4px] text-[11px] font-medium border ${estadoCfg.color}`}>
-                        {ESTADO_ICON[oc.estado]}
-                        {estadoCfg.label}
-                      </span>
-                    </td>
-                    <td className="px-[16px] py-[12px] text-[13px] text-text-primary truncate max-w-[180px]">
-                      {oc.proveedorNombre}
-                    </td>
-                    <td className="px-[16px] py-[12px] text-[13px] text-text-secondary truncate max-w-[180px]">
-                      {oc.conceptoNombre}
-                    </td>
-                    <td className="px-[16px] py-[12px] text-[13px] font-medium text-text-primary text-right tabular-nums whitespace-nowrap">
-                      ${oc.monto.toLocaleString()} {oc.moneda}
-                    </td>
-                    <td className="px-[16px] py-[12px]">
-                      {oc.urgencia === 'urgente' ? (
-                        <span className="inline-flex items-center gap-1 px-[8px] py-[3px] rounded-[4px] text-[11px] font-medium bg-red-100 text-red-700 border border-red-300">
-                          <AlertTriangle className="w-3 h-3" />
-                          Urgente
-                        </span>
-                      ) : (
-                        <span className="text-[12px] text-text-muted">Normal</span>
-                      )}
-                    </td>
-                    <td className="px-[16px] py-[12px] text-[13px] text-text-secondary whitespace-nowrap">
-                      {oc.fechaRequerida}
-                    </td>
-                    <td className="px-[16px] py-[12px] text-[13px] text-text-secondary whitespace-nowrap">
-                      {oc.origen === 'embarque' ? (
-                        <span className="text-info-text font-medium">{oc.embarqueFolio || 'Embarque'}</span>
-                      ) : (
-                        <span className="text-text-muted">Oficina</span>
-                      )}
-                    </td>
-                    <td className="px-[16px] py-[12px]">
-                      <BadgeIVA etiqueta={etiquetaIVADeOC(oc)} />
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+        ordenesFiltradas.length === 0 ? (
+          <div className="border border-divider rounded-[8px] bg-white">
+            {/* U-6 · El vacío explica cuál de los dos es: no hay ninguna, o el
+                filtro las escondió. Antes decía siempre lo segundo. */}
+            <EstadoVacio
+              variante="plano"
+              icono={<FileText className="w-5 h-5" />}
+              titulo={hayFiltro
+                ? 'Ninguna orden coincide con los filtros'
+                : 'Todavía no hay órdenes de compra'}
+              detalle={hayFiltro
+                ? 'Quita los filtros para ver todas las órdenes.'
+                : 'Nacen del embarque cuando hay que pagarle a un proveedor, o se capturan sueltas para los gastos de oficina.'}
+            />
+          </div>
+        ) : (
+          <div className="pt-8">
+            <SpreadsheetTable<OrdenCompra>
+              data={ordenesFiltradas}
+              columns={columnas}
+              pinnedColumnIds={['folio']}
+              vista={vistaTabla}
+              onVistaChange={setVistaTabla}
+              onRowClick={onSelectOC}
+              maxHeight="calc(100vh - 420px)"
+            />
+          </div>
+        )
       )}
 
       {/* Footer con total. En la vista por proveedor no va: ahí el pie lo
@@ -384,7 +377,7 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
         {/* §4.3 · Por moneda. Este pie era la CUARTA aparición del mismo bug:
             un reduce sobre `monto` sin mirar `moneda`, con el resultado
             rotulado como si fuera una sola. */}
-        {filtroEstado === 'autorizada' && (
+        {filtros.estado === 'autorizada' && (
           <span className="font-medium text-text-primary">
             Total por pagar: {formatearPorMoneda(
               sumarPorMoneda(ordenesFiltradas, oc => oc.monto, oc => oc.moneda),
@@ -395,29 +388,5 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
       </div>
       )}
     </div>
-  );
-}
-
-// ─── Tarea 36 · Badge de IVA ─────────────────────────────────────────────────
-
-function BadgeIVA({ etiqueta }: { etiqueta: EtiquetaIVA }) {
-  if (!etiqueta) return <span className="text-[11px] text-text-muted">—</span>;
-
-  const estilos: Record<NonNullable<EtiquetaIVA>, string> = {
-    ok: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    alerta: 'bg-amber-100 text-amber-800 border-amber-300',
-    pendiente: 'bg-gray-100 text-gray-500 border-gray-200',
-  };
-  const textos: Record<NonNullable<EtiquetaIVA>, string> = {
-    ok: 'OK',
-    alerta: 'No cuadra',
-    pendiente: 'Pendiente',
-  };
-
-  return (
-    <span className={`inline-flex items-center gap-1 px-[6px] py-[2px] rounded-[4px] text-[10px] font-bold border ${estilos[etiqueta]}`}>
-      {etiqueta === 'alerta' && <AlertTriangle className="w-3 h-3" />}
-      {textos[etiqueta]}
-    </span>
   );
 }

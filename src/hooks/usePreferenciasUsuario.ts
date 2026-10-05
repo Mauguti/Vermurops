@@ -24,6 +24,9 @@ export interface PreferenciasUsuario {
   /** Tarea 58 · Cuentas por pagar: por proveedor (un renglón por factura) o
    *  la tabla orden por orden. */
   vistaCuentasPorPagar?: 'proveedor' | 'orden';
+  /** Tarea 61 · Cuentas por cobrar: agrupada por cliente (lo de siempre) o la
+   *  tabla configurable, un renglón por factura. */
+  vistaCuentasPorCobrar?: 'cliente' | 'factura';
 }
 
 const COL = 'preferenciasUsuario';
