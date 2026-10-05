@@ -234,7 +234,9 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
       </div>
 
       {/* Barra de búsqueda y acciones */}
-      <div className="flex gap-[12px] items-center">
+      {/* Tarea 58 · `flex-wrap`: con el toggle nuevo, a 390 px la barra ya no
+          cabe en un renglón y «Exportar» se salía del borde. */}
+      <div className="flex gap-[12px] items-center flex-wrap">
         <div className="relative max-w-[400px] flex-1">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input

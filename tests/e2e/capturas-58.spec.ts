@@ -131,13 +131,17 @@ test('la factura se abre y el folio de la orden lleva a su ficha', async ({ brow
   const { page, ctx } = await entrar(browser, 'administracion@vermur.com');
   await abrirCuentasPorPagar(page);
 
-  // Cerrada, las órdenes no se ven.
-  await expect(page.getByRole('button', { name: 'OC-2026-0581', exact: true })).toHaveCount(0);
-
-  await page.getByText('F-IDA-1201').click();
+  // Los COD están a la vista en el renglón, sin abrir nada: es como se busca
+  // una orden de la que alguien pasó el folio.
   const cod = page.getByRole('button', { name: 'OC-2026-0581', exact: true });
   await expect(cod).toBeVisible();
   await expect(page.getByRole('button', { name: 'OC-2026-0582', exact: true })).toBeVisible();
+
+  // El desglose agrega el concepto y el monto de cada orden.
+  await expect(page.getByText('Maniobras en destino')).toHaveCount(0);
+  await page.getByRole('button', { name: 'F-IDA-1201', exact: true }).click();
+  await expect(page.getByText('Maniobras en destino')).toBeVisible();
+  await expect(page.getByText('Almacenaje')).toBeVisible();
   await page.getByRole('button', { name: 'OC-2026-0582', exact: true }).scrollIntoViewIfNeeded();
   await page.waitForTimeout(400);
   await page.screenshot({ path: `${IMG}/58-desglose-factura-desktop.png`, fullPage: true });

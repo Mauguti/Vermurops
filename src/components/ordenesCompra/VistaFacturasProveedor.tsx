@@ -127,29 +127,54 @@ function RenglonFactura({
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={onAlternar}
-        aria-expanded={abierta}
-        className="w-full px-[16px] py-[10px] flex items-center justify-between gap-3 text-left hover:bg-neutral-bg/60 transition-colors"
-      >
+      {/*
+       * El renglón NO es un botón: dentro viven los COD, que son enlaces a su
+       * orden, y un botón dentro de otro botón no es HTML válido. Abre y
+       * cierra el chevron o el número de la factura.
+       */}
+      <div className="w-full px-[16px] py-[10px] flex items-center justify-between gap-3 hover:bg-neutral-bg/60 transition-colors">
         <span className="min-w-0 flex items-center gap-2 flex-wrap">
-          <ChevronRight
-            className={`w-3.5 h-3.5 text-text-muted shrink-0 transition-transform ${abierta ? 'rotate-90' : ''}`}
-          />
+          <button
+            type="button"
+            onClick={onAlternar}
+            aria-expanded={abierta}
+            aria-label={`Desglose de ${factura.numero ?? factura.folios.join(', ')}`}
+            className="shrink-0 text-text-muted hover:text-text-primary"
+          >
+            <ChevronRight
+              className={`w-3.5 h-3.5 transition-transform ${abierta ? 'rotate-90' : ''}`}
+            />
+          </button>
           {sinFactura ? (
-            <span className="text-[13px] text-text-muted italic">
+            <button type="button" onClick={onAlternar} className="text-[13px] text-text-muted italic">
               Sin factura del proveedor
-            </span>
+            </button>
           ) : (
-            <span className="text-[13px] font-medium text-text-primary">{factura.numero}</span>
+            <button type="button" onClick={onAlternar} className="text-[13px] font-medium text-text-primary">
+              {factura.numero}
+            </button>
           )}
           <span className={`inline-flex items-center px-[8px] py-[2px] rounded-[4px] text-[11px] font-medium border ${estadoCfg.color}`}>
             {estadoCfg.label}
           </span>
+          {/*
+           * Los COD, a la vista y no escondidos tras la expansión: es como se
+           * busca una orden de la que alguien te pasó el folio. Cada uno abre
+           * su ficha, que regresa aquí.
+           */}
+          {factura.ordenes.map(o => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => onSelectOC?.(o)}
+              className="font-mono text-[11px] text-primario hover:text-primario-hover underline underline-offset-2 font-medium"
+              title={`Abrir ${o.folio}`}
+            >
+              {o.folio}
+            </button>
+          ))}
           <span className="text-[11px] text-text-muted">
-            {factura.ordenes.length} {factura.ordenes.length === 1 ? 'orden' : 'órdenes'}
-            {factura.fechaPago && ` · se paga ${factura.fechaPago}`}
+            {factura.fechaPago && `se paga ${factura.fechaPago}`}
           </span>
           {factura.fechasDistintas && (
             <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-[6px] py-[2px] rounded bg-amber-100 text-amber-800">
@@ -172,22 +197,17 @@ function RenglonFactura({
         <span className="text-right shrink-0 text-[13px] font-semibold text-text-primary tabular-nums">
           {formatearPorMoneda(factura.totales, { vacio: '—' })}
         </span>
-      </button>
+      </div>
 
       {abierta && (
         <div className="bg-canvas border-t border-divider divide-y divide-divider/60">
           {factura.ordenes.map(o => (
             <div key={o.id} className="px-[16px] py-[8px] pl-[38px] flex items-center justify-between gap-3">
               <span className="min-w-0 flex items-center gap-2 flex-wrap">
-                {/* El COD: enlace directo a la ficha de la orden. */}
-                <button
-                  type="button"
-                  onClick={() => onSelectOC?.(o)}
-                  className="font-mono text-[11px] text-primario hover:text-primario-hover underline underline-offset-2 font-medium"
-                  title={`Abrir ${o.folio}`}
-                >
-                  {o.folio}
-                </button>
+                {/* El enlace vive arriba, en el renglón: aquí el folio es la
+                    etiqueta del desglose, no un segundo botón con el mismo
+                    nombre. */}
+                <span className="font-mono text-[11px] text-text-muted">{o.folio}</span>
                 <span className="text-[12px] text-text-secondary truncate">{o.conceptoNombre}</span>
                 <span className="text-[11px] text-text-muted">
                   {ESTADOS_OC_MAP[o.estado].label}
