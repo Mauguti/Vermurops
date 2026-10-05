@@ -16,6 +16,7 @@ import type { KanbanQuote, ServicioSolicitado, CargaSolicitada } from '../compon
 import { aplanarCotizacion, type LineaPlana } from './lineasCotizacion';
 import { cargaDesdeLegacy, modalidadDeCarga, ETIQUETA_MODALIDAD, ETIQUETA_CONTENEDOR, ETIQUETA_UNIDAD_TERRESTRE } from './cargaSolicitud';
 import { numeroVersionActual } from './versionesCotizacion';
+import { contactoParaAvisos, type ContactoEditable } from './contactos';
 
 export type IdiomaPdf = 'es' | 'en';
 
@@ -45,7 +46,7 @@ export interface OpcionesPdf {
   /** YYYY-MM-DD. Inyectable para pruebas. */
   hoy: string;
   /** Cliente del catálogo, si la cotización está vinculada. */
-  cliente?: { nombre: string; contactos?: { nombre: string; email?: string | null; principal?: boolean }[] } | null;
+  cliente?: { nombre: string; contactos?: ContactoEditable[] } | null;
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -96,7 +97,9 @@ export function vigenciaSugerida(lineas: readonly LineaPlana[]): string {
 export function armarPayloadPdf(quote: KanbanQuote, o: OpcionesPdf): PayloadPdf {
   const servicio = quote.servicios?.[0];
   const carga = servicio ? (servicio.carga ?? cargaDesdeLegacy(servicio)) : null;
-  const contactoPrincipal = o.cliente?.contactos?.find(c => c.principal) ?? o.cliente?.contactos?.[0];
+  // Tarea 60: nunca un contacto desactivado. Mandarle la cotización a quien
+  // ya no trabaja ahí se ve perfectamente bien y no llega a nadie.
+  const contactoPrincipal = contactoParaAvisos(o.cliente?.contactos);
 
   return {
     folio: `${quote.id} v${numeroVersionActual(quote)}`,

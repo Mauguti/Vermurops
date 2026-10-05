@@ -19,6 +19,8 @@ import { useFacturas } from '../../hooks/useFacturas';
 import { resumenDeCliente } from '../../lib/cuentasPorCobrar';
 import { formatearPorMoneda } from '../../lib/sumarPorMoneda';
 import { usuariosPorRol, useAuth } from '../../auth/AuthContext';
+import EditorContactos from '../ui/EditorContactos';
+import { TIPOS_CONTACTO_CLIENTE, contactosActivos, contactosParaGuardar } from '../../lib/contactos';
 import {
   REGIMENES_FISCALES, estadoFiscal, faltantesFiscales,
   validarCodigoPostal, esRFCExtranjero,
@@ -60,7 +62,7 @@ const withDefaults = (c: ClienteVermur): ClienteVermur => ({
   pagare: c.pagare ?? PAGARE_DEFAULT,
 });
 
-type TabId = 'informacion' | 'credito' | 'expediente' | 'contrato';
+type TabId = 'informacion' | 'contactos' | 'credito' | 'expediente' | 'contrato';
 
 // ── Shared style helpers ──────────────────────────────────────────────────────
 const INPUT = 'w-full px-3 py-2 text-[13px] bg-white border border-card-border rounded-[6px] focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand text-text-primary';
@@ -238,6 +240,15 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
   const set = <K extends keyof ClienteVermur>(key: K, val: ClienteVermur[K]) =>
     setDraft(prev => ({ ...prev, [key]: val }));
 
+  /*
+   * Tarea 60 · Contactos. Hasta hoy los 169 clientes que traen contactos de
+   * Magaya los tenían invisibles: el dato estaba importado y ninguna
+   * pantalla lo enseñaba. El editor es el mismo del proveedor
+   * (`ui/EditorContactos`); aquí además se clasifican por tipo y se
+   * desactivan en vez de borrarse.
+   */
+  const contactosVivos = contactosActivos(draft.contactos);
+
   const save = async (fields: Partial<ClienteVermur>) => {
     setSaving(true);
     try {
@@ -249,6 +260,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
 
   const TABS: { id: TabId; label: string }[] = [
     { id: 'informacion', label: 'Información' },
+    { id: 'contactos',   label: `Contactos${contactosVivos.length ? ` (${contactosVivos.length})` : ''}` },
     { id: 'credito',     label: 'Crédito' },
     { id: 'expediente',  label: 'Expediente' },
     { id: 'contrato',    label: 'Contrato / Pagaré' },
@@ -295,6 +307,12 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
         responsablePricing: draft.responsablePricing || null,
         responsableOperativo: draft.responsableOperativo || null,
       });
+    } else if (tab === 'contactos') {
+      // Las líneas sin nombre no se escriben, y el principal sale vivo
+      // aunque se haya desactivado o borrado a quien lo era.
+      const limpios = contactosParaGuardar(draft.contactos ?? []);
+      setDraft(prev => ({ ...prev, contactos: limpios }));
+      save({ contactos: limpios });
     } else if (tab === 'credito') {
       const dct = draft.diasCreditoPorTipo ?? {
         general: draft.dias, maritimo: draft.dias,
@@ -535,6 +553,27 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
                 </div>
               </div>
               {/* Tarea 50: «Guardar cambios» subió al encabezado. */}
+            </div>
+          )}
+
+          {/* ── Contactos ──────────────────────────────────────────────────── */}
+          {tab === 'contactos' && (
+            <div className="max-w-3xl">
+              <p className="mb-4 text-[12px] text-text-muted">
+                Quién es quién en la organización del cliente: el dueño, quien pide la
+                unidad, quien manda la factura y quien monitorea pueden ser cuatro
+                personas distintas. Un contacto que ya no está <strong>se desactiva</strong>,
+                no se borra: deja de aparecer en los avisos y se conserva en el expediente.
+              </p>
+              <EditorContactos
+                contactos={draft.contactos ?? []}
+                onChange={next => set('contactos', next)}
+                tipos={TIPOS_CONTACTO_CLIENTE}
+                modoBaja="desactivar"
+                nombreGrupo={`contacto-principal-${cliente.id}`}
+                soloLectura={soloConsulta}
+                vacio="Este cliente no tiene contactos capturados. Agrega el primero."
+              />
             </div>
           )}
 

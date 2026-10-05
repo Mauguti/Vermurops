@@ -43,13 +43,32 @@ export interface PagareCliente {
   vencimiento: string;     // 'YYYY-MM-DD' o vacío
 }
 
-/** Contacto dentro de la organización del cliente (Magaya). */
+/**
+ * Contacto dentro de la organización del cliente.
+ *
+ * Nació del import de Magaya (169 de los 817 clientes lo traen, todos con
+ * `tipo: 'general'`) y en la tarea 60 (5-oct-2026) se volvió editable desde
+ * la ficha, con los cinco tipos que pidió Vermur.
+ *
+ * Todo lo nuevo es OPCIONAL y se lee con respaldo del valor viejo:
+ *   - `tipo`: uno de `TipoContactoCliente` ('dueno' | 'pide_unidad' |
+ *     'factura' | 'monitorea' | 'otro'). Lo que no sea de esos cinco —el
+ *     'general' de Magaya— se LEE como «sin tipo» y se conserva tal cual.
+ *   - `activo`: ausente = activo. Un contacto se desactiva, no se borra
+ *     (ver `lib/contactos.ts`).
+ */
 export interface ContactoCliente {
+  /** Id local dentro del documento. Magaya los trae como 'cnt-1'. */
+  id?: string;
   nombre: string;
+  /** Ver `TipoContactoCliente` en `lib/contactos.ts`. */
   tipo?: string | null;
+  puesto?: string | null;
   email?: string | null;
   telefono?: string | null;
   principal?: boolean;
+  /** Ausente = activo. */
+  activo?: boolean;
 }
 
 // ─── Entidad principal ────────────────────────────────────────────────────────
