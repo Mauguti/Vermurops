@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { X, Loader2, Plus, Trash2 } from 'lucide-react';
 import { ProveedorVermur, ContactoProveedor, Modalidad, TipoProveedor, PatenteAduanal } from './ProveedoresData';
 import { validarRFC } from '../../lib/validadores';
+import EditorContactos from '../ui/EditorContactos';
+import { contactosParaGuardar, idContacto } from '../../lib/contactos';
 
 interface Props {
   mode: 'crear' | 'editar';
@@ -33,7 +35,7 @@ function emptyPatente(): PatenteAduanal {
 }
 
 function emptyContacto(): ContactoProveedor {
-  return { id: `cnt-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, nombre: '', puesto: '', email: '', telefono: '', principal: false };
+  return { id: idContacto(), nombre: '', puesto: '', email: '', telefono: '', principal: false };
 }
 
 export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate, onUpdate }: Props) {
@@ -93,29 +95,13 @@ export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate,
     setPatentes(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
   };
 
-  // ── Contactos management ──────────────────────────────────────────────────
-  const updateContacto = (idx: number, field: keyof ContactoProveedor, value: string | boolean) => {
-    setContactos(prev => prev.map((c, i) => i === idx ? { ...c, [field]: value } : c));
-  };
-
-  const setPrincipal = (idx: number) => {
-    setContactos(prev => prev.map((c, i) => ({ ...c, principal: i === idx })));
-  };
-
-  const addContacto = () => {
-    setContactos(prev => [...prev, emptyContacto()]);
-  };
-
-  const removeContacto = (idx: number) => {
-    setContactos(prev => {
-      const next = prev.filter((_, i) => i !== idx);
-      // If removed the principal, first remaining becomes principal
-      if (!next.some(c => c.principal) && next.length > 0) {
-        next[0] = { ...next[0], principal: true };
-      }
-      return next;
-    });
-  };
+  /*
+   * Tarea 60 · El editor de contactos salió de aquí a `ui/EditorContactos`
+   * para que la ficha del cliente lo use también. Las reglas —altas, el
+   * radio de principal, el relevo al quitar uno— están en `lib/contactos.ts`
+   * con tests. El proveedor conserva el BORRADO que ya tenía; el cliente
+   * desactiva. Cambiarlo también aquí sería otra tarea.
+   */
 
   // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
@@ -148,11 +134,10 @@ export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate,
 
     try {
       const now = new Date().toISOString();
-      // Ensure exactly one principal
-      const finalContactos = contactos.map(c => ({ ...c, nombre: c.nombre.trim(), puesto: c.puesto.trim(), email: c.email.trim(), telefono: c.telefono.trim() }));
-      if (!finalContactos.some(c => c.principal) && finalContactos.length > 0) {
-        finalContactos[0].principal = true;
-      }
+      // Recorta, descarta las líneas sin nombre y deja exactamente un
+      // principal. `vaciosComoNull: false` porque el modelo del proveedor
+      // declara `email: string` y no admite null.
+      const finalContactos = contactosParaGuardar(contactos, { vaciosComoNull: false });
 
       // Patentes limpias: solo las que tienen nombre y número
       const finalPatentes = tipos.includes('agente_aduanal')
@@ -377,61 +362,12 @@ export default function ProveedorFormModal({ mode, proveedor, onClose, onCreate,
           {/* ── Contactos ──────────────────────────────────────────── */}
           <div>
             <h4 className="text-[11px] font-bold text-text-muted uppercase tracking-wider mb-3">Contactos</h4>
-            <div className="space-y-3">
-              {contactos.map((c, idx) => (
-                <div key={c.id} className="border border-card-border rounded-lg p-3 bg-canvas">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="radio"
-                        name="contacto-principal"
-                        checked={c.principal}
-                        onChange={() => setPrincipal(idx)}
-                        className="w-4 h-4 text-brand focus:ring-brand accent-brand"
-                      />
-                      <span className="text-[12px] font-medium text-text-secondary">
-                        {c.principal ? 'Principal' : `Contacto ${idx + 1}`}
-                      </span>
-                    </label>
-                    {contactos.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeContacto(idx)}
-                        className="p-1 rounded text-text-muted hover:text-danger-text transition-colors"
-                        title="Eliminar contacto"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={LABEL}>Nombre *</label>
-                      <input className={INPUT} value={c.nombre} onChange={e => updateContacto(idx, 'nombre', e.target.value)} placeholder="Nombre del contacto" />
-                    </div>
-                    <div>
-                      <label className={LABEL}>Puesto</label>
-                      <input className={INPUT} value={c.puesto} onChange={e => updateContacto(idx, 'puesto', e.target.value)} placeholder="Cargo" />
-                    </div>
-                    <div>
-                      <label className={LABEL}>Email</label>
-                      <input className={INPUT} type="email" value={c.email} onChange={e => updateContacto(idx, 'email', e.target.value)} placeholder="correo@ejemplo.com" />
-                    </div>
-                    <div>
-                      <label className={LABEL}>Teléfono</label>
-                      <input className={INPUT} value={c.telefono} onChange={e => updateContacto(idx, 'telefono', e.target.value)} placeholder="55 1234 5678" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={addContacto}
-              className="mt-2 flex items-center gap-1.5 text-[12px] font-semibold text-brand hover:text-brand-hover transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" /> Agregar contacto
-            </button>
+            <EditorContactos
+              contactos={contactos}
+              onChange={setContactos}
+              modoBaja="eliminar"
+              nombreGrupo="contacto-principal-proveedor"
+            />
           </div>
 
           {/* ── Notas ──────────────────────────────────────────────── */}

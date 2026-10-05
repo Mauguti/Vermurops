@@ -54,6 +54,20 @@ describe('el payload del PDF', () => {
     // el contacto capturado en la solicitud se conserva
     expect(q.cliente.contacto).toBe('Ana');
   });
+
+  // Tarea 60: un contacto desactivado no recibe la cotización.
+  it('sin prospecto, toma al contacto activo del cliente y nunca a uno dado de baja', () => {
+    const sinProspecto = { ...quote, prospecto: undefined };
+    const cliente = {
+      nombre: 'Alfa', contactos: [
+        { nombre: 'Roberto', email: 'r@alfa.mx', principal: true, activo: false },
+        { nombre: 'Lucía', email: 'l@alfa.mx' },
+      ],
+    };
+    const q = armarPayloadPdf(sinProspecto, { ...opts, cliente });
+    expect(q.cliente.contacto).toBe('Lucía');
+    expect(q.cliente.correo).toBe('l@alfa.mx');
+  });
 });
 
 describe('carga, vigencia y nombre', () => {
