@@ -1128,6 +1128,50 @@ parecer un duplicado.
     distintas sigue produciendo DOS transferencias. Decisión de negocio
     (¿se adelanta todo a la fecha más próxima?), no de interfaz.
 
+## 4.25 El tráfico del embarque se deriva, y con él el mes de cierre (tarea 59, 5-oct-2026)
+
+Julio cierra el mes por importación / exportación y por modalidad, y desde la
+lista de Embarques el tráfico **no se veía en ninguna parte**: vive en el
+prefijo del folio (VLIM, VLEM…), que hay que saber leer, y en los embarques
+cuyo folio viene de Magaya —`BOL 9016543`, `EASHA2406487`, `SHP-26-0001`— no
+está ni ahí.
+
+**No se agregó campo `trafico` al embarque: se DERIVA** (`lib/traficoEmbarque.ts`,
+18 tests, más 6 de los filtros), por la misma razón por la que `traficoDeFolio` ya existía en vez de
+duplicarlo — un dato duplicado es un dato que se desincroniza. Dos fuentes, en
+este orden:
+  1. **El folio** (`traficoDeFolio`): es lo que reservó la serie al abrir el
+     embarque (§4.15) y lo que se imprime. **Manda sobre la ruta.**
+  2. **La ruta** (`resolverTrafico`): destino en México es importación, origen
+     en México es exportación (§4.2). Es la MISMA derivación que ya usan la
+     cotización y el IVA; `resolverTrafico` pasó a un parámetro estructural
+     (`EntradaTrafico`) para que el embarque le pase sus puertos en vez de
+     copiar las listas de pistas.
+  3. Si ninguna alcanza —nacional, cross-trade, ruta vacía—, `null`. La
+     columna pinta «—» con el motivo en el tooltip. Un embarque marcado así se
+     corrige; uno clasificado mal se cuenta en el mes equivocado.
+
+**El mes de cierre usa la fecha del lado mexicano de la operación**, que es la
+misma dimensión de la regla espejo del IVA (§4.2):
+
+    Importación → la mercancía LLEGA a México → fecha de ARRIBO (ETA)
+    Exportación → la mercancía SALE de México → fecha de SALIDA (ETD)
+
+Es **una** fecha por embarque, no las dos: si uno cayera en el cierre de dos
+meses, los totales de Julio no cuadrarían con ninguno. Un embarque sin la
+fecha que su tráfico exige no cae en ningún mes —mismo criterio que el rango
+de fechas que ya existía— y el encabezado de la lista **dice cuántos quedaron
+fuera**, para que un cierre incompleto no pase inadvertido. Tráfico
+desconocido usa el arribo, que es la fecha por omisión de la lista.
+
+**Los dos filtros se guardan con la vista** (`VistaUsuario.filtros`) y se
+combinan con el de modalidad: «mis importaciones aéreas de septiembre» son
+tres filtros juntos. Un valor basura guardado en una vista se descarta al
+leerla en vez de dejar la lista vacía sin explicación.
+  - La columna «Tráfico» entra a la vista por defecto; las vistas ya guardadas
+    conservan sus columnas y pueden agregarla a mano.
+  - El CSV de la lista suma «Tráfico» y «Mes de cierre».
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

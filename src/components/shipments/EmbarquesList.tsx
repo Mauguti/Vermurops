@@ -25,6 +25,10 @@ import {
   filtrosParaVista, responsablesPresentes, type FiltrosEmbarques,
 } from '../../lib/filtrosEmbarques';
 import { ETAPAS_EMBARQUE } from '../../lib/estadoEmbarque';
+import {
+  ETIQUETA_TRAFICO, cierreDelEmbarque, etiquetaMes, mesesDeCierrePresentes,
+  traficoDeEmbarque,
+} from '../../lib/traficoEmbarque';
 
 interface EmbarquesListProps {
   embarques: EmbarqueCompleto[];
@@ -94,12 +98,31 @@ export default function EmbarquesList({ embarques, onSelectEmbarque, onCrearEmba
     return clientes.filter(c => ids.has(c.id)).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
   }, [embarques, clientes]);
 
+  /** Los meses que existen en los embarques, para no ofrecer meses vacíos. */
+  const mesesCierre = useMemo(() => mesesDeCierrePresentes(embarques), [embarques]);
+
+  /**
+   * Cuántos se quedan fuera del mes de cierre por no tener la fecha que su
+   * tráfico exige (ETA en importación, ETD en exportación). Decirlo evita que
+   * un cierre salga incompleto sin que nadie se entere.
+   */
+  const sinFechaDeCierre = useMemo(() => {
+    if (!filtros.mesCierre) return 0;
+    return aplicarFiltros(embarques, { ...filtros, mesCierre: '' }, { clientes })
+      .filter(e => !cierreDelEmbarque(e).fecha).length;
+  }, [embarques, filtros, clientes]);
+
   const exportarCSV = () => {
-    const headers = ['Folio', 'Cliente', 'Responsable', 'Modalidad', 'BL/AWB', 'ETD', 'ETA'];
-    const rows = filtrados.map(e => [
-      e.folio, e.entidades?.clienteCobrar ?? '', e.responsableOperativo ?? '', e.modalidad,
-      e.numeroGuia, e.fechas?.salida ?? '', e.fechas?.arribo ?? '',
-    ]);
+    const headers = ['Folio', 'Cliente', 'Responsable', 'Modalidad', 'Tráfico', 'BL/AWB', 'ETD', 'ETA', 'Mes de cierre'];
+    const rows = filtrados.map(e => {
+      const { trafico } = traficoDeEmbarque(e);
+      return [
+        e.folio, e.entidades?.clienteCobrar ?? '', e.responsableOperativo ?? '', e.modalidad,
+        trafico ? ETIQUETA_TRAFICO[trafico] : '',
+        e.numeroGuia, e.fechas?.salida ?? '', e.fechas?.arribo ?? '',
+        cierreDelEmbarque(e).mes,
+      ];
+    });
     const csv = [headers, ...rows].map(r => r.map(f => `"${String(f).replace(/"/g, '""')}"`).join(',')).join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
     const a = document.createElement('a');
@@ -117,6 +140,14 @@ export default function EmbarquesList({ embarques, onSelectEmbarque, onCrearEmba
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
               {filtrados.length} de {embarques.length}{activos > 0 ? ` · ${activos} filtro${activos !== 1 ? 's' : ''}` : ''}
             </p>
+            {sinFechaDeCierre > 0 && (
+              <p
+                className="text-[10px] font-bold text-amber-600 mt-0.5"
+                title="El mes de cierre usa la fecha de arribo en importación y la de salida en exportación. Sin esa fecha, el embarque no cae en ningún mes."
+              >
+                {sinFechaDeCierre} embarque{sinFechaDeCierre !== 1 ? 's' : ''} sin fecha de cierre, fuera de este mes
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -164,6 +195,24 @@ export default function EmbarquesList({ embarques, onSelectEmbarque, onCrearEmba
             <option value="maritimo">Marítimo</option>
             <option value="aereo">Aéreo</option>
             <option value="terrestre">Terrestre</option>
+          </select>
+
+          <select value={filtros.trafico} onChange={e => set('trafico', e.target.value as FiltrosEmbarques['trafico'])} className={SELECT} title="Importación / exportación, derivado del folio o de la ruta">
+            <option value="">Tráfico: todos</option>
+            <option value="impo">Importación</option>
+            <option value="expo">Exportación</option>
+          </select>
+
+          <select
+            value={filtros.mesCierre}
+            onChange={e => set('mesCierre', e.target.value)}
+            className={SELECT}
+            title="Mes de cierre: fecha de arribo en importación, de salida en exportación"
+          >
+            <option value="">Mes de cierre: todos</option>
+            {/* El prefijo se queda en la opción elegida: junto al rango de
+                fechas de abajo, un «septiembre 2026» a secas se lee como ETA. */}
+            {mesesCierre.map(m => <option key={m} value={m}>Cierre: {etiquetaMes(m)}</option>)}
           </select>
 
           <select value={filtros.clienteId} onChange={e => set('clienteId', e.target.value)} className={`${SELECT} max-w-[220px]`}>

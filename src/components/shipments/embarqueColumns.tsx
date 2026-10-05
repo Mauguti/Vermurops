@@ -7,11 +7,12 @@
 
 import React from 'react';
 import { createColumnHelper } from '@tanstack/react-table';
-import { Plane, Ship, Truck, ArrowRight } from 'lucide-react';
+import { Plane, Ship, Truck, ArrowRight, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import type { EmbarqueCompleto, ModalidadEmbarque } from './EmbarquesData';
 import type { VistaConfig } from '../table/SpreadsheetTable';
 import { estadoDe, ETAPAS_EMBARQUE } from '../../lib/estadoEmbarque';
 import { nombreDeUsuario } from '../../auth/AuthContext';
+import { ETIQUETA_TRAFICO, traficoDeEmbarque } from '../../lib/traficoEmbarque';
 
 const col = createColumnHelper<EmbarqueCompleto>();
 
@@ -28,6 +29,29 @@ function BadgeModalidad({ modalidad }: { modalidad: ModalidadEmbarque }) {
   );
 }
 
+/**
+ * Importación / exportación. El tráfico se DERIVA (folio o ruta), así que el
+ * badge lleva en el tooltip de dónde salió: Julio cierra el mes con esto y un
+ * «—» tiene que poder rastrearse. Ni morado ni rojo: el morado es el acento de
+ * la interfaz y el rojo es peligro (§4.20).
+ */
+function BadgeTrafico({ embarque }: { embarque: EmbarqueCompleto }) {
+  const { trafico, detalle } = traficoDeEmbarque(embarque);
+  if (!trafico) {
+    return <span className="text-gray-300 italic" title={detalle}>—</span>;
+  }
+  const t = trafico === 'impo'
+    ? { icon: <ArrowDownLeft className="w-3 h-3" />, cls: 'bg-teal-50 text-teal-700 border-teal-100' }
+    : { icon: <ArrowUpRight className="w-3 h-3" />, cls: 'bg-violet-50 text-violet-700 border-violet-100' };
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${t.cls}`}
+      title={`${ETIQUETA_TRAFICO[trafico]} · ${detalle}`}
+    >
+      {t.icon}{ETIQUETA_TRAFICO[trafico]}
+    </span>
+  );
+}
 
 function CierreDot({ label, done }: { label: string; done: boolean }) {
   return (
@@ -74,6 +98,10 @@ export const EMBARQUE_COLUMNS = [
   col.accessor('modalidad', {
     id: 'modalidad', header: 'Modalidad', size: 110,
     cell: info => <BadgeModalidad modalidad={info.getValue()} />,
+  }),
+  col.accessor(e => traficoDeEmbarque(e).trafico ?? '', {
+    id: 'trafico', header: 'Tráfico', size: 120,
+    cell: info => <BadgeTrafico embarque={info.row.original} />,
   }),
   col.accessor(e => e.entidades?.consignatario ?? '', {
     id: 'consignatario', header: 'Consignatario', size: 180,
@@ -131,7 +159,8 @@ export const EMBARQUE_COLUMNS = [
 export const VISTA_DEFAULT_EMBARQUES: VistaConfig = {
   columnas: [
     { id: 'folio' }, { id: 'cliente' }, { id: 'responsable' }, { id: 'estado' },
-    { id: 'modalidad' }, { id: 'ruta' }, { id: 'guia' }, { id: 'eta' }, { id: 'cierres' },
+    { id: 'modalidad' }, { id: 'trafico' }, { id: 'ruta' }, { id: 'guia' },
+    { id: 'eta' }, { id: 'cierres' },
   ],
   ordenamiento: { columnaId: 'eta', direccion: 'asc' },
 };

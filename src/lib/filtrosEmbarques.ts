@@ -15,12 +15,19 @@ import type { EmbarqueCompleto, ModalidadEmbarque } from '../components/shipment
 import { estadoDe, type EstadoEmbarque } from './estadoEmbarque';
 import { clienteDelEmbarque } from './entidadesEmbarque';
 import { normalizarTexto } from './texto';
+import { mesDeCierre, traficoDeEmbarque, type TraficoEmbarque } from './traficoEmbarque';
 
 export interface FiltrosEmbarques {
   /** Correo del responsable operativo. '' = todos. */
   responsable: string;
   estado: EstadoEmbarque | '';
   modalidad: ModalidadEmbarque | '';
+  /**
+   * Importación / exportación, derivado (ver `lib/traficoEmbarque`). Es el
+   * otro eje del cierre de mes de Julio, y se combina con `modalidad`: «mis
+   * importaciones marítimas de septiembre» son los tres filtros juntos.
+   */
+  trafico: TraficoEmbarque | '';
   /** Id del cliente (clientes/). '' = todos. */
   clienteId: string;
   /** Qué fecha acota el rango. */
@@ -28,6 +35,12 @@ export interface FiltrosEmbarques {
   /** YYYY-MM-DD, inclusivos. '' = sin límite. */
   desde: string;
   hasta: string;
+  /**
+   * Mes de cierre, YYYY-MM. La fecha que cuenta depende del tráfico: arribo
+   * para importación, salida para exportación (ver `cierreDelEmbarque`). Es
+   * independiente del rango de arriba, que filtra por UNA fecha elegida.
+   */
+  mesCierre: string;
   /** Búsqueda libre: folio, guía, PO, consignatario, shipper. */
   busqueda: string;
   /** Cierre pendiente. '' = sin filtro. */
@@ -35,14 +48,17 @@ export interface FiltrosEmbarques {
 }
 
 export const FILTROS_VACIOS: FiltrosEmbarques = {
-  responsable: '', estado: '', modalidad: '', clienteId: '',
-  fechaCampo: 'arribo', desde: '', hasta: '', busqueda: '', cierrePendiente: '',
+  responsable: '', estado: '', modalidad: '', trafico: '', clienteId: '',
+  fechaCampo: 'arribo', desde: '', hasta: '', mesCierre: '', busqueda: '',
+  cierrePendiente: '',
 };
 
 /** Cuántos filtros están activos (la búsqueda cuenta). */
 export function filtrosActivos(f: FiltrosEmbarques): number {
-  return [f.responsable, f.estado, f.modalidad, f.clienteId, f.desde, f.hasta, f.busqueda.trim(), f.cierrePendiente]
-    .filter(Boolean).length;
+  return [
+    f.responsable, f.estado, f.modalidad, f.trafico, f.clienteId,
+    f.desde, f.hasta, f.mesCierre, f.busqueda.trim(), f.cierrePendiente,
+  ].filter(Boolean).length;
 }
 
 /** De un mapa plano guardado en una vista a filtros válidos. Ignora lo desconocido. */
@@ -54,6 +70,10 @@ export function filtrosDesdeVista(guardados: Record<string, string | null> | und
     if (typeof v === 'string') (f as unknown as Record<string, string>)[k] = v;
   }
   if (f.fechaCampo !== 'arribo' && f.fechaCampo !== 'salida') f.fechaCampo = 'arribo';
+  // Un valor desconocido en estos dos no filtraría nada y dejaría la lista
+  // vacía sin explicación: se descarta al leer la vista.
+  if (f.trafico !== 'impo' && f.trafico !== 'expo') f.trafico = '';
+  if (!/^\d{4}-\d{2}$/.test(f.mesCierre)) f.mesCierre = '';
   return f;
 }
 
@@ -93,6 +113,10 @@ export function aplicarFiltros(
     }
     if (f.estado && estadoDe(e) !== f.estado) return false;
     if (f.modalidad && e.modalidad !== f.modalidad) return false;
+    // El tráfico se deriva; uno que no se pudo determinar no cae en
+    // «importación» ni en «exportación». Aparece sin filtro, con «—».
+    if (f.trafico && traficoDeEmbarque(e).trafico !== f.trafico) return false;
+    if (f.mesCierre && mesDeCierre(e) !== f.mesCierre) return false;
     if (f.clienteId) {
       const c = clienteDelEmbarque(e, ctx.clientes);
       if (c?.id !== f.clienteId) return false;

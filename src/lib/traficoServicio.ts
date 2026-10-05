@@ -15,7 +15,7 @@
  * Lógica pura: sin React ni Firestore.
  */
 
-import { ServicioSolicitado, TraficoServicio } from '../components/quotes/QuotesData';
+import { TraficoServicio } from '../components/quotes/QuotesData';
 import { Servicio, ModalidadServicio } from '../config/serviciosStore';
 
 // ─── Modalidad ────────────────────────────────────────────────────────────────
@@ -64,6 +64,17 @@ export interface ResolucionTrafico {
   fuente: FuenteTrafico;
   /** Explicación para la advertencia, cuando no se pudo determinar. */
   motivo?: string;
+}
+
+/**
+ * Lo único que `resolverTrafico` mira. Estructural a propósito para que la
+ * MISMA derivación sirva al servicio de una cotización y a la ruta de un
+ * embarque (`lib/traficoEmbarque.ts`), sin copiar las listas de pistas.
+ * `ServicioSolicitado` la satisface.
+ */
+export interface EntradaTrafico {
+  trafico?: TraficoServicio;
+  ruta?: { origen?: string; destino?: string };
 }
 
 /**
@@ -150,7 +161,7 @@ function pareceMexico(lugar: string | undefined): boolean {
  * 3. Si ambos extremos parecen México, o ninguno, se devuelve null. La ruta es
  *    texto libre y equivocarse aquí produce un folio incorrecto.
  */
-export function resolverTrafico(srv: ServicioSolicitado): ResolucionTrafico {
+export function resolverTrafico(srv: EntradaTrafico): ResolucionTrafico {
   if (srv.trafico) return { trafico: srv.trafico, fuente: 'declarado' };
 
   const origenMx = pareceMexico(srv.ruta?.origen);
