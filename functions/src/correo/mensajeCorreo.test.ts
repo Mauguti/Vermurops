@@ -85,6 +85,25 @@ describe('texto plano desde el HTML', () => {
       .toBe('Cu&Co <USD 1,500> MXN');
   });
 
+  it('las entidades del texto de Vermur también', () => {
+    // El `&rarr;` de «Configuración → Integraciones» salía crudo en el cuerpo
+    // de texto plano del correo de prueba. Lo atrapó el envío por el emulador,
+    // no un test: de ahí este caso.
+    expect(textoDesdeHtml('<p>Configuración &rarr; Integraciones</p>'))
+      .toBe('Configuración → Integraciones');
+    expect(textoDesdeHtml('<p>&laquo;VLIM-0001&raquo; &mdash; 15 d&iacute;as</p>'))
+      .toBe('«VLIM-0001» — 15 d&iacute;as');
+  });
+
+  it('las entidades numéricas se resuelven, en decimal y en hexadecimal', () => {
+    expect(textoDesdeHtml('<p>&#8594; &#x2192; &#191;ok&#63;</p>')).toBe('→ → ¿ok?');
+  });
+
+  it('un &amp;amp; escapado no se decodifica dos veces', () => {
+    // `&amp;#8594;` es el TEXTO «&#8594;», no una flecha.
+    expect(textoDesdeHtml('<p>&amp;#8594;</p>')).toBe('&#8594;');
+  });
+
   it('el estilo y el script no entran al cuerpo', () => {
     expect(textoDesdeHtml('<style>p{color:red}</style><p>Aviso</p>')).toBe('Aviso');
   });

@@ -158,11 +158,18 @@ export function textoDesdeHtml(html: string): string {
     .replace(/<\s*\/\s*(td|th)\s*>/gi, '\t')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
+    .replace(/&rarr;/g, '→')
+    .replace(/&ndash;/g, '–')
+    .replace(/&mdash;/g, '—')
+    .replace(/&laquo;/g, '«')
+    .replace(/&raquo;/g, '»')
+    // Las numéricas antes que `&amp;`, o un `&amp;#8594;` saldría a medias.
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -357,7 +364,7 @@ export function correoDePrueba(destino: string, solicitante: string, ahora: Date
       '<p>Este es un <strong>correo de prueba</strong> de VermurOps.</p>',
       '<p>Si lo estás leyendo, el correo saliente por Exchange quedó configurado:',
       'la plataforma pudo autenticarse en el servidor y entregar el mensaje.</p>',
-      `<p>Lo pidió <strong>${solicitante}</strong> desde Configuración &rarr; Integraciones.</p>`,
+      `<p>Lo pidió <strong>${solicitante}</strong> desde Configuración → Integraciones.</p>`,
       `<p>Sello: ${sello}</p>`,
       '<p>No hay que contestar nada.</p>',
     ].join('\n'),
