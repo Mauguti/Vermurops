@@ -1266,6 +1266,77 @@ aparece en Programación de pagos, y poder aislarla es poder destrabarla.
   - El selector de vistas **solo aparece en el modo tabla**: en el agrupado no
     hay columnas que elegir y ofrecerlo prometería lo que esa vista no cumple.
 
+## 4.28 Un solo botón de documentos, y el tipo lo propone el agente (tarea 63, 5-oct-2026)
+
+Gaby: «se vuelven 15 documentos… me equivoqué, puse la constancia en el acta».
+Un botón por casilla obliga a acertar la casilla **antes** de abrir el
+archivo, y el error queda guardado con cara de correcto: la constancia
+aparece como acta y el checklist afirma que el acta está.
+
+**Ahora el tipo se propone DESPUÉS de leer el documento**
+(`lib/loteDocumentos.ts`, 32 tests; `components/documentos/SubirDocumentosLote.tsx`).
+Un botón «Subir documentos» acepta hasta 15 archivos, cada uno sube a Storage
+y pasa por `clasificarDocumento`, y la **lista del lote ES la pantalla de
+revisión** (§4.10): nada toca Firestore hasta confirmarla. Lo que
+`RevisionDocumentoClasificado` hace con un documento, en plural y sin modal —
+con 15 archivos, 15 modales encadenados son peores que el problema.
+
+Está en los tres lugares que pidió la tarea: expediente del cliente,
+expediente del proveedor (vía `botonLote` de `ExpedientePanel`) y la ficha de
+la orden de compra.
+
+**La clasificación es de MEJOR ESFUERZO.** Si el agente no contesta, se
+equivoca o devuelve un tipo que este contexto no tiene, el renglón queda
+«Sin clasificar» y lo resuelve la persona; el archivo ya está en Storage y no
+se pierde. Tirarlo porque la IA no contestó castigaría al usuario por una
+falla de infraestructura, y en un lote de 15 uno así tiraría los 15.
+  - **Un tipo desconocido NO se fuerza al más parecido.** Un BL en el
+    expediente del cliente queda sin clasificar, no como «acta». Adivinar la
+    casilla es el error de Gaby escrito en código.
+  - Los nombres equivalentes viven en **grupos**, no en un mapa dirigido: el
+    expediente del cliente indexa `constancia_situacion_fiscal` y el del
+    proveedor `csf` (su clave en `DocsAlta`), y los dos resuelven con el mismo
+    grupo. Lo ambiguo se deja fuera a propósito: «comprobante» a secas es de
+    domicilio en el expediente y de pago en la orden.
+  - **Dos archivos del mismo tipo se avisan** cuando el destino guarda uno por
+    tipo (los dos expedientes son mapas): el segundo pisa al primero y hay que
+    saberlo antes de guardar. La orden guarda una LISTA, así que ahí conviven
+    —dos transferencias son dos comprobantes— y no se avisa de lo que no es un
+    problema.
+  - **La casilla no es la validación.** Que el documento esté y el agente lo
+    reconozca marca su casilla de `docsAlta`; validar el expediente sigue
+    siendo de Administración con su botón (§4.18). Lo único que cambió es cómo
+    llega el archivo.
+  - Por casilla solo queda **«Reemplazar»**, y solo donde ya hay archivo: ahí
+    el destino no se adivina. En el cliente pasa por la revisión de uno, que
+    es la que ofrece adoptar RFC y domicilio (D-2); en el lote esos datos se
+    ofrecen **después de guardar**, con el mismo criterio de confirmación
+    explícita.
+  - **Quién corrigió el tipo queda escrito** (`textoCorreccionTipo`) con las
+    dos cosas: qué leyó el agente y qué decidió la persona. Guardar solo lo
+    segundo esconde que el clasificador se equivocó, que es justo lo que hay
+    que ver para arreglar el flujo de n8n. Vive en `observaciones`, el campo
+    que ya existía. El **expediente del proveedor no lo persiste**:
+    `ArchivoExpediente` no tiene dónde, y agregarle un campo no estaba en el
+    modelo aprobado — está propuesto en el reporte 63.
+
+**Los complementos de pago del proveedor ya tienen dónde ir** (§4.24): la
+orden de compra tiene `documentos?: DocumentoOC[]`, lista **opcional y
+aditiva**, con factura, complemento de pago, comprobante de pago y cotización
+del proveedor. `facturaArchivos` (tarea 55) no se toca: ahí sigue el PDF y el
+XML con parseo de CFDI y cotejo contra el monto.
+  - El flujo nuevo es `documento-oc`, con capacidad **`ordenCompra.solicitar`**
+    — la tienen las tres áreas que tocan una orden; `gestionar` dejaría fuera a
+    Administración y `autorizar` a Operaciones. El espejo de capacidades de
+    `functions/src/comun/auth.ts` no traía NINGUNA de `ordenCompra`.
+  - **El webhook `clasificar-documento-oc` todavía no existe en n8n**: hasta
+    que se importe, los archivos de la orden caen como «Sin clasificar» y el
+    tipo se elige a mano. Y `N8N_WEBHOOK_URL_DOC_OC` es un `defineString`
+    nuevo: el deploy de Functions deja de ser desatendido.
+  - Los archivos van a `ordenesCompra/{id}/factura/`, que es la única ruta de
+    la orden con regla publicada, y **acepta solo PDF y XML**. Una carpeta
+    `documentos/` que acepte imágenes necesita su propia regla de Storage.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
