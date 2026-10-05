@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   FORMATO_FOLIO_PREDETERMINADO, MAX_DIGITOS, anioDeFolio, armarFolioSerie,
+  avisoPrefijoFueraDeFamilia,
   ejemploFolio, formatoDeSerie, formatoParaGuardar, formatoPersonalizado,
   razonFormatoInvalido, type FormatoFolioSerie,
 } from './formatoFolioSerie';
@@ -186,5 +187,24 @@ describe('qué no se puede guardar', () => {
   it('formatoParaGuardar devuelve el formato completo cuando sí cambia', () => {
     const f = formatoParaGuardar('VLIM', { prefijo: 'BLIM', separador: '', digitosAnio: 2, digitos: 3 });
     expect(f).toEqual({ prefijo: 'BLIM', separador: '', digitosAnio: 2, digitos: 3 });
+  });
+});
+
+describe('el aviso del prefijo fuera de la familia VL', () => {
+  it('la familia VL no avisa', () => {
+    expect(avisoPrefijoFueraDeFamilia({ prefijo: 'VLIM' })).toBeNull();
+    expect(avisoPrefijoFueraDeFamilia({ prefijo: 'VLET' })).toBeNull();
+    expect(avisoPrefijoFueraDeFamilia({ prefijo: 'VL' })).toBeNull();
+  });
+
+  it('BLIM avisa que el tráfico deja de salir del folio', () => {
+    const aviso = avisoPrefijoFueraDeFamilia({ prefijo: 'BLIM' });
+    expect(aviso).toMatch(/tráfico/i);
+    expect(aviso).toMatch(/BLIM/);
+  });
+
+  it('no avisa de un prefijo vacío: de eso se queja razonFormatoInvalido', () => {
+    expect(avisoPrefijoFueraDeFamilia({ prefijo: '' })).toBeNull();
+    expect(avisoPrefijoFueraDeFamilia({})).toBeNull();
   });
 });

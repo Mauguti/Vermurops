@@ -3,8 +3,9 @@ import { AlertTriangle, CheckCircle2, Hash, Pencil, Power, X } from 'lucide-reac
 import { useContadoresSerie } from '../../hooks/useContadoresSerie';
 import { formatFolioSerie } from '../../lib/folioService';
 import {
-  MAX_DIGITOS, SEPARADORES, ejemploFolio, formatoDeSerie, formatoPersonalizado,
-  razonFormatoInvalido, type FormatoFolioSerie,
+  MAX_DIGITOS, SEPARADORES, avisoPrefijoFueraDeFamilia, ejemploFolio,
+  formatoDeSerie, formatoPersonalizado, razonFormatoInvalido,
+  type FormatoFolioSerie,
 } from '../../lib/formatoFolioSerie';
 import Toast, { TipoToast } from '../ui/Toast';
 
@@ -327,6 +328,7 @@ export default function ContadoresFolio() {
                   </span>
                   <input
                     value={formato.prefijo}
+                    aria-label="Prefijo del folio"
                     onChange={e => setFormato(f => f && { ...f, prefijo: e.target.value.toUpperCase() })}
                     className="w-full px-[10px] py-[7px] text-[13px] font-mono border border-card-border rounded-[6px] focus:outline-none focus:border-primario focus:ring-1 focus:ring-primario"
                   />
@@ -341,6 +343,7 @@ export default function ContadoresFolio() {
                   </span>
                   <select
                     value={formato.separador}
+                    aria-label="Separador del folio"
                     onChange={e => setFormato(f => f && { ...f, separador: e.target.value })}
                     className="w-full px-[10px] py-[7px] text-[13px] border border-card-border rounded-[6px] focus:outline-none focus:border-primario focus:ring-1 focus:ring-primario"
                   >
@@ -379,6 +382,16 @@ export default function ContadoresFolio() {
                   />
                 </label>
               </div>
+
+              {avisoPrefijoFueraDeFamilia(formato) && (
+                <div
+                  className="flex items-start gap-[8px] mt-[14px] px-[12px] py-[10px] rounded-[8px] border"
+                  style={{ background: '#FFFBEB', borderColor: '#FDE68A', color: '#B45309' }}
+                >
+                  <AlertTriangle className="w-[15px] h-[15px] shrink-0 mt-[1px]" />
+                  <p className="text-[12px] leading-snug">{avisoPrefijoFueraDeFamilia(formato)}</p>
+                </div>
+              )}
 
               <p className="text-[12px] text-text-muted mt-[14px] leading-snug">
                 Cambiar el formato <strong>no renumera</strong> los folios ya emitidos: los

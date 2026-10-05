@@ -304,8 +304,20 @@ export function saldoDeFactura(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function traficoDeFolio(folio: string): 'impo' | 'expo' | null {
-  const prefijo = folio.split('-')[0]?.toUpperCase() ?? '';
-  // VL + I/E + modalidad. La serie provisional «VL-» no dice el tráfico.
-  if (!/^VL[IE][MTA]$/.test(prefijo)) return null;
-  return prefijo[2] === 'I' ? 'impo' : 'expo';
+  /*
+   * Tarea 66 · Se busca el prefijo AL PRINCIPIO del folio, no como primer
+   * segmento separado por guion. El separador dejó de ser fijo —Vermur puede
+   * configurar `VLIM26001` o `VLIM/26/001`— y un folio sin guion dejaba el
+   * tráfico en null, y con él el IVA (§4.2) y la columna Tráfico (§4.25).
+   *
+   * El `(?![A-Z])` evita el falso positivo: lo que sigue al prefijo tiene que
+   * ser el año, el separador o el final, no más letras.
+   *
+   * VL + I/E + modalidad. La serie provisional «VL-» no dice el tráfico, y un
+   * prefijo que NO sea de la familia VL tampoco: si Vermur confirma otro
+   * (BLIM), esta función tiene que aprenderlo — está en el reporte 66.
+   */
+  const m = /^VL([IE])[MTA](?![A-Za-z])/.exec(folio.trim().toUpperCase());
+  if (!m) return null;
+  return m[1] === 'I' ? 'impo' : 'expo';
 }

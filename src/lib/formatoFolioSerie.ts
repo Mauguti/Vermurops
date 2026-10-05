@@ -147,6 +147,27 @@ export function formatoParaGuardar(
   return formatoDeSerie(serie, f);
 }
 
+/**
+ * Lo que se rompe si se guarda este formato, o null si no se rompe nada.
+ *
+ * El tráfico del embarque NO es un campo: se lee del prefijo de su folio
+ * (`traficoDeFolio`, §4.25), y de él salen el IVA de las facturas (§4.2) y la
+ * columna Tráfico de la lista. Esa lectura reconoce la familia VL + I/E +
+ * modalidad. Un prefijo fuera de esa familia —BLIM, el que quedó anotado en la
+ * sesión del 2-oct— deja a los embarques NUEVOS sin tráfico derivable del
+ * folio; caen a la ruta, y si la ruta no alcanza, a «—».
+ *
+ * No se prohíbe: si Vermur confirma BLIM, el prefijo es el correcto y lo que
+ * tiene que aprenderlo es `traficoDeFolio`. Pero se dice antes de guardar, en
+ * vez de que aparezca semanas después en un cierre de mes.
+ */
+export function avisoPrefijoFueraDeFamilia(f: Partial<FormatoFolioSerie>): string | null {
+  const prefijo = textoLimpio(f.prefijo)?.toUpperCase();
+  if (!prefijo) return null;
+  if (/^VL([IE][MTA])?$/.test(prefijo)) return null;
+  return `El tráfico del embarque se lee del prefijo de su folio, y «${prefijo}» no es de la familia VL (VLIM, VLET…). Los embarques nuevos no podrán derivar importación/exportación del folio: el IVA y la columna Tráfico caerán a la ruta. Confírmalo con Vermur antes de guardarlo.`;
+}
+
 /** Por qué un formato no se puede guardar, o null si se puede. */
 export function razonFormatoInvalido(f: Partial<FormatoFolioSerie>): string | null {
   const prefijo = textoLimpio(f.prefijo);

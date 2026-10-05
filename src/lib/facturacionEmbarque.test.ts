@@ -218,6 +218,21 @@ describe('traficoDeFolio', () => {
     expect(traficoDeFolio('SHP-0001')).toBeNull();
     expect(traficoDeFolio('')).toBeNull();
   });
+
+  // Tarea 66 · El separador del folio se configura: ya no se puede suponer que
+  // el prefijo es el primer segmento partido por guion.
+  it('lo lee aunque el formato no lleve guion ni use otro separador', () => {
+    expect(traficoDeFolio('VLIM26001')).toBe('impo');
+    expect(traficoDeFolio('VLEA/26/001')).toBe('expo');
+    expect(traficoDeFolio('VLIT.26.107')).toBe('impo');
+    expect(traficoDeFolio('VLIT 24 107')).toBe('impo'); // folio heredado de Magaya
+    expect(traficoDeFolio('vlim-26-001')).toBe('impo');
+  });
+
+  it('no se confunde con un folio que solo EMPIEZA parecido', () => {
+    expect(traficoDeFolio('VLIMEX-001')).toBeNull();
+    expect(traficoDeFolio('BLIM-26-001')).toBeNull(); // otro prefijo: hay que decidirlo, no adivinarlo
+  });
 });
 
 // ─── La tasa que Pricing eligió manda sobre lo derivado ──────────────────────
