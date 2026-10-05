@@ -793,11 +793,14 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
               </div>
 
               <div className="mt-6">
-                <p className={LABEL}>Expediente en Drive</p>
+                {/* Tarea 57 · Vermur usa OneDrive, no Google Drive. El campo
+                    de la base sigue siendo `expedienteDrive`: renombrarlo
+                    dejaría ciegos los 817 documentos que ya lo traen. */}
+                <p className={LABEL}>Carpeta en OneDrive</p>
                 <div className="mt-2">
                   <BoolCheck
                     checked={draft.expedienteDrive}
-                    label="Carpeta creada en Google Drive"
+                    label="Carpeta creada en OneDrive"
                     onToggle={() => set('expedienteDrive', !draft.expedienteDrive)}
                   />
                 </div>
@@ -805,7 +808,7 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
 
               {/* Tarea 50: «Guardar cambios» subió al encabezado. La subida
                   guarda sola al confirmar la revisión; el botón del header
-                  guarda las marcas manuales y el checkbox de Drive. */}
+                  guarda las marcas manuales y el checkbox de OneDrive. */}
             </div>
           )}
 

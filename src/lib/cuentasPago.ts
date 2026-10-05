@@ -29,7 +29,14 @@ import { esPagoDeImpuestos } from './fondeoCliente';
 // 1 · Los bancos de Vermur
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type BancoVermur = 'santander' | 'banorte' | 'monex' | 'partnerpay';
+export type BancoVermur =
+  | 'santander_gastos'
+  | 'santander_impuestos'
+  | 'bbva'
+  | 'banorte'
+  | 'monex_mxn'
+  | 'monex_usd'
+  | 'partnerpay';
 
 export interface CuentaVermur {
   id: BancoVermur;
@@ -42,30 +49,55 @@ export interface CuentaVermur {
   montoMinimo?: number;
 }
 
+/*
+ * Las SIETE cuentas (sesión de Administración con Julio y Gaby, 2-oct-2026).
+ * Antes había cuatro: «Santander» cubría gastos e impuestos en un solo
+ * renglón, «Monex» solo aparecía en dólares y BBVA no existía. Son cuentas
+ * reales distintas y la conciliación del mes se arma por cuenta, así que
+ * juntarlas obliga a Julio a separarlas a mano.
+ */
 export const BANCOS_VERMUR: CuentaVermur[] = [
   {
-    id: 'santander',
-    nombre: 'Santander',
+    id: 'santander_gastos',
+    nombre: 'Santander gastos',
     monedas: ['MXN'],
-    usoHabitual: 'Proveedores e impuestos',
+    usoHabitual: 'Pagos a proveedores y gastos de operación.',
+  },
+  {
+    id: 'santander_impuestos',
+    nombre: 'Santander impuestos',
+    monedas: ['MXN'],
+    usoHabitual: 'Impuestos y derechos de la operación aduanal.',
+  },
+  {
+    id: 'bbva',
+    nombre: 'BBVA',
+    monedas: ['MXN'],
+    usoHabitual: 'Recibir pagos de clientes y cargos domiciliados.',
   },
   {
     id: 'banorte',
     nombre: 'Banorte',
     monedas: ['MXN'],
-    usoHabitual: 'Garantías y aduanal',
+    usoHabitual: 'Garantías y gastos aduanales.',
   },
   {
-    id: 'monex',
-    nombre: 'Monex',
+    id: 'monex_mxn',
+    nombre: 'Monex pesos',
+    monedas: ['MXN'],
+    usoHabitual: 'Operaciones en pesos por Monex.',
+  },
+  {
+    id: 'monex_usd',
+    nombre: 'Monex dólares',
     monedas: ['USD'],
-    usoHabitual: 'Pagos en dólares',
+    usoHabitual: 'Pagos en dólares.',
   },
   {
     id: 'partnerpay',
     nombre: 'PartnerPay',
     monedas: ['USD'],
-    usoHabitual: 'Dólares a agentes de carga',
+    usoHabitual: 'Dólares a agentes de carga. Mínimo USD 80.',
     // Debajo de este monto la comisión se come el pago: va por Monex.
     montoMinimo: 80,
   },
@@ -73,6 +105,76 @@ export const BANCOS_VERMUR: CuentaVermur[] = [
 
 export const BANCOS_VERMUR_MAP: Record<BancoVermur, CuentaVermur> =
   Object.fromEntries(BANCOS_VERMUR.map(b => [b.id, b])) as Record<BancoVermur, CuentaVermur>;
+
+/**
+ * La cuenta donde ENTRA el dinero del cliente. Es el uso que Vermur le dio a
+ * BBVA («recibir pagos y domiciliados»), así que un cobro arranca ahí en vez
+ * de en la primera de la lista, que es una cuenta de salida.
+ */
+export const BANCO_COBRO_DEFAULT: CuentaVermur = BANCOS_VERMUR_MAP.bbva;
+
+/*
+ * Los ids que se guardaron antes del 5-oct-2026. No se migran: se LEEN.
+ * «santander» se reparte entre gastos e impuestos y no se puede adivinar
+ * cuál era, así que apunta a la de gastos —el caso común— y la orden sigue
+ * mostrando algo cierto en vez de un hueco.
+ */
+const ALIAS_LEGACY: Record<string, BancoVermur> = {
+  santander: 'santander_gastos',
+  monex: 'monex_usd',
+};
+
+/**
+ * La cuenta que corresponde a un id guardado, sea nuevo o viejo.
+ * Devuelve null cuando el id no es de ninguna cuenta conocida: ahí el valor
+ * crudo se muestra tal cual, porque borrarlo de la pantalla haría parecer
+ * que la orden nunca tuvo banco asignado.
+ */
+export function resolverBancoVermur(id: string | null | undefined): CuentaVermur | null {
+  if (!id) return null;
+  const directo = BANCOS_VERMUR_MAP[id as BancoVermur];
+  if (directo) return directo;
+  const alias = ALIAS_LEGACY[id];
+  return alias ? BANCOS_VERMUR_MAP[alias] : null;
+}
+
+export interface OpcionBanco {
+  valor: string;
+  nombre: string;
+  usoHabitual: string;
+  monedas: ('MXN' | 'USD')[];
+  /** El id guardado no está en la lista de hoy: se conserva para no perderlo. */
+  fueraDeLista?: boolean;
+}
+
+/**
+ * Las opciones del selector: las siete de hoy, más el valor guardado cuando
+ * ya no está entre ellas. Un `<select>` cuyo value no existe entre sus
+ * opciones se pinta en la primera y parece que alguien eligió esa.
+ */
+export function opcionesBanco(valorGuardado?: string | null): OpcionBanco[] {
+  const base: OpcionBanco[] = BANCOS_VERMUR.map(b => ({
+    valor: b.id,
+    nombre: b.nombre,
+    usoHabitual: b.usoHabitual,
+    monedas: b.monedas,
+  }));
+  if (!valorGuardado || base.some(o => o.valor === valorGuardado)) return base;
+
+  const legacy = resolverBancoVermur(valorGuardado);
+  return [
+    ...base,
+    {
+      valor: valorGuardado,
+      nombre: legacy ? `${legacy.nombre} (registro anterior)` : valorGuardado,
+      usoHabitual: legacy
+        ? 'Se guardó con el nombre viejo de la cuenta.'
+        : 'Esta cuenta ya no está en la lista. Se conserva como quedó registrada.',
+      monedas: legacy?.monedas ?? ['MXN', 'USD'],
+      fueraDeLista: true,
+    },
+  ];
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 2 · Qué banco de Vermur usar
@@ -85,6 +187,13 @@ export const BANCOS_VERMUR_MAP: Record<BancoVermur, CuentaVermur> =
 //   b) «Garantías» no es una categoría del catálogo. Se detecta por el
 //      nombre del concepto (garantía / guarantee / depósito en garantía).
 //      Si Vermur marca esos conceptos, esto se sustituye por la marca.
+//
+// ⚠️ DECISIÓN MARCADA (5-oct-2026, tarea 57): al pasar de cuatro cuentas a
+//    siete, «Santander» se partió en gastos e impuestos. Un impuesto ya
+//    salía por Santander, así que ahora sale por la de impuestos; todo lo
+//    demás en pesos, por la de gastos. Nadie dijo qué se paga por Monex
+//    pesos, y BBVA es de entrada, no de salida: ninguna de las dos se
+//    sugiere.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const esAduanal = (conceptoNombre: string, categoria?: string): boolean =>
@@ -122,18 +231,26 @@ export function sugerirBancoVermur(
     }
     if (esAgente) {
       return {
-        banco: 'monex',
+        banco: 'monex_usd',
         razon: 'Dólares a un agente de carga, pero por debajo del mínimo de PartnerPay.',
         aviso: `PartnerPay pide mínimo USD ${minimo}; esta orden es por ${oc.monto}.`,
       };
     }
-    return { banco: 'monex', razon: 'Pago en dólares.' };
+    return { banco: 'monex_usd', razon: 'Pago en dólares.' };
   }
 
-  // Pesos: impuestos y proveedores por Santander; garantías y aduanal por
-  // Banorte. El orden importa — un impuesto aduanal es impuesto.
+  /*
+   * Pesos: impuestos a su propia cuenta de Santander, proveedores y gastos a
+   * la de gastos, garantías y aduanal por Banorte. El orden importa — un
+   * impuesto aduanal es impuesto.
+   *
+   * BBVA y Monex pesos NUNCA se sugieren: BBVA es para RECIBIR (pagos de
+   * clientes y domiciliados) y de Monex pesos nadie dijo qué sale por ahí.
+   * Las dos se pueden elegir a mano; inventarles un criterio pondría a la
+   * mitad de los pagos en la cuenta equivocada con cara de sugerencia.
+   */
   if (esPagoDeImpuestos(oc)) {
-    return { banco: 'santander', razon: 'Pago de impuestos.' };
+    return { banco: 'santander_impuestos', razon: 'Pago de impuestos.' };
   }
   if (esGarantia(oc.conceptoNombre)) {
     return { banco: 'banorte', razon: 'Garantía.' };
@@ -141,7 +258,7 @@ export function sugerirBancoVermur(
   if (esAduanal(oc.conceptoNombre, ctx.categoriaConcepto)) {
     return { banco: 'banorte', razon: 'Gasto aduanal.' };
   }
-  return { banco: 'santander', razon: 'Pago a proveedor en pesos.' };
+  return { banco: 'santander_gastos', razon: 'Pago a proveedor en pesos.' };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

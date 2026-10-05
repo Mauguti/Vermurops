@@ -19,7 +19,7 @@ import {
   ETIQUETA_ESTADO_COBRO, type EstadoCobro, type FacturaEnCartera, type ClienteEnCartera,
 } from '../../lib/cuentasPorCobrar';
 import { formatearPorMoneda, type TotalPorMoneda } from '../../lib/sumarPorMoneda';
-import { BANCOS_VERMUR } from '../../lib/cuentasPago';
+import { BANCOS_VERMUR, BANCO_COBRO_DEFAULT } from '../../lib/cuentasPago';
 import { EnlaceEntidad } from '../ui/ficha/EnlaceEntidad';
 import { contiene } from '../../lib/texto';
 import EstadoVacio from '../ui/EstadoVacio';
@@ -264,7 +264,7 @@ function ModalCobro({ item, hoy, onCancelar, onConfirmar }: {
   const f = item.factura;
   const [monto, setMonto] = useState(String(item.saldo));
   const [fechaCobro, setFechaCobro] = useState(hoy);
-  const [banco, setBanco] = useState(BANCOS_VERMUR[0].nombre);
+  const [banco, setBanco] = useState(BANCO_COBRO_DEFAULT.nombre);
   const [referencia, setReferencia] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -316,7 +316,11 @@ function ModalCobro({ item, hoy, onCancelar, onConfirmar }: {
               <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Banco de Vermur</span>
               <select value={banco} onChange={e => setBanco(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario bg-white">
-                {BANCOS_VERMUR.map(b => <option key={b.id} value={b.nombre}>{b.nombre}</option>)}
+                {BANCOS_VERMUR.map(b => (
+                  <option key={b.id} value={b.nombre} title={b.usoHabitual}>
+                    {b.nombre} — {b.usoHabitual}
+                  </option>
+                ))}
               </select>
             </label>
             <label className="block">

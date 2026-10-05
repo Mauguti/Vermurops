@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { exigirExpediente } from '../lib/frenoExpediente';
-import { initialQuotes, initialClients, initialProspectos, Prospecto } from '../data';
+import { Prospecto } from '../data';
 import { X, Plus, Search, Filter, Download, Upload, List, LayoutGrid, MessageSquare } from 'lucide-react';
 import { contiene } from '../lib/texto';
 import { useAuth } from '../auth/AuthContext';
@@ -438,12 +438,28 @@ export default function Quotes() {
       ]
     : PIPELINE_STAGES.map(s => ({ id: s.id, label: s.label }));
 
+  /*
+   * Tarea 57 · Este botón exportaba `initialQuotes`: las cuatro cotizaciones
+   * de ejemplo de `src/data.ts` —QT-1001 a QT-1003, fechadas en 2023, con
+   * Hapag-Lloyd y DHL— en vez de las cotizaciones de la pantalla. El archivo
+   * se llama «cotizaciones_export.csv» y se abre en Excel: nada en él dice
+   * que es de ejemplo.
+   *
+   * Ahora exporta exactamente los renglones que la tabla está mostrando.
+   * Total y moneda van en columnas separadas, igual que en la tabla: §4.3
+   * prohíbe un solo número que mezcle monedas.
+   */
   const handleExportCSVQuotes = () => {
-    const headers = ['Cotización', 'Cliente', 'Detalles', 'Fecha', 'Valor', 'Estatus'];
-    const rows = initialQuotes.map(q => {
-      const clientName = initialClients.find(c => c.id === q.clientId)?.name || q.clientId;
-      return [q.id, clientName, `${q.origin} -> ${q.destination}`, q.date, q.total, q.status];
-    });
+    const headers = ['Cotización', 'Cliente', 'Etapa', 'Modalidad', 'Total', 'Moneda', 'Actualizada'];
+    const rows = filteredTableQuotes.map(q => [
+      q.id,
+      q.prospecto?.empresa ?? '',
+      q.etapa,
+      q.servicios[0]?.tipo ?? '',
+      q.valorTotalConsolidado ?? 0,
+      q.moneda ?? '',
+      q.updatedAt ?? '',
+    ]);
     const csvContent = [headers.join(','), ...rows.map(r => r.map(f => `"${String(f).replace(/"/g, '""')}"`).join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');

@@ -1031,6 +1031,60 @@ y contar cuántos tests se caen— en vez de confiar en el reporte. Está en §7
 de `docs/sprint-post-junta/AUDITORIA-35-48.md`. Un sprint autónomo puede
 entregar código correcto sin entregar evidencia; son cosas distintas.
 
+## 4.23 Cuentas bancarias, OneDrive y el dato de ejemplo (tarea 57, 5-oct-2026)
+
+**Son SIETE cuentas, no cuatro** (`BANCOS_VERMUR` en `lib/cuentasPago.ts`):
+Santander gastos, Santander impuestos, BBVA, Banorte, Monex pesos, Monex
+dólares y PartnerPay (USD, mínimo 80). Cada una con su uso en una línea, que
+el selector muestra. Antes «Santander» cubría gastos e impuestos en un solo
+renglón, «Monex» solo existía en dólares y BBVA no aparecía — y Julio concilia
+el mes **por cuenta**, así que juntarlas lo obliga a separarlas a mano.
+  - **Los ids viejos se LEEN, no se migran.** `resolverBancoVermur` mapea
+    `santander` → gastos (el caso común; cuál era no se puede adivinar) y
+    `monex` → dólares (era la única que había). `opcionesBanco(valorGuardado)`
+    agrega el valor guardado al selector cuando ya no está en la lista: un
+    `<select>` cuyo value no existe entre sus opciones se pinta en la primera
+    y parece que alguien eligió esa. El renglón lo dice y se puede corregir.
+  - **BBVA y Monex pesos nunca se SUGIEREN.** BBVA es de entrada —y por eso
+    es el default al registrar un cobro (`BANCO_COBRO_DEFAULT`)— y de Monex
+    pesos nadie dijo qué sale por ahí. Se eligen a mano; inventarles un
+    criterio pondría pagos en la cuenta equivocada con cara de sugerencia.
+  - La lista vive en código, no en Firestore. Abrir otra cuenta sigue siendo
+    un commit; pasarla a catálogo es decisión pendiente.
+
+**El expediente del cliente está en OneDrive, no en Google Drive.** Cambió la
+etiqueta («Carpeta en OneDrive» en la ficha, columna «OneDrive» en Altas con
+su filtro Con carpeta / Sin carpeta); **el campo de la base sigue siendo
+`expedienteDrive`**, porque 817 clientes ya lo traen y renombrarlo solo
+cambiaría una etiqueta interna. El filtro vive en la barra y no en la tabla:
+`SpreadsheetTable` todavía no tiene filtros por columna — el `filterFn` de la
+columna «Fiscal» existe y nadie lo llama (otra regla sin call site).
+
+**Un folio de ejemplo se copia a un correo.** Finanzas → «Nueva Factura
+(CFDI 4.0)» anunciaba «Folio siguiente: F-2023-088» escrito en el código y
+timbraba con un `alert()`; alrededor vivían cuatro facturas con RFC, UUID y
+montos a mano, y `FichaFactura` fabricaba un XML CFDI 4.0 completo con el RFC
+de Vermur, PAC y certificado falsos. Nada estaba conectado y el botón que
+abría la pantalla ya se había retirado: **la pantalla era inalcanzable y el
+código seguía ahí**, listo para volver con un `setShowForm(true)`. Se quitó
+completo; la pestaña dice lo que pasa con `ModuloEnDesarrollo`.
+  - El barrido pedido por la tarea encontró lo mismo en «Exportar» de
+    Cotizaciones, que bajaba `cotizaciones_export.csv` con las cuatro
+    cotizaciones de ejemplo de `src/data.ts` (QT-1001…, fechadas en 2023) en
+    vez de las de la pantalla. Ahora exporta los renglones visibles, con
+    total y moneda en columnas separadas (§4.3).
+  - **Reservas (`Bookings`) y Recolecciones (`Pickups`) son rutas
+    huérfanas**: `App.tsx` las rutea y `users.ts` se las da a admin, pero el
+    menú lateral no tiene entrada para ellas ni con admin, y nadie llama a
+    `safeNavigate('bookings')`. Traían `BKG-2023-014` y `PK-2023-110` con
+    contactos y teléfonos inventados; quedaron en `ModuloEnDesarrollo` porque
+    una entrada de menú los hubiera vuelto visibles de golpe.
+  - Lo que **queda con datos de ejemplo, sin tocar**: `Customs.tsx`,
+    `Documents.tsx`, `ClientPortal.tsx`, `Warehouse.tsx`, `Pricing.tsx` y
+    `pricing/PricingData.ts` — ninguno está importado por nada, son archivos
+    huérfanos— y los seeds de `src/data.ts`, que sí alimentan los prospectos
+    y el Kanban de demostración.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
