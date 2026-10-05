@@ -11,6 +11,7 @@ import {
   type TipoDocLote,
 } from './loteDocumentos';
 import { DOCUMENTOS_EXPEDIENTE, etiquetaDocExpediente } from './clasificacionDocumentos';
+import { DOCS_PROVEEDOR_NACIONAL, DOCS_PROVEEDOR_EXTRANJERO } from './expedienteProveedor';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,36 @@ describe('normalizarTipoClasificado', () => {
 
   it('no mete una factura en el checklist del expediente', () => {
     expect(normalizarTipoClasificado('factura_proveedor', CATALOGO_KYC)).toBeNull();
+  });
+});
+
+describe('normalizarTipoClasificado · catálogo del proveedor', () => {
+  // El expediente del proveedor indexa por clave de DocsAlta ('csf'), no por
+  // el nombre largo: el agente contesta el largo y tiene que caer igual.
+  const CATALOGO_PROVEEDOR: TipoDocLote[] = DOCS_PROVEEDOR_NACIONAL.map(d => ({
+    tipo: d.campo,
+    etiqueta: d.etiqueta,
+  }));
+
+  it('el nombre largo del agente cae en la clave corta del proveedor', () => {
+    expect(normalizarTipoClasificado('constancia_situacion_fiscal', CATALOGO_PROVEEDOR)).toBe('csf');
+    expect(normalizarTipoClasificado('acta_constitutiva', CATALOGO_PROVEEDOR)).toBe('acta');
+    expect(normalizarTipoClasificado('comprobante_domicilio', CATALOGO_PROVEEDOR)).toBe('comprobante');
+    expect(normalizarTipoClasificado('caratula_bancaria', CATALOGO_PROVEEDOR)).toBe('bancaria');
+  });
+
+  it('el proveedor extranjero mapea su documento fiscal al mismo campo', () => {
+    const extranjero: TipoDocLote[] = DOCS_PROVEEDOR_EXTRANJERO.map(d => ({
+      tipo: d.campo, etiqueta: d.etiqueta,
+    }));
+    expect(normalizarTipoClasificado('constancia_situacion_fiscal', extranjero)).toBe('csf');
+    expect(normalizarTipoClasificado('documento_fiscal', extranjero)).toBe('csf');
+  });
+
+  it('el poder y la identificación no están en el checklist del proveedor', () => {
+    // No se fuerzan a otra casilla: quedan sin clasificar y lo resuelve quien sube.
+    expect(normalizarTipoClasificado('poder_notarial', CATALOGO_PROVEEDOR)).toBeNull();
+    expect(normalizarTipoClasificado('identificacion_oficial', CATALOGO_PROVEEDOR)).toBeNull();
   });
 });
 

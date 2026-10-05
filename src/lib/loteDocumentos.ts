@@ -84,50 +84,46 @@ function clave(valor: string): string {
 }
 
 /**
- * Sinónimos conocidos → tipo canónico. Crece sin tocar la lógica.
+ * Grupos de nombres que significan LO MISMO.
  *
- * Incluye los tipos de las otras taxonomías que ya existen (la del embarque
- * manda `factura_proveedor`), porque el mismo documento se sube desde varios
- * lados y el agente puede contestar con el vocabulario de otro flujo.
+ * Son grupos y no un mapa dirigido porque el mismo documento se llama
+ * distinto en cada catálogo: el expediente del cliente lo indexa como
+ * `constancia_situacion_fiscal` y el del proveedor como `csf` (su clave en
+ * `DocsAlta`). Con grupos, los dos resuelven sin duplicar el mapa al revés.
+ *
+ * Incluye el vocabulario de las taxonomías que ya existen —la del embarque
+ * manda `factura_proveedor`— porque el mismo documento se sube desde varios
+ * lados y el agente puede contestar con el nombre de otro flujo.
+ *
+ * Lo que NO está aquí es lo ambiguo: «comprobante» a secas es comprobante de
+ * domicilio en el expediente y comprobante de pago en la orden. Juntarlos
+ * pondría un comprobante de pago en el checklist de alta.
  */
-const SINONIMOS: Record<string, string> = {
-  // Expediente KYC
-  csf: 'constancia_situacion_fiscal',
-  constancia: 'constancia_situacion_fiscal',
-  constancia_fiscal: 'constancia_situacion_fiscal',
-  constancia_de_situacion_fiscal: 'constancia_situacion_fiscal',
-  situacion_fiscal: 'constancia_situacion_fiscal',
-  acta: 'acta_constitutiva',
-  acta_constitutiva_y_estatutos: 'acta_constitutiva',
-  poder: 'poder_notarial',
-  poder_notarial_representante: 'poder_notarial',
-  identificacion: 'identificacion_oficial',
-  ine: 'identificacion_oficial',
-  pasaporte: 'identificacion_oficial',
-  comprobante_de_domicilio: 'comprobante_domicilio',
-  domicilio: 'comprobante_domicilio',
-  caratula_banco: 'caratula_bancaria',
-  caratula_de_estado_de_cuenta: 'caratula_bancaria',
-  estado_de_cuenta: 'caratula_bancaria',
-  estado_cuenta: 'caratula_bancaria',
-  estado_de_cuenta_bancario: 'caratula_bancaria',
-  // Orden de compra
-  factura_proveedor: 'factura',
-  factura_de_proveedor: 'factura',
-  cfdi: 'factura',
-  cfdi_ingreso: 'factura',
-  rep: 'complemento_pago',
-  complemento_de_pago: 'complemento_pago',
-  complemento_de_recepcion_de_pagos: 'complemento_pago',
-  recepcion_de_pagos: 'complemento_pago',
-  cfdi_pago: 'complemento_pago',
-  comprobante_de_pago: 'comprobante_pago',
-  transferencia: 'comprobante_pago',
-  comprobante_transferencia: 'comprobante_pago',
-  spei: 'comprobante_pago',
-  cotizacion: 'cotizacion_proveedor',
-  cotizacion_de_proveedor: 'cotizacion_proveedor',
-};
+const GRUPOS_EQUIVALENTES: string[][] = [
+  // ── Expediente KYC (nombres largos y claves de DocsAlta) ──
+  ['constancia_situacion_fiscal', 'csf', 'constancia', 'constancia_fiscal',
+   'constancia_de_situacion_fiscal', 'situacion_fiscal', 'documento_fiscal'],
+  ['acta_constitutiva', 'acta', 'acta_constitutiva_y_estatutos'],
+  ['poder_notarial', 'poder', 'poder_notarial_representante'],
+  ['identificacion_oficial', 'identificacion', 'ine', 'pasaporte'],
+  ['comprobante_domicilio', 'comprobante', 'comprobante_de_domicilio', 'domicilio'],
+  ['caratula_bancaria', 'bancaria', 'caratula', 'caratula_banco',
+   'caratula_de_estado_de_cuenta', 'estado_de_cuenta', 'estado_cuenta',
+   'estado_de_cuenta_bancario'],
+  // ── Orden de compra ──
+  ['factura', 'factura_proveedor', 'factura_de_proveedor', 'cfdi', 'cfdi_ingreso'],
+  ['complemento_pago', 'rep', 'complemento_de_pago', 'cfdi_pago',
+   'complemento_de_recepcion_de_pagos', 'recepcion_de_pagos'],
+  ['comprobante_pago', 'comprobante_de_pago', 'transferencia',
+   'comprobante_transferencia', 'spei'],
+  ['cotizacion_proveedor', 'cotizacion', 'cotizacion_de_proveedor'],
+];
+
+/** Todos los nombres equivalentes a uno dado, él incluido. */
+function equivalentes(k: string): string[] {
+  const grupo = GRUPOS_EQUIVALENTES.find(g => g.includes(k));
+  return grupo ?? [k];
+}
 
 /**
  * Traduce lo que dijo el agente a un tipo del catálogo de este contexto.
@@ -144,14 +140,13 @@ export function normalizarTipoClasificado(
   const k = clave(crudo ?? '');
   if (!k) return null;
 
-  const existe = (t: string) => catalogo.some(c => clave(c.tipo) === clave(t));
+  // Exacto primero: el catálogo manda sobre cualquier equivalencia.
+  const exacto = catalogo.find(c => clave(c.tipo) === k);
+  if (exacto) return exacto.tipo;
 
-  if (existe(k)) return catalogo.find(c => clave(c.tipo) === k)!.tipo;
-
-  const sinonimo = SINONIMOS[k];
-  if (sinonimo && existe(sinonimo)) {
-    return catalogo.find(c => clave(c.tipo) === clave(sinonimo))!.tipo;
-  }
+  const grupo = equivalentes(k);
+  const porGrupo = catalogo.find(c => grupo.includes(clave(c.tipo)));
+  if (porGrupo) return porGrupo.tipo;
 
   // Última pasada: el agente pudo contestar con la etiqueta en vez del id
   // («Complemento de pago» en lugar de 'complemento_pago').
