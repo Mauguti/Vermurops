@@ -1,2 +1,7 @@
 lib/
 node_modules/
+
+# Valores de los parámetros por proyecto, que escribe `firebase deploy`.
+# Hoy solo trae URLs de n8n, pero es el archivo donde aterriza CUALQUIER
+# defineString: un secreto mal declarado acabaría aquí y de aquí a git.
+.env.*
