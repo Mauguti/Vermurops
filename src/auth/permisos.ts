@@ -46,7 +46,9 @@ export type Capacidad =
   // Gestión de usuarios (GU): solo admin
   | 'usuario.gestionar'       // Invitar, cambiar rol, desactivar
   // Tipo de cambio (tarea 51)
-  | 'tipoCambio.actualizar';  // Forzar consulta a Banxico desde la app
+  | 'tipoCambio.actualizar'   // Forzar consulta a Banxico desde la app
+  // Correo saliente (tarea 64)
+  | 'correo.probar';          // Mandar el correo de prueba por Exchange
 
 export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
   'lead.crear',
@@ -69,6 +71,7 @@ export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
   'ordenCompra.autorizar',
   'usuario.gestionar',
   'tipoCambio.actualizar',
+  'correo.probar',
 ];
 
 // ─── Matriz rol → capacidades ────────────────────────────────────────────────
@@ -117,6 +120,12 @@ export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
  *    catálogos completos (~817 clientes) contra la base que el equipo está
  *    usando. Los datos ya están cargados desde hace semanas, así que hoy solo
  *    puede hacer daño. Queda exclusiva de 'admin'.
+ *
+ *  - `correo.probar` tampoco está en la matriz, por lo mismo: es la prueba de
+ *    instalación del correo saliente por Exchange (tarea 64) y manda un correo
+ *    DE VERDAD desde el buzón de notificaciones de Vermur. Exclusiva de
+ *    'admin'. Cuando las notificaciones por correo existan, quien las recibe
+ *    no necesita esta capacidad: las dispara el sistema.
  */
 export const CAPACIDADES_POR_ROL: Record<UserRole, Capacidad[]> = {
   ventas: [

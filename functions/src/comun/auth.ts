@@ -96,7 +96,11 @@ const CAPACIDADES: Record<UserRole, string[]> = {
           'catalogo.importarMasivo', 'cliente.alta', 'proveedor.alta', 'puerto.alta',
           'embarque.generar', 'factura.generar', 'notaCredito.generar',
           'ordenCompra.solicitar', 'ordenCompra.gestionar', 'ordenCompra.autorizar',
-          'usuario.gestionar', 'tipoCambio.actualizar'],
+          'usuario.gestionar', 'tipoCambio.actualizar',
+          // Tarea 64: probar el correo saliente. Solo el superusuario técnico.
+          // Es una herramienta de instalación, no una función del negocio:
+          // manda correo de verdad desde el buzón de Vermur.
+          'correo.probar'],
 };
 
 export interface UsuarioVerificado {
