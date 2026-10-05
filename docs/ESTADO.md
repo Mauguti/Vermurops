@@ -1,16 +1,129 @@
-# Estado de VermurOps — 2 de octubre de 2026
+# Estado de VermurOps — 5 de octubre de 2026
 
-**La cadena 35 → 55 está PUBLICADA.** 21 ramas mergeadas con `--no-ff` en
-orden, main == origin/main == `e411298`, y los cuatro despliegues hechos:
-reglas de Firestore, Storage, las tres Functions nuevas y hosting.
+**Corte del sprint nocturno del 5-oct: la cadena 56 → 66 está COMPLETA y SIN
+PUBLICAR.** Once tareas cerradas, cero bloqueos de la guardia, cero `[!]`.
+Punta: `sprint/66-embarque-automatico-switch`, que sale en línea de las diez
+anteriores — mergearla trae las once.
 
-Producción corre `index-By7gL9-J.js`, el mismo hash que el build local.
+**Producción sigue en la cadena 35 → 55** (main == origin/main, hosting
+`index-By7gL9-J.js`). Nada del sprint del 5-oct ha llegado al equipo.
 
-**2028 tests · 90 archivos · tsc 0 · recorrido 6/6 (dos veces) ·
-45-filtros 34/34 · 47-barrido 95/95 sin hallazgos · reglas 26/26.**
+En la punta de la cadena: **103 archivos · 2,369 tests en verde** (línea base
+2,317) · `tsc --noEmit` **0 errores** · `npm run build` limpio ·
+`./scripts/e2e.sh` **6/6 dos veces** · filtros 34/34 · barrido 95/95.
 
-Las 15 reglas de IVA de la tarea 39 **ya se aplicaron** (2-oct, 10:27).
-Los 15 conceptos estaban en `reglaIVA: 'revisar'`; el punto de retorno es
+El resumen de la noche, con la secuencia de publicación y las preguntas
+redactadas, está en `sprint/reportes/RESUMEN.md` (no versionado).
+
+---
+
+## 1. La cadena 56 → 66, sin publicar
+
+Cada rama sale de la anterior. En orden:
+
+| # | Tarea | Rama | Despliega |
+|---|---|---|---|
+| 56 | TC: el de Pricing calcula, Banxico solo referencia | sprint/56-tc-pricing | Hosting |
+| 57 | Cuentas bancarias, OneDrive y el folio inventado | sprint/57-cuentas-onedrive-folio | Hosting |
+| 58 | Un renglón por factura y COD a la orden | sprint/58-vista-proveedor-factura | Hosting |
+| 59 | Importación y exportación visibles en Embarques | sprint/59-trafico-embarques | Hosting |
+| 60 | Contactos múltiples en clientes, con tipo | sprint/60-contactos-cliente | Hosting |
+| 61 | Vistas guardadas y columnas en Finanzas | sprint/61-vistas-finanzas | Hosting |
+| 62 | PLAN: pagos, cobros, flujo de efectivo, prefactura | sprint/62-plan-pagos | Nada (plan) |
+| 63 | Un solo botón de Documentos que clasifica el tipo | sprint/63-boton-documentos | Hosting + Functions |
+| 64 | Correo saliente por Exchange | sprint/64-correo-exchange | Hosting + Function + 2 secretos |
+| 65 | Carga de «Clientes OK» (script en seco) | sprint/65-carga-clientes-ok | Nada (scripts) |
+| 66 | Embarque automático: diagnóstico y switch apagado | sprint/66-embarque-automatico-switch | Hosting |
+
+**Ninguna rama toca reglas, índices ni migra datos.** Lo documentado en
+CLAUDE.md: §4.23 (57), §4.24 (58), §4.25 (59), §4.26 (60), §4.27 (61),
+§4.28 (63), §4.29 (64), §4.30 (65), §4.31 (66); §4.3 ampliada por la 56.
+
+### Lo que hay que hacer antes del hosting
+
+1. **Los dos secretos del correo, PRIMERO** — una Function que declara un
+   `defineSecret` inexistente **no despliega**:
+   `firebase functions:secrets:set CORREO_SMTP_USUARIO` y `CORREO_SMTP_PASSWORD`.
+2. **`functions:clasificarDocumento` antes del hosting** (63): si va después, el
+   navegador nuevo pediría el flujo `documento-oc` que la Function vieja no
+   conoce y contestaría 400. El deploy **preguntará por
+   `N8N_WEBHOOK_URL_DOC_OC`** (`defineString` nuevo, §3): Enter acepta el default.
+3. **`functions:enviarCorreo`** (64). Si las credenciales de Exchange no han
+   llegado, se puede publicar sin este paso: la tarjeta de Integraciones se ve y
+   el botón dice que falta configuración. Nada más depende de ella.
+4. Hosting, y `git push origin main`.
+
+Todo con su `cd /Users/mauriciogutierrezmunoz/antigravity/Vermur-Logistics` y
+leyendo `uploading`, no `skipping upload` (§3).
+
+### Opcional, aparte — no bloquea la publicación
+
+- **Regla de Storage `ordenesCompra/{id}/documentos/`** (bloque exacto en el
+  reporte 63). Sin ella, los documentos de la orden caen en `factura/`, que
+  acepta **solo PDF y XML**: un comprobante en PNG se rechaza.
+- **Flujo `clasificar-documento-oc` en n8n** — no existe todavía. El cambio
+  exacto (webhook, prompt, tipos, campos del multipart) está escrito en el
+  reporte 63. Mientras no exista, los archivos de la orden caen «Sin
+  clasificar» y el tipo se elige a mano: la app funciona.
+
+### Lo nuevo en la cadena 56 → 66
+
+- **Tipo de cambio (56):** el **operativo** es el de Pricing (`pricing_rate`) y
+  es la fuente por defecto de una cotización nueva. El FIX del DOF queda como
+  **referencia informativa** — se quitó el botón «Usar el de Banxico», no
+  precarga nada ni entra en ningún cálculo. Las cotizaciones viejas conservan su
+  tasa congelada y al reabrir la captura se dice de dónde vino. 16 tests.
+- **Cuentas y datos de ejemplo (57):** siete cuentas bancarias con su uso en el
+  selector (ids viejos se leen sin migrar); `expedienteDrive` se etiqueta
+  **OneDrive** con columna y filtro en Altas; fuera el «Folio siguiente:
+  F-2023-088» inventado y la pantalla de facturación inalcanzable que lo rodeaba,
+  más el CSV de Cotizaciones que bajaba las cotizaciones de ejemplo de 2023.
+- **Cuentas por pagar (58):** la unidad de lo que se debe es la **factura**, no
+  la orden. `lib/facturasProveedor.ts`, 21 tests. Resuelve el IDAMEX duplicado
+  que vio Julio, reproducido en emulador. El COD va en el renglón, enlazado a la
+  ficha de la orden — esconderlo tras la expansión lo tumbó el recorrido e2e.
+- **Tráfico del embarque (59):** se **deriva** (folio primero, ruta después),
+  sin campo nuevo. Columna y filtro, más filtro por mes de cierre con la fecha
+  del lado mexicano de la operación (ETA en impo, ETD en expo). Los dos se
+  guardan con la vista. 18 + 6 tests.
+- **Contactos del cliente (60):** 169 de los 817 ya traían contactos de Magaya y
+  ninguna pantalla los enseñaba. Editor único compartido con el proveedor; cinco
+  tipos; se **desactivan**, no se borran, y desactivar al principal lo traspasa.
+  26 tests.
+- **Finanzas (61):** `SpreadsheetTable` en las dos pantallas, con filtros
+  guardados en la vista y **el CSV con las columnas de la vista** — antes
+  agregar una columna la dejaba fuera del archivo del cierre. 17 + 9 tests.
+- **Plan de pagos (62):** `docs/sprint-post-junta/PLAN-PAGOS.md`, 872 líneas, con
+  archivo y línea en cada afirmación. **Es lo que se construye martes y
+  miércoles.** Tres hallazgos del Paso 0: el lado del cliente tiene dos formas
+  incompatibles y ninguna registra «doce facturas con una transferencia»; el
+  lado del proveedor no tiene entidad de pago, solo un string copiado N veces
+  (de ahí que pago parcial y reversa no existan); y el bloque 1 de Gaby estaba
+  bien diagnosticado hasta el detalle de la moneda heredada.
+- **Botón único de documentos (63):** el tipo se propone **después** de leer el
+  archivo, en los tres lugares (cliente, proveedor, orden). Clasificación de
+  mejor esfuerzo: si el agente falla, «Sin clasificar» y el archivo ya está en
+  Storage. La orden estrena `documentos?: DocumentoOC[]` con **complemento de
+  pago**. 32 tests.
+- **Correo (64):** `enviarCorreo` por `smtp.office365.com:587`, credenciales en
+  Secret Manager, modo `captura` en emulador y las cuatro causas de falla
+  separadas —incluido el `535 5.7.139` de SMTP AUTH apagado, que se lee como
+  contraseña mala y no lo es. **Ninguna notificación está conectada todavía.**
+- **Carga de clientes (65):** `clientes-ok.xlsx` no llegó, así que el script
+  quedó con mapeo de columnas configurable y probado con un fixture sintético.
+  58 tests. En seco por omisión, con respaldo y reversa que distingue «valía
+  null» de «no existía». Tres reglas niegan escrituras: lo capturado a mano no
+  se pisa, lo ausente no se toca, un empate dudoso no se adivina.
+- **Embarque automático (66):** no faltaba código, faltaba el **dato**. Pasó de
+  constante a **interruptor en Configuración → Consecutivos de folio, apagado y
+  fail-closed**, y el formato del folio se configura por serie. 52 tests.
+
+---
+
+## 2. Lo que está en producción (cadena 35 → 55)
+
+Todo hasta la 55. Hosting `index-By7gL9-J.js` (2-oct). Las 15 reglas de IVA de
+la tarea 39 aplicadas el 2-oct; punto de retorno
 `docs/datos/respaldo-conceptos-iva-2026-10-02T16-27-38.json`:
 
 ```bash
@@ -18,243 +131,183 @@ SERVICE_ACCOUNT=/ruta/a/llave.json npx tsx scripts/revertirConceptosIVA.ts \
   docs/datos/respaldo-conceptos-iva-2026-10-02T16-27-38.json
 ```
 
-Lo que sigue es la **validación en navegador**:
-[VALIDACION-35-55.md](sprint-post-junta/VALIDACION-35-55.md).
+**Las 21 ramas publicadas, por cadena:**
 
----
-
-## 1. Lo que se publicó
-
-### Cadena 35–42
-
-| # | Tarea | Rama | Despliega |
-|---|---|---|---|
-| 35 | Datos fiscales del cliente | sprint/35-datos-fiscales | Hosting |
-| 36 | IVA de la factura del proveedor y alerta | sprint/36-iva-factura-proveedor | Hosting |
-| 37 | Cotización usa días de crédito por modalidad | sprint/37-dias-credito-modalidad | Hosting |
-| 38 | Aprobación de proveedores (pasos 1, 4, 5A) | sprint/38-aprobacion-proveedores | Hosting |
-| 39 | Script conceptos IVA de Vermur | sprint/39-conceptos-iva | Nada (script) |
-| 40 | Documentos operativos: config empresa + Function | sprint/40-documentos-base | Hosting + Functions + Reglas |
-| 41 | Notificación de arribo desde el embarque | sprint/41-notificacion-arribo | Hosting + Functions |
-| 42 | PLAN: carga fiscal desde Magaya | sprint/42-plan-carga-fiscal | Nada (plan) |
-
-### Cadena 43–48 (sprint del 1-oct, encima de la anterior)
-
-| # | Tarea | Rama | Despliega |
-|---|---|---|---|
-| 43 | Botón «Regresar» en todas las fichas | sprint/43-boton-regresar | Hosting |
-| 44 | Acciones de las fichas arriba | sprint/44-acciones-arriba | Hosting |
-| 45 | Barrido de filtros: inventario y prueba | sprint/45-barrido-filtros | Hosting |
-| 46 | Barrido de filtros: arreglos | sprint/46-barrido-filtros-arreglos | Hosting |
-| 47 | Barrido general: consola y permisos por rol | sprint/47-barrido-consola-roles | Hosting |
-| 48 | Textos pendientes y pestaña inicial de Finanzas | sprint/48-textos-finanzas | Hosting |
-
-### Cadena 49–55 (sprint del 1-oct noche, encima de la anterior)
-
-| # | Tarea | Rama | Despliega |
-|---|---|---|---|
-| 49 | Auditoría independiente de las cadenas 35–48 | sprint/49-auditoria-cadenas | Nada (documento) |
-| 50 | Acciones arriba en fichas restantes (RFQ, cliente, embarque) | sprint/50-acciones-arriba-resto | Hosting |
-| 51 | Tipo de cambio automático desde Banxico | sprint/51-tipo-cambio-banxico | Hosting + Functions + Reglas Firestore |
-| 52 | Cartas encomienda y garantía por naviera | sprint/52-cartas-encomienda | Hosting + Functions |
-| 53 | PLAN: reglas de Firestore y Storage por rol | sprint/53-plan-reglas-por-rol | Nada (plan) |
-| 54 | Expediente del proveedor | sprint/54-expediente-proveedor | Hosting |
-| 55 | Factura del proveedor en la OC | sprint/55-factura-oc-oficina | Hosting + Regla Storage |
-
-**2028 tests · tsc 0 · e2e 6/6** en la punta de la cadena (sprint/55).
-
-### Lo nuevo en la cadena 49–55
-
-- **Auditoría (49):** revisión independiente de las 14 tareas previas. Todas
-  publicables. Documento en `docs/sprint-post-junta/AUDITORIA-35-48.md`.
-- **Acciones arriba (50):** «Guardar cambios» de cliente, «Guardar Cambios»
-  de embarque y «Enviar a Ventas» del RFQ subieron al header. Fix: el
-  SaveBar de Información del cliente no guardaba los 3 responsables.
-- **Tipo de cambio (51):** Function programada que consulta Banxico (FIX del
-  DOF) cada 2h en días hábiles. Módulo completo con historial, badge de
-  actualización y botón «Actualizar ahora» (admin/administracion/pricing).
-  Precarga en la cotización cuando la fuente es Banxico o SAT. 24 tests.
-- **Cartas encomienda (52):** 11 plantillas HTML fieles a los originales de
-  cada naviera (COSCO, Hamburg Süd, CMA CGM, Evergreen, Sealand, Agunsa,
-  ONE, PIL, Maersk, HMM garantía, MSC encomienda+garantía). Botón en la
-  ficha del embarque, validación de datos, selector de patente. 31 tests.
-- **Plan de reglas (53):** matriz de 20 colecciones × 5 roles, plan de
-  migración de lista de correos a custom claims en 5 pasos publicables.
-  Documento en `docs/sprint-post-junta/PLAN-REGLAS-POR-ROL.md`.
-- **Expediente proveedor (54):** checklist KYC con subida a Storage,
-  validación formal por Admin, soporte de proveedor extranjero. Componente
-  compartido `ExpedientePanel` reutilizable. 15 tests.
-- **Factura en OC (55):** parser de XML CFDI 4.0/3.3 en el navegador (sin
-  n8n), subida de PDF y XML, 3 avisos (RFC, total, duplicada), campo legacy
-  preservado. 21 tests.
-
----
-
-## 2. Lo que hay en producción
-
-Todo hasta la 55. Hosting en `index-By7gL9-J.js` (2-oct, 16:2x).
+| Cadena | Tareas | Despliegues |
+|---|---|---|
+| 35–42 | datos fiscales, IVA factura proveedor, días de crédito, aprobación de proveedores, script IVA, documentos base, notificación de arribo, plan carga fiscal | Hosting + Functions + Reglas |
+| 43–48 | botón Regresar, acciones arriba, barrido de filtros (inventario y arreglos), barrido de consola por rol, textos de Finanzas | Hosting |
+| 49–55 | auditoría 35–48, acciones arriba resto, TC Banxico, cartas encomienda, plan reglas por rol, expediente del proveedor, factura en la OC | Hosting + Functions + Reglas Firestore y Storage |
 
 **Functions, las seis, Node 22 en us-central1:** `extraerTarifas`,
-`clasificarDocumento`, `gestionarUsuarios`, y las tres del 2-oct —
-`generarDocumento`, `tipoCambioProgramado` (0 8,10,12,14,16,18 L-V,
-hora de la Ciudad de México) y `actualizarTipoCambio` (401 sin token:
-pública en la red, cerrada en el código). Log sin un solo error.
+`clasificarDocumento`, `gestionarUsuarios`, `generarDocumento`,
+`tipoCambioProgramado` (0 8,10,12,14,16,18 L-V, hora de la Ciudad de México) y
+`actualizarTipoCambio`. Log sin un solo error.
 
-**Reglas de Firestore Y de Storage desplegadas**, las dos con
-`uploading rules` —no `skipping upload`— incluyendo las tres rutas que
-el sprint usaba y que estaban denegadas: `configuracion/empresa`,
-`configuracion/tipoCambio` + `tiposCambio/{fecha}` (solo lectura desde
-el navegador) y `ordenesCompra/{id}/factura/` en Storage.
+**La consulta automática de Banxico SÍ funciona** — contra lo que se asumía. El
+log real del 5-oct muestra `tiposCambio/2026-10-01` = 18.3688 y `2026-10-02` =
+18.1903 escritos, en sus horarios, sin errores. El 3 y 4 fueron fin de semana y
+no corrió, que es correcto. Lo que no funcionaba era su **papel**: ese no es el
+número con el que Vermur cotiza. Eso es lo que corrige la 56.
 
-El deploy de Functions pidió dos parámetros nuevos
-(`N8N_WEBHOOK_URL_GENERAR_DOC` y `N8N_WEBHOOK_URL_TIPO_CAMBIO`): las
-tareas 40 y 51 los declararon con `defineString` y `functions/.env` está
-en .gitignore, así que el sprint no podía escribirlos. Quedaron en
-`functions/.env.vermur-logistics-app` y ya no vuelve a preguntar.
-
-**2028 tests · 90 archivos · tsc 0 · recorrido 6/6** en main.
+Pendiente de la cadena anterior: **validar 35–55 en navegador**
+([VALIDACION-35-55.md](sprint-post-junta/VALIDACION-35-55.md)).
 
 ---
 
 ## 3. Cola restante
 
-Las colas 35–42, 43–48 y 49–55 quedaron vacías. Lo que sigue:
+La cola 56–66 quedó vacía a las 15:26. Lo que sigue, en orden de urgencia:
 
 | Qué | Tipo | Bloquea |
 |---|---|---|
-| Validar 35–55 en navegador (VALIDACION-35-55.md) | Validación | Cerrar el sprint |
-| Correr `actualizarTipoCambio` una vez desde la app y ver qué documento cae en `tiposCambio` | Validación | Confirmar la tasa |
+| **Publicar la cadena 56 → 66** (secretos → Functions → hosting) | Despliegue | Todo lo de abajo |
+| Validar 56–66 en navegador | Validación | Cerrar el sprint |
+| **Construir los bloques 1–4 del plan de pagos** (martes y miércoles) | Código | Aprobar M1–M7 del reporte 62 |
+| Sembrar los seis consecutivos reales de Magaya y confirmar el formato del folio | Dato externo | Encender el embarque automático |
+| Pedirle a Luis «Clientes OK» en CSV y correr la carga en seco | Dato externo | Los 817 clientes sin RFC |
+| Fase 1 del plan 42: minar `numeroEntidadMagaya` → `rfc` (~250–300 clientes) | Script | Timbrado |
+| Validar 35–55 en navegador (arrastrado) | Validación | Cerrar el sprint anterior |
 | Borrar o deshabilitar las tres cuentas de prueba del Auth de producción | Seguridad | — |
-| Deploy de `storage.rules` (expedientes + facturas OC) | Reglas | Subidas desde la app |
-| Script de carga fiscal fase 1 (minar `numeroEntidadMagaya`) | Script | Timbrado |
-| Export de Magaya con datos fiscales (fase 2) | Dato externo | Timbrado |
-| Confirmaciones de Julio (3 conceptos IVA + regla fiscal TC + IVA oficina) | Decisión | Script 39, tarea 51, tarea 55 |
+| Regla de Storage `ordenesCompra/{id}/documentos/` | Reglas | Comprobantes en imagen |
+| Flujo `clasificar-documento-oc` en n8n | n8n | Clasificar documentos de la orden |
+| Credenciales de Exchange + encender SMTP AUTH | Dato externo | El correo saliente |
+| Plan de reglas por rol (53) | Código | Decisión: ¿se adelanta? |
+| Confirmaciones de Julio (3 conceptos IVA + regla fiscal TC + IVA oficina) | Decisión | Script 39, tareas 51 y 55 |
 | Freno de facturación por datos fiscales incompletos | Código | Timbrado |
 | Pasos 2 y 3 de aprobación de proveedores | Código | Julio define docs |
-| Freno de OC por expediente del proveedor (paso 2 del plan) | Código | Decisión de Mau |
+| Freno de OC por expediente del proveedor | Código | Decisión de Mau |
 | Documentos operativos restantes (BL, booking…) | Código | Preguntas de Gaby |
-| Tarea 25: correo como imagen en revisión de tarifas | Código | No se intentó |
+| Tarea 25: correo como imagen en revisión de tarifas | Código | No se ha intentado |
 
-Y lo que arrastramos:
-- Barrido de reglas sin quien las llame (4 identificadas)
-- `tsc` bloqueante en el build
-- Deshabilitar cuentas de prueba en Auth de producción
+Y lo que arrastramos: barrido de reglas sin quien las llame, `tsc` bloqueante en
+el build, y la limpieza de los seis archivos huérfanos de la 57.
 
 ---
 
-## 3.1 Lo que espera a Julio
+## 3.1 Lo que espera a Julio y Gaby
 
-Nada de esto se construye hasta tener su respuesta. Está junto porque son
-una sola conversación, no nueve pendientes sueltos.
+Nada de esto se construye hasta tener respuesta. **Las 21 preguntas están
+redactadas para copiar en `sprint/reportes/RESUMEN.md` §4.** Las que bloquean:
 
 | Qué | Por qué está trabado |
 |---|---|
-| **Días festivos** | El vencimiento se recorre al lunes (§4.7), pero la lista de festivos tiene que ser suya y configurable, no una constante en el código |
-| **Fondeo** | Cuándo se considera fondeada una OC y quién lo declara |
-| **Anticipos** | Cómo se reparte un anticipo entre varias OC y qué pasa con el remanente |
-| **Complemento de pago** | Cuándo se emite y quién lo captura |
-| **Pronto pago** | Los 25 términos ya traen el descuento; falta cuándo se aplica y quién lo autoriza |
-| **Documentos del proveedor** | Qué exige el expediente de un proveedor extranjero frente a uno nacional |
-| **Primer reporte** | Cuál de los que hoy hacen a mano se automatiza primero |
-| **Regla del tipo de cambio en la factura** | La tasa ya sale de Banxico; falta si la factura usa esa misma o la del día de la operación |
-| **CON-019, CON-022, CON-081** | Las tres reglas de IVA que se aplicaron tal como vinieron, sin confirmar |
+| **El formato del folio del embarque** | «BLIM + año + tres dígitos… arrancamos en 2701» no cuadra con los `VLIM-26-001` ya impresos. Tres lecturas posibles; recomendamos VLIM. Y: ¿el consecutivo reinicia en enero? ¿En qué número va cada serie? |
+| **El saldo de las siete cuentas** | Es lo único que la plataforma no puede saber sola. ¿Captura diaria o se baja del portal? |
+| **Monex pesos y BBVA** | Quedaron en el selector sin criterio para sugerirlas |
+| **El cierre de mes: arribo o pedimento** | Usamos el arribo; el pedimento no tiene fecha propia en el modelo |
+| **La regla del TC de Pricing** | ¿Número diario o regla sobre otra tasa? ¿Igual para todos los clientes? |
+| **El TC de la factura** | El CFDI exige el del DOF, no el de Pricing. Conviene que quede dicho antes de facturar |
+| **Días festivos** | El vencimiento se recorre al lunes (§4.7), pero la lista tiene que ser suya y configurable |
+| **Fondeo, anticipos, complemento de pago, pronto pago** | Cuándo, quién y cómo se reparte |
+| **Documentos del proveedor extranjero** | Qué exige su expediente frente al nacional; y si el checklist suma poder notarial e identificación |
+| **CON-019, CON-022, CON-081** | Las tres reglas de IVA aplicadas tal como vinieron, sin confirmar |
+| **Primer reporte a automatizar** | Cuál de los que hoy hacen a mano |
 
-Programación de pagos, bancos y anticipos **no se tocan** hasta esa junta.
-El material de preparación está en
-[PREVIA-JUNTA-ADMIN.md](sprint-post-junta/PREVIA-JUNTA-ADMIN.md).
+Material de preparación: [PREVIA-JUNTA-ADMIN.md](sprint-post-junta/PREVIA-JUNTA-ADMIN.md).
 
 ---
 
-## 4. Decisiones pendientes
+## 4. Decisiones pendientes para Mau
 
-### Para Mau (de la cadena 49–55)
+Las 18 están desarrolladas, con recomendación cada una, en
+`sprint/reportes/RESUMEN.md` §3. Las que bloquean trabajo:
 
-1. **Regla de `configuracion` y `tiposCambio`:** bloqueante para «Mi empresa»
-   y tipo de cambio. El bloque exacto está en el reporte 51.
-2. **¿Las 6 cuentas ya tienen el custom claim `rol`?** Prerrequisito del plan
-   de reglas por rol (tarea 53).
-3. **¿Administración necesita la vista 'quotes'?** Tiene `cotizacion.crear`
-   pero no `quotes` en `ALLOWED_VIEWS_BY_ROLE`.
-4. **¿`info@digsol.com.mx` sigue como admin?**
-5. **¿El despliegue de las reglas por rol se hace un sábado?**
-6. **Regla de Storage para `ordenesCompra/*/factura/`:** bloque exacto en
-   reporte 55.
+### Del sprint del 5-oct
 
-### Para Mau (pendientes anteriores)
+1. **Los siete puntos del plan de pagos (62):** `pagos/` con aplicaciones
+   embebidas; los cuatro campos nuevos; ¿Operaciones deja de registrar cobros?;
+   ¿Operaciones marca «no pagar» y solo Admin lo libera?; ¿se adelanta el plan
+   de reglas por rol?; ¿parar en P3?; ¿correr `auditarPagos.ts` antes de P1?
+   **Recomendación en los siete: sí**, y parar en P3.
+2. **¿Enciendo la creación automática de embarques?** (66) No de golpe: sembrar
+   los consecutivos, confirmar el formato, encenderla con Operaciones mirando.
+3. **¿El correo se enciende antes o después de las capacitaciones del lunes 12?**
+   Recomendación: después. Hoy no hay notificación conectada.
+4. **Campo para el registro de corrección de tipo en el expediente del
+   proveedor** (63): `ArchivoExpediente` no tiene dónde. Propuesto
+   `clasificacion?: { tipoCrudo?, confianza?, observaciones? }`.
+5. **¿El pricing rate se guarda una vez y se hereda?** (56) Toca `firestore.rules`.
+6. **¿Borro los seis archivos huérfanos?** (57) ~1,700 líneas con datos
+   inventados que nada importa. En commit aparte.
+7. **¿Reservas y Recolecciones?** (57) Rutas sin menú: quitarles ruta y permiso.
+8. **¿Las siete cuentas pasan a catálogo de Firestore?** (57) No hasta decidir
+   el modelo de saldos del bloque 3.
+9. **¿El proveedor también desactiva contactos en vez de borrarlos?** (60) Tarea
+   aparte: toca los 544.
+10. **¿El interruptor se muda a `configuracion/foliosEmbarque`?** (66) No hasta
+    que toque publicar reglas por otra razón.
 
-7. ¿Correr la fase 1 del plan fiscal (minar `numeroEntidadMagaya` → `rfc`)?
-8. ¿Freno de facturación por datos fiscales incompletos?
-9. ¿Tolerancia del IVA configurable?
-10. ¿Correr `auditarCotizacionesVivas.ts` contra producción? (plan 17)
-11. ¿Agentes de carga son siempre clientes de oficina? (plan 18)
-12. ¿Operaciones ve Bandeja de Pricing o solo la lista? (plan 18)
-13. ¿Bloquear envío por tarifas vencidas al reciclar? (plan 19)
-14. ¿Gaby y Luis ambos admin? (tarea 21)
-15. Confirmar `VERMUR_N8N_TOKEN` como variable de entorno en n8n (tarea 22)
+### Arrastrados
 
-### Para Vermur
-
-**Julio:**
-- Regla fiscal del tipo de cambio (determinación vs liquidación).
-- IVA para gastos de oficina sin embarque (¿siempre 16%?).
-- 3 confirmaciones del script de IVA (CON-019, CON-022, CON-081).
-
-**Gaby / Luis:**
-- G11: teléfono oficial para las cartas encomienda.
-- G12: firma como texto o imagen.
-- G16: cargo USD $174 de MSC vigente.
-- ¿Pricing cotiza con el FIX o le carga un diferencial?
-- 10 preguntas de PLAN-C sobre documentos y HBL.
-
-**Luis:**
-- Export de Magaya con Entity Number, Name, Tax ID, Zip Code, Country,
-  Address (clientes y proveedores).
+11. **Regla de `configuracion` y `tiposCambio`** — bloque exacto en el reporte 51.
+12. **¿Las 6 cuentas ya tienen el custom claim `rol`?** Prerrequisito del plan 53.
+13. ¿Administración necesita la vista `quotes`? Tiene `cotizacion.crear` pero no
+    `quotes` en `ALLOWED_VIEWS_BY_ROLE`.
+14. ¿`info@digsol.com.mx` sigue como admin?
+15. ¿El despliegue de las reglas por rol se hace un sábado?
+16. ¿Freno de facturación por datos fiscales incompletos? ¿Tolerancia del IVA
+    configurable?
+17. ¿Correr `auditarCotizacionesVivas.ts` contra producción? (plan 17)
+18. ¿Agentes de carga son siempre clientes de oficina? ¿Operaciones ve la Bandeja
+    de Pricing o solo la lista? (plan 18) ¿Bloquear envío por tarifas vencidas al
+    reciclar? (plan 19) ¿Gaby y Luis ambos admin? (tarea 21)
+19. Confirmar `VERMUR_N8N_TOKEN` como variable de entorno en n8n (tarea 22).
 
 ---
 
 ## 5. Deuda crítica que no se movió
 
-- Reglas de Firestore no distinguen roles (plan escrito en tarea 53)
+- Reglas de Firestore no distinguen roles (plan escrito en la tarea 53; la 62
+  recomienda adelantarlo: un pago escrito desde la consola es dinero que nadie
+  autorizó)
 - `localhost` sin emuladores escribe en producción
-- Tres cuentas de prueba en Auth de producción
+- Tres cuentas de prueba en el Auth de producción
 - `getCostoOficial` suma sin mirar moneda
+- Las notificaciones por ROL no llegan a nadie (el correo de la 64 existe pero
+  no está conectado a ninguna notificación)
 
 ---
 
 ## 6. Entregables vigentes que no son código
 
 **Planes** (`docs/sprint-post-junta/`):
+- `PLAN-PAGOS.md` — **nuevo (62)**: pagos y aplicaciones, flujo de efectivo,
+  prefactura. Ocho pasos publicables; es lo de martes y miércoles.
+- `PLAN-CARGA-FISCAL.md` — minar Tax IDs, pedir export, script de carga.
+  **§7 corregido por la 65**: el consecutivo vive en `referenciaMagaya` y el Tax
+  ID en `numeroEntidadMagaya`, no en `rfc`.
 - `AUDITORIA-35-48.md` — veredictos de publicación de las 14 tareas previas.
 - `PLAN-REGLAS-POR-ROL.md` — matriz colección × rol, migración a claims.
-- `PLAN-CARGA-FISCAL.md` — minar Tax IDs, pedir export, script de carga.
-- `PLAN-FUENTE-TARIFA.md` — tarifa elegida, reconciliación silenciosa.
-- `PLAN-EQUIPOS-MINIMO.md` — CRM readonly para Ops, equipos reales.
-- `PLAN-RECICLAR.md` — copiar cotización previa, tarifas vencidas.
-- `PLAN-C.md` — 6 documentos operativos, talonario de HBL.
-- `PLAN-APROBACION.md` — expediente de proveedores.
+- `PLAN-FUENTE-TARIFA.md`, `PLAN-EQUIPOS-MINIMO.md`, `PLAN-RECICLAR.md`,
+  `PLAN-C.md`, `PLAN-APROBACION.md`.
 
-**Diagnósticos** (`docs/sprint-post-junta/`):
-- `BARRIDO-FILTROS.md` — inventario de 43 filtros, estado de cada uno.
-- `BARRIDO-GENERAL.md` — recorrido de 95 pantallas × 5 roles, limpio.
+**Diagnósticos:** `BARRIDO-FILTROS.md` (43 filtros), `BARRIDO-GENERAL.md`
+(95 pantallas × 5 roles, limpio).
 
-**JSON de n8n** (`docs/n8n/`):
-- `generar-pdf-cotizacion.n8n.json` — con nodo de validación de token.
-- `tipo-cambio-banxico.n8n.json` — flujo de consulta al SIE de Banxico.
+**JSON de n8n** (`docs/n8n/`): `generar-pdf-cotizacion.n8n.json`,
+`tipo-cambio-banxico.n8n.json`. **Falta por escribir:** `clasificar-documento-oc`
+— el cambio exacto está descrito en el reporte 63, sin inventar el flujo.
 
 ---
 
 ## 7. Orden propuesto para la mañana
 
 1. Leer `sprint/reportes/RESUMEN.md` y los reportes que interesen.
-2. Publicar la cadena 35–42 primero (reglas de `configuracion`, Functions,
-   hosting).
-3. Publicar la cadena 43–48 (solo hosting).
-4. Publicar la cadena 49–55: reglas Firestore (`configuracion`, `tiposCambio`)
-   → Functions (`tipoCambioProgramado`, `actualizarTipoCambio`,
-   `generarDocumento`) → Storage (`ordenesCompra/*/factura/`) → hosting.
-5. Validar en producción: tipo de cambio (clic «Actualizar ahora»), cartas
-   encomienda (generar una de Maersk), expediente de proveedor, factura en OC.
-6. Mandar las preguntas a Julio (TC + IVA oficina + 3 conceptos) y a
-   Gaby/Luis (teléfono, firma, MSC, diferencial).
-7. Desplegar Storage pendiente del sprint anterior.
-8. Deshabilitar las tres cuentas de prueba en Auth.
+2. **Publicar la cadena 56 → 66**: secretos del correo → `clasificarDocumento`
+   → `enviarCorreo` → hosting → `git push origin main`. Si las credenciales de
+   Exchange no llegaron, saltar los pasos del correo y publicar el resto.
+3. Validar en navegador lo de la noche: Cuentas por pagar por factura (que
+   IDAMEX salga una vez), la columna Tráfico y el mes de cierre en Embarques,
+   los contactos del cliente, las vistas guardadas de Finanzas, el botón único
+   de documentos y el interruptor de folio **apagado**.
+4. Mandar las 21 preguntas de §4 del resumen: el formato del folio y los
+   consecutivos a Julio (bloquean encender el embarque automático), el TC a
+   Gaby, el CSV a Luis.
+5. Aprobar o ajustar los siete puntos del plan de pagos, para poder construir
+   martes y miércoles.
+6. Pedir las credenciales de Exchange **junto con** encender «SMTP autenticado»
+   para ese buzón — viene apagado por omisión y el error se lee como contraseña
+   mala.
+7. Cerrar lo arrastrado: validar 35–55, deshabilitar las tres cuentas de prueba
+   del Auth, publicar la regla de Storage de los documentos de la orden.
