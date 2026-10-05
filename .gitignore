@@ -43,3 +43,9 @@ ui-debug.log
 
 # Paquete del sprint nocturno: vive solo en el worktree del sprint
 sprint/
+
+# Respaldos de los scripts de carga (cargarClientesOk.ts y los que sigan).
+# Son una foto de documentos REALES de clientes —RFC, domicilio fiscal,
+# responsables— tomada justo antes de escribir. Sirven para revertir, no para
+# viajar en el repo.
+scripts/respaldos/
