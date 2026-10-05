@@ -17,9 +17,25 @@ import type { OrdenCompra } from './OrdenesCompraData';
 import {
   ordenesProgramadas, transferenciasDelDia, resumenDelDia, textoComprobante,
 } from '../../lib/programacionPagos';
+import type { GrupoDePago } from '../../lib/calendarioPagos';
 
 const money = (n: number) =>
   n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/**
+ * Tarea 58 · Las facturas que cubre una transferencia, sin repetir.
+ *
+ * Una transferencia es por proveedor, fecha y moneda (§4.3), no por factura:
+ * eso no cambia. Lo que cambia es que se DICE qué factura cubre, para que el
+ * mismo proveedor en dos tarjetas se entienda en vez de parecer un duplicado.
+ */
+function facturasDelGrupo(grupo: GrupoDePago<OrdenCompra>): string[] {
+  return [...new Set(
+    grupo.items
+      .map(o => (o.facturaDatos?.numero ?? o.facturaAsociada ?? '').trim())
+      .filter(Boolean),
+  )];
+}
 
 interface Props {
   ordenes: OrdenCompra[];
@@ -142,6 +158,16 @@ export default function PanelPagos({ ordenes, hoy, onAbrirOC, onRegistrarPago, c
                     <div className="min-w-0">
                       <p className="text-[13px] font-bold text-text-primary truncate">{g.proveedorNombre}</p>
                       <p className="text-[11px] text-text-muted">
+                        {/* Tarea 58 · Qué factura cubre esta transferencia. Sin
+                            esto, el mismo proveedor en dos tarjetas —por fecha
+                            o por moneda distinta, que es lo correcto para una
+                            transferencia— se lee como un duplicado. */}
+                        {facturasDelGrupo(g).length > 0 && (
+                          <>
+                            {facturasDelGrupo(g).length === 1 ? 'factura ' : 'facturas '}
+                            {facturasDelGrupo(g).join(', ')} ·{' '}
+                          </>
+                        )}
                         {g.items.length} concepto{g.items.length !== 1 ? 's' : ''} · programado {g.fechaPago}
                       </p>
                     </div>

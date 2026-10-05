@@ -14,6 +14,8 @@ import EstadoVacio from '../ui/EstadoVacio';
 import { sumarPorMoneda, formatearPorMoneda } from '../../lib/sumarPorMoneda';
 import type { ConceptoVermur } from '../conceptos/ConceptosData';
 import { compararIVAFactura, etiquetaIVA, type EtiquetaIVA } from '../../lib/ivaOrdenCompra';
+import VistaFacturasProveedor from './VistaFacturasProveedor';
+import { usePreferenciasUsuario } from '../../hooks/usePreferenciasUsuario';
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -64,6 +66,16 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>('todos');
   const [filtroIVA, setFiltroIVA] = useState<FiltroIVA>('todos');
   const [searchTerm, setSearchTerm] = useState('');
+
+  /*
+   * Tarea 58 · Cómo se ve lo que se debe. Por proveedor es el default: es
+   * como Julio lo lee, y es la vista donde una factura repartida en varias
+   * órdenes deja de contarse dos veces. La preferencia se guarda por usuario
+   * (preferenciasUsuario/{uid}) como la de cargos (§4.14): quien prefiera el
+   * detalle orden por orden no lo vuelve a elegir cada vez.
+   */
+  const { prefs, guardar } = usePreferenciasUsuario();
+  const vista: 'proveedor' | 'orden' = prefs.vistaCuentasPorPagar ?? 'proveedor';
 
   /** Mapa de conceptoId → reglaIVA para resolución rápida. */
   const reglasPorConcepto = useMemo(() => {
@@ -222,7 +234,9 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
       </div>
 
       {/* Barra de búsqueda y acciones */}
-      <div className="flex gap-[12px] items-center">
+      {/* Tarea 58 · `flex-wrap`: con el toggle nuevo, a 390 px la barra ya no
+          cabe en un renglón y «Exportar» se salía del borde. */}
+      <div className="flex gap-[12px] items-center flex-wrap">
         <div className="relative max-w-[400px] flex-1">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
@@ -233,6 +247,23 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
             className="w-full pl-[36px] bg-white border border-card-border rounded-[8px] p-[8px] text-[13px] focus:outline-none focus:border-brand shadow-sm text-text-primary"
           />
         </div>
+        {/* Tarea 58 · Por proveedor | Por orden */}
+        <div className="flex rounded-[8px] border border-card-border overflow-hidden shrink-0">
+          {([['proveedor', 'Por proveedor'], ['orden', 'Por orden']] as const).map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => guardar('vistaCuentasPorPagar', id)}
+              aria-pressed={vista === id}
+              className={`text-[12px] font-medium px-[12px] py-[8px] transition-colors ${
+                vista === id
+                  ? 'bg-primario text-white'
+                  : 'bg-white text-text-secondary hover:bg-neutral-bg'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
         <button
           onClick={handleExportCSV}
           className="flex items-center text-[13px] font-medium text-text-secondary bg-white border border-card-border rounded-[8px] px-[12px] py-[8px] hover:bg-neutral-bg transition-colors shadow-sm"
@@ -241,7 +272,18 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
         </button>
       </div>
 
+      {/* Tarea 58 · Un renglón por factura del proveedor. El agrupado y el
+          caso del duplicado viven en lib/facturasProveedor.ts. */}
+      {vista === 'proveedor' && (
+        <VistaFacturasProveedor
+          ordenes={ordenesFiltradas}
+          onSelectOC={onSelectOC}
+          hayFiltro={hayFiltro}
+        />
+      )}
+
       {/* Tabla */}
+      {vista === 'orden' && (
       <div className="overflow-x-auto border border-divider rounded-[8px]">
         <table className="w-full border-collapse">
           <thead>
@@ -332,10 +374,13 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
           </tbody>
         </table>
       </div>
+      )}
 
-      {/* Footer con total */}
+      {/* Footer con total. En la vista por proveedor no va: ahí el pie lo
+          pone VistaFacturasProveedor, que cuenta renglones y no órdenes. */}
+      {vista === 'orden' && (
       <div className="flex justify-between items-center text-[12px] text-text-muted px-[4px]">
-        <span>{totalFiltrado} orden{totalFiltrado !== 1 ? 'es' : ''} de compra</span>
+        <span>{totalFiltrado} {totalFiltrado === 1 ? 'orden' : 'órdenes'} de compra</span>
         {/* §4.3 · Por moneda. Este pie era la CUARTA aparición del mismo bug:
             un reduce sobre `monto` sin mirar `moneda`, con el resultado
             rotulado como si fuera una sola. */}
@@ -348,6 +393,7 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
           </span>
         )}
       </div>
+      )}
     </div>
   );
 }

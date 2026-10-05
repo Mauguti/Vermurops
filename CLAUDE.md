@@ -1085,6 +1085,49 @@ completo; la pestaña dice lo que pasa con `ModuloEnDesarrollo`.
     huérfanos— y los seeds de `src/data.ts`, que sí alimentan los prospectos
     y el Kanban de demostración.
 
+## 4.24 Cuentas por pagar: un renglón por factura (tarea 58, 5-oct-2026)
+
+Julio vio IDAMEX dos veces en la vista por proveedor. **No eran datos
+duplicados:** las dos pantallas de Cuentas por pagar cuentan ÓRDENES, y un
+proveedor emite UNA factura por todo lo que prestó (§4.14). Reproducido en
+emulador: tres órdenes de IDAMEX, dos de ellas cubiertas por la misma
+F-IDA-1201, se veían como tres renglones. Quien ve tres renglones programa
+tres pagos.
+
+**La unidad de lo que se debe es la FACTURA, no la orden**
+(`lib/facturasProveedor.ts`, 21 tests). Qué la identifica, en orden de
+confianza: `facturaUUID` (el folio fiscal del CFDI) → `facturaDatos.numero`
+(lo que leyó el clasificador) → `facturaAsociada` (lo tecleado), siempre
+**dentro del mismo proveedor**: el «A-001» de dos proveedores son dos
+facturas. El número se compara sin guiones, espacios ni mayúsculas.
+  - **Una orden sin factura NO se agrupa con las otras sueltas**: es su
+    propio renglón y lo dice. Juntarlas afirmaría que existe una factura que
+    nadie ha visto.
+  - Totales **por moneda** (§4.3), estado el **menos avanzado** de sus
+    órdenes, y la fecha de pago **más próxima** — con aviso «fechas
+    distintas» cuando no coinciden, porque una factura se paga de una vez.
+  - Una orden rechazada no suma ni decide el estado: no existió.
+
+**En pantalla:** toggle «Por proveedor | Por orden» en Cuentas por pagar,
+**default proveedor**, preferencia por usuario en `preferenciasUsuario/{uid}`
+(`vistaCuentasPorPagar`), como la de cargos. El proveedor aparece una vez,
+con sus facturas dentro; abrir una enseña concepto, estado y monto de cada
+orden. «Por orden» conserva la tabla de siempre con sus filtros.
+
+**El COD va en el renglón, no escondido tras la expansión.** El folio de cada
+orden es un enlace a su ficha, que ya regresa a Cuentas por pagar. Esconderlo
+rompió el recorrido: quien trae un folio en la mano lo busca a la vista.
+Lo atrapó `./scripts/e2e.sh` en el paso 5, no los tests unitarios.
+
+**Programación de pagos NO cambia de agrupado.** Una transferencia es por
+proveedor, fecha y moneda, y eso es correcto: dos monedas son dos
+transferencias (§4.3). Lo que cambia es que cada tarjeta **dice qué factura
+cubre**, para que el mismo proveedor en dos tarjetas se entienda en vez de
+parecer un duplicado.
+  - Pendiente anotado: una factura repartida en órdenes con fechas de pago
+    distintas sigue produciendo DOS transferencias. Decisión de negocio
+    (¿se adelanta todo a la fecha más próxima?), no de interfaz.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
