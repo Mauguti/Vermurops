@@ -190,6 +190,9 @@ export interface LineaLote {
   observaciones?: string;
   /** Lo que el agente extrajo; cada contexto decide qué usa. */
   datos?: Record<string, unknown>;
+  /** D-2 · RFC y razón social que leyó el agente, para ofrecer adopción. */
+  rfc?: string;
+  razonSocial?: string;
   /** Dónde quedó el archivo en Storage. Vacío si la subida falló. */
   storagePath: string;
   url: string;

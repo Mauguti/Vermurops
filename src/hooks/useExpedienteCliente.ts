@@ -130,5 +130,39 @@ export function useExpedienteCliente() {
     return { expediente, docsAlta };
   };
 
-  return { procesando, subirYClasificar, guardarDocumento };
+  /**
+   * Tarea 63 · Guarda VARIOS documentos de un lote en una sola escritura.
+   *
+   * Uno por uno serían N `updateDoc` sobre el mismo documento, y el segundo
+   * podría pisar al primero si llega con la copia vieja del expediente. Una
+   * escritura con el mapa completo no tiene ese problema.
+   */
+  const guardarDocumentos = async (
+    cliente: ClienteVermur,
+    documentos: { tipo: TipoDocExpediente; documento: DocExpediente }[],
+  ): Promise<{ expediente: NonNullable<ClienteVermur['expediente']>; docsAlta: DocsAlta }> => {
+    exigir(user?.rol as UserRole | undefined, 'cliente.alta');
+
+    const autor = user?.email ?? user?.uid ?? '';
+    const expediente = { ...(cliente.expediente ?? {}) };
+    for (const { tipo, documento } of documentos) {
+      expediente[tipo] = { ...documento, subidoPor: documento.subidoPor || autor };
+    }
+
+    const docsAlta = derivarDocsAlta(
+      cliente.docsAlta ?? { acta: false, poder: false, identificacion: false, csf: false, comprobante: false, bancaria: false },
+      expediente,
+    );
+
+    await conAviso('los documentos del expediente', () =>
+      updateDoc(doc(db, 'clientes', cliente.id), sanitizarParaFirestore({
+        expediente,
+        docsAlta,
+        updatedAt: new Date().toISOString(),
+      }) as Record<string, unknown>));
+
+    return { expediente, docsAlta };
+  };
+
+  return { procesando, subirYClasificar, guardarDocumento, guardarDocumentos };
 }
