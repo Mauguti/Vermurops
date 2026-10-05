@@ -4,6 +4,11 @@
  * Muestra el FIX del DOF (serie SF43718 de Banxico) con su fecha de
  * determinación, un aviso si está desactualizado, historial de los últimos
  * 30 días, y botón «Actualizar ahora» para admin, administracion y pricing.
+ *
+ * Tarea 56: esta pantalla es el dato FISCAL, de referencia. Con lo que se
+ * cotiza es el tipo de cambio de Pricing, que se captura en cada cotización y
+ * se congela ahí. Aquí se dice, para que nadie lea este número como «el tipo
+ * de cambio de la empresa». Ver `lib/tipoCambioPricing.ts`.
  */
 
 import React from 'react';
@@ -39,8 +44,17 @@ export default function ExchangeRates() {
           Tipo de Cambio
         </h2>
         <p className="text-[13px] text-text-secondary mt-1">
-          FIX del DOF publicado por Banxico (serie SF43718). Se actualiza automáticamente cada 2 horas en días hábiles.
+          FIX del DOF publicado por Banxico (serie SF43718). Se consulta solo a las 8, 10, 12, 14, 16 y 18 h
+          en días hábiles.
         </p>
+      </div>
+
+      {/* ── Qué es y qué no es este número (tarea 56) ──────────────────── */}
+      <div className="bg-primario/5 border border-primario/20 rounded-xl px-5 py-3 text-[12px] text-gray-700 leading-relaxed">
+        <strong className="text-primario">Esta pantalla es de referencia.</strong> Con lo que Vermur cotiza
+        es el <strong>tipo de cambio de Pricing</strong>, que se captura en cada cotización y se congela ahí
+        junto con el margen. El FIX de Banxico se muestra al lado de esa captura, informativo; no la precarga
+        ni entra en ningún cálculo.
       </div>
 
       {/* ── Tarjeta principal ──────────────────────────────────────────── */}
@@ -128,9 +142,10 @@ export default function ExchangeRates() {
 
       {/* ── Nota fiscal ────────────────────────────────────────────────── */}
       <div className="bg-amber-50/50 border border-amber-200 rounded-xl px-5 py-3 text-[12px] text-amber-800 leading-relaxed">
-        <strong>Regla fiscal pendiente de confirmar:</strong> para CFDI se usa el tipo de cambio publicado
-        en el DOF el día hábil anterior a la operación. Se guardan las dos fechas (determinación y
-        liquidación) para aplicar la que confirme Julio.
+        <strong>Para qué servirá:</strong> el CFDI exige el tipo de cambio publicado en el DOF, no el de
+        Pricing. Este dato es el que usará la factura cuando exista el timbrado; se guardan las dos fechas
+        (determinación y liquidación) para aplicar la regla que confirme Julio —el día hábil anterior a la
+        operación, salvo que él diga otra.
       </div>
 
       {/* ── Historial ──────────────────────────────────────────────────── */}

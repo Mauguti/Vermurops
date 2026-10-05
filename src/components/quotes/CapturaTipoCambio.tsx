@@ -1,21 +1,26 @@
 import React, { useState } from 'react';
-import { Coins, Check, ArrowDown } from 'lucide-react';
+import { Coins, Check, Info, AlertTriangle } from 'lucide-react';
 import {
   ETIQUETA_FUENTE, aplicarReglaPricingRate, etiquetaTipoCambio, tasaUtilizable,
   type TipoCambioCotizacion, type FuenteTipoCambio, type ReglaPricingRate,
 } from '../../lib/monedaComparativa';
+import {
+  FUENTES_OPERATIVAS, FUENTES_REFERENCIA, fuenteInicial, modoInicial,
+  avisoFuenteReferencia, etiquetaReferenciaBanxico, type ModoCaptura,
+} from '../../lib/tipoCambioPricing';
 import { useTipoCambioActual } from '../../hooks/useTipoCambio';
 
 /**
- * Captura del tipo de cambio de la cotización (MO-3).
+ * Captura del tipo de cambio de la cotización (MO-3, revisada en la tarea 56).
  *
  * Se guarda CON la cotización y no se relee: si se tomara el vigente en cada
  * apertura, reabrir el documento el mes que viene podría reordenar a los
  * agentes de la comparativa y contradecir una decisión ya tomada.
  *
- * Cuando la fuente es Banxico o SAT, propone el valor guardado en
- * `configuracion/tipoCambio` (tarea 51). Editable: el usuario puede
- * aceptarlo o cambiarlo.
+ * La tasa que se captura aquí es la OPERATIVA, la de Pricing — es la que abre
+ * por defecto. El FIX de Banxico (`configuracion/tipoCambio`) se ve al lado
+ * como dato informativo: no precarga el campo ni entra en ningún cálculo. Si
+ * alguien lo quiere, lo teclea. Ver `lib/tipoCambioPricing.ts`.
  */
 
 interface Props {
@@ -27,14 +32,11 @@ interface Props {
 const FUENTES_BASE: Exclude<FuenteTipoCambio, 'pricing_rate' | 'manual'>[] =
   ['sat', 'banxico', 'banamex_compra', 'banamex_venta'];
 
-/** ¿La fuente puede precargarse desde el dato de Banxico? */
-const FUENTE_CON_PRECARGA: FuenteTipoCambio[] = ['banxico', 'sat'];
-
 export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: Props) {
   const [abierto, setAbierto] = useState(false);
-  const [modo, setModo] = useState<'directo' | 'regla'>('directo');
+  const [modo, setModo] = useState<ModoCaptura>(modoInicial(tipoCambio));
   const [valor, setValor] = useState(String(tipoCambio?.valor ?? ''));
-  const [fuente, setFuente] = useState<FuenteTipoCambio>(tipoCambio?.fuente ?? 'banxico');
+  const [fuente, setFuente] = useState<FuenteTipoCambio>(fuenteInicial(tipoCambio));
   const [tasaBase, setTasaBase] = useState('');
   const [baseFuente, setBaseFuente] = useState<ReglaPricingRate['baseFuente']>('banamex_venta');
   const [colchonTipo, setColchonTipo] = useState<'monto' | 'porcentaje'>('monto');
@@ -60,17 +62,13 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
 
   const definido = tasaUtilizable(tipoCambio);
 
-  /** Precarga del valor de Banxico cuando la fuente lo admite. */
-  const precargaDisponible = modo === 'directo'
-    && FUENTE_CON_PRECARGA.includes(fuente)
-    && tcBanxico
-    && tcBanxico.valor > 0
-    && valor !== String(tcBanxico.valor);
-
-  const aplicarPrecarga = () => {
-    if (!tcBanxico) return;
-    setValor(String(tcBanxico.valor));
-  };
+  /**
+   * El FIX, solo para leerlo. No hay botón que lo copie: un botón que
+   * precarga se aprieta por reflejo, y 18.19 se ve idéntico a 20.50 en el
+   * renglón del total — la diferencia aparece en el margen, semanas después.
+   */
+  const referenciaBanxico = etiquetaReferenciaBanxico(tcBanxico);
+  const aviso = avisoFuenteReferencia(tipoCambio);
 
   if (!editable) {
     return (
@@ -106,10 +104,17 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
                   modo === m ? 'bg-white text-[#18181B] shadow-sm' : 'text-gray-400 hover:text-gray-600'
                 }`}
               >
-                {m === 'directo' ? 'Valor directo' : 'Pricing rate'}
+                {m === 'directo' ? 'Valor directo' : 'Con regla'}
               </button>
             ))}
           </div>
+
+          {aviso && (
+            <p className="flex items-start gap-1.5 text-[10px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 leading-snug">
+              <AlertTriangle className="w-3 h-3 mt-px shrink-0" />
+              {aviso}
+            </p>
+          )}
 
           {modo === 'directo' ? (
             <>
@@ -132,27 +137,38 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
                   onChange={e => setFuente(e.target.value as FuenteTipoCambio)}
                   className="w-full px-2 py-1.5 text-[12px] border border-gray-200 rounded-lg outline-none focus:border-primario bg-white"
                 >
-                  {(Object.keys(ETIQUETA_FUENTE) as FuenteTipoCambio[])
-                    .filter(f => f !== 'pricing_rate')
-                    .map(f => <option key={f} value={f}>{ETIQUETA_FUENTE[f]}</option>)}
+                  {/* El de Pricing primero y por defecto: es la tasa con la
+                      que Vermur cotiza. Las de mercado siguen disponibles,
+                      agrupadas aparte, porque hay cotizaciones viejas con
+                      ellas y porque alguien puede querer dejarlo escrito. */}
+                  <optgroup label="El de Vermur">
+                    {FUENTES_OPERATIVAS.map(f => (
+                      <option key={f} value={f}>{ETIQUETA_FUENTE[f]}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Tasas de mercado (referencia)">
+                    {FUENTES_REFERENCIA.map(f => (
+                      <option key={f} value={f}>{ETIQUETA_FUENTE[f]}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
-              {precargaDisponible && (
-                <button
-                  onClick={aplicarPrecarga}
-                  className="flex items-center gap-1.5 w-full text-[11px] text-primario bg-primario/5 border border-primario/20 rounded-lg px-2 py-1.5 hover:bg-primario/10 transition-colors"
-                >
-                  <ArrowDown className="w-3 h-3" />
-                  Usar el de Banxico: <strong className="tabular-nums">{tcBanxico!.valor}</strong>
-                  <span className="text-gray-400 ml-auto">{tcBanxico!.fechaDeterminacion}</span>
-                </button>
-              )}
             </>
           ) : (
             <>
               <p className="text-[10px] text-gray-400 leading-snug">
-                El pricing rate es una regla sobre otra tasa. Queda escrito de dónde salió.
+                El de Pricing también se puede expresar como una regla sobre otra tasa
+                («Banamex más cuatro pesos»). Queda escrito de dónde salió.
               </p>
+              {tipoCambio?.reglaAplicada && (
+                /* Al reabrir, los campos de la regla salen vacíos: sin esto no
+                   se vería cuál está aplicada y parecería que no hay ninguna. */
+                <p className="text-[10px] text-gray-500 bg-gray-50 rounded-lg px-2 py-1">
+                  Regla aplicada:{' '}
+                  <span className="font-mono text-gray-700">{tipoCambio.reglaAplicada}</span>
+                  {' '}= <span className="font-mono text-gray-700">{tipoCambio.valor}</span>
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-2">
                 <div>
                   <label className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Base</label>
@@ -209,6 +225,25 @@ export default function CapturaTipoCambio({ tipoCambio, editable, onCambiar }: P
               )}
             </>
           )}
+
+          {/* Banxico, solo como referencia. Sin botón: se teclea a mano. */}
+          <div className="border-t border-gray-100 pt-2">
+            {referenciaBanxico ? (
+              <p className="flex items-start gap-1.5 text-[10px] text-gray-500 leading-snug">
+                <Info className="w-3 h-3 mt-px shrink-0 text-gray-400" />
+                <span>
+                  <span className="tabular-nums">{referenciaBanxico}</span>
+                  <span className="block text-gray-400">
+                    Informativo. Es el que el SAT exige en la factura, no el que usa Pricing para cotizar.
+                  </span>
+                </span>
+              </p>
+            ) : (
+              <p className="text-[10px] text-gray-400 leading-snug">
+                Sin dato de Banxico para mostrar como referencia.
+              </p>
+            )}
+          </div>
 
           <div className="flex justify-end gap-2 pt-1">
             {definido && (

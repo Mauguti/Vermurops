@@ -39,6 +39,7 @@ import { ETAPAS_EMBARQUE, estadoDe, patchParaEtapa, type EstadoEmbarque } from '
 import { useOrdenesCompra } from '../../hooks/useOrdenesCompra';
 import Toast, { TipoToast } from '../ui/Toast';
 import { sumarPorMoneda, formatearPorMoneda } from '../../lib/sumarPorMoneda';
+import { ETIQUETA_FUENTE } from '../../lib/monedaComparativa';
 
 /**
  * Las pestañas, en el orden en que se trabaja (decisión de Mau, 10-sep-2026):
@@ -1471,7 +1472,11 @@ export default function FichaEmbarque({
                     <p className="text-xs font-mono text-gray-700">
                       {embarque.tipoCambio.valor} MXN/USD
                       <span className="text-[10px] text-gray-400 font-sans ml-1">
-                        · {embarque.tipoCambio.fuente} · {embarque.tipoCambio.fecha.slice(0, 10)}
+                        {/* La etiqueta, no la clave: con el de Pricing por defecto
+                            (tarea 56) aquí se leía «pricing_rate». */}
+                        · {ETIQUETA_FUENTE[embarque.tipoCambio.fuente] ?? embarque.tipoCambio.fuente}
+                        {embarque.tipoCambio.reglaAplicada && ` (${embarque.tipoCambio.reglaAplicada})`}
+                        {' '}· {embarque.tipoCambio.fecha.slice(0, 10)}
                       </span>
                     </p>
                   ) : (
