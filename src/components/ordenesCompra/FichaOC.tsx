@@ -9,8 +9,7 @@ import {
   evaluarFondeo, esPagoDeImpuestos, type FondeoEmbarque,
 } from '../../lib/fondeoCliente';
 import {
-  sugerirBancoVermur, sugerirCuentaProveedor, BANCOS_VERMUR, BANCOS_VERMUR_MAP,
-  type BancoVermur,
+  sugerirBancoVermur, sugerirCuentaProveedor, BANCOS_VERMUR_MAP, opcionesBanco,
 } from '../../lib/cuentasPago';
 import type { ProveedorVermur } from '../proveedores/ProveedoresData';
 import {
@@ -163,7 +162,12 @@ export default function FichaOC({
     tiposProveedor: proveedor?.tipos,
   });
   const sugCuenta = sugerirCuentaProveedor(proveedor, ocLocal);
-  const bancoElegido = (oc.bancoSalida as BancoVermur | null) ?? sugBanco.banco;
+  /* El valor guardado se respeta tal cual, aunque sea un id de antes de las
+     siete cuentas: `opcionesBanco` lo agrega como opción para que el selector
+     no lo pinte en la primera de la lista. */
+  const bancoElegido: string = oc.bancoSalida ?? sugBanco.banco;
+  const opcionesDeBanco = opcionesBanco(oc.bancoSalida);
+  const bancoElegidoInfo = opcionesDeBanco.find(o => o.valor === bancoElegido) ?? null;
   const cuentaElegidaId = oc.cuentaBancariaId ?? sugCuenta.cuenta?.id ?? '';
   const cuentasOfrecidas = sugCuenta.cuenta
     ? [sugCuenta.cuenta, ...sugCuenta.alternativas]
@@ -446,10 +450,16 @@ export default function FichaOC({
                   onChange={e => onActualizar({ bancoSalida: e.target.value })}
                   className="w-full px-3 py-2 text-[12px] bg-white border border-card-border rounded-md outline-none focus:border-brand"
                 >
-                  {BANCOS_VERMUR.map(b => (
-                    <option key={b.id} value={b.id} disabled={!b.monedas.includes(oc.moneda)}>
-                      {b.nombre} — {b.usoHabitual}
-                      {!b.monedas.includes(oc.moneda) ? ` (no opera ${oc.moneda})` : ''}
+                  {opcionesDeBanco.map(o => (
+                    <option
+                      key={o.valor}
+                      value={o.valor}
+                      /* Una cuenta fuera de la lista no se deshabilita: es el
+                         valor actual y hay que poder verlo seleccionado. */
+                      disabled={!o.fueraDeLista && !o.monedas.includes(oc.moneda)}
+                    >
+                      {o.nombre} — {o.usoHabitual}
+                      {!o.fueraDeLista && !o.monedas.includes(oc.moneda) ? ` (no opera ${oc.moneda})` : ''}
                     </option>
                   ))}
                 </select>
@@ -458,6 +468,11 @@ export default function FichaOC({
                     ? `Elegido a mano. Se sugería ${BANCOS_VERMUR_MAP[sugBanco.banco].nombre}: ${sugBanco.razon.toLowerCase()}`
                     : `Sugerido: ${sugBanco.razon}`}
                 </p>
+                {bancoElegidoInfo?.fueraDeLista && (
+                  <p className="text-[10px] text-amber-700 mt-0.5">
+                    {bancoElegidoInfo.usoHabitual} Elige una de las siete cuentas actuales si quieres corregirlo.
+                  </p>
+                )}
                 {sugBanco.aviso && !oc.bancoSalida && (
                   <p className="text-[10px] text-amber-700 mt-0.5">{sugBanco.aviso}</p>
                 )}

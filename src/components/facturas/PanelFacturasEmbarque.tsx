@@ -18,7 +18,7 @@ import {
   proponerFactura, diasCreditoDe, vencimientoFactura, saldoDeFactura,
   type CreditoCliente, type ResultadoPropuesta,
 } from '../../lib/facturacionEmbarque';
-import { BANCOS_VERMUR } from '../../lib/cuentasPago';
+import { BANCOS_VERMUR, BANCO_COBRO_DEFAULT } from '../../lib/cuentasPago';
 
 const money = (n: number) =>
   n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -293,7 +293,7 @@ function FilaFactura({
   const [abierto, setAbierto] = useState(false);
   const [monto, setMonto] = useState('');
   const [fechaCobro, setFechaCobro] = useState(new Date().toISOString().slice(0, 10));
-  const [banco, setBanco] = useState(BANCOS_VERMUR[0].nombre);
+  const [banco, setBanco] = useState(BANCO_COBRO_DEFAULT.nombre);
   const [referencia, setReferencia] = useState('');
 
   const cancelada = factura.estado === 'cancelada';
@@ -437,7 +437,11 @@ function FilaFactura({
               value={banco} onChange={e => setBanco(e.target.value)}
               className="w-full px-2.5 py-1.5 text-[12px] bg-white border border-card-border rounded-md outline-none focus:border-brand"
             >
-              {BANCOS_VERMUR.map(b => <option key={b.id} value={b.nombre}>{b.nombre}</option>)}
+              {BANCOS_VERMUR.map(b => (
+                  <option key={b.id} value={b.nombre} title={b.usoHabitual}>
+                    {b.nombre} — {b.usoHabitual}
+                  </option>
+                ))}
             </select>
           </div>
           <div className="flex gap-2">
