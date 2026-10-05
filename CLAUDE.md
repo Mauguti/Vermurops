@@ -1172,6 +1172,53 @@ leerla en vez de dejar la lista vacía sin explicación.
     conservan sus columnas y pueden agregarla a mano.
   - El CSV de la lista suma «Tráfico» y «Mes de cierre».
 
+## 4.26 Contactos del cliente: varios, con tipo, y se desactivan (tarea 60, 5-oct-2026)
+
+**169 de los 817 clientes ya traían contactos de Magaya y ninguna pantalla
+los enseñaba.** El dato estaba importado (`contactos[]`, con `id: 'cnt-1'` y
+`tipo: 'general'`, los 169 iguales) y la ficha del cliente no tenía dónde
+verlo: solo el PDF de la cotización lo leía, para sacar el correo del
+principal. Es una variante de «regla sin call site»: el dato existe y nadie
+lo mira.
+
+**El editor es UNO solo** (`components/ui/EditorContactos.tsx`), con las
+reglas en `lib/contactos.ts` (26 tests). Vivía pegado dentro de
+`ProveedorFormModal` —estado, altas, bajas y el radio de «principal»— así que
+el cliente no podía reusarlo. Ahora lo usan los dos, y las dos diferencias
+legítimas son props:
+  - **`tipos`:** el cliente clasifica a sus contactos con los cinco que pidió
+    Vermur —dueño, quien pide la unidad, quien manda la factura, quien
+    monitorea, otro—; el proveedor no.
+  - **`modoBaja`:** el cliente **desactiva**, el proveedor conserva el
+    borrado que ya tenía. Cambiarlo también en proveedores es otra tarea.
+
+**Se desactiva, no se borra.** Una persona que dejó la empresa del cliente
+sigue siendo quien firmó el correo de hace seis meses; borrarla deja ese
+correo sin autor. `activo` ausente = activo, y solo se escribe al desactivar.
+  - **Desactivar al principal TRASPASA el principal** al primer activo que
+    quede. Si no, `contactoParaAvisos` —que usa el PDF de la cotización—
+    seguiría apuntando a quien ya no trabaja ahí, y el PDF se vería
+    perfectamente bien.
+  - Si no queda ninguno activo no se sugiere a nadie: mandarle la cotización
+    a alguien dado de baja es peor que no sugerir contacto.
+
+**El `tipo: 'general'` de Magaya se LEE como «sin tipo» y se conserva tal
+cual.** `tipoContactoConocido` devuelve null para cualquier valor que no sea
+de los cinco, el renglón lo enseña como «Magaya: general» y el selector queda
+en «Sin tipo». Nada se reescribe hasta que alguien lo cambie a mano:
+reescribir 169 contactos para que digan lo mismo con otra palabra no es un
+arreglo, es ruido en la bitácora.
+
+**Lo que se guarda** (`contactosParaGuardar`): recorta, convierte '' en null,
+**descarta las líneas sin nombre** —la misma trampa del Bloque 0 en la tabla
+de la cotización— y, si al descartarlas se fue el principal, lo toma el
+primer activo. `vaciosComoNull: false` para el proveedor, cuyo modelo declara
+`email: string`.
+
+**Quién edita:** `cliente.alta`, igual que el resto de la ficha
+(Administración y admin). Los demás leen, con el fieldset deshabilitado que
+ya tenía la ficha. La pestaña dice cuántos ACTIVOS hay: «Contactos (3)».
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
