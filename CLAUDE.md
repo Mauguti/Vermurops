@@ -1401,6 +1401,81 @@ la 57. Un «Gmail Workspace · Conectado» junto a la tarjeta nueva se lee como
 que el correo ya salía por Gmail. Quedan como catálogo de lo pedido, con
 estado «Sin construir» y sin botón que prometa un flujo inexistente.
 
+## 4.30 Carga de «Clientes OK»: en seco, sin pisar y sin adivinar (tarea 65, 5-oct-2026)
+
+La base no trae RFC ni días de crédito y Magaya sí los tiene; Luis entregó la
+lista buena, «Clientes OK». **La lista todavía no está en el repo**, así que lo
+que se construyó es el script y su mapeo configurable, probado con un archivo
+sintético (`scripts/fixtures/clientes-ok-sintetico.csv`) con los casos
+difíciles. Lógica en `lib/cargaClientesOk.ts` (58 tests), el script en
+`scripts/cargarClientesOk.ts` y la reversa en `scripts/revertirCargaClientes.ts`.
+
+**Lo corre Mau, no el script solo.** En seco por omisión: sin `--aplicar` no
+escribe un campo. `--columnas` inventaría los encabezados sin pedir
+credenciales. Sin `SERVICE_ACCOUNT` ni `FIRESTORE_EMULATOR_HOST` falla limpio.
+
+**El dato está donde el export lo dejó, no donde debería.** El consecutivo de
+Magaya vive en `referenciaMagaya` (817 de 817) y el Tax ID en
+`numeroEntidadMagaya` (318 de 817, `rfc` en 0) — lo levantó la tarea 42. Por
+eso el empate mira los dos campos en cada llave: **número de entidad → RFC →
+nombre normalizado**, y `rfcEfectivo` cae al Tax ID de Magaya cuando pasa
+`validarRFC`. Empatar solo contra `rfc` fallaría justo en los clientes que SÍ
+tienen RFC.
+
+**Tres reglas, y las tres niegan una escritura:**
+  - **Lo capturado a mano no se pisa.** Un valor distinto en VermurOps es
+    CONFLICTO: se lista con los dos valores y se queda como está. Quien lo
+    resuelve es Julio.
+  - **Lo que no viene en la lista no se toca.** «Reemplazar la base» no es
+    borrar: los ausentes se listan. Nada se borra, nada se desactiva, no se
+    crean clientes — un renglón sin empate se reporta como «nuevo» para que
+    Julio decida el alta.
+  - **Un empate dudoso no se adivina.** Dos clientes con el mismo nombre
+    normalizado («UNO RETAIL» y «UNORETAIL», que existen) es AMBIGUO y no se
+    escribe nada; y **dos renglones que reclaman al mismo cliente tampoco se
+    escriben** (`clientesConVariosRenglones`), porque escribir los dos deja el
+    valor del último renglón del archivo y nadie sabría que hubo otro. Es el
+    duplicado del que Luis avisó, «FIBREMEX SA de CV» contra «FIBREMEX».
+  - Cuando una llave fuerte empata y los nombres no se parecen, el empate se
+    respeta **y se dice**: un RFC tecleado en el renglón equivocado le
+    escribiría su régimen y su responsable a otro cliente.
+
+**El cero de Magaya cuenta como vacío.** 742 de los 817 traen los cuatro
+plazos en cero porque Magaya no los tenía. Tratarlo como «capturado» pondría
+la lista entera en conflicto y la carga no serviría de nada. Un plazo mayor
+que cero sí es un dato. El escalar legacy `dias` sigue al general para que no
+divergan (la ficha lee `diasCreditoPorTipo.general ?? dias`).
+
+**La marca «Heredado de Magaya» solo se completa en quien ya se lee así.** Un
+cliente con `origenDatos: 'manual'` NO se marca: marcarlo lo movería de
+`sin_validar` a `heredado_magaya` y con eso levantaría el freno de expediente
+(§4.18) de alguien que Administración no validó. Que un nombre aparezca en la
+lista de Magaya no es la validación del expediente. Por lo mismo **no se
+escribe `numeroEntidadMagaya`**, aunque el renglón lo traiga: ese campo decide
+el mismo freno. El enlace se sugiere en la salida.
+
+**Lo inválido se reporta, no se carga:** un RFC que no pasa estructura y
+dígito verificador del SAT, un Tax ID extranjero (`DE253556233`), un CP que no
+es de cinco dígitos (`M6H 1C2`), un régimen fuera de `c_RegimenFiscal`,
+«contado» en la columna de días, y un responsable de ventas que no empata con
+ningún usuario de la plataforma — ese se lee de `usuarios/{uid}` con el mapa
+del equipo como respaldo, y si no empata **no se inventa el correo**: los
+filtros de «Solo los míos» apuntarían a una cuenta que no existe.
+
+**El respaldo distingue «valía null» de «no existía».** `presente: false` en
+el respaldo hace que la reversa BORRE el campo (`FieldValue.delete()`) en vez
+de dejarlo en null: un `rfc: null` escrito donde no había nada se ve igual en
+pantalla y no es el mismo documento — `estadoFiscal` y los filtros de Altas
+leen la ausencia. El respaldo se arma con el documento del servidor en el
+momento de escribir, no con lo que se leyó al empezar, e incluye `updatedAt`.
+Vive en `scripts/respaldos/`, ignorado por git: es una foto de datos reales.
+
+**Mapeo de columnas en UN lugar.** `ALIAS_COLUMNA` acepta encabezados en
+español e inglés, con acentos y puntuación (se comparan normalizados), y el
+delimitador se detecta solo fuera de comillas — Excel en es-MX exporta con
+`;` y una razón social con coma haría ganar a la coma. Un Excel se convierte a
+CSV antes: el script lee texto delimitado y lo dice con los pasos.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

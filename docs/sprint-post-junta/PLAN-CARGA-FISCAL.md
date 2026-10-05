@@ -343,3 +343,32 @@ en este sprint.
 La fase 1 no tiene dependencia: se puede hacer hoy. La fase 2 espera el
 export de Luis. La fase 3 espera saber si el dato existe en algún archivo
 o hay que capturarlo a mano.
+
+---
+
+## 7. Lo que construyó la tarea 65 (5-oct-2026)
+
+La **fase 2 ya está escrita**, y hace más de lo que este plan pedía:
+`scripts/cargarClientesOk.ts` (lógica en `src/lib/cargaClientesOk.ts`, 58
+tests, reversa en `scripts/revertirCargaClientes.ts`). Ver §4.30 de CLAUDE.md.
+
+Carga desde la lista «Clientes OK» de Luis: RFC, código postal, régimen
+fiscal, **días de crédito por modalidad**, **responsable de ventas** y la
+marca «Heredado de Magaya». En seco por omisión, con respaldo por documento y
+script de reversa. La lista todavía no llegó: el mapeo de encabezados está en
+`ALIAS_COLUMNA` y se probó con un archivo sintético.
+
+Dos cosas que este plan asumía y conviene corregir aquí:
+
+1. **La llave de empate es `referenciaMagaya`, pero también se mira
+   `numeroEntidadMagaya`.** Lo que el §1 de este plan descubrió —que el Tax ID
+   cayó en `numeroEntidadMagaya`— significa que el empate por RFC tiene que
+   mirar ese campo, o fallaría justo en los 318 clientes que sí traen RFC.
+   `rfcEfectivo()` lo resuelve.
+
+2. **La fase 1 (minar `numeroEntidadMagaya` → `rfc`) no se escribió como
+   script aparte.** El de la tarea 65 la cubre cuando la lista trae el RFC, y
+   lo que mina de Magaya sale en los avisos («el Tax ID de Magaya contradice
+   el RFC de la lista»). Si Mau quiere la fase 1 suelta —sin esperar la
+   lista— es el mismo recorrido con la base como única fuente: media hora
+   reusando `rfcEfectivo` y el respaldo.
