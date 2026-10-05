@@ -127,6 +127,24 @@ cd /Users/mauriciogutierrezmunoz/antigravity/Vermur-Logistics && npx firebase de
 Es la misma lección que la de abajo —«mira desde dónde corre»— en su versión
 de despliegue, y la primera vez dejó a Mau fuera de su propia base de datos.
 
+**Un `defineSecret` sin secreto detiene el deploy de TODAS las Functions.**
+Es el hermano mayor de la lección de abajo, y muerde más fuerte. El `--only`
+del CLI filtra **qué se despliega, no qué se analiza**: Firebase resuelve los
+parámetros de todo el codebase antes de filtrar. El 5-oct, `enviarCorreo`
+(tarea 64) declaraba dos `defineSecret` que no existían en Secret Manager —no
+había credenciales de Exchange todavía— y eso tumbó el deploy de
+`clasificarDocumento`, que no tiene nada que ver:
+
+```
+Error: In non-interactive mode but have no value for the secret CORREO_SMTP_USUARIO
+```
+
+Interactivamente no se arregla: pide teclear la credencial, y no existía.
+La salida fue **comentar el export en `functions/src/index.ts`** con el
+porqué y la fecha de reactivación. La regla que queda: **una Function cuyo
+secreto todavía no existe no se exporta**. Se escribe, se prueba por el
+emulador, y el export entra el día que entra el secreto.
+
 **Un `defineString` nuevo detiene el deploy de Functions preguntando.**
 Las tareas 40 y 51 declararon `N8N_WEBHOOK_URL_GENERAR_DOC` y
 `N8N_WEBHOOK_URL_TIPO_CAMBIO` con `defineString`. `functions/.env` está en

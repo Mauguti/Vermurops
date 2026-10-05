@@ -155,6 +155,36 @@ Pendiente de la cadena anterior: **validar 35–55 en navegador**
 
 ---
 
+## 3.0 ⛔ PENDIENTE BLOQUEANTE · reactivar el correo después del 12-oct
+
+**`enviarCorreo` está comentado en `functions/src/index.ts`** (5-oct). No es
+un olvido: mientras esa línea exista y falten sus secretos, **no se puede
+desplegar NINGUNA Cloud Function**.
+
+`defineSecret('CORREO_SMTP_USUARIO')` y `…PASSWORD` no existen en Secret
+Manager porque no hay credenciales de Exchange, y el `--only` del CLI filtra
+qué se despliega pero no qué se **analiza**: Firebase resuelve los parámetros
+de todo el codebase antes de filtrar. Eso bloqueó el deploy de
+`clasificarDocumento` el 5-oct con:
+
+```
+Error: In non-interactive mode but have no value for the secret CORREO_SMTP_USUARIO
+```
+
+**Descomentar la línea NO basta.** Hacen falta dos cosas:
+
+1. Las capacitaciones del **12-oct**, que es cuando se enciende el correo.
+2. **Decidir el transporte.** `vermur.com` está en Microsoft 365 (MX →
+   `outlook.com`, SPF con `-all`), donde SMTP AUTH viene apagado por default
+   y Microsoft lo está retirando. Si se va por **Graph**, los dos secretos de
+   SMTP no aplican: hay que cambiarlos por el client id / tenant id / client
+   secret de una app registration.
+
+Mientras tanto no hay nada en la interfaz que mande correo, así que no falta
+ninguna función en producción — falta un endpoint sin usar.
+
+---
+
 ## 3. Cola restante
 
 La cola 56–66 quedó vacía a las 15:26. Lo que sigue, en orden de urgencia:
