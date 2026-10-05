@@ -270,21 +270,36 @@ function imprimirSinEmpate(planes: PlanRenglon[]) {
   }
 }
 
-function escribirCSV(ruta: string, planes: PlanRenglon[], ausentes: ClienteBase[]) {
+function escribirCSV(
+  ruta: string,
+  planes: PlanRenglon[],
+  ausentes: ClienteBase[],
+  idsDuplicados: Set<string>,
+) {
   const esc = (v: unknown) => {
     const s = v === null || v === undefined ? '' : String(v);
     return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   const lineas = ['linea,resultado,llave,clienteId,clienteNombre,nombreEnLista,campo,accion,antes,despues,razon'];
   for (const p of planes) {
-    const base = [p.renglon.linea, p.empate.resultado, p.empate.llave ?? '', p.empate.cliente?.id ?? '', p.empate.cliente?.nombre ?? '', p.renglon.nombre];
+    // Un cliente que la lista menciona dos veces se marca en el RESULTADO, no
+    // en una nota al pie: el archivo es con lo que Julio decide, y un renglón
+    // que dice «empatado» se lee como que se escribió.
+    const repetido = !!p.empate.cliente && idsDuplicados.has(p.empate.cliente.id);
+    const resultado = repetido ? 'repetido_en_la_lista' : p.empate.resultado;
+    const base = [p.renglon.linea, resultado, p.empate.llave ?? '', p.empate.cliente?.id ?? '', p.empate.cliente?.nombre ?? '', p.renglon.nombre];
+    const nota = repetido ? 'Otro renglón reclama al mismo cliente. No se escribe nada. ' : '';
     if (p.cambios.length === 0) {
-      lineas.push([...base, '', '', '', '', p.empate.razon ?? ''].map(esc).join(','));
+      lineas.push([...base, '', '', '', '', nota + (p.empate.razon ?? '')].map(esc).join(','));
       continue;
     }
     for (const c of p.cambios) {
       if (!DETALLE && (c.accion === 'igual' || c.accion === 'sin_dato')) continue;
-      lineas.push([...base, c.campo, c.accion, c.antes, c.despues ?? '', c.razon ?? ''].map(esc).join(','));
+      const accion = repetido && c.accion === 'escribe' ? 'no_se_escribe_por_repetido' : c.accion;
+      lineas.push([...base, c.campo, accion, c.antes, c.despues ?? '', nota + (c.razon ?? '')].map(esc).join(','));
+    }
+    for (const a of p.avisos) {
+      lineas.push([...base, '', 'aviso', '', '', a].map(esc).join(','));
     }
   }
   for (const c of ausentes) {
@@ -398,7 +413,7 @@ async function main() {
 
   if (SALIDA) {
     const ausentes = base.filter(c => res.ausentesDeLaLista.includes(c.id));
-    escribirCSV(SALIDA, planes, ausentes);
+    escribirCSV(SALIDA, planes, ausentes, idsDuplicados);
   }
 
   if (!APLICAR) {
