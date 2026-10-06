@@ -143,11 +143,14 @@ export default function DocumentosOC({
             return subirYClasificar(file, {
               flujo: 'documento-oc',
               capacidad: 'ordenCompra.solicitar',
-              // La regla de Storage que existe para la orden es la de
-              // `factura/`, y acepta solo PDF y XML (documentos fiscales,
-              // sin update ni delete). Una carpeta `documentos/` necesita su
-              // propia regla: el bloque exacto está en el reporte de la 63.
-              storageBasePath: `ordenesCompra/${oc.id}/factura`,
+              /*
+               * `documentos/` y no `factura/`: su regla de Storage se
+               * publicó el 5-oct y acepta FOTO —JPG, PNG, HEIC— además de
+               * PDF y XML, hasta 20 MB. `factura/` sigue restringida a
+               * documentos fiscales, y el comprobante de una transferencia
+               * llega como captura del teléfono: ahí no entraba.
+               */
+              storageBasePath: `ordenesCompra/${oc.id}/documentos`,
               campos: {
                 proveedorNombre: oc.proveedorNombre,
                 folioOC: oc.folio,
@@ -158,8 +161,8 @@ export default function DocumentosOC({
           }}
           puedeSubir
           onGuardar={guardar}
-          accept=".pdf,.xml"
-          ayuda="Varios a la vez (PDF o XML). El agente propone el tipo de cada uno y tú confirmas."
+          accept=".pdf,.xml,.jpg,.jpeg,.png,.heic,.heif"
+          ayuda="Varios a la vez (PDF, XML o foto). El agente propone el tipo de cada uno y tú confirmas."
         />
       )}
     </div>

@@ -70,6 +70,7 @@ type Veredicto =
   | 'desacuerdo'      // Magaya trae OTRO rfc válido: decide una persona
   | 'rfc_invalido'    // el rfc que ya está no pasa, y Magaya no ofrece nada mejor
   | 'magaya_invalido' // rfc vacío, Magaya trae algo que no es un RFC
+  | 'generico'        // Magaya trae un RFC genérico del SAT: no identifica a nadie
   | 'sin_dato';       // ni rfc ni Magaya
 
 interface Caso { veredicto: Veredicto; propio: string; magaya: string }
@@ -85,11 +86,35 @@ function estructuraDeRFC(v: string): boolean {
   return /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(v);
 }
 
+/*
+ * Los dos genéricos del SAT. `validarRFC` los acepta por whitelist —son
+ * válidos para timbrar— pero NINGUNO identifica a un cliente, así que
+ * ninguno se mina:
+ *
+ *   XAXX010101000  «público en general». Una empresa con nombre y razón
+ *                  social NO es público en general. Escribirlo afirma algo
+ *                  falso, y encima deja el campo con cara de validado.
+ *   XEXX010101000  residente en el extranjero. Para un cliente extranjero
+ *                  SÍ es el RFC correcto del CFDI, pero tampoco distingue a
+ *                  uno de otro: si lo minamos, 40 extranjeros quedan con el
+ *                  mismo «RFC» y el empate por RFC de la fase 2 los junta.
+ *
+ * Los dos salen listados para que Administración los ponga a mano donde
+ * corresponda. Si Vermur decide que XEXX sí se escriba a los extranjeros,
+ * es quitar una línea de este Set.
+ */
+const RFC_GENERICOS_SAT = new Set(['XAXX010101000', 'XEXX010101000']);
+
 function clasificar(c: ClienteBase): Caso {
   const propio = normalizarRFC(c.rfc ?? '');
   const magaya = normalizarRFC(c.numeroEntidadMagaya ?? '');
   const propioOk = !!propio && validarRFC(propio).valido;
   const magayaOk = !!magaya && validarRFC(magaya).valido;
+
+  // Antes que nada: un genérico no se mina, venga de donde venga.
+  if (!propio && magayaOk && RFC_GENERICOS_SAT.has(magaya)) {
+    return { veredicto: 'generico', propio, magaya };
+  }
 
   // Magaya aporta algo solo si es válido Y distinto de lo que ya hay.
   if (magayaOk && magaya !== propio) {
@@ -133,6 +158,7 @@ async function main() {
 
   const grupos: Record<Veredicto, typeof clientes> = {
     ya_tiene: [], minar: [], sin_dato: [], magaya_invalido: [], desacuerdo: [], rfc_invalido: [],
+    generico: [],
   };
   const detalle = new Map<string, { propio: string; magaya: string }>();
 
@@ -143,13 +169,13 @@ async function main() {
   });
 
   const aMinar = grupos.minar;
-  const extranjeros = aMinar.filter(c => esRFCExtranjero(detalle.get(c.id)!.magaya));
 
   console.log('── Qué encontró ──');
   console.log(`  ya tienen rfc válido:        ${grupos.ya_tiene.length}`);
   console.log(`  SE MINAN (rfc vacío):        ${aMinar.length}`);
   console.log(`  Magaya trae algo no-RFC:     ${grupos.magaya_invalido.length}`);
   console.log(`  el rfc que ya está no pasa:  ${grupos.rfc_invalido.length}`);
+  console.log(`  genérico del SAT (NO se mina):${String(grupos.generico.length).padStart(4)}`);
   console.log(`  sin dato en ninguno:         ${grupos.sin_dato.length}`);
   console.log(`  desacuerdo (NO se tocan):    ${grupos.desacuerdo.length}`);
   console.log();
@@ -171,14 +197,18 @@ async function main() {
     console.log();
   }
 
-  if (extranjeros.length) {
-    /*
-     * XEXX010101000 es el RFC genérico de extranjero del SAT: es correcto,
-     * pero no identifica a nadie. Sale aparte para que el conteo no se lea
-     * como «ya tenemos N RFC buenos».
-     */
-    console.log(`  ⚠️  de los que se minan, ${extranjeros.length} son el RFC genérico de extranjero`);
-    console.log(`      (XEXX…): válido para el SAT, pero no distingue un cliente de otro.\n`);
+  if (grupos.generico.length) {
+    const xaxx = grupos.generico.filter(c => detalle.get(c.id)!.magaya === 'XAXX010101000');
+    const xexx = grupos.generico.filter(c => esRFCExtranjero(detalle.get(c.id)!.magaya));
+    console.log('── RFC genéricos del SAT: NO se minan ──');
+    console.log(`  XAXX (público en general): ${xaxx.length}  ← una empresa con nombre no es «público en general»`);
+    console.log(`  XEXX (extranjero):         ${xexx.length}  ← correcto para el CFDI, pero no distingue un cliente de otro`);
+    console.log('  Los pone Administración a mano donde corresponda.');
+    grupos.generico.slice(0, 10).forEach(c => {
+      console.log(`      ${c.id} · ${String(c.nombre).slice(0, 40).padEnd(40)} «${detalle.get(c.id)!.magaya}»`);
+    });
+    if (grupos.generico.length > 10) console.log(`      … y ${grupos.generico.length - 10} más`);
+    console.log();
   }
 
   if (grupos.desacuerdo.length) {
