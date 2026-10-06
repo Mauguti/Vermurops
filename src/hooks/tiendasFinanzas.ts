@@ -31,6 +31,26 @@ export const tiendaFacturas = tiendaDe<FacturaCliente>('facturas', 'fechaEmision
 export const tiendaCobros = tiendaDe<CobroCliente>('cobros', 'fechaCobro');
 export const tiendaDepositos = tiendaDe<DepositoCliente>('depositosCliente', 'fechaDeposito');
 
+/**
+ * Lo que cada hook ve de la lista compartida.
+ *
+ * Vive aparte del hook y es pura a propósito: es la mitad de CORRECCIÓN de
+ * la tarea 89, y los tests de arriba solo cubren la de rendimiento —que haya
+ * un listener por colección—. Sin esto, romper el filtro no tumbaba nada y
+ * la pestaña Facturas de un embarque mostraría las facturas de TODOS.
+ *
+ * `undefined` = sin filtro (Finanzas ve todo). Una cadena vacía NO es «sin
+ * filtro»: es un embarqueId que nadie tiene, y devolver todo ahí sería el
+ * mismo error con otra cara.
+ */
+export function filtrarPorEmbarque<T extends { embarqueId?: string }>(
+  todos: readonly T[],
+  embarqueId?: string,
+): T[] {
+  if (embarqueId === undefined) return [...todos];
+  return todos.filter(x => x.embarqueId === embarqueId);
+}
+
 /** Lista compartida de una tienda, filtrada por embarque si se pide. */
 export function useTienda<T extends { embarqueId?: string }>(
   tienda: { suscribir(o: (e: EstadoTienda<T>) => void): () => void },
@@ -43,9 +63,6 @@ export function useTienda<T extends { embarqueId?: string }>(
     if (!activo) { setLoading(false); return; }
     return tienda.suscribir(e => { setTodos(e.datos); setLoading(e.loading); });
   }, [tienda, activo]);
-  const datos = useMemo(
-    () => (embarqueId ? todos.filter(x => x.embarqueId === embarqueId) : todos),
-    [todos, embarqueId],
-  );
+  const datos = useMemo(() => filtrarPorEmbarque(todos, embarqueId), [todos, embarqueId]);
   return { datos, loading };
 }
