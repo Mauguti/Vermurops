@@ -302,7 +302,7 @@ export function useFacturas(embarqueId?: string) {
     const pago = pagos.find(p => p.id === id);
     const donde = coleccionDelPago(id, pagos);
     if (donde === 'pagos') {
-      await anularPago(id);
+      await anularPago(id, { motivo: motivo.trim(), por: quienSoy(), en: new Date().toISOString() });
     } else if (donde === 'cobros') {
       await conAviso('el cobro', () =>
         updateDoc(doc(db, COL_COBROS, id), sanitizarParaFirestore({
@@ -338,7 +338,9 @@ export function useFacturas(embarqueId?: string) {
     const embarqueDe = (fid: string) => facturas.find(f => f.id === fid)?.embarqueId;
     const patch = pagoSinAplicacion(pago, destinoId, embarqueDe);
 
-    await actualizarAplicaciones(pagoId, patch);
+    const { quitadas, ...cambios } = patch;
+    const rastro = { motivo: motivo.trim(), por: quienSoy(), en: new Date().toISOString() };
+    await actualizarAplicaciones(pagoId, cambios, quitadas.map(q => ({ ...q, ...rastro })));
 
     for (const q of patch.quitadas) {
       const t = textoAplicacionQuitada(pago, q, quienSoy(), motivo);

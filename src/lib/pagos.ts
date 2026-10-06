@@ -124,9 +124,33 @@ export interface Pago {
 
   registradoPor: { uid: string; nombre: string };
   activo: boolean;
+
+  /**
+   * Tarea 79 · Quién anuló el pago, cuándo y por qué. Opcional y aditivo: un
+   * pago anulado antes de esta tarea no lo trae, y su motivo se lee de la
+   * bitácora del embarque (`correccionesDelPago`). `en` es ISO 8601, como el
+   * resto de las fechas del modelo.
+   */
+  anulacion?: MotivoCorreccion | null;
+  /**
+   * Tarea 79 · Las aplicaciones que se quitaron, cada una con su motivo. La
+   * aplicación sale de `aplicaciones[]` (y el saldo de la factura se
+   * recupera); aquí queda lo que era, para que no se pierda el rastro.
+   */
+  aplicacionesQuitadas?: AplicacionQuitada[];
+
   createdAt: string;
   updatedAt: string;
 }
+
+/** Quién corrigió, cuándo y por qué. `en` es ISO 8601. */
+export interface MotivoCorreccion {
+  motivo: string;
+  por: string;
+  en: string;
+}
+
+export type AplicacionQuitada = AplicacionPago & MotivoCorreccion;
 
 const redondear = (n: number) => Math.round(n * 100) / 100;
 

@@ -353,3 +353,53 @@ export function bitacoraDelPago(
   }
   return out.sort((a, b) => b.fecha.localeCompare(a.fecha));
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6 · Las correcciones de un pago: el Pago primero, la bitácora para lo viejo
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CorreccionDePago {
+  id: string;
+  titulo: string;
+  /** ISO 8601. */
+  fecha: string;
+  detalle?: string;
+  /** De dónde se leyó: el pago mismo o la bitácora de un embarque (anterior a la tarea 79). */
+  fuente: 'pago' | 'bitacora';
+}
+
+/**
+ * Tarea 79 · Lo que se le hizo a un pago, la más reciente primero.
+ *
+ * `Pago.anulacion` y `Pago.aplicacionesQuitadas` mandan. La bitácora solo
+ * aporta lo que el pago no dice: una anulación o una aplicación quitada
+ * ANTES de esta tarea (no traen campo) y las aplicaciones nuevas de saldo.
+ * Una entrada de bitácora que el pago ya cubre no se repite: se reconoce por
+ * la factura y el motivo, que es lo único que ambos lados comparten.
+ */
+export function correccionesDelPago(
+  pago: Pick<Pago, 'folio' | 'terceroNombre' | 'moneda' | 'anulacion' | 'aplicacionesQuitadas'>,
+  bitacoras: readonly (readonly EntradaBitacora[] | undefined)[],
+): CorreccionDePago[] {
+  const out: CorreccionDePago[] = [];
+  const quitadas = pago.aplicacionesQuitadas ?? [];
+
+  if (pago.anulacion) {
+    const t = textoAnulacion(pago, pago.anulacion.por, pago.anulacion.motivo);
+    out.push({ id: `anulacion-${pago.folio}`, titulo: t.titulo, fecha: pago.anulacion.en, detalle: t.detalle, fuente: 'pago' });
+  }
+  quitadas.forEach((q, i) => {
+    const t = textoAplicacionQuitada(pago, q, q.por, q.motivo);
+    out.push({ id: `quitada-${pago.folio}-${i}`, titulo: t.titulo, fecha: q.en, detalle: t.detalle, fuente: 'pago' });
+  });
+
+  for (const e of bitacoraDelPago(pago.folio, bitacoras)) {
+    const esAnulacion = /anul/i.test(e.titulo);
+    const esQuitada = /quit/i.test(e.titulo);
+    if (esAnulacion && pago.anulacion) continue;
+    if (esQuitada && quitadas.some(q =>
+      e.titulo.includes(q.destinoNumero) && (e.detalle ?? '').includes(`Motivo: ${q.motivo.trim()}`))) continue;
+    out.push({ id: e.id, titulo: e.titulo, fecha: e.fecha, detalle: e.detalle, fuente: 'bitacora' });
+  }
+  return out.sort((a, b) => b.fecha.localeCompare(a.fecha));
+}

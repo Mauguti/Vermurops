@@ -22,13 +22,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { db } from '../firebase';
-import { collection, doc, onSnapshot, setDoc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, updateDoc, query, orderBy, arrayUnion } from 'firebase/firestore';
 import { useAuth } from '../auth/AuthContext';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 import { conAviso } from '../lib/erroresEscritura';
 import { idUnico } from '../lib/idUnico';
 import { generateFolioPago } from '../lib/folioServicePago';
-import type { AplicacionPago, ContextoPago, Pago } from '../lib/pagos';
+import type { AplicacionPago, AplicacionQuitada, ContextoPago, MotivoCorreccion, Pago } from '../lib/pagos';
 
 const COL = 'pagos';
 
@@ -104,10 +104,12 @@ export function usePagos(embarqueId?: string) {
    * aplicado desaparece solo porque se DERIVA de las aplicaciones vivas
    * (§1.5), igual que ya hace `disponibleDeAnticipo`.
    */
-  const anularPago = useCallback(async (id: string): Promise<void> => {
+  const anularPago = useCallback(async (id: string, anulacion?: MotivoCorreccion): Promise<void> => {
     await conAviso('el pago', () =>
       updateDoc(doc(db, COL, id), sanitizarParaFirestore({
         activo: false, updatedAt: new Date().toISOString(),
+        // Tarea 79: el motivo viaja DENTRO del pago, no solo en la bitácora.
+        ...(anulacion ? { anulacion } : {}),
       }) as Record<string, unknown>));
   }, []);
 
@@ -123,11 +125,18 @@ export function usePagos(embarqueId?: string) {
   const actualizarAplicaciones = useCallback(async (
     id: string,
     patch: { aplicaciones: AplicacionPago[]; destinoIds: string[]; embarqueIds: string[] },
+    quitadas: AplicacionQuitada[] = [],
   ): Promise<void> => {
+    /* Tarea 79 · `arrayUnion`: dos correcciones a la vez no se pisan la lista
+       de aplicaciones quitadas. */
     await conAviso('el pago', () =>
-      updateDoc(doc(db, COL, id), sanitizarParaFirestore({
-        ...patch, updatedAt: new Date().toISOString(),
-      }) as Record<string, unknown>));
+      updateDoc(doc(db, COL, id), {
+        ...(sanitizarParaFirestore(patch) as Record<string, unknown>),
+        ...(quitadas.length > 0
+          ? { aplicacionesQuitadas: arrayUnion(...sanitizarParaFirestore(quitadas)) }
+          : {}),
+        updatedAt: new Date().toISOString(),
+      }));
   }, []);
 
   return { pagos, loading, contextoNuevo, guardarPago, anularPago, actualizarAplicaciones };

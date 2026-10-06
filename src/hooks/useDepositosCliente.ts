@@ -111,7 +111,9 @@ export function useDepositosCliente(embarqueId?: string) {
 
     const donde = coleccionDelPago(id, pagos);
     if (donde === 'pagos') {
-      await anularPago(id);
+      await anularPago(id, {
+        motivo: motivo.trim(), por: user?.nombre ?? user?.email ?? '', en: new Date().toISOString(),
+      });
     } else if (donde === 'depositosCliente') {
       await conAviso('el depósito', () =>
         updateDoc(doc(db, COL, id), sanitizarParaFirestore({

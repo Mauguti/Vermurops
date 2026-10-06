@@ -16,7 +16,7 @@ import {
   problemaMotivo, estadoDePago, aFavorDe, aplicarFiltrosPagos, FILTROS_PAGOS_VACIOS,
   filtrosPagosDesdeVista, filtrosPagosParaVista, filtrosPagosActivos, totalesDePagos,
   pagoSinAplicacion, pagoConAplicaciones, motivoNoEditable, bitacoraDelPago,
-  textoAnulacion, textoAplicacionQuitada, mesesDePagos,
+  textoAnulacion, textoAplicacionQuitada, mesesDePagos, correccionesDelPago,
 } from './reversaPagos';
 import type { EntradaBitacora } from '../components/shipments/EmbarquesData';
 
@@ -247,5 +247,59 @@ describe('el rastro en la bitácora', () => {
     ];
     const r = bitacoraDelPago('PAG-2026-0001', [bit, bit]);
     expect(r.map(e => e.id)).toEqual(['1']);
+  });
+});
+
+describe('correccionesDelPago (tarea 79)', () => {
+  const entrada = (id: string, titulo: string, detalle: string, fecha = '2026-10-02T10:00:00.000Z'): EntradaBitacora =>
+    ({ id, evento: 'cobro', titulo, detalle, fecha, autor: { uid: 'u1', nombre: 'Julio' } } as unknown as EntradaBitacora);
+
+  it('un pago sin embarque anulado se explica solo con su campo, sin bitácora', () => {
+    const p = pago({
+      activo: false, aplicaciones: [], embarqueIds: [],
+      anulacion: { motivo: 'Depósito duplicado', por: 'Julio', en: '2026-10-06T09:00:00.000Z' },
+    });
+    const c = correccionesDelPago(p, []);
+    expect(c).toHaveLength(1);
+    expect(c[0].fuente).toBe('pago');
+    expect(c[0].titulo).toContain('Julio anuló el pago PAG-2026-0001');
+    expect(c[0].detalle).toContain('Depósito duplicado');
+  });
+
+  it('una anulación anterior a la tarea 79 se lee de la bitácora', () => {
+    const p = pago({ activo: false });
+    const t = textoAnulacion(p, 'Julio', 'Error de captura');
+    const c = correccionesDelPago(p, [[entrada('b1', t.titulo, t.detalle)]]);
+    expect(c).toHaveLength(1);
+    expect(c[0].fuente).toBe('bitacora');
+    expect(c[0].detalle).toContain('Error de captura');
+  });
+
+  it('lo que el pago y la bitácora dicen a la vez no se repite', () => {
+    const p = pago({
+      activo: false,
+      anulacion: { motivo: 'Error de captura', por: 'Julio', en: '2026-10-06T09:00:00.000Z' },
+    });
+    const t = textoAnulacion(p, 'Julio', 'Error de captura');
+    const c = correccionesDelPago(p, [[entrada('b1', t.titulo, t.detalle)]]);
+    expect(c).toHaveLength(1);
+    expect(c[0].fuente).toBe('pago');
+  });
+
+  it('una aplicación quitada nueva y otra vieja (solo en bitácora) salen las dos, la reciente primero', () => {
+    const vieja = apl('f9', 500);
+    const nueva = apl('f1', 1000);
+    const p = pago({
+      aplicaciones: [],
+      aplicacionesQuitadas: [{ ...nueva, motivo: 'Factura equivocada', por: 'Julio', en: '2026-10-06T09:00:00.000Z' }],
+    });
+    const tv = textoAplicacionQuitada(p, vieja, 'Gaby', 'Monto mal');
+    const tn = textoAplicacionQuitada(p, nueva, 'Julio', 'Factura equivocada');
+    const c = correccionesDelPago(p, [[
+      entrada('b-vieja', tv.titulo, tv.detalle, '2026-10-01T09:00:00.000Z'),
+      entrada('b-nueva', tn.titulo, tn.detalle, '2026-10-06T09:00:00.000Z'),
+    ]]);
+    expect(c.map(x => x.fuente)).toEqual(['pago', 'bitacora']);
+    expect(c[1].detalle).toContain('Monto mal');
   });
 });
