@@ -7,7 +7,7 @@ import {
   embarquesFondeables, problemaAnticipo, entradasDelEmbarque,
   AVISO_COBRO_EN_COBRANZA,
 } from './entradaDinero';
-import { pagoDesdeCobro, pagoDesdeDeposito, type Pago } from './pagos';
+import { pagoDesdeCobro, pagoDesdeDeposito, entradasDeFondeo, type Pago } from './pagos';
 import type { OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
 import type { CobroCliente } from '../components/facturas/FacturasData';
 import type { DepositoCliente } from '../components/ordenesCompra/OrdenesCompraData';
@@ -278,5 +278,49 @@ describe('AVISO_COBRO_EN_COBRANZA', () => {
   it('dice quién lo hace y dónde, no solo que ya no está aquí', () => {
     expect(AVISO_COBRO_EN_COBRANZA).toContain('Administración');
     expect(AVISO_COBRO_EN_COBRANZA).toContain('Cuentas por cobrar');
+  });
+});
+
+// ─── D · Un pago repartido entre dos embarques (tarea 82) ───────────────────
+
+describe('entradasDelEmbarque = fondeo, con un pago repartido', () => {
+  const repartido: Pago = {
+    ...pagoDesdeCobro(cobro({ id: 'P1', monto: 100000 })),
+    id: 'P1',
+    embarqueIds: ['E1', 'E2'],
+    aplicaciones: [
+      { destinoTipo: 'factura', destinoId: 'F1', destinoNumero: 'F-1', monto: 60000, moneda: 'MXN',
+        aplicadaPor: { uid: 'u', nombre: 'A', fecha: '2026-10-03' } },
+      { destinoTipo: 'factura', destinoId: 'F2', destinoNumero: 'F-2', monto: 40000, moneda: 'MXN',
+        aplicadaPor: { uid: 'u', nombre: 'A', fecha: '2026-10-03' } },
+    ],
+  };
+  const resolver = (f: string) => (f === 'F1' ? 'E1' : f === 'F2' ? 'E2' : null);
+  const suma = (xs: { monto: number }[]) => xs.reduce((a, x) => a + x.monto, 0);
+
+  it('la ficha y el fondeo dicen lo mismo en cada embarque', () => {
+    for (const e of ['E1', 'E2']) {
+      const ficha = suma(entradasDelEmbarque([repartido], e, resolver));
+      const fondeo = suma(entradasDeFondeo([repartido], e, resolver));
+      expect(ficha).toBe(fondeo);
+    }
+    expect(suma(entradasDelEmbarque([repartido], 'E1', resolver))).toBe(60000);
+    expect(suma(entradasDelEmbarque([repartido], 'E2', resolver))).toBe(40000);
+  });
+
+  it('enseña el monto completo del pago aparte y solo las facturas de ESE embarque', () => {
+    const [e] = entradasDelEmbarque([repartido], 'E1', resolver);
+    expect(e.montoDelPago).toBe(100000);
+    expect(e.aplicadoA).toEqual(['F-1']);
+  });
+
+  it('sin resolvedor no cuenta, igual que el fondeo (falla cerrado)', () => {
+    expect(entradasDelEmbarque([repartido], 'E1')).toEqual([]);
+    expect(entradasDeFondeo([repartido], 'E1')).toEqual([]);
+  });
+
+  it('un pago de un solo embarque con aplicado menor al monto: la ficha dice lo que fondea', () => {
+    const p: Pago = { ...pagoDesdeCobro(cobro({ id: 'C1', monto: 5000 })) };
+    expect(suma(entradasDelEmbarque([p], 'E1'))).toBe(suma(entradasDeFondeo([p], 'E1')));
   });
 });

@@ -20,42 +20,55 @@
  * que el §6 del CLAUDE.md pone peor que no guardar.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, doc, onSnapshot, setDoc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, updateDoc, query, orderBy, arrayUnion } from 'firebase/firestore';
 import { useAuth } from '../auth/AuthContext';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 import { conAviso } from '../lib/erroresEscritura';
 import { idUnico } from '../lib/idUnico';
+import { crearTiendaCompartida } from '../lib/tiendaCompartida';
 import { generateFolioPago } from '../lib/folioServicePago';
-import type { AplicacionPago, ContextoPago, Pago } from '../lib/pagos';
+import type { AplicacionPago, AplicacionQuitada, ContextoPago, MotivoCorreccion, Pago } from '../lib/pagos';
 
 const COL = 'pagos';
 
+/*
+ * Tarea 82 · UNA suscripción a `pagos/` para toda la app. `useFacturas`,
+ * `useDepositosCliente` y `Finance` montan este hook a la vez; cada uno abría
+ * su propio `onSnapshot` (tres lecturas de la colección). Ahora comparten una,
+ * y cada hook filtra por embarque sobre la misma lista.
+ */
+const tiendaPagos = crearTiendaCompartida<Pago>((alDato, alError) =>
+  onSnapshot(
+    query(collection(db, COL), orderBy('fecha', 'desc')),
+    snap => {
+      const data: Pago[] = [];
+      snap.forEach(d => data.push({ id: d.id, ...d.data() } as Pago));
+      alDato(data);
+    },
+    alError,
+  ));
+
 export function usePagos(embarqueId?: string) {
   const { user } = useAuth();
-  const [pagos, setPagos] = useState<Pago[]>([]);
+  const [todos, setTodos] = useState<Pago[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
-    const unsub = onSnapshot(
-      query(collection(db, COL), orderBy('fecha', 'desc')),
-      snap => {
-        const data: Pago[] = [];
-        snap.forEach(d => data.push({ id: d.id, ...d.data() } as Pago));
-        /*
-         * El embarque filtra por `embarqueIds`, no por un `embarqueId`
-         * suelto: un pago puede tocar varios, y es justo el caso que
-         * `CobroCliente` no podía representar (§1.4).
-         */
-        setPagos(embarqueId ? data.filter(p => (p.embarqueIds ?? []).includes(embarqueId)) : data);
-        setLoading(false);
-      },
-      () => setLoading(false),
-    );
-    return () => unsub();
-  }, [user, embarqueId]);
+    return tiendaPagos.suscribir(e => { setTodos(e.datos); setLoading(e.loading); });
+  }, [user]);
+
+  /*
+   * El embarque filtra por `embarqueIds`, no por un `embarqueId` suelto: un
+   * pago puede tocar varios, y es justo el caso que `CobroCliente` no podía
+   * representar (§1.4).
+   */
+  const pagos = useMemo(
+    () => (embarqueId ? todos.filter(p => (p.embarqueIds ?? []).includes(embarqueId)) : todos),
+    [todos, embarqueId],
+  );
 
   /**
    * El contexto de un pago nuevo: id, folio reservado, quién y cuándo.
@@ -104,10 +117,12 @@ export function usePagos(embarqueId?: string) {
    * aplicado desaparece solo porque se DERIVA de las aplicaciones vivas
    * (§1.5), igual que ya hace `disponibleDeAnticipo`.
    */
-  const anularPago = useCallback(async (id: string): Promise<void> => {
+  const anularPago = useCallback(async (id: string, anulacion?: MotivoCorreccion): Promise<void> => {
     await conAviso('el pago', () =>
       updateDoc(doc(db, COL, id), sanitizarParaFirestore({
         activo: false, updatedAt: new Date().toISOString(),
+        // Tarea 79: el motivo viaja DENTRO del pago, no solo en la bitácora.
+        ...(anulacion ? { anulacion } : {}),
       }) as Record<string, unknown>));
   }, []);
 
@@ -123,11 +138,18 @@ export function usePagos(embarqueId?: string) {
   const actualizarAplicaciones = useCallback(async (
     id: string,
     patch: { aplicaciones: AplicacionPago[]; destinoIds: string[]; embarqueIds: string[] },
+    quitadas: AplicacionQuitada[] = [],
   ): Promise<void> => {
+    /* Tarea 79 · `arrayUnion`: dos correcciones a la vez no se pisan la lista
+       de aplicaciones quitadas. */
     await conAviso('el pago', () =>
-      updateDoc(doc(db, COL, id), sanitizarParaFirestore({
-        ...patch, updatedAt: new Date().toISOString(),
-      }) as Record<string, unknown>));
+      updateDoc(doc(db, COL, id), {
+        ...(sanitizarParaFirestore(patch) as Record<string, unknown>),
+        ...(quitadas.length > 0
+          ? { aplicacionesQuitadas: arrayUnion(...sanitizarParaFirestore(quitadas)) }
+          : {}),
+        updatedAt: new Date().toISOString(),
+      }));
   }, []);
 
   return { pagos, loading, contextoNuevo, guardarPago, anularPago, actualizarAplicaciones };

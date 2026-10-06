@@ -27,7 +27,7 @@ import type {
   EstadoOC,
   RegistroEstadoOC,
 } from '../components/ordenesCompra/OrdenesCompraData';
-import { puedeTransicionarOC, type RolOC } from '../lib/stateMachineOC';
+import { puedeTransicionarOC, puedeRevertirPagoOC, ESTADO_TRAS_REVERSA_PAGO, type RolOC } from '../lib/stateMachineOC';
 import type { FondeoEmbarque } from '../lib/fondeoCliente';
 import { generateFolioOC } from '../lib/folioServiceOC';
 import { conAviso } from '../lib/erroresEscritura';
@@ -172,6 +172,45 @@ export function useOrdenesCompra() {
     return { ok: true };
   }, []);
 
+  // ── Revertir el pago (tarea 80) ───────────────────────────────────────────
+
+  /**
+   * Devuelve una orden de `pagada` a `autorizada` porque el pago que la
+   * cubría se anuló. Valida con `puedeRevertirPagoOC` —el arco de reversa de
+   * la máquina, no un updateDoc suelto— y limpia lo que la pagada afirmaba:
+   * `comprobantePago` y `pagadaPor`. Dejar la referencia vieja permitiría
+   * volver a pagarla con una transferencia que ya no existe.
+   */
+  const revertirPago = useCallback(async (
+    oc: OrdenCompra,
+    rol: RolOC,
+    usuario: { uid: string; nombre: string },
+    detalle: { folioPago: string; motivo: string },
+  ): Promise<{ ok: boolean; razon?: string }> => {
+    const v = puedeRevertirPagoOC(rol, oc);
+    if (!v.ok) return v;
+    const ahora = new Date().toISOString();
+    const registro: RegistroEstadoOC = {
+      estado: ESTADO_TRAS_REVERSA_PAGO,
+      fecha: ahora,
+      usuarioId: usuario.uid,
+      usuarioNombre: usuario.nombre,
+      motivo: `Anulado el pago ${detalle.folioPago}: ${detalle.motivo}`,
+    };
+    await conAviso('la orden de compra', () => updateDoc(doc(db, COLLECTION, oc.id), sanitizarParaFirestore({
+      estado: ESTADO_TRAS_REVERSA_PAGO,
+      historialEstados: [...oc.historialEstados, registro],
+      pagadaPor: null,
+      comprobantePago: null,
+      updatedAt: ahora,
+    }) as Record<string, unknown>));
+    await anotarBitacora(oc.embarqueId, 'orden_compra',
+      `${usuario.nombre} revirtió la orden de compra ${oc.folio} a ${oc.proveedorNombre}: se anuló el pago ${detalle.folioPago}`,
+      usuario,
+      `Vuelve a «autorizada» · Motivo: ${detalle.motivo.trim()}`);
+    return { ok: true };
+  }, []);
+
   // ── Soft delete ───────────────────────────────────────────────────────────
 
   const deleteOrden = useCallback(async (id: string): Promise<void> => {
@@ -211,6 +250,7 @@ export function useOrdenesCompra() {
     createOrden,
     updateOrden,
     transicionarEstado,
+    revertirPago,
     deleteOrden,
     // KPIs
     porPagar,

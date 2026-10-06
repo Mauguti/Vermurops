@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { estatusDeCliente, visibleEnAltas, contarSinEstatus, ETIQUETA_ESTATUS } from './estatusCliente';
+import { clienteOperable, estatusDeCliente, visibleEnAltas, contarSinEstatus, ETIQUETA_ESTATUS } from './estatusCliente';
 
 describe('estatusCliente', () => {
   it('lee los dos valores válidos', () => {
@@ -28,5 +28,23 @@ describe('estatusCliente', () => {
   });
   it('la etiqueta es «Sin estatus»', () => {
     expect(ETIQUETA_ESTATUS.sin_estatus).toBe('Sin estatus');
+  });
+
+  describe('clienteOperable', () => {
+    it('ACTIVO es operable', () => expect(clienteOperable({ statusOperativo: 'ACTIVO' })).toBe(true));
+    it('INACTIVO no', () => expect(clienteOperable({ statusOperativo: 'INACTIVO' })).toBe(false));
+    it('sin campo es operable', () => {
+      expect(clienteOperable({})).toBe(true);
+      expect(clienteOperable({ statusOperativo: null })).toBe(true);
+    });
+    it('un valor raro es operable (sin estatus)', () => {
+      expect(clienteOperable({ statusOperativo: 'SUSPENDIDO' })).toBe(true);
+      expect(clienteOperable({ statusOperativo: 'inactivo' })).toBe(true);
+    });
+    it('coincide con la lista de Altas por omisión', () => {
+      for (const v of ['ACTIVO', 'INACTIVO', undefined, 'x']) {
+        expect(clienteOperable({ statusOperativo: v })).toBe(visibleEnAltas({ statusOperativo: v }, false));
+      }
+    });
   });
 });

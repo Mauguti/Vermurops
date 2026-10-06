@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Package, Plus, Trash2, Weight, Box, ChevronDown, ChevronRight, Edit2, ShieldCheck, X } from 'lucide-react';
 import { EmbarqueProducto, Pallet, DatosContenedor, TIPOS_CONTENEDOR, palletPiezas, palletPeso, palletVolumen, palletDescripcion } from './EmbarquesData';
 import { ClienteVermur } from '../clientes/ClientesData';
+import { clienteOperable, estatusDeCliente, ETIQUETA_ESTATUS } from '../../lib/estatusCliente';
 
 const TIPOS_EMBALAJE = ['Pallet', 'Caja', 'Tambor', 'Bulto', 'Bobina', 'Contenedor', 'Otro'] as const;
 
@@ -554,8 +555,10 @@ export default function ProductosEmbarque({
                       className="w-full px-3 py-2 border border-card-border rounded-lg text-xs font-semibold outline-none focus:border-brand bg-white"
                     >
                       <option value="">— Seleccionar cliente —</option>
-                      {clientes.filter(c => c.statusOperativo === 'ACTIVO').map(c => (
-                        <option key={c.id} value={c.id}>{c.nombre}</option>
+                      {clientes.filter(clienteOperable).map(c => (
+                        <option key={c.id} value={c.id}>
+                          {c.nombre}{estatusDeCliente(c) === 'sin_estatus' ? ` (${ETIQUETA_ESTATUS.sin_estatus})` : ''}
+                        </option>
                       ))}
                     </select>
                   ) : (

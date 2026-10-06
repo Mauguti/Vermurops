@@ -43,6 +43,7 @@ import type { CobroCliente } from '../components/facturas/FacturasData';
 import type { DepositoCliente, OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
 import type { Moneda } from './sumarPorMoneda';
 import { montoATransferir } from './anticipos';
+import { puedeRevertirPagoOC, type RolOC } from './stateMachineOC';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1 · El modelo (§1.1)
@@ -124,9 +125,33 @@ export interface Pago {
 
   registradoPor: { uid: string; nombre: string };
   activo: boolean;
+
+  /**
+   * Tarea 79 · Quién anuló el pago, cuándo y por qué. Opcional y aditivo: un
+   * pago anulado antes de esta tarea no lo trae, y su motivo se lee de la
+   * bitácora del embarque (`correccionesDelPago`). `en` es ISO 8601, como el
+   * resto de las fechas del modelo.
+   */
+  anulacion?: MotivoCorreccion | null;
+  /**
+   * Tarea 79 · Las aplicaciones que se quitaron, cada una con su motivo. La
+   * aplicación sale de `aplicaciones[]` (y el saldo de la factura se
+   * recupera); aquí queda lo que era, para que no se pierda el rastro.
+   */
+  aplicacionesQuitadas?: AplicacionQuitada[];
+
   createdAt: string;
   updatedAt: string;
 }
+
+/** Quién corrigió, cuándo y por qué. `en` es ISO 8601. */
+export interface MotivoCorreccion {
+  motivo: string;
+  por: string;
+  en: string;
+}
+
+export type AplicacionQuitada = AplicacionPago & MotivoCorreccion;
 
 const redondear = (n: number) => Math.round(n * 100) / 100;
 
@@ -655,6 +680,10 @@ export interface DatosPagoDeGrupo {
   referencia: string;
   /** YYYY-MM-DD. El día en que el dinero salió. */
   fecha: string;
+  /** Cuenta de salida elegida (tarea 81). Sin ella se deriva de las órdenes, como antes. */
+  banco?: string | null;
+  /** Comprobante ya subido a Storage (tarea 81): un solo archivo para todo el grupo. */
+  comprobante?: ArchivoPago | null;
 }
 
 /**
@@ -702,7 +731,8 @@ export function construirPagoDeGrupo(
   const aTransferir = (o: OrdenCompra) => montoATransferir(o);
   const monto = exigirMonto(ordenes.reduce((acc, o) => acc + aTransferir(o), 0), 'el pago del grupo');
   const bancos = new Set(ordenes.map(o => o.bancoSalida ?? ''));
-  const banco = bancos.size === 1 ? ([...bancos][0] || null) : null;
+  const bancoDerivado = bancos.size === 1 ? ([...bancos][0] || null) : null;
+  const banco = datos.banco !== undefined ? (datos.banco || null) : bancoDerivado;
 
   const aplicaciones: AplicacionPago[] = ordenes.map(o => ({
     destinoTipo: 'orden',
@@ -725,7 +755,7 @@ export function construirPagoDeGrupo(
     fecha: datos.fecha,
     banco,
     referencia,
-    comprobante: null,
+    comprobante: datos.comprobante ?? null,
     aplicaciones,
     destinoIds: [...new Set(aplicaciones.map(a => a.destinoId))],
     embarqueIds: [...new Set(ordenes.map(o => o.embarqueId).filter((e): e is string => !!e))],
@@ -855,4 +885,50 @@ export function entradasDeFondeo(
   }
 
   return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7 · Anular un pago a proveedor revierte sus órdenes (tarea 80)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PlanAnulacionProveedor {
+  /** Las órdenes que vuelven a `autorizada`, resueltas contra la lista actual. */
+  ordenes: OrdenCompra[];
+  /** Por qué NO se puede, una línea por orden. Vacío = se puede. */
+  problemas: string[];
+}
+
+/**
+ * Qué pasa con las órdenes si se anula este pago a proveedor.
+ *
+ * Es TODO O NADA: si una sola orden no puede regresar (ya no existe, no está
+ * pagada, el rol no puede) no se anula nada y `problemas` dice cuál y por qué.
+ * Anular el pago y dejar una orden `pagada` la dejaría afirmando un pago que
+ * ya no existe. Cada orden se evalúa con la máquina de estados
+ * (`puedeRevertirPagoOC`), no con una regla copiada aquí.
+ */
+export function planAnulacionProveedor(
+  pago: Pago,
+  ordenes: readonly OrdenCompra[],
+  rol: RolOC,
+): PlanAnulacionProveedor {
+  const problemas: string[] = [];
+  if (pago.lado !== 'proveedor') problemas.push('no es un pago a proveedor.');
+  if (pago.activo === false) problemas.push('el pago ya está anulado.');
+  if (pago.origen && pago.origen !== 'app') {
+    problemas.push('es un registro anterior (se leyó de las órdenes pagadas): no tiene documento propio que anular.');
+  }
+  const destinos = [...new Set((pago.aplicaciones ?? []).map(a => a.destinoId))];
+  if (destinos.length === 0) problemas.push('el pago no cubre ninguna orden.');
+
+  const resueltas: OrdenCompra[] = [];
+  for (const id of destinos) {
+    const o = ordenes.find(x => x.id === id);
+    const numero = (pago.aplicaciones ?? []).find(a => a.destinoId === id)?.destinoNumero || id;
+    if (!o) { problemas.push(`${numero}: la orden ya no existe en la lista.`); continue; }
+    const v = puedeRevertirPagoOC(rol, o);
+    if (!v.ok) problemas.push(`${o.folio}: ${v.razon}`);
+    else resueltas.push(o);
+  }
+  return { ordenes: problemas.length === 0 ? resueltas : [], problemas };
 }

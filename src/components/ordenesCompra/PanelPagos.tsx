@@ -18,6 +18,7 @@ import {
   ordenesProgramadas, transferenciasDelDia, resumenDelDia, textoComprobante,
 } from '../../lib/programacionPagos';
 import type { GrupoDePago } from '../../lib/calendarioPagos';
+import ModalRegistrarPagoProveedor, { type DatosFormularioPago } from './ModalRegistrarPagoProveedor';
 
 const money = (n: number) =>
   n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -43,7 +44,7 @@ interface Props {
   hoy?: string;
   onAbrirOC: (id: string) => void;
   /** Registra el pago del grupo: marca las órdenes como pagadas. */
-  onRegistrarPago?: (ocIds: string[], comprobante: string) => void;
+  onRegistrarPago?: (datos: DatosFormularioPago) => Promise<void>;
   /** Conteos por estado de TODAS las OC (no solo autorizadas), para contexto. */
   conteosPorEstado?: Record<string, number>;
 }
@@ -51,6 +52,7 @@ interface Props {
 export default function PanelPagos({ ordenes, hoy, onAbrirOC, onRegistrarPago, conteosPorEstado }: Props) {
   const fechaHoy = hoy ?? new Date().toISOString().slice(0, 10);
   const [copiado, setCopiado] = useState<string | null>(null);
+  const [pagando, setPagando] = useState<GrupoDePago<OrdenCompra> | null>(null);
 
   const programadas = useMemo(() => ordenesProgramadas(ordenes, fechaHoy), [ordenes, fechaHoy]);
   const resumen = useMemo(() => resumenDelDia(programadas), [programadas]);
@@ -112,6 +114,14 @@ export default function PanelPagos({ ordenes, hoy, onAbrirOC, onRegistrarPago, c
 
   return (
     <div className="space-y-4">
+      {pagando && onRegistrarPago && (
+        <ModalRegistrarPagoProveedor
+          grupo={pagando}
+          hoy={hoy}
+          onCancelar={() => setPagando(null)}
+          onConfirmar={async datos => { await onRegistrarPago(datos); setPagando(null); }}
+        />
+      )}
       {/* Resumen del día */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
@@ -187,13 +197,7 @@ export default function PanelPagos({ ordenes, hoy, onAbrirOC, onRegistrarPago, c
                       {onRegistrarPago && (
                         <button
                           type="button"
-                          onClick={() => {
-                            const ref = window.prompt(
-                              `Referencia del pago a ${g.proveedorNombre} por ${g.moneda} ${money(g.total)}:`,
-                            );
-                            if (!ref?.trim()) return;
-                            onRegistrarPago(g.items.map(o => o.id), ref.trim());
-                          }}
+                          onClick={() => setPagando(g)}
                           className="text-[11px] font-bold text-white bg-brand hover:bg-brand-hover rounded-md px-3 py-1.5"
                         >
                           Registrar pago

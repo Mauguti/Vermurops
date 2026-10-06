@@ -45,18 +45,27 @@ export function columnasPagos({ onAbrir }: OpcionesColumnasPagos = {}) {
       },
     }),
     col.accessor(p => p.terceroNombre, {
-      id: 'cliente', header: 'Cliente', size: 220,
+      id: 'cliente', header: 'Cliente / proveedor', size: 220,
       cell: info => {
         const p = info.row.original;
         if (!p.terceroId) return <span className="truncate block" title={p.terceroNombre}>{p.terceroNombre || '—'}</span>;
         return (
           <span onClick={e => e.stopPropagation()}>
-            <EnlaceEntidad tipo="cliente" id={p.terceroId} title={`Abrir la ficha de ${p.terceroNombre}`}>
+            <EnlaceEntidad tipo={p.lado === 'proveedor' ? 'proveedor' : 'cliente'} id={p.terceroId} title={`Abrir la ficha de ${p.terceroNombre}`}>
               <span className="font-sans">{p.terceroNombre}</span>
             </EnlaceEntidad>
           </span>
         );
       },
+    }),
+    col.accessor(p => p.lado === 'proveedor' ? 'Proveedor' : 'Cliente', {
+      id: 'lado', header: 'Lado', size: 90,
+      cell: info => (
+        <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${
+          info.getValue() === 'Proveedor' ? 'bg-gray-50 text-gray-700 border-gray-200' : 'bg-primario/10 text-primario border-primario/30'}`}>
+          {info.getValue()}
+        </span>
+      ),
     }),
     col.accessor(p => p.fecha, {
       id: 'fecha', header: 'Fecha', size: 110,
@@ -137,7 +146,7 @@ export function columnasPagos({ onAbrir }: OpcionesColumnasPagos = {}) {
 /** Lo que se ve al entrar: lo más reciente primero, con lo que sobra a la vista. */
 export const VISTA_DEFAULT_PAGOS: VistaConfig = {
   columnas: [
-    { id: 'folio' }, { id: 'cliente' }, { id: 'fecha' }, { id: 'monto' }, { id: 'moneda' },
+    { id: 'folio' }, { id: 'lado' }, { id: 'cliente' }, { id: 'fecha' }, { id: 'monto' }, { id: 'moneda' },
     { id: 'aplicado' }, { id: 'aFavor' }, { id: 'estado' }, { id: 'accion' },
   ],
   ordenamiento: { columnaId: 'fecha', direccion: 'desc' },

@@ -477,7 +477,12 @@ export default function FichaOC({
                       </span>
                       {e.referencia && <span className="ml-2 font-mono text-[11px] text-gray-400">{e.referencia}</span>}
                     </span>
-                    <strong className="tabular-nums shrink-0">{e.moneda} {money(e.monto)}</strong>
+                    <strong className="tabular-nums shrink-0">
+                      {e.moneda} {money(e.monto)}
+                      {e.montoDelPago !== e.monto && (
+                        <span className="ml-1 font-normal text-[10px] text-gray-400">de {money(e.montoDelPago)} del pago</span>
+                      )}
+                    </strong>
                   </li>
                 ))}
               </ul>

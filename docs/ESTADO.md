@@ -1,72 +1,58 @@
-# Estado de VermurOps — 6 de octubre de 2026 (corte nocturno)
+# Estado de VermurOps — 7 de octubre de 2026 (corte nocturno)
 
-**Corte del sprint nocturno P5 → P7 y pendientes chicos: la cadena 72 → 78 está
-lista y SIN PUBLICAR.** Siete tareas, las siete `[x]`, **un solo bloqueo de la
-guardia (falso positivo)**, ninguna `[!]`.
+**Corte del sprint nocturno de pagos a proveedor: la cadena 79 → 83 está lista y
+SIN PUBLICAR.** Cinco tareas `[x]`, una `[!]` (84, fuera de la cadena), ningún
+bloqueo de la guardia.
 
-La cadena de la noche anterior (67 → 71) y la regla de `pagos/` **ya están en
-`main`** (`c1d7970`); esta cadena sale de ahí.
+La cadena 72 → 78 ya está en `main` (`e237219`, merge de `verif/72-78`); esta
+sale de ahí. No verifiqué si su hosting ya se publicó: confirmarlo antes.
 
-Punta: `sprint/78-limpieza-huerfanos` — **mergearla trae las siete**.
+Punta: `sprint/83-estatus-operativo` — **mergearla trae las cinco**.
 
-En la punta: **112 archivos · 2,600 tests en verde** (línea base 2,559 al
-arrancar la 72) · `tsc --noEmit` **0 errores** · `npm run build` limpio ·
-`./scripts/e2e.sh` **6/6** · barrido 45 + 47 en verde.
+En la punta: **2,645 tests en verde** · `tsc --noEmit` 0 errores · build limpio ·
+`./scripts/e2e.sh` 6/6.
 
 **La cadena es solo hosting.** No toca reglas, índices, Functions, secretos ni
-n8n, y no migra ningún dato. Campos nuevos, todos opcionales: `esPrefactura`,
-`motivoPrefactura` y `DepositoCliente.referencia` (`string | null`).
+n8n, y no migra datos. Campos nuevos, opcionales: `Pago.anulacion` y
+`Pago.aplicacionesQuitadas`.
 
-El resumen de la noche, con las preguntas redactadas para copiar, está en
-`sprint/reportes/RESUMEN.md` (no versionado).
+Resumen con preguntas redactadas: `sprint/reportes/RESUMEN.md` (no versionado).
 
 ---
 
-## 1. La cadena de la noche: 72 → 78, sin publicar
-
-Cada rama sale de la anterior; `main` = `c1d7970`.
+## 1. La cadena de la noche: 79 → 83, sin publicar
 
 | # | Tarea | Rama | CLAUDE.md |
 |---|---|---|---|
-| 72 | P5 · Pestaña Pagos, ficha del pago, quitar aplicación, anular | `sprint/72-pestana-pagos` | §4.37 |
-| 73 | P6 · Un pago a proveedor cubre varias órdenes | `sprint/73-pago-grupo-proveedor` | §4.38 |
-| 74 | P7 · Prefactura | `sprint/74-prefactura` | §4.39 |
-| 75 | Arreglos chicos de pagos y expediente | `sprint/75-arreglos-pagos-expediente` | §4.40 |
-| 76 | Clientes sin `statusOperativo` visibles en Altas | `sprint/76-clientes-sin-estatus` | §4.41 |
-| 77 | Barrido de aserciones de ausencia en los e2e | `sprint/77-barrido-ausencias` | §4.42 |
-| 78 | Limpieza de huérfanos y rutas sin módulo | `sprint/78-limpieza-huerfanos` | §4.43 |
+| 79 | Motivo de anulación dentro del Pago; fuera el `prompt` | `sprint/79-anulacion-en-pago` | §4.44 |
+| 80 | Pagos a proveedor en Pagos; anular revierte sus órdenes | `sprint/80-pagos-proveedor-lista-anular` | §4.45 |
+| 81 | Formulario de pago a proveedor | `sprint/81-formulario-pago-proveedor` | §4.46 |
+| 82 | Entradas de la orden = cálculo del fondeo; un listener de `pagos/` | `sprint/82-entradas-orden-fondeo` | §4.47 |
+| 83 | `clienteOperable`: un criterio de `statusOperativo` | `sprint/83-estatus-operativo` | — |
 
 ### Qué trae cada una
 
-- **72.** Finanzas → Pagos con vistas guardables y filtros; ficha del pago;
-  aplicar el saldo a favor reusando `ModalAplicarPago`; quitar una aplicación y
-  anular, ambos con motivo obligatorio. `anularDeposito` por fin tiene call site.
-  Motivo, autor y fecha viajan a la bitácora del embarque (el modelo no tiene
-  campos de anulación; ver decisiones).
-- **73.** `registrarPagoDelGrupo` escribe UN `Pago` con una aplicación por
-  orden, validando todo el grupo antes de escribir. La ficha de la orden dice
-  «Cubierta por el pago PAG-…». Sin migración ni doble conteo.
-- **74.** Prefactura: la marca se guarda en la **orden de compra** (no en la
-  factura al cliente, como decía la tarea; así lo pone PLAN-PAGOS), lo demás se
-  deriva. Casilla, badge, columna, filtro y contador. Marca Operaciones.
-- **75.** Cobros anulados fuera de la pestaña Facturas; el expediente del
-  cliente pinta la corrección de tipo; las dos sumas de `TablaUnificadaCargos`
-  estaban mal (mezclaban monedas) y se arreglaron con `totalesDelConcepto`.
-- **76.** «Sin estatus» en Altas en lugar de esconder al cliente; no se escribe
-  el campo en ningún documento.
-- **77.** 49 aserciones de ausencia revisadas, cada una con su positivo. Una era
-  vacía de verdad (capturas-61, «No pagar»).
-- **78.** Borrados Customs, Documents, ClientPortal, Warehouse, Pricing,
-  PricingData y también `pricing/FichaRFQ.tsx` (fuera de la lista). Reservas y
-  Recolecciones sin ruta ni permiso; sus archivos se conservan.
+- **79.** `anulacion` y `aplicacionesQuitadas` en el Pago (`en` es ISO, no
+  Timestamp); la ficha lee del Pago y completa con la bitácora lo anterior.
+  Modal de motivo en Facturas del embarque.
+- **80.** Pestaña Pagos con los dos lados y totales por lado. Anular un pago a
+  proveedor regresa cada orden `pagada → autorizada` por un arco aparte
+  (`puedeRevertirPagoOC`), todo o nada.
+- **81.** Modal «Registrar pago»: órdenes con casilla, fecha del pago, cuenta,
+  referencia y comprobante subido una vez y ligado a todas las órdenes.
+- **82.** La ficha de la OC usa `entradasDeFondeo`; `pagos/` pasa de 3
+  listeners a 1 (`tiendaCompartida.ts`).
+- **83.** Altas, selector de cliente del pallet y mapeo a embarque usan
+  `clienteOperable`; los «sin estatus» operan y se etiquetan.
 
 ### Lo que hay que hacer antes del hosting
 
-1. **Avisarle al equipo que anular un cobro ahora pide motivo.**
+1. Avisar al equipo que anular un cobro pide motivo en un modal.
 2. Hosting con `--only hosting` desde el checkout principal
    (`cd /Users/mauriciogutierrezmunoz/antigravity/Vermur-Logistics`), leyendo
-   `uploading` y no `skipping upload` (§3), y después `git push origin main`.
-3. Validar en navegador (ver §10). La 75 no tiene capturas: se valida solo ahí.
+   `uploading` y no `skipping upload` (§3); luego merge `--no-ff` y push.
+3. Validar en navegador con las tablas de `sprint/reportes/79–83.md`
+   (la 83 no tiene capturas).
 
 **Punto de regreso:** `git revert` del merge. Nada que deshacer en datos.
 
@@ -74,40 +60,43 @@ Cada rama sale de la anterior; `main` = `c1d7970`.
 
 ## 2. Cola restante
 
-La cola de la noche (72–78) quedó vacía a las 09:30. **No hay cola nueva
-escrita.** Lo que sigue, en orden de urgencia:
+La cola 79–84 terminó a las 11:31. **No hay cola nueva escrita.**
 
 | Qué | Tipo | Bloquea |
 |---|---|---|
-| **Publicar la cadena 72 → 78** (hosting) | Despliegue | Todo lo de abajo |
+| **Publicar la cadena 79 → 83** (hosting) | Despliegue | — |
+| **84 · Higiene de los e2e** (`[!]`: la sesión salió sin esperar la suite; trabajo a medias en `sprint/84-higiene-e2e`, sin verificar) | Pruebas | Redundancia por mutación de las reglas de dinero de la 73 |
+| Reemplazar los `prompt`/`confirm`/`alert` restantes por modal (lista en `79.md`) | Código | Pregunta 5 de Mau |
+| Armonizar lectores de `statusOperativo`/`activo` de clientes y proveedores (lista en `83.md`) | Código | — |
 | Validar 56–66 y 35–55 en navegador (arrastrado) | Validación | Cerrar sprints anteriores |
-| **Lista y ficha de pagos a proveedor** (P6 los escribe y nadie los ve; anular uno no revierte sus órdenes) | Código | Corregir un pago de grupo |
-| Formulario de pago a proveedor de §7.2 (checkboxes por factura, fecha elegida, comprobante) | Código | Fecha real del pago |
-| **P8** · flujo de efectivo y `saldosCuenta/` | Código + reglas | Respuesta de Julio sobre cómo capturan saldos |
+| **P8** · flujo de efectivo y `saldosCuenta/` | Código + reglas | Respuesta de Julio |
 | Freno del cierre administrativo por prefactura sin factura (J6) | Código | Respuesta de Julio |
 | `banco` en `DepositoCliente` (M-F) | Modelo | Respuesta de Julio |
-| Campos `anulacion` y `aplicacionesQuitadas` en `Pago` | Modelo | Aprobación de Mau |
 | Reglas por rol (plan 53) | Código + reglas | Después de las capacitaciones del 12 |
-| `clasificarDocumento` y `enviarCorreo` (dependen de §4) | Despliegue | Credenciales / transporte |
-| Regla de Storage de `ordenesCompra/{id}/documentos/` | Reglas | Comprobantes en imagen |
+| `clasificarDocumento` y `enviarCorreo` | Despliegue | Credenciales / transporte (§5) |
 | Flujo `clasificar-documento-oc` en n8n | n8n | Clasificar documentos de la orden |
-| Sembrar los seis consecutivos de Magaya y confirmar el formato del folio | Dato externo | Encender el embarque automático |
-| «Clientes OK» de Luis en CSV y carga en seco | Dato externo | Los 817 clientes sin RFC |
+| Sembrar consecutivos de Magaya y confirmar formato del folio | Dato externo | Embarque automático |
+| «Clientes OK» de Luis en CSV y carga en seco | Dato externo | 817 clientes sin RFC |
 | Borrar o deshabilitar las tres cuentas de prueba del Auth de producción | Seguridad | — |
-| Unificar los tres criterios de `statusOperativo` (`ProductosEmbarque`, `cotizacionAEmbarque`, Altas) | Código | — |
 
 ---
 
-## 3. Decisiones de Mau ya tomadas (6-oct, en la cola)
+## 3. Decisiones de Mau y pendientes de esta cadena
 
-- `confianza` con las dos escalas: se queda.
-- Los cuatro campos de §1.4 del plan: solo con pantalla que los lea. Se
-  escribieron `esPrefactura` y `motivoPrefactura` (74).
-- `banco` en `DepositoCliente`: espera a Julio.
-- Unificar `ExpedientePanel`: no esta semana.
-- Reglas por rol: después de las capacitaciones del 12.
-- Quitar `incluirAnulados`, corrección de tipo del cliente, sumas de
-  `TablaUnificadaCargos`, limpieza de huérfanos y rutas: hechas esta noche.
+Ya tomadas (7-oct): `anulacion` y `aplicacionesQuitadas` aprobados; no se
+aplican anticipos viejos; prefactura vive en la orden de compra; Administración
+no marca prefactura y se permite retroactiva; los «Sin estatus» no se corrigen
+en lote; FichaRFQ se borró, Bookings y Pickups se conservan.
+
+Pendientes (recomendación entre paréntesis, detalle en `RESUMEN.md`):
+- ¿Anular un pago a proveedor regresa a `autorizada` o `en_gestion`? (autorizada)
+- ¿Anular un pago heredado revierte sus órdenes? (no, hasta que se pida)
+- ¿Un cliente «sin estatus» opera o solo se ve? (opera)
+- ¿Cuenta de salida obligatoria en el pago a proveedor? (sí, cuando Julio concilie por cuenta)
+- ¿Modal de motivo para los `prompt` restantes? (sí, tarea chica)
+- ¿Pago repartido sin resolvedor: omitir o listar con aviso? (omitir)
+- ¿Se libera el anticipo cruzado de una orden revertida? (revisar con Julio)
+- Para Julio: ¿los días de una prefactura cuentan desde la fecha del pago o de la captura?
 
 ---
 

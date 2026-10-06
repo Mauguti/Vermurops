@@ -1983,6 +1983,98 @@ ejemplo que §4.23 dejó anotados; los seeds de `src/data.ts` siguen.
     importador, como punto de partida para cuando exista el módulo: entonces
     vuelven con ruta, permiso y entrada de menú juntos.
 
+## 4.44 El motivo de la corrección vive en el Pago (tarea 79, 6-oct-2026)
+
+Cierra la pregunta 1 de §4.37: `Pago.anulacion?: { motivo, por, en }` y
+`Pago.aplicacionesQuitadas?: Array<AplicacionPago & { motivo, por, en }>`,
+opcionales y aditivos. Anular y quitar una aplicación los escriben **además**
+de la bitácora del embarque; un pago sin embarque anulado ya no pierde el
+motivo.
+  - **`en` es ISO 8601, no `Timestamp`**: el contrato decía Timestamp, pero
+    todo el modelo de pagos (`fecha`, `createdAt`, `updatedAt`) son strings ISO
+    y mezclar dos tipos de fecha en un documento complica los filtros.
+  - `aplicacionesQuitadas` se escribe con `arrayUnion`: dos correcciones
+    simultáneas no se pisan la lista.
+  - **La ficha lee el Pago primero y la bitácora para lo anterior**
+    (`correccionesDelPago` en `lib/reversaPagos.ts`): una anulación o quitada
+    hecha antes de la 79 no trae campo y se sigue leyendo de la bitácora; lo
+    que el pago ya dice no se repite (se reconoce por factura y motivo).
+  - **Un solo campo de motivo** (`components/pagos/MotivoCorreccion.tsx`): en
+    línea en la ficha del pago y en modal (`ModalMotivoCorreccion`) en la
+    pestaña Facturas del embarque, donde antes era `window.prompt`.
+  - Quedan con cuadro nativo en pantallas de usuario (no tocados, fuera de
+    alcance): cancelar factura (`PanelFacturasEmbarque`), «Copiar detalle» y
+    «Registrar pago» (`PanelPagos`), «No pagar» y otra nota (`FichaOC`), y
+    varios `confirm`/`alert` en Cotizaciones, Clientes, Settings, Usuarios,
+    Tarifas, VistaSelector y FichaEmbarque.
+
+## 4.45 Los pagos a proveedor en la pestaña Pagos, y anular revierte sus órdenes (tarea 80, 6-oct-2026)
+
+Cierra la pregunta 4 de §4.37/§4.38: los pagos `lado: 'proveedor'` de la 73
+existían en `pagos/` sin lista ni ficha.
+  - **Finanzas → Pagos muestra los dos lados** con el filtro «Cliente y
+    proveedor / Cliente / Proveedor» (`FiltrosPagos.lado`, se guarda con la
+    vista; un valor basura se descarta). La lista del proveedor es
+    `pagosDeProveedor` (los de `pagos/` más las órdenes pagadas antes de P6).
+    **Los totales van por lado**: «Entrado» (cliente) y «Pagado a proveedores»
+    son dos tarjetas, nunca una suma (§4.3).
+  - **La ficha de un pago a proveedor** lista sus órdenes con su estado de hoy;
+    no ofrece quitar aplicación ni aplicar saldo (se anula completo).
+  - **Anular revierte por la máquina**: `puedeRevertirPagoOC` es un arco aparte
+    de `TRANSITIONS_OC` (`pagada → autorizada`, solo administracion y admin: los
+    que registran el pago). `pagada` sigue terminal para el flujo normal. El
+    único camino de vuelta es anular el pago. `revertirPago`
+    (`useOrdenesCompra`) valida con ese arco, limpia `comprobantePago` y
+    `pagadaPor`, deja motivo en `historialEstados` y entrada en la bitácora.
+  - **Todo o nada**: `planAnulacionProveedor` evalúa cada orden ANTES de
+    escribir; si una no puede regresar (ya no existe, no está pagada, rol) no se
+    anula nada y la ficha dice cuál y por qué (botón deshabilitado).
+  - Orden de escritura: pago anulado primero (con `anulacion`, tarea 79) y luego
+    las órdenes, como `registrarPagoDelGrupo`; si falla una orden, el aviso dice
+    el folio. Sigue sin ser transacción.
+  - Un pago a proveedor leído de las órdenes (`legacy_comprobante_oc`) se ve pero
+    no se anula: no tiene documento propio.
+
+## 4.46 El formulario de «Registrar pago» a proveedor (tarea 81, 6-oct-2026)
+
+Cierra la pregunta 3 de §4.38 (PLAN-PAGOS §7.2). El `window.prompt` de
+Programación de pagos pasa a `ModalRegistrarPagoProveedor`: las órdenes del
+grupo con casilla (todas marcadas), **fecha del pago** (hoy por default,
+editable, no futura), cuenta de salida, referencia y comprobante opcional.
+Reglas puras en `lib/formularioPagoProveedor.ts`; el dinero sigue en
+`pagos.ts`.
+  - **Se paga un subconjunto:** desmarcar una orden la deja `autorizada` y
+    el total baja a lo que sí sale del banco (`montoATransferir`, §4.38).
+  - **La fecha es la del PAGO y la de cada aplicación**, no la de captura
+    (`DatosPagoDeGrupo.fecha`; `createdAt` sigue siendo el momento de captura).
+    El «hoy» es local (`hoyLocal`), no UTC: de noche en México el UTC ya es mañana.
+  - **El comprobante se sube UNA vez** a `ordenesCompra/{primera orden}/documentos/`
+    (PDF, JPG, PNG, HEIC, <20 MB; la regla ya existía) y queda en
+    `Pago.comprobante` y como `DocumentoOC` tipo `comprobante_pago` en CADA
+    orden pagada, apuntando al mismo `storagePath`. Si la subida falla no se
+    escribe nada.
+  - **Falla antes de escribir con excepción:** el modal muestra el motivo en
+    línea y se queda abierto. Lo posterior al pago (órdenes que no pasaron a
+    pagada) sigue siendo toast con el folio.
+  - La cuenta de salida elegida manda sobre la de las órdenes; «Sin indicar»
+    guarda null. Sin elegir nada el comportamiento es el de la 73.
+  - Sin cambio de modelo, de reglas ni de Functions.
+
+## 4.47 La ficha de la orden cuenta como el fondeo, y `pagos/` tiene un solo listener (tarea 82, 6-oct-2026)
+
+  - **`entradasDelEmbarque` ya no lee `p.monto`**: llama a `entradasDeFondeo`
+    (un pago a la vez) y recibe el mismo resolvedor factura → embarque que el
+    fondeo. Un pago de 100,000 repartido 60,000 / 40,000 entre dos embarques
+    muestra 60,000 en la ficha del primero —«de 100,000.00 del pago» aparte— y
+    solo las facturas de ESE embarque. Sin resolvedor un pago repartido no se
+    lista, igual que no fondea: dos cifras para el mismo dinero es peor que una
+    ausencia. `EntradaDeEmbarque.monto` es el aporte; `montoDelPago`, el total.
+  - **Un solo `onSnapshot` sobre `pagos/`** (`lib/tiendaCompartida.ts`, con
+    refcount): `useFacturas`, `useDepositosCliente` y `Finance` montaban
+    `usePagos` y abrían tres. Ahora los hooks comparten una y filtran por
+    embarque sobre la misma lista. Se abre con el primer suscriptor y se cierra
+    con el último.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

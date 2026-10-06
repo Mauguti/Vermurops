@@ -88,6 +88,8 @@ const PAGOS = {
   Y: { id: 'PAG-72-Y', folio: 'PAG-2026-0721' },
   /** 6,000 aplicados completos a A-7202: el de anular. */
   Z: { id: 'PAG-72-Z', folio: 'PAG-2026-0722' },
+  /** Tarea 79 · Anticipo SIN embarque: la bitácora no tiene dónde guardar su motivo. */
+  W: { id: 'PAG-72-W', folio: 'PAG-2026-0723' },
 };
 
 async function limpiar() {
@@ -125,6 +127,7 @@ async function sembrar() {
   await escribir(`pagos/${PAGOS.X.id}`, pagoSemilla(PAGOS.X.id, PAGOS.X.folio, 12_000, [{ id: 'FAC-72-A', numero: 'A-7201', monto: 10_000 }]));
   await escribir(`pagos/${PAGOS.Y.id}`, pagoSemilla(PAGOS.Y.id, PAGOS.Y.folio, 5_000, []));
   await escribir(`pagos/${PAGOS.Z.id}`, pagoSemilla(PAGOS.Z.id, PAGOS.Z.folio, 6_000, [{ id: 'FAC-72-B', numero: 'A-7202', monto: 6_000 }]));
+  await escribir(`pagos/${PAGOS.W.id}`, { ...pagoSemilla(PAGOS.W.id, PAGOS.W.folio, 3_000, []), embarqueIds: ARR([]) });
 }
 
 async function tokenDe(email: string): Promise<string> {
@@ -209,7 +212,7 @@ async function cobradoYResta(page: Page, numero: string): Promise<{ cobrado: str
 
 test('siembra: un cliente, tres facturas y tres pagos', async () => { await sembrar(); });
 
-test('la lista muestra los tres pagos con su estado y los totales por moneda', async ({ browser }) => {
+test('la lista muestra los pagos con su estado y los totales por moneda', async ({ browser }) => {
   const { page, ctx } = await entrar(browser, 'administracion@vermur.com');
   await abrirPagos(page);
 
@@ -217,9 +220,9 @@ test('la lista muestra los tres pagos con su estado y los totales por moneda', a
   await expect(page.getByRole('row').filter({ hasText: PAGOS.X.folio })).toContainText('Parcial');
   await expect(page.getByRole('row').filter({ hasText: PAGOS.Y.folio })).toContainText('Sin aplicar');
   await expect(page.getByRole('row').filter({ hasText: PAGOS.Z.folio })).toContainText('Aplicado');
-  // Totales por moneda, sin mezclar: 23,000 entrados y 7,000 a favor (2,000 + 5,000).
-  await expect(page.getByTestId('totales-pagos')).toContainText('MXN 23,000.00');
-  await expect(page.getByTestId('totales-pagos')).toContainText('MXN 7,000.00');
+  // Totales por moneda, sin mezclar: 26,000 entrados y 10,000 a favor (2,000 + 5,000 + 3,000 del pago sin embarque, tarea 79).
+  await expect(page.getByTestId('totales-pagos')).toContainText('MXN 26,000.00');
+  await expect(page.getByTestId('totales-pagos')).toContainText('MXN 10,000.00');
 
   await foto(page, 'lista');
   await page.setViewportSize({ width: 390, height: 900 });
@@ -298,6 +301,12 @@ test('B · quitar una aplicación pide motivo y devuelve el saldo', async ({ bro
 
   const p = await leer(`pagos/${PAGOS.X.id}`);
   expect(p.destinoIds).toEqual(['FAC-72-A']);
+  // Tarea 79: lo quitado queda DENTRO del pago, con motivo, autor y fecha.
+  expect(p.aplicacionesQuitadas).toHaveLength(1);
+  expect(p.aplicacionesQuitadas[0]).toMatchObject({
+    destinoNumero: 'A-7203', motivo: 'Se aplicó a la factura equivocada',
+  });
+  expect(p.aplicacionesQuitadas[0].por).toBeTruthy();
   await ctx.close();
 
   const { page: p2, ctx: ctx2 } = await entrar(browser, 'administracion@vermur.com');
@@ -376,6 +385,33 @@ test('Operaciones lee la ficha pero no ve los botones; Administración sí', asy
   await expect(pa.getByTestId('ficha-pago').getByRole('button', { name: 'Anular pago' })).toBeVisible();
   await expect(pa.getByTestId('ficha-pago').getByRole('button', { name: 'Quitar aplicación' })).toBeVisible();
   await ca.close();
+});
+
+test('C3 · tarea 79 · un pago SIN embarque anulado deja su motivo en el pago y la ficha lo muestra', async ({ browser }) => {
+  const { page, ctx } = await entrar(browser, 'administracion@vermur.com');
+  await abrirPagos(page);
+  await abrirFicha(page, PAGOS.W.folio);
+  const ficha = page.getByTestId('ficha-pago');
+
+  await ficha.getByRole('button', { name: 'Anular pago' }).click();
+  await page.getByLabel('Motivo de la corrección').fill('Depósito sin cliente identificado');
+  await page.getByTestId('motivo-pago').getByRole('button', { name: 'Anular pago' }).click();
+  await expect(ficha).toContainText('Anulado', { timeout: 15_000 });
+
+  // El motivo vive en el Pago: no hay embarque donde la bitácora lo anote.
+  await expect(ficha.getByTestId('motivo-anulacion')).toContainText('Depósito sin cliente identificado');
+  await expect(ficha.getByTestId('correcciones-pago')).toContainText('Depósito sin cliente identificado');
+  const doc = await leer(`pagos/${PAGOS.W.id}`);
+  expect(doc.activo).toBe(false);
+  expect(doc.anulacion.motivo).toBe('Depósito sin cliente identificado');
+  expect(doc.anulacion.por).toBeTruthy();
+  expect(doc.anulacion.en).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+  await foto(page, 'anulado-sin-embarque');
+  await page.screenshot({ path: `${IMG}/79-anulado-sin-embarque-escritorio.png` });
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.screenshot({ path: `${IMG}/79-anulado-sin-embarque-angosto.png` });
+
+  await ctx.close();
 });
 
 test('limpia lo sembrado', async () => {

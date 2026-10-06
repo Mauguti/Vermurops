@@ -380,6 +380,13 @@ describe('advertencia: cliente sin expediente validado', () => {
     expect(advertencias.find(a => a.tipo === 'cliente_sin_expediente')!.detalle).toContain('INACTIVO');
   });
 
+  it('un cliente sin estatus o con valor raro NO se avisa como inactivo', () => {
+    for (const v of [undefined, 'SUSPENDIDO']) {
+      const c = { ...clienteOk, statusOperativo: v } as unknown as ClienteVermur;
+      expect(tiposDe(conCliente('CLI-001'), { cliente: c })).not.toContain('cliente_sin_expediente');
+    }
+  });
+
   it('avisa si no tiene RFC — la ausencia de RFC es la señal de no validado', () => {
     const sinRfc = { ...clienteOk, rfc: '' } as ClienteVermur;
     const { advertencias } = mapearCotizacionAEmbarque(conCliente('CLI-001'), { fechaReferencia: HOY, cliente: sinRfc });

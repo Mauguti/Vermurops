@@ -10,14 +10,17 @@
  * igual que un pago nuevo, marcado «Registro anterior». Los pagos anulados no
  * se esconden: salen con el filtro «Anulados» (o «Todos»).
  *
- * Hoy es solo el lado cliente. El lado proveedor entra con P6, cuando
- * `registrarPagoDelGrupo` escriba un pago por transferencia.
+ * Tarea 80 · Los dos lados: el cliente que paga y Vermur que paga a un
+ * proveedor (P6). Un filtro Cliente / Proveedor los separa, y los totales van
+ * por lado: «entrado» y «pagado» no se suman entre sí.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Search, X, Download, SlidersHorizontal, Banknote } from 'lucide-react';
 import type { FacturaCliente } from '../facturas/FacturasData';
 import type { AplicacionPago, Pago } from '../../lib/pagos';
+import type { OrdenCompra } from '../ordenesCompra/OrdenesCompraData';
+import type { RolOC } from '../../lib/stateMachineOC';
 import { cartera } from '../../lib/cuentasPorCobrar';
 import { claveDeCliente, facturasAplicables } from '../../lib/aplicarPago';
 import {
@@ -43,6 +46,10 @@ interface Props {
   pagos: Pago[];
   /** `cobro.registrar`: aplicar saldo, quitar una aplicación y anular. */
   puedeEditar: boolean;
+  /** Tarea 80 · Quien registra el pago a proveedor es quien lo anula (Administración, admin). */
+  puedeAnularProveedor?: boolean;
+  ordenes?: OrdenCompra[];
+  rolOC?: RolOC;
   onQuitarAplicacion: (pagoId: string, destinoId: string, motivo: string) => Promise<void>;
   onAnularPago: (pago: Pago, motivo: string) => Promise<void>;
   onAplicarSaldo: (pagoId: string, aplicaciones: AplicacionPago[], embarqueIds: string[]) => Promise<void>;
@@ -52,7 +59,7 @@ interface Props {
 const SELECT = 'bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-gray-700 outline-none focus:border-primario';
 
 export default function PanelListaPagos({
-  facturas, pagos, puedeEditar, onQuitarAplicacion, onAnularPago, onAplicarSaldo, hoy,
+  facturas, pagos, puedeEditar, puedeAnularProveedor = false, ordenes = [], rolOC, onQuitarAplicacion, onAnularPago, onAplicarSaldo, hoy,
 }: Props) {
   const fecha = hoy ?? new Date().toISOString().slice(0, 10);
   const { user } = useAuth();
@@ -68,15 +75,18 @@ export default function PanelListaPagos({
   const aplicando = aplicandoId ? pagos.find(p => p.id === aplicandoId) ?? null : null;
 
   const visibles = useMemo(() => aplicarFiltrosPagos(pagos, filtros), [pagos, filtros]);
-  const totales = useMemo(() => totalesDePagos(visibles), [visibles]);
+  const totalesCliente = useMemo(() => totalesDePagos(visibles.filter(p => p.lado !== 'proveedor')), [visibles]);
+  const totalesProveedor = useMemo(() => totalesDePagos(visibles.filter(p => p.lado === 'proveedor')), [visibles]);
+  const hayCliente = visibles.some(p => p.lado !== 'proveedor');
+  const hayProveedor = visibles.some(p => p.lado === 'proveedor');
   const activos = filtrosPagosActivos(filtros);
   const conteo = (e: FiltroEstadoPago) => aplicarFiltrosPagos(pagos, { ...FILTROS_PAGOS_VACIOS, estado: e }).length;
 
   const clientesPresentes = useMemo(() => {
     const m = new Map<string, string>();
-    pagos.forEach(p => { if (p.terceroId) m.set(p.terceroId, p.terceroNombre); });
+    pagos.forEach(p => { if (p.terceroId && (!filtros.lado || p.lado === filtros.lado)) m.set(p.terceroId, p.terceroNombre); });
     return [...m.entries()].map(([id, nombre]) => ({ id, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-  }, [pagos]);
+  }, [pagos, filtros.lado]);
   const meses = useMemo(() => mesesDePagos(pagos), [pagos]);
 
   // La cartera con los pagos ya aplicados: las facturas con saldo a las que se puede aplicar.
@@ -117,16 +127,26 @@ export default function PanelListaPagos({
   return (
     <div className="space-y-5">
       <p className="text-[11px] text-gray-500">
-        Cada movimiento de dinero del cliente, con su folio. Ahí se ve a qué facturas se aplicó, lo que sobra a su
-        favor, y desde la ficha se corrige: aplicar el saldo, quitar una aplicación o anular el pago.
+        Cada movimiento de dinero, con su folio: lo que el cliente pagó y lo que Vermur pagó a sus proveedores.
+        Ahí se ve a qué facturas u órdenes se aplicó, y desde la ficha se corrige: aplicar el saldo, quitar una
+        aplicación o anular el pago (uno a proveedor devuelve sus órdenes a «autorizada»).
       </p>
 
       {/* Totales por moneda (§4.3): nunca un total mezclado. */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[12px]" data-testid="totales-pagos">
-        <Total t="Entrado" v={formatearPorMoneda(totales.entrado)} />
-        <Total t="Aplicado a facturas" v={formatearPorMoneda(totales.aplicado)} />
-        <Total t="A favor del cliente" v={formatearPorMoneda(totales.aFavor)} destacado />
-      </div>
+      {(hayCliente || !hayProveedor) && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[12px]" data-testid="totales-pagos">
+          <Total t="Entrado" v={formatearPorMoneda(totalesCliente.entrado)} />
+          <Total t="Aplicado a facturas" v={formatearPorMoneda(totalesCliente.aplicado)} />
+          <Total t="A favor del cliente" v={formatearPorMoneda(totalesCliente.aFavor)} destacado />
+        </div>
+      )}
+      {hayProveedor && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[12px]" data-testid="totales-pagos-proveedor">
+          <Total t="Pagado a proveedores" v={formatearPorMoneda(totalesProveedor.entrado)} />
+          <Total t="Aplicado a órdenes" v={formatearPorMoneda(totalesProveedor.aplicado)} />
+          <Total t="Sin aplicar" v={formatearPorMoneda(totalesProveedor.aFavor)} />
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         {([
@@ -158,8 +178,13 @@ export default function PanelListaPagos({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <select value={filtros.lado} onChange={e => set('lado', e.target.value as FiltrosPagos['lado'])} className={SELECT} title="Quién movió el dinero" data-testid="filtro-lado-pago">
+          <option value="">Cliente y proveedor</option>
+          <option value="cliente">Cliente (entradas)</option>
+          <option value="proveedor">Proveedor (salidas)</option>
+        </select>
         <select value={filtros.clienteId} onChange={e => set('clienteId', e.target.value)} className={`${SELECT} max-w-[220px]`}>
-          <option value="">Cliente: todos</option>
+          <option value="">Cliente / proveedor: todos</option>
           {clientesPresentes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
         </select>
         <select value={filtros.moneda} onChange={e => set('moneda', e.target.value as FiltrosPagos['moneda'])} className={SELECT} title="Moneda del pago">
@@ -209,7 +234,7 @@ export default function PanelListaPagos({
             icono={<Banknote className="w-5 h-5" />}
             titulo={pagos.length === 0 ? 'Todavía no hay pagos registrados' : 'Nada con ese filtro'}
             detalle={pagos.length === 0
-              ? 'Los pagos se registran en Cuentas por cobrar: «Aplicar pago» contra una factura o «Registrar entrada de dinero» para un anticipo.'
+              ? 'Los pagos de clientes se registran en Cuentas por cobrar y los de proveedores en Programación de pagos. En Cuentas por cobrar: «Aplicar pago» contra una factura o «Registrar entrada de dinero» para un anticipo.'
               : filtros.estado === 'vigentes' && conteo('anulado') > 0
                 ? 'Hay pagos anulados: se ven con el filtro «Anulados».'
                 : 'Prueba con otro estado u otra búsqueda.'}
@@ -234,7 +259,9 @@ export default function PanelListaPagos({
       {abierto && !aplicando && (
         <FichaPago
           pago={abierto}
-          puedeEditar={puedeEditar}
+          puedeEditar={abierto.lado === 'proveedor' ? puedeAnularProveedor : puedeEditar}
+          ordenes={ordenes}
+          rolOC={rolOC}
           hayFacturasParaAplicar={hayFacturasPara(abierto)}
           bitacoras={bitacorasDe(abierto)}
           onCerrar={() => setAbiertoId(null)}

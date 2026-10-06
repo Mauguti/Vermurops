@@ -390,6 +390,35 @@ test('Administración · depósito, autoriza y paga la OC, factura y cobra al cl
   await page.getByRole('button', { name: 'Guardar', exact: true }).click();
   await expect(page.getByText(/Cobro registrado/)).toBeVisible({ timeout: 15_000 });
 
+  /*
+   * Tarea 79 · Anular un cobro desde la pestaña Facturas pide el motivo con
+   * el mismo campo que la ficha del pago —un modal propio, no el cuadro
+   * nativo del navegador—. Se anula y se vuelve a cobrar, para que los
+   * cierres de abajo sigan viendo la factura cobrada.
+   */
+  let hubo_dialogo = false;
+  page.on('dialog', () => { hubo_dialogo = true; });
+  await page.getByRole('button', { name: 'Anular', exact: true }).first().click();
+  const modalMotivo = page.getByTestId('modal-motivo-pago');
+  await expect(modalMotivo).toBeVisible();
+  await expect(modalMotivo.getByRole('button', { name: 'Anular cobro' })).toBeDisabled();
+  await page.screenshot({ path: 'sprint/reportes/img/79-modal-motivo-escritorio.png' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: 'sprint/reportes/img/79-modal-motivo-angosto.png' });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await page.getByLabel('Motivo de la corrección').fill('Referencia bancaria equivocada');
+  await modalMotivo.getByRole('button', { name: 'Anular cobro' }).click();
+  await expect(modalMotivo).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByRole('button', { name: 'Anular', exact: true })).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByRole('button', { name: 'Registrar cobro' }).first()).toBeVisible();
+  expect(hubo_dialogo).toBe(false);
+  await page.getByRole('button', { name: 'Registrar cobro' }).first().click();
+  const montoOtraVez = inputTras(page, 'Monto');
+  await montoOtraVez.fill((await montoOtraVez.getAttribute('placeholder') ?? '0').replace(/,/g, ''));
+  await page.getByPlaceholder('Referencia').fill('SPEI-CLI-4412');
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+  await expect(page.getByText(/Cobro registrado/).last()).toBeVisible({ timeout: 15_000 });
+
   // Los tres cierres.
   await page.getByRole('button', { name: /^Información/ }).click();
   for (const c of ['Cierre Operativo', 'Cierre de Pagos / Finanzas', 'Cierre Administrativo']) {

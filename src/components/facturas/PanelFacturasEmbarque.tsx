@@ -9,6 +9,7 @@
  */
 
 import React, { useMemo, useState } from 'react';
+import { ModalMotivoCorreccion } from '../pagos/MotivoCorreccion';
 import { Plus, AlertTriangle, Ban, Check } from 'lucide-react';
 import type { EmbarqueCompleto } from '../shipments/EmbarquesData';
 import { lineasFacturables, gruposDeFacturacion } from '../shipments/EmbarquesData';
@@ -46,7 +47,7 @@ interface Props {
   onRegistrar: (f: Omit<FacturaCliente, 'id' | 'registradaPor' | 'activo' | 'createdAt' | 'updatedAt'>, cargoIds: string[]) => void;
   onCancelar: (facturaId: string, motivo: string) => void;
   onCobrar: (c: Omit<CobroCliente, 'id' | 'registradoPor' | 'activo' | 'createdAt' | 'updatedAt'>) => void;
-  onAnularCobro: (cobroId: string, motivo: string) => void;
+  onAnularCobro: (cobroId: string, motivo: string) => void | Promise<void>;
 }
 
 export default function PanelFacturasEmbarque({
@@ -304,9 +305,10 @@ function FilaFactura({
   puedeCobrar: boolean;
   onCancelar: (id: string, motivo: string) => void;
   onCobrar: Props['onCobrar'];
-  onAnularCobro: (id: string, motivo: string) => void;
+  onAnularCobro: (id: string, motivo: string) => void | Promise<void>;
 }) {
   const [abierto, setAbierto] = useState(false);
+  const [anulando, setAnulando] = useState<{ id: string; folio: string; monto: string } | null>(null);
   const [monto, setMonto] = useState('');
   const [fechaCobro, setFechaCobro] = useState(new Date().toISOString().slice(0, 10));
   const [banco, setBanco] = useState(BANCO_COBRO_DEFAULT.nombre);
@@ -427,13 +429,7 @@ function FilaFactura({
                 {puedeCobrar && (
                   <button
                     type="button"
-                    onClick={() => {
-                      /* Tarea 72 · P5 · El motivo es obligatorio. `prompt` es
-                         provisional, como el `confirm` que reemplaza; la ficha
-                         del pago (Finanzas → Pagos) lo pide con su campo. */
-                      const motivo = (window.prompt('Motivo para anular este cobro (obligatorio):') ?? '').trim();
-                      if (motivo) onAnularCobro(p.id, motivo);
-                    }}
+                    onClick={() => setAnulando({ id: p.id, folio: p.folio, monto: `${a.moneda} ${money(a.monto)}` })}
                     className="text-[10px] font-bold text-gray-400 hover:text-red-600"
                   >
                     Anular
@@ -443,6 +439,17 @@ function FilaFactura({
             </div>
           ))}
         </div>
+      )}
+
+      {/* Tarea 79 · El motivo de anular un cobro se pide con el mismo campo que
+          la ficha del pago, no con el cuadro nativo del navegador. */}
+      {anulando && (
+        <ModalMotivoCorreccion
+          descripcion={`Anular ${anulando.folio}: ${anulando.monto} dejan de contar y la factura recupera su saldo.`}
+          confirmar="Anular cobro"
+          onCancelar={() => setAnulando(null)}
+          onConfirmar={async (motivo) => { await onAnularCobro(anulando.id, motivo); setAnulando(null); }}
+        />
       )}
 
       {/* Alta de cobro */}

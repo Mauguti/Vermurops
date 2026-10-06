@@ -29,6 +29,7 @@ import { ClienteVermur } from '../components/clientes/ClientesData';
 import { CargoDetalle, MonedaCargo } from '../components/shipments/EmbarquesData';
 import { aplanarCotizacion, LineaPlana } from './lineasCotizacion';
 import { ubicacionDeLinea } from './ivaCotizacion';
+import { clienteOperable } from './estatusCliente';
 import type { ConceptoVermur } from '../components/conceptos/ConceptosData';
 
 // ─── Advertencias ─────────────────────────────────────────────────────────────
@@ -301,7 +302,7 @@ export function revisarCliente(
   }
 
   const faltantes: string[] = [];
-  if (cliente.statusOperativo === 'INACTIVO') faltantes.push('está marcado como INACTIVO');
+  if (!clienteOperable(cliente)) faltantes.push('está marcado como INACTIVO');
   if (!cliente.rfc?.trim()) faltantes.push('no tiene RFC');
   if (cliente.validadoFiscalmente !== true) faltantes.push('no está validado fiscalmente');
 

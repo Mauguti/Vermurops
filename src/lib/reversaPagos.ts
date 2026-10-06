@@ -29,7 +29,7 @@
  * Sin React, sin Firestore.
  */
 
-import type { AplicacionPago, Pago } from './pagos';
+import type { AplicacionPago, LadoPago, Pago } from './pagos';
 import { aplicado, sinAplicar } from './pagos';
 import type { EntradaBitacora } from '../components/shipments/EmbarquesData';
 import { contiene } from './texto';
@@ -105,10 +105,12 @@ export interface FiltrosPagos {
   mes: string;
   /** Folio, cliente, referencia o folio de factura aplicada. */
   busqueda: string;
+  /** Tarea 80 · Quién movió el dinero: el cliente (entra) o Vermur al proveedor (sale). '' = los dos. */
+  lado: LadoPago | '';
 }
 
 export const FILTROS_PAGOS_VACIOS: FiltrosPagos = {
-  estado: 'vigentes', clienteId: '', moneda: '', mes: '', busqueda: '',
+  estado: 'vigentes', clienteId: '', moneda: '', mes: '', busqueda: '', lado: '',
 };
 
 const ESTADOS_VALIDOS: EstadoPago[] = ['aplicado', 'parcial', 'sin_aplicar', 'anulado'];
@@ -119,6 +121,7 @@ export function aplicarFiltrosPagos(pagos: readonly Pago[], f: FiltrosPagos): Pa
     const e = estadoDePago(p);
     if (f.estado === 'vigentes') { if (e === 'anulado') return false; }
     else if (f.estado !== 'todos' && e !== f.estado) return false;
+    if (f.lado && p.lado !== f.lado) return false;
     if (f.clienteId && p.terceroId !== f.clienteId) return false;
     if (f.moneda && p.moneda !== f.moneda) return false;
     if (f.mes && (p.fecha ?? '').slice(0, 7) !== f.mes) return false;
@@ -185,6 +188,7 @@ export function filtrosPagosDesdeVista(
     f.estado = 'vigentes';
   }
   if (f.moneda !== 'USD' && f.moneda !== 'MXN') f.moneda = '';
+  if (f.lado !== 'cliente' && f.lado !== 'proveedor') f.lado = '';
   if (!/^\d{4}-\d{2}$/.test(f.mes)) f.mes = '';
   return f;
 }
@@ -196,6 +200,10 @@ export function filtrosPagosDesdeVista(
 /** Por qué NO se puede reaplicar o quitar una aplicación. null = se puede. */
 export function motivoNoEditable(p: Pago): string | null {
   if (p.activo === false) return 'Este pago está anulado: no se le puede aplicar ni quitar nada.';
+  if (p.lado === 'proveedor') {
+    return 'Un pago a proveedor no se reaplica ni se le quita una orden: se anula completo, '
+      + 'y cada orden que cubría regresa a «autorizada».';
+  }
   if (!esPagoEditable(p)) {
     return 'Es un registro anterior (de Cobros o Depósitos): se lee y se puede anular, '
       + 'pero no se reaplica porque esas colecciones ya no se escriben.';
@@ -350,6 +358,56 @@ export function bitacoraDelPago(
       vistas.add(e.id);
       out.push(e);
     }
+  }
+  return out.sort((a, b) => b.fecha.localeCompare(a.fecha));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6 · Las correcciones de un pago: el Pago primero, la bitácora para lo viejo
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface CorreccionDePago {
+  id: string;
+  titulo: string;
+  /** ISO 8601. */
+  fecha: string;
+  detalle?: string;
+  /** De dónde se leyó: el pago mismo o la bitácora de un embarque (anterior a la tarea 79). */
+  fuente: 'pago' | 'bitacora';
+}
+
+/**
+ * Tarea 79 · Lo que se le hizo a un pago, la más reciente primero.
+ *
+ * `Pago.anulacion` y `Pago.aplicacionesQuitadas` mandan. La bitácora solo
+ * aporta lo que el pago no dice: una anulación o una aplicación quitada
+ * ANTES de esta tarea (no traen campo) y las aplicaciones nuevas de saldo.
+ * Una entrada de bitácora que el pago ya cubre no se repite: se reconoce por
+ * la factura y el motivo, que es lo único que ambos lados comparten.
+ */
+export function correccionesDelPago(
+  pago: Pick<Pago, 'folio' | 'terceroNombre' | 'moneda' | 'anulacion' | 'aplicacionesQuitadas'>,
+  bitacoras: readonly (readonly EntradaBitacora[] | undefined)[],
+): CorreccionDePago[] {
+  const out: CorreccionDePago[] = [];
+  const quitadas = pago.aplicacionesQuitadas ?? [];
+
+  if (pago.anulacion) {
+    const t = textoAnulacion(pago, pago.anulacion.por, pago.anulacion.motivo);
+    out.push({ id: `anulacion-${pago.folio}`, titulo: t.titulo, fecha: pago.anulacion.en, detalle: t.detalle, fuente: 'pago' });
+  }
+  quitadas.forEach((q, i) => {
+    const t = textoAplicacionQuitada(pago, q, q.por, q.motivo);
+    out.push({ id: `quitada-${pago.folio}-${i}`, titulo: t.titulo, fecha: q.en, detalle: t.detalle, fuente: 'pago' });
+  });
+
+  for (const e of bitacoraDelPago(pago.folio, bitacoras)) {
+    const esAnulacion = /anul/i.test(e.titulo);
+    const esQuitada = /quit/i.test(e.titulo);
+    if (esAnulacion && pago.anulacion) continue;
+    if (esQuitada && quitadas.some(q =>
+      e.titulo.includes(q.destinoNumero) && (e.detalle ?? '').includes(`Motivo: ${q.motivo.trim()}`))) continue;
+    out.push({ id: e.id, titulo: e.titulo, fecha: e.fecha, detalle: e.detalle, fuente: 'bitacora' });
   }
   return out.sort((a, b) => b.fecha.localeCompare(a.fecha));
 }
