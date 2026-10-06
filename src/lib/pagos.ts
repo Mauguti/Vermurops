@@ -15,12 +15,20 @@
  * doce documentos con la misma referencia copiada a mano, y ninguno sabe de
  * los otros. Un pago con N aplicaciones es un documento.
  *
- * ── Qué hace este archivo HOY (P1) ────────────────────────────────────────
- * **Nada se escribe todavía en `pagos/`.** Este paso solo unifica la
- * LECTURA: los cobros y los depósitos que ya están en Firestore se leen
- * como pagos —`pagoDesdeCobro`, `pagoDesdeDeposito`— y los diez call sites
- * del §2.2 pasan a consumir una sola lista. El número en pantalla es el
- * mismo antes y después; `pagos.equivalencia.test.ts` lo fija.
+ * ── Qué hace este archivo (P1 y P2) ──────────────────────────────────────
+ * **P1 unificó la LECTURA**: los cobros y los depósitos que ya están en
+ * Firestore se leen como pagos —`pagoDesdeCobro`, `pagoDesdeDeposito`— y los
+ * diez call sites del §2.2 consumen una sola lista. El número en pantalla es
+ * el mismo antes y después; `pagos.equivalencia.test.ts` lo fija.
+ *
+ * **P2 cambió la ESCRITURA**: `registrarCobro` y `registrarDeposito` crean un
+ * documento en `pagos/` con `construirPagoDeCobro` y
+ * `construirPagoDeDeposito`. `cobros/` y `depositosCliente/` quedan de solo
+ * lectura: dejan de escribirse, no se migran y no se borran.
+ *
+ * ⚠️ `pagos/` necesita su regla publicada en `firestore.rules`. Sin ella la
+ * escritura falla con «permission denied» — a gritos, no en silencio. Es la
+ * lección de §3 del CLAUDE.md: la regla escrita no basta, hay que publicarla.
  *
  * **No hay riesgo de doble conteo, y es por construcción:** un movimiento de
  * dinero vive en `pagos` **o** en `cobros`/`depositosCliente`, nunca en los
@@ -419,7 +427,257 @@ export function pagosDesdeOrdenes(ordenes: readonly OrdenCompra[]): Pago[] {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 4 · El fondeo del embarque, leído de los pagos
+// 4 · Escribir un pago (§1.3 · paso P2)
+//
+// `registrarCobro` y `registrarDeposito` dejan de escribir en `cobros/` y
+// `depositosCliente/` y pasan a escribir UN documento en `pagos/`. La firma
+// pública de los dos hooks no cambia: lo que entra es exactamente lo que
+// entraba, y estas dos funciones lo convierten. Por eso viven aquí y no en el
+// hook — son la parte que se puede probar sin Firestore.
+//
+// **Lo viejo no se migra ni se toca.** Deja de escribirse y se sigue leyendo
+// por los adaptadores del §3: un movimiento vive en `pagos` **o** en lo
+// viejo, nunca en los dos, que es lo que hace imposible el doble conteo.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Lo que se captura de un cobro contra una factura. La firma de hoy. */
+export type DatosCobro = Omit<
+  CobroCliente, 'id' | 'registradoPor' | 'activo' | 'createdAt' | 'updatedAt'
+>;
+
+/** Lo que se captura de un depósito del cliente. La firma de hoy. */
+export type DatosDeposito = Omit<
+  DepositoCliente, 'id' | 'registradoPor' | 'activo' | 'fechaAlta' | 'updatedAt'
+>;
+
+export interface ContextoPago {
+  /** Id del documento en `pagos/`. */
+  id: string;
+  /** «PAG-2026-0001», reservado con `generateFolioPago`. */
+  folio: string;
+  por: { uid: string; nombre: string };
+  /** ISO. `createdAt` y `updatedAt`. */
+  ahora: string;
+}
+
+/**
+ * Un monto que de verdad mueve dinero.
+ *
+ * Se valida ANTES de escribir, y lanzando: Firestore acepta un cero y un
+ * NaN se guarda como tal, y un pago de cero se ve igual que uno de verdad en
+ * la lista. §6: un guardado que falla en silencio es peor que uno que no
+ * guarda — este falla a gritos y no escribe nada.
+ */
+function exigirMonto(monto: number, que: string): number {
+  if (!Number.isFinite(monto) || monto <= 0) {
+    throw new Error(`${que}: el monto tiene que ser mayor que cero (llegó ${monto}).`);
+  }
+  return redondear(monto);
+}
+
+/**
+ * Un cobro contra una factura, escrito como pago: **una sola aplicación, por
+ * el monto completo.**
+ *
+ * Es el mismo documento que `pagoDesdeCobro` produce al leer un cobro viejo,
+ * así que las pantallas no distinguen uno de otro — y por eso el número en
+ * pantalla no se mueve al cambiar la escritura.
+ */
+export function construirPagoDeCobro(datos: DatosCobro, ctx: ContextoPago): Pago {
+  if (!datos.facturaId) {
+    throw new Error('el cobro: falta la factura a la que se aplica.');
+  }
+  const monto = exigirMonto(datos.monto, 'el cobro');
+  return construirPagoAplicado({
+    terceroId: datos.clienteId ?? null,
+    terceroNombre: datos.clienteNombre ?? '',
+    monto,
+    moneda: datos.moneda,
+    fecha: datos.fechaCobro,
+    banco: datos.banco || null,
+    referencia: datos.referencia ?? null,
+    aplicaciones: [{
+      destinoTipo: 'factura',
+      destinoId: datos.facturaId,
+      destinoNumero: datos.facturaNumero ?? '',
+      monto,
+      moneda: datos.moneda,
+      aplicadaPor: { uid: ctx.por.uid, nombre: ctx.por.nombre, fecha: datos.fechaCobro },
+    }],
+    embarqueIds: datos.embarqueId ? [datos.embarqueId] : [],
+  }, ctx, 'el cobro');
+}
+
+/** Lo que se captura de un pago repartido entre varias facturas (tarea 70 · P4). */
+export interface DatosPagoAplicado {
+  terceroId: string | null;
+  terceroNombre: string;
+  monto: number;
+  moneda: Moneda;
+  /** YYYY-MM-DD: el día en que el dinero se movió, no el de captura. */
+  fecha: string;
+  banco: string | null;
+  referencia: string | null;
+  /** Puede estar vacío: eso es el «a cuenta». Lo arma `aplicacionesDelReparto`. */
+  aplicaciones: AplicacionPago[];
+  /** Derivado de las facturas aplicadas: `embarquesDelReparto`. */
+  embarqueIds: string[];
+}
+
+/**
+ * Un pago con N aplicaciones (§7.1 · paso P4).
+ *
+ * Es la forma general, y `construirPagoDeCobro` es su caso de UNA aplicación:
+ * un cobro contra una factura siempre fue esto con N = 1. Un solo constructor
+ * para que los dos caminos escriban exactamente el mismo documento — si se
+ * escribieran aparte, el pago de doce facturas podría nacer con un campo de
+ * menos y nadie lo vería hasta leerlo.
+ *
+ * **Lo que NO deja escribir:**
+ *
+ *  - Un pago que aplica más de lo que movió. Es la regla del punto 1 de la
+ *    tarea, y se valida aquí además de en la pantalla: el botón se puede
+ *    esquivar —otra pestaña, un reparto que quedó viejo— y un pago que
+ *    liquida 130,000 con 120,000 se ve perfectamente bien en la lista. Lo
+ *    que sobra sí se permite: es el «a cuenta» de `sinAplicar`.
+ *  - Una aplicación en otra moneda. §4: un pago tiene UNA moneda, y una
+ *    aplicación con otra no contaría para el saldo de su factura
+ *    (`saldoDeFactura` la descarta) pero sí se vería como aplicada.
+ *  - Una aplicación sin destino, o con monto que no sea mayor que cero.
+ */
+export function construirPagoAplicado(
+  datos: DatosPagoAplicado,
+  ctx: ContextoPago,
+  que = 'el pago',
+): Pago {
+  const monto = exigirMonto(datos.monto, que);
+  const aplicaciones = datos.aplicaciones ?? [];
+
+  for (const a of aplicaciones) {
+    if (!a.destinoId) throw new Error(`${que}: hay una aplicación sin factura.`);
+    if (!Number.isFinite(a.monto) || a.monto <= 0) {
+      throw new Error(`${que}: la aplicación a ${a.destinoNumero || a.destinoId} no tiene monto.`);
+    }
+    if (a.moneda !== datos.moneda) {
+      throw new Error(
+        `${que}: la aplicación a ${a.destinoNumero || a.destinoId} está en ${a.moneda} `
+        + `y el pago en ${datos.moneda}. Un pago no se aplica a destinos de otra moneda (§4.3).`,
+      );
+    }
+  }
+
+  // Una sola moneda por construcción: el bucle de arriba lo garantiza (§4.3).
+  const aplicado = redondear(aplicaciones.reduce((acc, a) => acc + a.monto, 0));
+  // Un peso de tolerancia, el mismo de `saldoDeFactura`: los redondeos de IVA
+  // dejan centavos que no son una deuda.
+  if (aplicado > monto + 1) {
+    throw new Error(
+      `${que}: se está aplicando ${aplicado.toLocaleString('en-US', { minimumFractionDigits: 2 })} `
+      + `de un pago de ${monto.toLocaleString('en-US', { minimumFractionDigits: 2 })}.`,
+    );
+  }
+
+  const referencia = (datos.referencia ?? '').trim();
+  return {
+    id: ctx.id,
+    folio: ctx.folio,
+    lado: 'cliente',
+    terceroTipo: 'cliente',
+    terceroId: datos.terceroId || null,
+    terceroNombre: datos.terceroNombre ?? '',
+    monto,
+    moneda: datos.moneda,
+    fecha: datos.fecha,
+    banco: datos.banco || null,
+    // Puede llegar DESPUÉS del pago (§0.3). Vacía se guarda como null, no como ''.
+    referencia: referencia || null,
+    comprobante: null,
+    aplicaciones,
+    /* `destinoIds` se deriva de `aplicaciones` y se escribe en la MISMA
+       operación (§1.1): es el índice con el que se consulta «pagos de esta
+       factura», y un índice que se escribe aparte se desincroniza. */
+    destinoIds: [...new Set(aplicaciones.map(a => a.destinoId))],
+    embarqueIds: [...new Set((datos.embarqueIds ?? []).filter(Boolean))],
+    origen: 'app',
+    registradoPor: ctx.por,
+    activo: true,
+    createdAt: ctx.ahora,
+    updatedAt: ctx.ahora,
+  };
+}
+
+/**
+ * Un depósito del cliente, escrito como pago: **CERO aplicaciones.**
+ *
+ * El dinero entró y todavía no cobra ninguna factura; eso es el «a cuenta»
+ * de `sinAplicar`. Fondea las órdenes de su embarque igual que siempre
+ * (`entradasDeFondeo`, caso 1).
+ *
+ * A diferencia del depósito viejo, este **sí trae banco** (§10.2 del plan:
+ * `DepositoCliente` no tenía dónde, y un depósito sin cuenta no se puede
+ * conciliar). `DatosDeposito` tampoco lo tiene todavía —la pantalla que lo
+ * captura es P3—, así que llega por el contexto y mientras queda en null.
+ */
+export function construirPagoDeDeposito(
+  datos: DatosDeposito,
+  ctx: ContextoPago & { banco?: string | null },
+): Pago {
+  const monto = exigirMonto(datos.monto, 'el depósito');
+  const referencia = (datos.referencia ?? '').trim();
+  return {
+    id: ctx.id,
+    folio: ctx.folio,
+    lado: 'cliente',
+    terceroTipo: 'cliente',
+    terceroId: datos.clienteId || null,
+    terceroNombre: datos.clienteNombre ?? '',
+    monto,
+    moneda: datos.moneda,
+    fecha: datos.fechaDeposito,
+    banco: ctx.banco ?? null,
+    referencia: referencia || null,
+    comprobante: datos.comprobante
+      ? { url: datos.comprobante, nombre: 'Comprobante', subidoEn: ctx.ahora }
+      : null,
+    aplicaciones: [],
+    destinoIds: [],
+    embarqueIds: datos.embarqueId ? [datos.embarqueId] : [],
+    origen: 'app',
+    registradoPor: ctx.por,
+    activo: true,
+    createdAt: ctx.ahora,
+    updatedAt: ctx.ahora,
+  };
+}
+
+/**
+ * En qué colección vive el movimiento que lleva ese id.
+ *
+ * Las pantallas anulan con un id suelto —«¿anular este cobro?»— y después de
+ * P2 ese id puede ser de `pagos/` o de un cobro viejo de `cobros/`. Lo
+ * decide el `origen` que puso el adaptador, nunca la forma del id: un
+ * `COB-…` es legacy porque se leyó de `cobros`, no porque empiece así.
+ *
+ * Devuelve null cuando el id no está en la lista. Quien anula **tiene que
+ * detenerse ahí**: escribir en la colección equivocada crearía un documento
+ * nuevo con `activo: false` y el movimiento seguiría vivo en la otra.
+ */
+export function coleccionDelPago(
+  id: string,
+  pagos: readonly Pago[],
+): 'pagos' | 'cobros' | 'depositosCliente' | null {
+  const p = pagos.find(x => x.id === id);
+  if (!p) return null;
+  if (p.origen === 'legacy_cobro') return 'cobros';
+  if (p.origen === 'legacy_deposito') return 'depositosCliente';
+  // Un pago derivado de `comprobantePago` NO tiene documento propio: su id es
+  // sintético y lo que lo sostiene son N órdenes. Se anula en las órdenes (P6).
+  if (p.origen === 'legacy_comprobante_oc') return null;
+  return 'pagos';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5 · El fondeo del embarque, leído de los pagos
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Una entrada de dinero, en la forma que `calcularFondeo` consume. */

@@ -1655,7 +1655,6 @@ el botón de quitar no aparece, se dice por qué.
 `DepositoCliente` no tiene dónde guardarlo (§10.2 del plan) y el modelo no se
 toca en este paso. El cobro contra factura sí lo pregunta, como siempre. No se
 ofrece un selector cuyo valor se tiraría al guardar.
-
 ## 4.34 El tercer destino también guarda quién corrigió el tipo (tarea 71, 5-oct-2026)
 
 La 63 dejó el registro de la corrección del tipo en dos de sus tres destinos.
@@ -1690,6 +1689,128 @@ palabras; una tercera copia habría divergido en el primer ajuste de redacción.
   - **El expediente del cliente guarda el registro y tampoco lo enseña**
     (`DocExpediente.observaciones`, que la casilla no pinta). Es el mismo
     arreglo de una línea y está anotado, sin tocar: la tarea era el proveedor.
+
+## 4.35 El cobro y el depósito se escriben en `pagos/` (tarea 68, 5-oct-2026)
+
+Paso **P2** del plan. La 67 unificó la LECTURA; esta cambia la ESCRITURA.
+`registrarCobro` y `registrarDeposito` dejan de escribir en `cobros/` y
+`depositosCliente/` y crean **un documento en `pagos/`**: un cobro es un pago
+con una sola aplicación, un depósito uno con cero.
+
+**La firma de los dos hooks no cambia.** Lo que entra es exactamente lo que
+entraba, y `construirPagoDeCobro` / `construirPagoDeDeposito` lo convierten
+—funciones puras en `lib/pagos.ts`, no lógica dentro del hook, para que la
+conversión se pruebe sin Firestore. Ninguna pantalla cambió.
+
+**Lo viejo queda de SOLO LECTURA.** Deja de escribirse, no se migra y no se
+borra. Un movimiento vive en `pagos` **o** en lo viejo, nunca en los dos: esa
+es toda la defensa contra el doble conteo, y es la razón para no migrar.
+  - `pagos.liberaPago.test.ts` recorre la cadena completa —cobro → fondeo →
+    autorización de la OC → saldo de la factura— y corre **el caso espejo al
+    lado**: el mismo cobro leído de `cobros/` como antes tiene que dar
+    exactamente lo mismo. Si un día difieren, el cobro dejó de liberar el
+    pago al proveedor, y eso es dinero que se queda sin salir.
+  - **El folio es atómico**: `PAG-2026-0001` en `contadores/pagos`
+    (`folioServicePago.ts`), y se reserva ANTES de armar el documento: si
+    falla, no se escribe un pago sin folio. No reinicia en enero, igual que
+    los folios de embarque (§4.31).
+  - **`coleccionDelPago` decide dónde se anula**, por el `origen` que puso el
+    adaptador y nunca por la forma del id. Un id que no está en la lista **no
+    se escribe en ninguna de las dos**: anular en la colección equivocada
+    crearía un documento nuevo con `activo: false` y el movimiento seguiría
+    vivo en la otra.
+  - **Un monto que no es mayor que cero lanza antes de escribir.** Firestore
+    acepta un cero y guarda un `NaN` tal cual, y un pago de cero se ve igual
+    que uno de verdad en la lista.
+  - La referencia vacía se guarda como `null`, no como `''`: puede llegar
+    DESPUÉS del pago y nunca es obligatoria (§0.3 del plan).
+
+**🔴 `pagos/` NECESITA su regla publicada, y el sprint no la pudo escribir.**
+El bloque exacto, dónde va y cómo se verifica están en
+`docs/sprint-post-junta/REGLA-PAGOS.md`. Es la lección de §3 en su forma más
+directa: **la regla escrita no basta, hay que publicarla** — con la diferencia
+de que aquí no se traga en silencio. La escritura falla con un aviso rojo que
+dice qué pasó, y el mensaje genérico de `permission-denied` («no tienes
+permiso») se traduce a propósito: quien lo lea pensaría que es su rol, y no lo
+es. Es la misma trampa del SMTP AUTH de §4.29.
+  - **Orden de publicación: reglas PRIMERO, hosting después.** Al revés deja a
+    Administración sin poder registrar un cobro durante la ventana entre los
+    dos despliegues.
+  - Mientras no esté, `./scripts/e2e.sh` falla en el paso 6 —el de
+    Administración— justo en el primer `pagos/`. Los cinco pasos anteriores
+    pasan: es el único punto que toca la colección nueva.
+  - Nace con `esDelEquipo()` como todo lo demás, así que **cualquiera del
+    equipo puede escribir un pago desde la consola**. Con dinero de verdad en
+    esa colección, la deuda de §6 sube de prioridad.
+
+## 4.36 Un pago, varias facturas: «Aplicar pago» (tarea 70, 5-oct-2026)
+
+Paso **P4** de `docs/sprint-post-junta/PLAN-PAGOS.md` (§7.1), el flujo de
+Magaya que describió Julio. `lib/aplicarPago.ts` (36 tests) y
+`components/facturas/ModalAplicarPago.tsx`.
+
+El renglón de Cuentas por cobrar dice **«Aplicar pago»** donde decía
+«Registrar cobro», y abre el reparto: arriba el dinero que entró —monto,
+moneda, fecha, cuenta, referencia opcional— y abajo las facturas pendientes
+**del mismo cliente y en la misma moneda**, con «se aplica» y «queda» por
+renglón. El caso de siempre no cambia de esfuerzo: se abre desde la factura
+con el monto y el reparto ya puestos en su saldo, así que cobrar una sola
+sigue siendo abrir y guardar. `ModalCobro` se retiró: era ese mismo caso con
+un formulario aparte.
+
+**Lo que sobra es saldo a favor, y se ve.** «Aplicar lo más vencido primero»
+reparte en cascada —propuesta editable, como la comparativa preselecciona el
+paquete más barato (§4.9)— y **no mete el excedente a la fuerza en la última
+factura**: queda como `sinAplicar` del pago, el pie lo dice («quedan MXN
+65,000.00 a favor del cliente») y se aplica después. Rellenar para cuadrar
+dejaría una factura sobrecobrada, que hoy es invisible (§10.5 del plan).
+  - **Lo que FALTA no se guarda.** El botón lo explica con los dos números:
+    «estás aplicando 143,000.00 de un pago de 120,000.00».
+  - **La regla se valida dos veces, y la segunda es la que importa.**
+    `construirPagoAplicado` lanza antes de escribir si lo aplicado pasa del
+    monto o si una aplicación trae otra moneda. El botón se puede esquivar
+    —otra pestaña, un reparto que quedó viejo— y un pago que liquida 130,000
+    con 120,000 se ve perfectamente bien en la lista.
+  - `construirPagoAplicado` es la forma GENERAL y `construirPagoDeCobro` pasó
+    a ser su caso de UNA aplicación. Un solo constructor: escritos aparte, el
+    pago de doce facturas podría nacer con un campo de menos.
+
+**La moneda no se convierte, y se dice.** §4 del plan, salida (a): el dinero
+que entró al banco está en una sola moneda y es la que Julio concilia.
+Cambiar la moneda del pago cambia la lista; cuando el cliente solo debe en la
+otra, la pantalla lo EXPLICA («lo que debe está en USD 3,000.00…») en vez de
+dejar la lista vacía, que se leería como «no debe nada». La conversión
+declarada es la salida (b) y espera la respuesta de Julio (J3).
+
+**Un pago cruza embarques, y cada bitácora anota lo suyo.** `embarqueIds` se
+deriva de las facturas aplicadas, así que una transferencia que cubre dos
+embarques fondea los dos por lo que les toca (`entradasDeFondeo`, caso 3) —
+el caso que `CobroCliente.embarqueId`, un solo string, no podía representar.
+`registrarPagoAplicado` deja UNA entrada por embarque con el total de ESE
+embarque: anotar el total en los dos haría parecer que entró el doble.
+
+**Desde la factura se ve qué pagos la cubrieron** (`coberturaDeFactura`): el
+«Cobrado» del renglón es el enlace, y abajo salen folio, fecha, monto, cuenta
+y referencia. Un cobro viejo de `cobros/` sale igual, marcado **«registro
+anterior»** porque no tiene folio de pago ni ficha propia. Dos aplicaciones
+del mismo pago a la misma factura son UN renglón: son un movimiento.
+**La vista al revés —un pago con todas sus facturas, quitar una aplicación,
+anular— es P5 y no se hizo.**
+  - **«Parcial» se pinta JUNTO al estado, no en su lugar.** El estado
+    contesta cuánto falta para el vencimiento y lo parcial, cuánto falta de
+    dinero: las dos preguntas se hacen a la vez. `EstadoCobro` no creció, así
+    que los filtros y las vistas guardadas de la 61 no cambian.
+
+**Un pago sin ninguna aplicación no se guarda desde aquí**, y es decisión de
+interfaz: el dinero que no cubre factura es el anticipo, y su formulario ya
+existe —«Registrar entrada de dinero» (§4.33)— donde además se elige el
+embarque, que es lo que lo hace fondear. Un pago nacido aquí sin aplicaciones
+no tendría embarque y no fondearía nada, aunque se vería igual en la lista.
+
+⚠️ **Esta pantalla NO guarda hasta que `pagos/` tenga su regla publicada**
+(§4.35). `tests/e2e/70-aplicar-pago.spec.ts` recorre los nueve casos contra
+emuladores y el último FIJA el aviso del bloqueo, con la versión en verde
+escrita y comentada para el día que la regla entre.
 
 ## 5. Estado de los módulos
 

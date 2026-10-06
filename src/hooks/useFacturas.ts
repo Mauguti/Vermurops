@@ -18,7 +18,11 @@ import { conAviso } from '../lib/erroresEscritura';
 import { idUnico } from '../lib/idUnico';
 import type { FacturaCliente, CobroCliente } from '../components/facturas/FacturasData';
 import { saldoDeFactura } from '../lib/facturacionEmbarque';
-import { pagosDeCliente, type Pago } from '../lib/pagos';
+import {
+  aplicacionesA, coleccionDelPago, construirPagoAplicado, construirPagoDeCobro,
+  pagosDeCliente, type DatosCobro, type DatosPagoAplicado, type Pago,
+} from '../lib/pagos';
+import { usePagos } from './usePagos';
 import { anotarBitacora } from './anotarBitacora';
 
 const COL_FACTURAS = 'facturas';
@@ -29,6 +33,8 @@ export function useFacturas(embarqueId?: string) {
   const [facturas, setFacturas] = useState<FacturaCliente[]>([]);
   const [cobros, setCobros] = useState<CobroCliente[]>([]);
   const [loading, setLoading] = useState(true);
+  // Tarea 68 · `pagos/` es donde se escribe desde P2; `cobros/` solo se lee.
+  const { pagos: pagosNuevos, contextoNuevo, guardarPago, anularPago } = usePagos(embarqueId);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
@@ -44,6 +50,10 @@ export function useFacturas(embarqueId?: string) {
       () => setLoading(false),
     );
 
+    /*
+     * Tarea 68 · `cobros/` es de SOLO LECTURA desde P2. Nada nuevo se
+     * escribe aquí; lo que ya está se sigue leyendo y no se migra.
+     */
     const unsubC = onSnapshot(
       query(collection(db, COL_COBROS), orderBy('fechaCobro', 'desc')),
       snap => {
@@ -101,69 +111,162 @@ export function useFacturas(embarqueId?: string) {
   };
 
   /**
+   * Tarea 67 · La lista unificada de pagos del lado cliente.
+   *
+   * `cobros` es la lectura cruda de lo viejo; `pagosNuevos`, la de `pagos/`.
+   * `pagos` es la lente con la que se lee todo: un cobro es un pago con una
+   * sola aplicación. No son dos verdades —una se deriva de la otra— y es lo
+   * que consumen las pantallas, para que cambiar la escritura no obligue a
+   * recorrer diez call sites otra vez.
+   *
+   * Los depósitos del cliente NO están aquí: los lee `useDepositosCliente` y
+   * los suma quien necesite el fondeo (Finance), con `pagosDeCliente`.
+   */
+  const pagos = useMemo<Pago[]>(
+    () => pagosDeCliente(pagosNuevos, cobros, []),
+    [pagosNuevos, cobros],
+  );
+
+  /**
    * Registra un cobro. Puede ser parcial.
    *
+   * ── Qué cambió en P2 ────────────────────────────────────────────────────
+   * Escribe UN documento en `pagos/` —un pago con una sola aplicación a la
+   * factura— en vez de un `CobroCliente` en `cobros/`. **La firma no cambia**:
+   * lo que entra es lo mismo que entraba, y `construirPagoDeCobro` lo
+   * convierte. `cobros/` queda de solo lectura y no se migra.
+   *
    * ── La conexión con el pago a proveedores (1.1) ──────────────────────────
-   * Cobrar al cliente es lo que libera el pago al proveedor: este cobro entra
-   * al fondeo del embarque. Por eso el cobro guarda `embarqueId` — sin él, el
-   * dinero entraría a la contabilidad pero no desbloquearía nada.
+   * Cobrar al cliente es lo que libera el pago al proveedor: este dinero
+   * entra al fondeo del embarque. Por eso el pago hereda `embarqueIds` — sin
+   * ellos, el dinero entraría a la contabilidad pero no desbloquearía nada.
    *
    * ── Tarea 69 · Quién cobra ───────────────────────────────────────────────
    * `cobro.registrar`, no `factura.generar`: emitir la factura es de las dos
    * áreas (§4.1) y recibir el dinero es solo de Administración. Es lo único
    * que P3 QUITA de lo que hoy funciona, y es lo que dice la minuta §5.
    */
-  const registrarCobro = async (
-    datos: Omit<CobroCliente, 'id' | 'registradoPor' | 'activo' | 'createdAt' | 'updatedAt'>,
-  ): Promise<CobroCliente> => {
+  const registrarCobro = async (datos: DatosCobro): Promise<Pago> => {
     exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
 
-    const ahora = new Date().toISOString();
-    const cobro: CobroCliente = {
-      ...datos,
-      id: idUnico('COB'),
-      registradoPor: { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' },
-      activo: true,
-      createdAt: ahora,
-      updatedAt: ahora,
-    };
+    const ctx = await contextoNuevo();
+    const pago = construirPagoDeCobro(datos, ctx);
+    await guardarPago(pago);
 
-    await conAviso('el cobro', () =>
-      setDoc(doc(db, COL_COBROS, cobro.id), sanitizarParaFirestore(cobro)));
-
-    await anotarBitacora(cobro.embarqueId, 'cobro',
-      `${cobro.registradoPor.nombre} registró un cobro de ${cobro.clienteNombre} contra ${cobro.facturaNumero}`,
-      cobro.registradoPor,
-      `${cobro.moneda} ${cobro.monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })} · ${cobro.banco} · ${cobro.referencia}`);
+    if (datos.embarqueId) {
+      await anotarBitacora(datos.embarqueId, 'cobro',
+        `${pago.registradoPor.nombre} registró un cobro de ${pago.terceroNombre} contra ${datos.facturaNumero}`,
+        pago.registradoPor,
+        `${pago.moneda} ${pago.monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })} · ${pago.banco ?? 'sin cuenta'} · ${pago.referencia ?? 'sin referencia'} · ${pago.folio}`);
+    }
 
     /*
      * El estado de la factura se guarda además de derivarse, porque los
      * paneles filtran por él y filtrar en Firestore exige el campo. La
-     * fuente de verdad sigue siendo saldoDeFactura sobre los cobros vivos:
-     * si los dos discrepan, gana el cálculo.
+     * fuente de verdad sigue siendo saldoDeFactura sobre las aplicaciones
+     * vivas: si los dos discrepan, gana el cálculo.
      */
     const factura = facturas.find(f => f.id === datos.facturaId);
     if (factura) {
-      const cobrosDeLaFactura = [...cobros.filter(c => c.facturaId === factura.id), cobro];
-      const { estado } = saldoDeFactura(factura, cobrosDeLaFactura);
+      const aplicaciones = [...aplicacionesA(factura.id, pagos), ...pago.aplicaciones];
+      const { estado } = saldoDeFactura(factura, aplicaciones);
       if (estado !== factura.estado) {
         await conAviso('el estado de la factura', () =>
           updateDoc(doc(db, COL_FACTURAS, factura.id), sanitizarParaFirestore({
-            estado, updatedAt: ahora,
+            estado, updatedAt: ctx.ahora,
           }) as Record<string, unknown>));
       }
     }
 
-    return cobro;
+    return pago;
   };
 
-  /** Anula un cobro mal capturado. El saldo se recalcula solo. */
+  /**
+   * Tarea 70 · P4 · Un pago repartido entre VARIAS facturas (§7.1).
+   *
+   * Es el mismo documento que `registrarCobro` escribe —`construirPagoAplicado`
+   * es la forma general y el cobro es su caso de una aplicación— así que no
+   * hay dos caminos de escritura que puedan divergir. Lo que esta función
+   * agrega es lo que pasa DESPUÉS de guardar, y que un cobro contra una sola
+   * factura ya hacía: la bitácora del embarque y el estado de la factura, en
+   * plural.
+   *
+   * **El pago se escribe primero y una sola vez.** Si la bitácora o un estado
+   * fallaran después, el dinero ya quedó registrado y los saldos se siguen
+   * derivando de las aplicaciones: el estado guardado es un índice para
+   * filtrar, no la verdad (§1.4). Al revés —derivar antes de guardar— sí
+   * dejaría facturas marcadas como cobradas por un pago que no existe.
+   */
+  const registrarPagoAplicado = async (datos: DatosPagoAplicado): Promise<Pago> => {
+    exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
+
+    const ctx = await contextoNuevo();
+    const pago = construirPagoAplicado(datos, ctx);
+    await guardarPago(pago);
+
+    /*
+     * Una entrada por embarque, diciendo qué facturas de ESE embarque cubrió.
+     * Un pago que cruza dos embarques deja una entrada en cada bitácora con
+     * lo que le toca: anotar el total en los dos haría parecer que entró el
+     * doble (§4.3 en su versión de bitácora).
+     */
+    for (const embarqueId of pago.embarqueIds) {
+      const suyas = pago.aplicaciones.filter(a =>
+        facturas.some(f => f.id === a.destinoId && f.embarqueId === embarqueId));
+      if (suyas.length === 0) continue;
+      const total = Math.round(suyas.reduce((acc, a) => acc + a.monto, 0) * 100) / 100;
+      await anotarBitacora(embarqueId, 'cobro',
+        `${pago.registradoPor.nombre} registró un cobro de ${pago.terceroNombre} contra `
+        + `${suyas.map(a => a.destinoNumero).join(', ')}`,
+        pago.registradoPor,
+        `${pago.moneda} ${total.toLocaleString('es-MX', { minimumFractionDigits: 2 })} · `
+        + `${pago.banco ?? 'sin cuenta'} · ${pago.referencia ?? 'sin referencia'} · ${pago.folio}`
+        + (pago.aplicaciones.length > suyas.length ? ` · el pago cubrió ${pago.aplicaciones.length} facturas en total` : ''));
+    }
+
+    /*
+     * El estado de cada factura tocada, por el motivo de siempre: los paneles
+     * filtran por él y filtrar en Firestore exige el campo. La fuente de
+     * verdad sigue siendo `saldoDeFactura` sobre las aplicaciones vivas — si
+     * los dos discrepan, gana el cálculo.
+     */
+    for (const a of pago.aplicaciones) {
+      const factura = facturas.find(f => f.id === a.destinoId);
+      if (!factura) continue;
+      const aplicaciones = [...aplicacionesA(factura.id, pagos), a];
+      const { estado } = saldoDeFactura(factura, aplicaciones);
+      if (estado === factura.estado) continue;
+      await conAviso('el estado de la factura', () =>
+        updateDoc(doc(db, COL_FACTURAS, factura.id), sanitizarParaFirestore({
+          estado, updatedAt: ctx.ahora,
+        }) as Record<string, unknown>));
+    }
+
+    return pago;
+  };
+
+  /**
+   * Anula un cobro mal capturado. El saldo se recalcula solo.
+   *
+   * El id puede ser de `pagos/` (lo registrado desde P2) o de un cobro viejo
+   * de `cobros/`: lo decide `coleccionDelPago` por el `origen` que puso el
+   * adaptador. Si el id no está en la lista **no se escribe nada**: escribir
+   * en la colección equivocada crearía un documento nuevo con `activo: false`
+   * y el movimiento seguiría vivo en la otra.
+   */
   const anularCobro = async (id: string): Promise<void> => {
     exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
-    await conAviso('el cobro', () =>
-      updateDoc(doc(db, COL_COBROS, id), sanitizarParaFirestore({
-        activo: false, updatedAt: new Date().toISOString(),
-      }) as Record<string, unknown>));
+
+    const donde = coleccionDelPago(id, pagos);
+    if (donde === 'pagos') { await anularPago(id); return; }
+    if (donde === 'cobros') {
+      await conAviso('el cobro', () =>
+        updateDoc(doc(db, COL_COBROS, id), sanitizarParaFirestore({
+          activo: false, updatedAt: new Date().toISOString(),
+        }) as Record<string, unknown>));
+      return;
+    }
+    throw new Error(`No se encontró el cobro ${id} para anularlo.`);
   };
 
   /** Los cobros de una factura, para calcular su saldo. */
@@ -172,25 +275,9 @@ export function useFacturas(embarqueId?: string) {
     [cobros],
   );
 
-  /**
-   * Tarea 67 · La lista unificada de pagos del lado cliente.
-   *
-   * `cobros` es la lectura cruda de Firestore; `pagos` es la lente con la que
-   * se lee: un cobro es un pago con una sola aplicación. No son dos verdades
-   * —una se deriva de la otra— y es lo que consumen las pantallas, para que
-   * el día que `pagos/` exista no haya que recorrer diez call sites otra vez.
-   *
-   * El primer argumento va vacío a propósito: en P1 la colección `pagos/`
-   * todavía no tiene regla publicada, y un listener contra ella solo
-   * produciría «permission denied» en la consola. P2 lo llena.
-   *
-   * Los depósitos del cliente NO están aquí: los lee `useDepositosCliente` y
-   * los suma quien necesite el fondeo (Finance), con `pagosDeCliente`.
-   */
-  const pagos = useMemo<Pago[]>(() => pagosDeCliente([], cobros, []), [cobros]);
-
   return {
-    facturas, cobros, pagos, loading,
-    registrarFactura, cancelarFactura, registrarCobro, anularCobro, cobrosDe,
+    facturas, cobros, pagosNuevos, pagos, loading,
+    registrarFactura, cancelarFactura, registrarCobro, registrarPagoAplicado,
+    anularCobro, cobrosDe,
   };
 }

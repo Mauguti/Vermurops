@@ -34,6 +34,8 @@ const LEGITIMOS: Record<string, string> = {
   'src/lib/ivaCotizacion.ts': 'Suma las partes de UN mismo importe (el split 25/75 del flete aéreo), todas en su moneda.',
   'src/components/ordenesCompra/OrdenesCompraData.ts': 'Anticipos: OC-0 decidió exigir la misma moneda y marcar para revisión manual. El guard va en C-6, donde se cruzan.',
   'src/lib/facturacionEmbarque.ts': 'Una factura cubre UNA moneda: proponerFactura rechaza la mezcla antes de sumar, y saldoDeFactura filtra los cobros a la moneda de la factura.',
+  'src/lib/aplicarPago.ts': 'Un pago tiene UNA moneda y sus aplicaciones la comparten: construirPagoAplicado lanza antes de escribir si una aplicación trae otra, y el reparto solo ofrece facturas de la moneda del pago (§4 del PLAN-PAGOS).',
+  'src/hooks/useFacturas.ts': 'La bitácora suma las aplicaciones de UN pago, que comparten su moneda por construcción (misma garantía que aplicarPago.ts), y la imprime con pago.moneda al lado.',
 };
 
 /** Deuda técnica conocida: se sabe que está mal y por qué no se corrige. */

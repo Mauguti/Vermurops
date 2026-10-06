@@ -10,7 +10,8 @@ import {
   aplicado, sinAplicar, aplicacionesA, aplicacionesConPago, avanceDeDestino,
   pagoDesdeCobro, pagoDesdeDeposito, pagosDeCliente, pagosDesdeOrdenes,
   entradasDeFondeo,
-  type Pago, type AplicacionPago,
+  construirPagoDeCobro, construirPagoDeDeposito, coleccionDelPago,
+  type Pago, type AplicacionPago, type DatosCobro, type DatosDeposito,
 } from './pagos';
 import type { CobroCliente } from '../components/facturas/FacturasData';
 import type { DepositoCliente, OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
@@ -372,5 +373,150 @@ describe('entradasDeFondeo', () => {
       aplicaciones: [aplicacion({ destinoId: 'F1', monto: 20000 })],
     });
     expect(entradasDeFondeo([p], 'E1')).toEqual([{ monto: 20000, moneda: 'MXN' }]);
+  });
+});
+
+// ─── P2 · Escribir un pago (tarea 68) ───────────────────────────────────────
+
+const ctx = {
+  id: 'PAG-nuevo', folio: 'PAG-2026-0007',
+  por: { uid: 'u-admin', nombre: 'Julio Gutiérrez' },
+  ahora: '2026-10-05T18:00:00.000Z',
+};
+
+const datosCobro = (over: Partial<DatosCobro> = {}): DatosCobro => {
+  const { id: _i, registradoPor: _r, activo: _a, createdAt: _c, updatedAt: _u, ...resto } = cobro();
+  return { ...resto, ...over };
+};
+
+const datosDeposito = (over: Partial<DatosDeposito> = {}): DatosDeposito => {
+  const { id: _i, registradoPor: _r, activo: _a, fechaAlta: _f, updatedAt: _u, ...resto } = deposito();
+  return { ...resto, ...over };
+};
+
+describe('construirPagoDeCobro · un cobro es un pago con UNA aplicación', () => {
+  it('la aplicación es por el monto completo y apunta a la factura', () => {
+    const p = construirPagoDeCobro(datosCobro(), ctx);
+    expect(p.aplicaciones).toHaveLength(1);
+    expect(p.aplicaciones[0]).toMatchObject({
+      destinoTipo: 'factura', destinoId: 'F1', destinoNumero: 'A-1',
+      monto: 5000, moneda: 'MXN',
+    });
+    expect(p.destinoIds).toEqual(['F1']);
+    expect(aplicado(p)).toBe(5000);
+    expect(sinAplicar(p)).toBe(0);
+  });
+
+  it('nace vivo, del lado cliente, con folio y origen «app»', () => {
+    const p = construirPagoDeCobro(datosCobro(), ctx);
+    expect(p).toMatchObject({
+      id: 'PAG-nuevo', folio: 'PAG-2026-0007', lado: 'cliente',
+      terceroTipo: 'cliente', terceroId: 'CLI-1', terceroNombre: 'Alfa',
+      monto: 5000, moneda: 'MXN', fecha: '2026-09-05',
+      origen: 'app', activo: true,
+    });
+    expect(p.registradoPor).toEqual(ctx.por);
+    expect(p.createdAt).toBe(ctx.ahora);
+  });
+
+  it('hereda el embarque del cobro: es lo que fondea las órdenes (1.1)', () => {
+    const p = construirPagoDeCobro(datosCobro(), ctx);
+    expect(p.embarqueIds).toEqual(['E1']);
+    expect(entradasDeFondeo([p], 'E1')).toEqual([{ monto: 5000, moneda: 'MXN' }]);
+  });
+
+  it('da el MISMO pago que leer el cobro viejo: la pantalla no distingue', () => {
+    const viejo = pagoDesdeCobro(cobro());
+    const nuevo = construirPagoDeCobro(datosCobro(), ctx);
+    const comparable = (p: typeof viejo) => ({
+      lado: p.lado, terceroId: p.terceroId, terceroNombre: p.terceroNombre,
+      monto: p.monto, moneda: p.moneda, fecha: p.fecha,
+      destinoIds: p.destinoIds, embarqueIds: p.embarqueIds,
+      aplicado: aplicado(p), activo: p.activo,
+    });
+    expect(comparable(nuevo)).toEqual(comparable(viejo));
+  });
+
+  it('la referencia vacía se guarda como null, no como cadena vacía', () => {
+    const p = construirPagoDeCobro(datosCobro({ referencia: '   ' }), ctx);
+    expect(p.referencia).toBeNull();
+  });
+
+  it('un monto de cero o negativo NO se escribe: lanza', () => {
+    expect(() => construirPagoDeCobro(datosCobro({ monto: 0 }), ctx)).toThrow(/mayor que cero/);
+    expect(() => construirPagoDeCobro(datosCobro({ monto: -100 }), ctx)).toThrow(/mayor que cero/);
+    expect(() => construirPagoDeCobro(datosCobro({ monto: NaN }), ctx)).toThrow(/mayor que cero/);
+  });
+
+  it('sin factura no hay aplicación que valga: lanza', () => {
+    expect(() => construirPagoDeCobro(datosCobro({ facturaId: '' }), ctx)).toThrow(/falta la factura/);
+  });
+});
+
+describe('construirPagoDeDeposito · un depósito es un pago con CERO aplicaciones', () => {
+  it('no aplica nada: todo queda «sin aplicar»', () => {
+    const p = construirPagoDeDeposito(datosDeposito(), ctx);
+    expect(p.aplicaciones).toEqual([]);
+    expect(p.destinoIds).toEqual([]);
+    expect(aplicado(p)).toBe(0);
+    expect(sinAplicar(p)).toBe(80000);
+  });
+
+  it('fondea su embarque por el monto completo, como el depósito de siempre', () => {
+    const p = construirPagoDeDeposito(datosDeposito(), ctx);
+    expect(p.embarqueIds).toEqual(['E1']);
+    expect(entradasDeFondeo([p], 'E1')).toEqual([{ monto: 80000, moneda: 'MXN' }]);
+  });
+
+  it('el banco llega por el contexto: el depósito viejo no tenía dónde (§10.2)', () => {
+    expect(construirPagoDeDeposito(datosDeposito(), ctx).banco).toBeNull();
+    expect(construirPagoDeDeposito(datosDeposito(), { ...ctx, banco: 'bbva' }).banco).toBe('bbva');
+  });
+
+  it('el comprobante se envuelve como ArchivoPago cuando viene', () => {
+    const p = construirPagoDeDeposito(datosDeposito({ comprobante: 'https://x/y.pdf' }), ctx);
+    expect(p.comprobante).toEqual({ url: 'https://x/y.pdf', nombre: 'Comprobante', subidoEn: ctx.ahora });
+  });
+
+  it('un monto de cero no se escribe: lanza', () => {
+    expect(() => construirPagoDeDeposito(datosDeposito({ monto: 0 }), ctx)).toThrow(/mayor que cero/);
+  });
+});
+
+describe('coleccionDelPago · dónde se anula', () => {
+  const nuevo = construirPagoDeCobro(datosCobro(), ctx);
+  const lista = [nuevo, pagoDesdeCobro(cobro()), pagoDesdeDeposito(deposito())];
+
+  it('lo registrado desde P2 se anula en pagos/', () => {
+    expect(coleccionDelPago('PAG-nuevo', lista)).toBe('pagos');
+  });
+
+  it('un cobro viejo se anula en cobros/ y un depósito viejo en depositosCliente/', () => {
+    expect(coleccionDelPago('COB-1', lista)).toBe('cobros');
+    expect(coleccionDelPago('DEP-1', lista)).toBe('depositosCliente');
+  });
+
+  it('un id que no está en la lista devuelve null: no se adivina colección', () => {
+    expect(coleccionDelPago('no-existe', lista)).toBeNull();
+  });
+
+  it('un pago derivado de comprobantePago no tiene documento propio: null', () => {
+    const [consolidado] = pagosDesdeOrdenes([orden()]);
+    expect(coleccionDelPago(consolidado.id, [consolidado])).toBeNull();
+  });
+});
+
+describe('la lista unificada con las TRES fuentes', () => {
+  it('suma lo nuevo y los dos legados sin contar dos veces', () => {
+    const nuevo = construirPagoDeCobro(datosCobro({ monto: 1000 }), ctx);
+    const lista = pagosDeCliente([nuevo], [cobro()], [deposito()]);
+    expect(lista).toHaveLength(3);
+    expect(lista.map(p => p.origen)).toEqual(['app', 'legacy_cobro', 'legacy_deposito']);
+    // 1,000 del pago nuevo + 5,000 del cobro viejo + 80,000 del depósito.
+    expect(entradasDeFondeo(lista, 'E1')).toEqual([
+      { monto: 1000, moneda: 'MXN' },
+      { monto: 5000, moneda: 'MXN' },
+      { monto: 80000, moneda: 'MXN' },
+    ]);
   });
 });

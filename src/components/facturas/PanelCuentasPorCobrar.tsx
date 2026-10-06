@@ -15,17 +15,19 @@
  * moneda), así que se conserva tal cual en vez de rehacerse peor.
  */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ChevronDown, ChevronRight, Search, AlertTriangle, Banknote, Clock, CheckCircle2, X,
   Download, SlidersHorizontal,
 } from 'lucide-react';
-import type { FacturaCliente, CobroCliente } from './FacturasData';
-import type { Pago } from '../../lib/pagos';
+import type { FacturaCliente } from './FacturasData';
+import type { DatosPagoAplicado, Pago } from '../../lib/pagos';
 import {
-  cartera, resumenCartera, agruparPorCliente, montoCobrable,
+  cartera, resumenCartera, agruparPorCliente,
   ETIQUETA_ESTADO_COBRO, type EstadoCobro, type FacturaEnCartera, type ClienteEnCartera,
 } from '../../lib/cuentasPorCobrar';
+import { coberturaDeFactura, type CoberturaDeFactura } from '../../lib/aplicarPago';
+import ModalAplicarPago from './ModalAplicarPago';
 import { formatearPorMoneda, type TotalPorMoneda } from '../../lib/sumarPorMoneda';
 import { BANCOS_VERMUR, BANCO_COBRO_DEFAULT } from '../../lib/cuentasPago';
 import {
@@ -51,7 +53,12 @@ interface Props {
   /** Tarea 67 · La lista unificada: un cobro viejo es un pago con una aplicación. */
   pagos: Pago[];
   puedeCobrar: boolean;
-  onCobrar: (c: Omit<CobroCliente, 'id' | 'registradoPor' | 'activo' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  /**
+   * Tarea 70 · P4 · Registra UN pago repartido entre varias facturas (§7.1).
+   * Reemplaza a `onCobrar`: un cobro contra una sola factura es este mismo
+   * pago con una aplicación, así que no hay dos formularios ni dos escrituras.
+   */
+  onAplicarPago: (datos: DatosPagoAplicado) => Promise<void>;
   /**
    * Tarea 69 · P3 · Los embarques a los que se les puede anticipar dinero,
    * derivados de sus órdenes de pago abiertas. Vacío = no hay ninguna orden
@@ -84,7 +91,7 @@ const ESTADO_CLS: Record<EstadoCobro, string> = {
 const SELECT = 'bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-gray-700 outline-none focus:border-primario';
 
 export default function PanelCuentasPorCobrar({
-  facturas, pagos, puedeCobrar, onCobrar,
+  facturas, pagos, puedeCobrar, onAplicarPago,
   embarquesFondeables = [], onRegistrarAnticipo, hoy,
 }: Props) {
   const fecha = hoy ?? new Date().toISOString().slice(0, 10);
@@ -94,6 +101,9 @@ export default function PanelCuentasPorCobrar({
     setFiltros(f => ({ ...f, [k]: v }));
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const [cobrando, setCobrando] = useState<FacturaEnCartera | null>(null);
+  /* Tarea 70 · P4 · punto 4: qué pagos cubrieron una factura. La vista al
+     revés —un pago con todas sus facturas— es P5. */
+  const [coberturaAbierta, setCoberturaAbierta] = useState<string | null>(null);
   /** Tarea 69 · P3 · El anticipo sin factura, que antes vivía en la ficha de la OC. */
   const [anticipando, setAnticipando] = useState(false);
 
@@ -368,17 +378,22 @@ export default function PanelCuentasPorCobrar({
               onToggle={() => toggle(g.clave)}
               puedeCobrar={puedeCobrar}
               onCobrar={setCobrando}
+              pagos={pagos}
+              coberturaAbierta={coberturaAbierta}
+              onToggleCobertura={id => setCoberturaAbierta(prev => (prev === id ? null : id))}
             />
           ))}
         </div>
       ))}
 
       {cobrando && (
-        <ModalCobro
+        <ModalAplicarPago
           item={cobrando}
+          items={items}
           hoy={fecha}
+          por={{ uid: user?.uid || user?.id || '', nombre: user?.nombre || user?.email || '' }}
           onCancelar={() => setCobrando(null)}
-          onConfirmar={async (c) => { await onCobrar(c); setCobrando(null); }}
+          onConfirmar={async (datos) => { await onAplicarPago(datos); setCobrando(null); }}
         />
       )}
 
@@ -408,9 +423,12 @@ function Kpi({ icono, titulo, total, pie, tono }: {
   );
 }
 
-function GrupoCliente({ grupo, abierto, onToggle, puedeCobrar, onCobrar }: {
+function GrupoCliente({ grupo, abierto, onToggle, puedeCobrar, onCobrar, pagos, coberturaAbierta, onToggleCobertura }: {
   grupo: ClienteEnCartera; abierto: boolean; onToggle: () => void; puedeCobrar: boolean;
   onCobrar: (i: FacturaEnCartera) => void;
+  pagos: Pago[];
+  coberturaAbierta: string | null;
+  onToggleCobertura: (facturaId: string) => void;
 }) {
   return (
     <div className="bg-white rounded-xl border border-gray-150 shadow-2xs overflow-hidden">
@@ -457,8 +475,17 @@ function GrupoCliente({ grupo, abierto, onToggle, puedeCobrar, onCobrar }: {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {grupo.facturas.map(i => (
-              <tr key={i.factura.id} className="hover:bg-gray-50/50">
+            {grupo.facturas.map(i => {
+              /* Tarea 70 · P4 · punto 4: desde la factura se ve qué pagos la
+                 cubrieron. Se calcula al pintar el renglón porque el dato ya
+                 está en memoria —las dos pantallas bajan `facturas` y los
+                 pagos completos— y guardarlo sería una tercera verdad. */
+              const cobertura = coberturaDeFactura(i.factura.id, pagos);
+              const abiertaCobertura = coberturaAbierta === i.factura.id;
+              const parcial = i.cobrado > 0 && i.estado !== 'cobrado';
+              return (
+              <Fragment key={i.factura.id}>
+              <tr className="hover:bg-gray-50/50">
                 <td className="px-4 py-2 font-mono font-semibold text-gray-800">{i.factura.numero}</td>
                 <td className="px-3 py-2"><EnlaceEntidad tipo="embarque" id={i.factura.embarqueId}>{i.factura.embarqueFolio}</EnlaceEntidad></td>
                 <td className="px-3 py-2 tabular-nums text-gray-500">{i.factura.fechaEmision}</td>
@@ -468,10 +495,31 @@ function GrupoCliente({ grupo, abierto, onToggle, puedeCobrar, onCobrar }: {
                   {i.estado === 'por_vencer' && <span className="ml-1 text-[10px] font-bold text-amber-700">en {-i.diasVencido}d</span>}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums">{i.factura.moneda} {money(i.factura.total)}</td>
-                <td className="px-3 py-2 text-right tabular-nums text-gray-500">{i.cobrado > 0 ? money(i.cobrado) : '—'}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-gray-500">
+                  {/* El cobrado es el enlace a los pagos que lo produjeron: es
+                      la pregunta que se hace mirando ese número. */}
+                  {cobertura.length > 0 ? (
+                    <button
+                      onClick={() => onToggleCobertura(i.factura.id)}
+                      aria-expanded={abiertaCobertura}
+                      className="tabular-nums font-semibold text-primario hover:underline"
+                      title={`Ver los ${cobertura.length} pago(s) que cubrieron ${i.factura.numero}`}
+                    >
+                      {money(i.cobrado)}
+                      <span className="ml-1 text-[9px] font-bold opacity-70">{cobertura.length} pago{cobertura.length !== 1 ? 's' : ''}</span>
+                    </button>
+                  ) : '—'}
+                </td>
                 <td className="px-3 py-2 text-right tabular-nums font-bold">{i.estado === 'cobrado' ? '—' : money(i.saldo)}</td>
                 <td className="px-3 py-2">
                   <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${ESTADO_CLS[i.estado]}`}>{ETIQUETA_ESTADO_COBRO[i.estado]}</span>
+                  {/* Punto 3 · por cobrar → parcial → cobrada. «Parcial» va
+                      JUNTO al estado y no en su lugar: el estado contesta
+                      cuánto falta para el vencimiento, y lo parcial, cuánto
+                      falta de dinero. Las dos preguntas se hacen a la vez. */}
+                  {parcial && (
+                    <span className="ml-1 px-2 py-0.5 rounded border text-[10px] font-bold bg-primario/10 text-primario border-primario/30">Parcial</span>
+                  )}
                   {i.avisoMoneda && <span className="block text-[9px] text-amber-700 mt-0.5">{i.avisoMoneda}</span>}
                 </td>
                 {puedeCobrar && (
@@ -481,13 +529,27 @@ function GrupoCliente({ grupo, abierto, onToggle, puedeCobrar, onCobrar }: {
                         onClick={() => onCobrar(i)}
                         className="text-[10px] font-bold uppercase tracking-wider text-primario hover:underline whitespace-nowrap"
                       >
-                        Registrar cobro
+                        Aplicar pago
                       </button>
                     )}
                   </td>
                 )}
               </tr>
-            ))}
+              {abiertaCobertura && (
+                <tr className="bg-gray-50/60">
+                  <td colSpan={puedeCobrar ? 9 : 8} className="px-4 py-2">
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                      Pagos que cubrieron {i.factura.numero}
+                    </p>
+                    <ul className="space-y-1">
+                      {cobertura.map(c => <RenglonCobertura key={c.pagoId} c={c} />)}
+                    </ul>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
+              );
+            })}
           </tbody>
         </table>
       )}
@@ -653,104 +715,34 @@ function ModalAnticipo({ embarques, hoy, onCancelar, onConfirmar }: {
   );
 }
 
-function ModalCobro({ item, hoy, onCancelar, onConfirmar }: {
-  item: FacturaEnCartera; hoy: string; onCancelar: () => void;
-  onConfirmar: (c: Omit<CobroCliente, 'id' | 'registradoPor' | 'activo' | 'createdAt' | 'updatedAt'>) => Promise<void>;
-}) {
-  const f = item.factura;
-  const [monto, setMonto] = useState(String(item.saldo));
-  const [fechaCobro, setFechaCobro] = useState(hoy);
-  const [banco, setBanco] = useState(BANCO_COBRO_DEFAULT.nombre);
-  const [referencia, setReferencia] = useState('');
-  const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const n = Number(monto);
-  /*
-   * Tarea 69 · P3, punto 2 · LA REFERENCIA YA NO ES OBLIGATORIA.
-   *
-   * Gaby: «la referencia bancaria aparece después del pago, no antes». Antes
-   * se exigía aquí y en el formulario de la ficha de la OC, así que no se
-   * podía capturar la entrada de dinero sin inventar una — y una referencia
-   * inventada se ve igual que una real, así que descuadra la conciliación de
-   * Julio sin que nadie se entere. Vacía es verdad; inventada es mentira.
-   */
-  const problema = montoCobrable(item, n, f.moneda);
-  const parcial = n > 0 && n < item.saldo - 1;
-
-  const confirmar = async () => {
-    if (problema || guardando) return;
-    setGuardando(true); setError(null);
-    try {
-      await onConfirmar({
-        facturaId: f.id, facturaNumero: f.numero,
-        embarqueId: f.embarqueId, embarqueFolio: f.embarqueFolio,
-        clienteId: f.clienteId, clienteNombre: f.clienteNombre,
-        monto: Math.round(n * 100) / 100, moneda: f.moneda,
-        fechaCobro, banco, referencia: referencia.trim(),
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setGuardando(false);
-    }
-  };
-
+/**
+ * Un pago que cubrió esta factura (tarea 70 · punto 4).
+ *
+ * `legacy` marca los movimientos que vienen de `cobros/` o de
+ * `depositosCliente/`: no tienen folio de pago ni ficha propia —su folio es
+ * su propio id— y por eso se dicen así en vez de enseñarse como un pago
+ * nuevo que se puede abrir. La ficha del pago llega en P5.
+ */
+function RenglonCobertura({ c }: { c: CoberturaDeFactura }) {
   return (
-    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50">
-          <div>
-            <h3 className="text-[14px] font-bold text-[#18181B]">Registrar cobro · {f.numero}</h3>
-            <p className="text-[11px] text-gray-500">{f.clienteNombre} · resta {f.moneda} {money(item.saldo)}</p>
-          </div>
-          <button onClick={onCancelar} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar"><X className="w-4 h-4" /></button>
-        </div>
-        <div className="p-5 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <label className="block">
-              <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Monto ({f.moneda})</span>
-              <input type="number" min={0} step="0.01" value={monto} onChange={e => setMonto(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario tabular-nums" />
-            </label>
-            <label className="block">
-              <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Fecha</span>
-              <input type="date" value={fechaCobro} onChange={e => setFechaCobro(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario" />
-            </label>
-            <label className="block">
-              <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Banco de Vermur</span>
-              <select value={banco} onChange={e => setBanco(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario bg-white">
-                {BANCOS_VERMUR.map(b => (
-                  <option key={b.id} value={b.nombre} title={b.usoHabitual}>
-                    {b.nombre} — {b.usoHabitual}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="block">
-              <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Referencia (opcional)</span>
-              <input value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="Puede llegar después"
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario font-mono" />
-            </label>
-          </div>
-          {parcial && !problema && (
-            <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-start gap-2">
-              <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              Cobro parcial: quedarán {f.moneda} {money(item.saldo - n)} por cobrar. La factura seguirá abierta.
-            </p>
-          )}
-          {(problema || error) && <p className="text-[11px] text-red-600 font-semibold">{error ?? problema}</p>}
-          <p className="text-[10px] text-gray-400">Este cobro fondea las órdenes de compra del embarque {f.embarqueFolio}.</p>
-        </div>
-        <div className="px-5 py-4 bg-gray-50/50 border-t border-gray-150 flex justify-end gap-2">
-          <button onClick={onCancelar} className="text-xs font-bold text-gray-500 hover:text-gray-700 uppercase tracking-wider px-4 py-2">Cancelar</button>
-          <button onClick={confirmar} disabled={!!problema || guardando}
-            className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-5 py-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
-            {guardando ? 'Guardando…' : 'Registrar cobro'}
-          </button>
-        </div>
-      </div>
-    </div>
+    <li className="text-[11px] text-gray-700 flex flex-wrap items-baseline gap-x-2">
+      <span className="font-mono font-bold text-gray-800">{c.folio}</span>
+      <span className="tabular-nums text-gray-500">{c.fecha}</span>
+      <span className="tabular-nums font-bold">{c.moneda} {money(c.monto)}</span>
+      <span className="text-gray-400">{c.banco || 'sin cuenta'}</span>
+      {c.referencia
+        ? <span className="font-mono text-gray-400">ref {c.referencia}</span>
+        : <span className="text-gray-300 italic">sin referencia</span>}
+      {c.compartido && (
+        <span className="text-[9px] font-bold uppercase tracking-wider text-primario">
+          el pago cubrió más facturas
+        </span>
+      )}
+      {c.legacy && (
+        <span className="text-[9px] font-bold uppercase tracking-wider text-gray-400" title="Capturado antes de que el pago fuera una entidad; no tiene folio de pago propio.">
+          registro anterior
+        </span>
+      )}
+    </li>
   );
 }
