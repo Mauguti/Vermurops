@@ -37,6 +37,7 @@ import { UserRole } from '../auth/users';
 import { totalesPorPagar, TotalesPorPagar } from '../lib/cuentasPorPagar';
 import { anotarBitacora } from './anotarBitacora';
 import { tituloOC } from '../lib/bitacoraEmbarque';
+import { problemaFechaPagoIndividual, hoyLocal } from '../lib/formularioPagoProveedor';
 
 // ─── Colección ──────────────────────────────────────────────────────────────
 
@@ -132,10 +133,19 @@ export function useOrdenesCompra() {
     rol: RolOC,
     usuario: { uid: string; nombre: string },
     fondeoCtx?: FondeoEmbarque,
+    fechaPago?: string,
   ): Promise<{ ok: boolean; razon?: string }> => {
     // Validar con la máquina de estados pura
     const resultado = puedeTransicionarOC(oc.estado, nuevoEstado, rol, oc, fondeoCtx);
     if (!resultado.ok) return resultado;
+
+    // Tarea 92: la fecha del pago es la que eligió quien lo registra (YYYY-MM-DD),
+    // con la misma regla que el pago de grupo; se vuelve a validar aquí porque la
+    // pantalla se puede esquivar. Sin fecha (llamadas viejas) rige la de captura.
+    if (nuevoEstado === 'pagada' && fechaPago !== undefined) {
+      const problema = problemaFechaPagoIndividual(fechaPago, hoyLocal(), oc);
+      if (problema) return { ok: false, razon: problema };
+    }
 
     // Construir registro de historial
     const registro: RegistroEstadoOC = {
@@ -153,7 +163,7 @@ export function useOrdenesCompra() {
     const actorField: Partial<OrdenCompra> = {};
     if (nuevoEstado === 'en_gestion') actorField.gestionadaPor = actor;
     if (nuevoEstado === 'autorizada') actorField.autorizadaPor = actor;
-    if (nuevoEstado === 'pagada') actorField.pagadaPor = actor;
+    if (nuevoEstado === 'pagada') actorField.pagadaPor = fechaPago ? { ...actor, fecha: fechaPago } : actor;
 
     await conAviso('la orden de compra', () => updateDoc(doc(db, COLLECTION, oc.id), sanitizarParaFirestore({
       estado: nuevoEstado,

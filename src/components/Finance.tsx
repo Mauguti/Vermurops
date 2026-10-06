@@ -139,7 +139,7 @@ export default function Finance() {
 
   const rolOC = (user?.rol ?? 'ventas') as RolOC;
 
-  const handleTransicionar = async (nuevoEstado: EstadoOC, cambios?: Partial<OrdenCompra>) => {
+  const handleTransicionar = async (nuevoEstado: EstadoOC, cambios?: Partial<OrdenCompra>, fechaPago?: string) => {
     if (!ocAbierta) return;
 
     /*
@@ -173,7 +173,7 @@ export default function Finance() {
     const r = await transicionarEstado(conCambios, nuevoEstado, rolOC, {
       uid: user?.uid ?? '',
       nombre: user?.nombre ?? user?.email ?? '',
-    }, fondeo);
+    }, fondeo, nuevoEstado === 'pagada' ? fechaPago : undefined);
     if (!r.ok) {
       setToast({ mensaje: r.razon ?? 'No se pudo cambiar el estado.', tipo: 'error' });
       return;

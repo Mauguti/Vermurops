@@ -60,6 +60,15 @@ export function problemasFechaContraAutorizacion(fecha: string, ordenes: readonl
   return out;
 }
 
+/**
+ * Pago de UNA orden (desde su ficha, tarea 92): la misma regla que el de grupo
+ * —fecha válida, no futura, no anterior a la autorización—, en una sola
+ * respuesta. Null = sirve.
+ */
+export function problemaFechaPagoIndividual(fecha: string, hoy: string, orden: OrdenCompra): string | null {
+  return problemaFechaPago(fecha, hoy) ?? problemasFechaContraAutorizacion(fecha, [orden])[0] ?? null;
+}
+
 /** Null si el archivo cabe en la regla de Storage; si no, por qué no. */
 export function problemaComprobante(nombre: string, tamano: number): string | null {
   const ext = nombre.split('.').pop()?.toLowerCase() ?? '';

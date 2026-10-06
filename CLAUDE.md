@@ -2161,6 +2161,18 @@ de la lectura deja la lista vacía y `loading` en false, como antes.
   - **Pendiente:** el recorrido NO se puede repetir sobre los mismos emuladores
     (la 2ª vuelta falla en pasos que dependen de datos de la 1ª).
 
+## 4.54 La fecha real también al pagar UNA orden (tarea 92, 6-oct-2026)
+
+Cierra lo que la 86 dejó fuera: `transicionarEstado` (pagar desde la ficha de
+la orden) seguía guardando la fecha de captura en `pagadaPor.fecha`. Ahora la
+ficha trae «Fecha del pago» (hoy por default, editable) cuando el pago está
+disponible, y viaja como tercer argumento de `onTransicionar` y quinto de
+`transicionarEstado`. Misma regla que el pago de grupo
+(`problemaFechaPagoIndividual`, en `formularioPagoProveedor.ts`): válida, no
+futura, no anterior a la autorización; el botón se deshabilita y dice por qué.
+El hook la vuelve a validar (la pantalla se puede esquivar). Sin fecha
+(llamadas viejas) rige la de captura; la hora sigue en `historialEstados`.
+
 ---
 
 ## 5. Estado de los módulos
