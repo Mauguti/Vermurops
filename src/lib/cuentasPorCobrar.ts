@@ -4,16 +4,18 @@
  * La cartera: qué se debe, quién lo debe y desde cuándo. La contraparte de
  * Cuentas por pagar.
  *
- * Todo se DERIVA de facturas y cobros (Bloque 2): el saldo de una factura
- * sale de `saldoDeFactura`, el estado de la fecha de vencimiento contra hoy,
+ * Todo se DERIVA de facturas y pagos (Bloque 2): el saldo de una factura
+ * sale de `saldoDeFactura` sobre las aplicaciones que la tocan, el estado de
+ * la fecha de vencimiento contra hoy,
  * y los totales se llevan POR MONEDA (§4.3) — una cartera que suma USD con
  * MXN se ve creíble y es basura.
  *
  * Sin React, sin Firestore.
  */
 
-import type { FacturaCliente, CobroCliente } from '../components/facturas/FacturasData';
+import type { FacturaCliente } from '../components/facturas/FacturasData';
 import { saldoDeFactura } from './facturacionEmbarque';
+import { aplicacionesA, type Pago } from './pagos';
 import {
   sumarPorMoneda, totalVacio, type TotalPorMoneda, type Moneda,
 } from './sumarPorMoneda';
@@ -57,10 +59,13 @@ export interface FacturaEnCartera {
 
 export function evaluarFactura(
   factura: FacturaCliente,
-  cobros: readonly CobroCliente[],
+  pagos: readonly Pago[],
   hoy: string,
 ): FacturaEnCartera {
-  const s = saldoDeFactura(factura, cobros.filter(c => c.facturaId === factura.id));
+  // Tarea 67 · Las aplicaciones vivas a ESTA factura, vengan de un pago nuevo
+  // o de un cobro viejo leído como pago. `saldoDeFactura` no cambió: solo
+  // cambió quién le pasa la lista.
+  const s = saldoDeFactura(factura, aplicacionesA(factura.id, pagos));
   const diasVencido = factura.fechaVencimiento ? diasEntre(factura.fechaVencimiento, hoy) : 0;
 
   let estado: EstadoCobro;
@@ -82,12 +87,12 @@ export function evaluarFactura(
 /** Las facturas vivas evaluadas. Las canceladas y las inactivas no son cartera. */
 export function cartera(
   facturas: readonly FacturaCliente[],
-  cobros: readonly CobroCliente[],
+  pagos: readonly Pago[],
   hoy: string,
 ): FacturaEnCartera[] {
   return facturas
     .filter(f => f.activo !== false && f.estado !== 'cancelada')
-    .map(f => evaluarFactura(f, cobros, hoy))
+    .map(f => evaluarFactura(f, pagos, hoy))
     .sort((a, b) => a.factura.fechaVencimiento.localeCompare(b.factura.fechaVencimiento));
 }
 
@@ -98,7 +103,17 @@ export interface ResumenCartera {
   porCobrar: TotalPorMoneda;
   /** Saldo de lo que ya venció, por moneda. */
   vencido: TotalPorMoneda;
-  /** Cobros recibidos en el mes de `hoy`, por moneda. */
+  /**
+   * Cobros recibidos en el mes de `hoy`, por moneda.
+   *
+   * Tarea 67 · Son las APLICACIONES a facturas de los pagos con fecha en el
+   * mes, no el monto de los pagos: un depósito a cuenta es dinero que entró y
+   * todavía no cobra ninguna factura. Sumar su monto aquí inflaría el KPI con
+   * un número del que nadie podría decir de dónde salió.
+   *
+   * El mes se mira sobre la fecha del PAGO —el día en que el dinero se
+   * movió—, que para un cobro viejo es su `fechaCobro`: el mismo número.
+   */
   cobradoDelMes: TotalPorMoneda;
   facturasAbiertas: number;
   facturasVencidas: number;
@@ -106,17 +121,19 @@ export interface ResumenCartera {
 
 export function resumenCartera(
   items: readonly FacturaEnCartera[],
-  cobros: readonly CobroCliente[],
+  pagos: readonly Pago[],
   hoy: string,
 ): ResumenCartera {
   const abiertas = items.filter(i => i.estado !== 'cobrado');
   const vencidas = abiertas.filter(i => i.estado === 'vencido');
   const mes = hoy.slice(0, 7);
-  const delMes = cobros.filter(c => c.activo !== false && c.fechaCobro.slice(0, 7) === mes);
+  const delMes = pagos
+    .filter(p => p.activo !== false && (p.fecha ?? '').slice(0, 7) === mes)
+    .flatMap(p => (p.aplicaciones ?? []).filter(a => a.destinoTipo === 'factura'));
   return {
     porCobrar: sumarPorMoneda(abiertas, i => i.saldo, i => i.factura.moneda),
     vencido: sumarPorMoneda(vencidas, i => i.saldo, i => i.factura.moneda),
-    cobradoDelMes: sumarPorMoneda(delMes, c => c.monto, c => c.moneda),
+    cobradoDelMes: sumarPorMoneda(delMes, a => a.monto, a => a.moneda),
     facturasAbiertas: abiertas.length,
     facturasVencidas: vencidas.length,
   };
@@ -178,10 +195,10 @@ export function agruparPorCliente(items: readonly FacturaEnCartera[]): ClienteEn
 export function resumenDeCliente(
   clienteId: string,
   facturas: readonly FacturaCliente[],
-  cobros: readonly CobroCliente[],
+  pagos: readonly Pago[],
   hoy: string,
 ): ClienteEnCartera | null {
-  const suyas = cartera(facturas.filter(f => f.clienteId === clienteId), cobros, hoy);
+  const suyas = cartera(facturas.filter(f => f.clienteId === clienteId), pagos, hoy);
   const abiertas = suyas.filter(f => f.estado !== 'cobrado');
   if (abiertas.length === 0) return null;
   return agruparPorCliente(abiertas)[0] ?? null;

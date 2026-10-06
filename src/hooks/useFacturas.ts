@@ -7,7 +7,7 @@
  * Nada de esto timbra ni pretende hacerlo.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { db } from '../firebase';
 import { collection, doc, onSnapshot, setDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { useAuth } from '../auth/AuthContext';
@@ -18,6 +18,7 @@ import { conAviso } from '../lib/erroresEscritura';
 import { idUnico } from '../lib/idUnico';
 import type { FacturaCliente, CobroCliente } from '../components/facturas/FacturasData';
 import { saldoDeFactura } from '../lib/facturacionEmbarque';
+import { pagosDeCliente, type Pago } from '../lib/pagos';
 import { anotarBitacora } from './anotarBitacora';
 
 const COL_FACTURAS = 'facturas';
@@ -166,8 +167,25 @@ export function useFacturas(embarqueId?: string) {
     [cobros],
   );
 
+  /**
+   * Tarea 67 · La lista unificada de pagos del lado cliente.
+   *
+   * `cobros` es la lectura cruda de Firestore; `pagos` es la lente con la que
+   * se lee: un cobro es un pago con una sola aplicación. No son dos verdades
+   * —una se deriva de la otra— y es lo que consumen las pantallas, para que
+   * el día que `pagos/` exista no haya que recorrer diez call sites otra vez.
+   *
+   * El primer argumento va vacío a propósito: en P1 la colección `pagos/`
+   * todavía no tiene regla publicada, y un listener contra ella solo
+   * produciría «permission denied» en la consola. P2 lo llena.
+   *
+   * Los depósitos del cliente NO están aquí: los lee `useDepositosCliente` y
+   * los suma quien necesite el fondeo (Finance), con `pagosDeCliente`.
+   */
+  const pagos = useMemo<Pago[]>(() => pagosDeCliente([], cobros, []), [cobros]);
+
   return {
-    facturas, cobros, loading,
+    facturas, cobros, pagos, loading,
     registrarFactura, cancelarFactura, registrarCobro, anularCobro, cobrosDe,
   };
 }

@@ -13,6 +13,7 @@ import { Plus, AlertTriangle, Ban, Check } from 'lucide-react';
 import type { EmbarqueCompleto } from '../shipments/EmbarquesData';
 import { lineasFacturables, gruposDeFacturacion } from '../shipments/EmbarquesData';
 import type { FacturaCliente, CobroCliente } from './FacturasData';
+import { aplicacionesConPago, type Pago, type AplicacionPago } from '../../lib/pagos';
 import type { ConceptoVermur } from '../conceptos/ConceptosData';
 import {
   proponerFactura, diasCreditoDe, vencimientoFactura, saldoDeFactura,
@@ -26,7 +27,8 @@ const money = (n: number) =>
 interface Props {
   embarque: EmbarqueCompleto;
   facturas: FacturaCliente[];
-  cobros: CobroCliente[];
+  /** Tarea 67 · La lista unificada. Un cobro viejo es un pago con una aplicación. */
+  pagos: Pago[];
   conceptos: ConceptoVermur[];
   /** Tráfico del embarque, derivado de su folio. null si no se sabe. */
   trafico: 'impo' | 'expo' | null;
@@ -40,7 +42,7 @@ interface Props {
 }
 
 export default function PanelFacturasEmbarque({
-  embarque, facturas, cobros, conceptos, trafico, clienteId, credito,
+  embarque, facturas, pagos, conceptos, trafico, clienteId, credito,
   puedeFacturar, onRegistrar, onCancelar, onCobrar, onAnularCobro,
 }: Props) {
   const detalles = embarque.cargos?.detalles ?? [];
@@ -255,8 +257,15 @@ export default function PanelFacturasEmbarque({
         ) : (
           <div className="space-y-3">
             {facturas.map(f => {
-              const suyos = cobros.filter(c => c.facturaId === f.id);
-              const saldo = saldoDeFactura(f, suyos);
+              /*
+               * Tarea 67 · Los anulados se incluyen a propósito: esta lista
+               * los pinta desde que existe, y P1 no cambia ninguna pantalla.
+               * `saldoDeFactura` los descarta él solo, así que el saldo es el
+               * mismo. Que un cobro anulado se siga viendo aquí está anotado
+               * como hallazgo, sin tocar.
+               */
+              const suyos = aplicacionesConPago(f.id, pagos, { incluirAnulados: true });
+              const saldo = saldoDeFactura(f, suyos.map(x => x.aplicacion));
               return (
                 <FilaFactura
                   key={f.id}
@@ -281,7 +290,7 @@ function FilaFactura({
   onCancelar, onCobrar, onAnularCobro,
 }: {
   factura: FacturaCliente;
-  cobros: CobroCliente[];
+  cobros: { pago: Pago; aplicacion: AplicacionPago }[];
   saldo: ReturnType<typeof saldoDeFactura>;
   embarque: EmbarqueCompleto;
   clienteId: string | null;
@@ -391,17 +400,17 @@ function FilaFactura({
       {/* Cobros recibidos */}
       {cobros.length > 0 && (
         <div className="border-t border-gray-100 divide-y divide-gray-50">
-          {cobros.map(c => (
-            <div key={c.id} className="px-4 py-1.5 flex items-center justify-between gap-3 text-[12px]">
+          {cobros.map(({ pago: p, aplicacion: a }) => (
+            <div key={`${p.id}:${a.destinoId}`} className="px-4 py-1.5 flex items-center justify-between gap-3 text-[12px]">
               <span className="text-gray-600">
-                {c.fechaCobro} · {c.banco} · <span className="font-mono text-[11px]">{c.referencia}</span>
+                {p.fecha} · {p.banco} · <span className="font-mono text-[11px]">{p.referencia}</span>
               </span>
               <span className="flex items-center gap-2 shrink-0">
-                <span className="font-semibold tabular-nums">{c.moneda} {money(c.monto)}</span>
+                <span className="font-semibold tabular-nums">{a.moneda} {money(a.monto)}</span>
                 {puedeFacturar && (
                   <button
                     type="button"
-                    onClick={() => { if (window.confirm('¿Anular este cobro?')) onAnularCobro(c.id); }}
+                    onClick={() => { if (window.confirm('¿Anular este cobro?')) onAnularCobro(p.id); }}
                     className="text-[10px] font-bold text-gray-400 hover:text-red-600"
                   >
                     Anular

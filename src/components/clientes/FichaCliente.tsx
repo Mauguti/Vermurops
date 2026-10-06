@@ -124,10 +124,10 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
   // U-4 · Lo que este cliente tiene abierto, enlazado desde su propia ficha.
   const { quotes } = useCotizaciones();
   const { embarques } = useEmbarques();
-  const { facturas, cobros } = useFacturas();
+  const { facturas, pagos } = useFacturas();
   const carteraCliente = useMemo(
-    () => resumenDeCliente(cliente.id, facturas, cobros, new Date().toISOString().slice(0, 10)),
-    [cliente.id, facturas, cobros],
+    () => resumenDeCliente(cliente.id, facturas, pagos, new Date().toISOString().slice(0, 10)),
+    [cliente.id, facturas, pagos],
   );
   const susCotizaciones = quotes.filter(q => q.clienteId === cliente.id);
   // Por su cotización, o porque el embarque lo enlaza como cliente a cobrar:

@@ -26,8 +26,9 @@
  * Sin React, sin Firestore, sin red.
  */
 
-import type { DepositoCliente, OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
-import { sumarPorMoneda, type TotalPorMoneda, type Moneda } from './sumarPorMoneda';
+import type { OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
+import type { EntradaFondeo } from './pagos';
+import { sumarPorMoneda, type TotalPorMoneda } from './sumarPorMoneda';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1 · Qué es un pago de impuestos
@@ -97,21 +98,20 @@ const MONEDAS: (keyof TotalPorMoneda)[] = ['USD', 'MXN'];
  * preguntas distintas. Quien necesite el saldo bancario mira el banco.
  */
 export function calcularFondeo(
-  depositos: DepositoCliente[],
-  ocsDelEmbarque: OrdenCompra[],
   /**
-   * Cobros de facturas de ESTE embarque (2.3). Cobrarle al cliente es lo que
-   * libera el pago al proveedor, así que un cobro fondea igual que un
-   * depósito: son el mismo dinero entrando por dos puertas —el anticipo que
-   * se pide antes de operar y la factura que se cobra después.
+   * El dinero del cliente que entró para este embarque (2.3).
+   *
+   * Tarea 67 · Era DOS parámetros —depósitos y cobros— y son «el mismo dinero
+   * entrando por dos puertas»: el anticipo que se pide antes de operar y la
+   * factura que se cobra después. Leerlos de dos listas es la dualidad que el
+   * CLAUDE.md §6 señala en `CotizacionProveedor`, así que ahora llega una
+   * sola, armada con `entradasDeFondeo` sobre los pagos del cliente.
    */
-  cobros: { monto: number; moneda: Moneda; activo?: boolean }[] = [],
+  entradas: readonly EntradaFondeo[],
+  ocsDelEmbarque: OrdenCompra[],
 ): FondeoEmbarque {
-  const entradas = [
-    ...depositos.filter(d => d.activo !== false).map(d => ({ monto: d.monto, moneda: d.moneda })),
-    ...cobros.filter(c => c.activo !== false).map(c => ({ monto: c.monto, moneda: c.moneda })),
-  ];
-  const depositado = sumarPorMoneda(entradas, e => e.monto, e => e.moneda);
+  const entradasVivas = entradas.filter(e => e.activo !== false);
+  const depositado = sumarPorMoneda(entradasVivas, e => e.monto, e => e.moneda);
 
   const vivas = ocsDelEmbarque.filter(
     oc => oc.activo !== false && oc.estado !== 'rechazada' && oc.estado !== 'pagada',

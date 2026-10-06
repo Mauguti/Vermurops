@@ -11,6 +11,7 @@ import { evaluarCierres, avisoDeOrden } from './cierresEmbarque';
 import type { EmbarqueCompleto, CargoDetalle } from '../components/shipments/EmbarquesData';
 import type { OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
 import type { FacturaCliente, CobroCliente } from '../components/facturas/FacturasData';
+import { pagoDesdeCobro, type Pago } from './pagos';
 
 const cargo = (over: Partial<CargoDetalle> = {}): CargoDetalle => ({
   id: 'c1', concepto: 'Ocean Freight', tipo: 'ingreso', monto: 1000, moneda: 'MXN',
@@ -37,7 +38,12 @@ const factura = (over: Partial<FacturaCliente> = {}): FacturaCliente => ({
   ...over,
 });
 
-const cobro = (monto: number, over: Partial<CobroCliente> = {}): CobroCliente => ({
+/**
+ * Tarea 67 · El cobro se construye igual y se LEE como pago: el cuerpo de los
+ * tests no cambió ni una cifra, y ahí está la prueba de que la lectura
+ * unificada da lo mismo que la lista de cobros.
+ */
+const cobro = (monto: number, over: Partial<CobroCliente> = {}): Pago => pagoDesdeCobro({
   id: 'COB-1', facturaId: 'FAC-1', facturaNumero: 'A-100',
   embarqueId: 'EMB-1', embarqueFolio: 'VLIM-0001',
   clienteId: 'CLI-1', clienteNombre: 'Cliente',
@@ -54,7 +60,7 @@ const orden = (over: Partial<OrdenCompra> = {}): OrdenCompra => ({
 } as OrdenCompra);
 
 const ctx = (over: Partial<Parameters<typeof evaluarCierres>[0]> = {}) => ({
-  embarque: embarque(), ordenes: [], facturas: [], cobros: [], ...over,
+  embarque: embarque(), ordenes: [], facturas: [], pagos: [], ...over,
 });
 
 // ─── A · Operativo ───────────────────────────────────────────────────────────
@@ -83,26 +89,26 @@ describe('cierre operativo', () => {
 
 describe('cierre de pago — facturar no es cobrar', () => {
   it('con la factura emitida pero SIN cobrar, no está listo', () => {
-    const r = evaluarCierres(ctx({ facturas: [factura()], cobros: [] }));
+    const r = evaluarCierres(ctx({ facturas: [factura()], pagos: [] }));
     expect(r.pago.listo).toBe(false);
     expect(r.pago.faltantes[0]).toContain('A-100');
     expect(r.pago.faltantes[0]).toContain('1,160.00');
   });
 
   it('con la factura cobrada completa, sí', () => {
-    const r = evaluarCierres(ctx({ facturas: [factura()], cobros: [cobro(1160)] }));
+    const r = evaluarCierres(ctx({ facturas: [factura()], pagos: [cobro(1160)] }));
     expect(r.pago.listo).toBe(true);
   });
 
   it('un cobro parcial no cierra', () => {
-    const r = evaluarCierres(ctx({ facturas: [factura()], cobros: [cobro(600)] }));
+    const r = evaluarCierres(ctx({ facturas: [factura()], pagos: [cobro(600)] }));
     expect(r.pago.listo).toBe(false);
   });
 
   it('líneas de ingreso sin facturar lo frenan', () => {
     const r = evaluarCierres(ctx({
       embarque: embarque({ cargos: { detalles: [cargo()], ingresos: 0, gastos: 0, ganancia: 0, moneda: 'MXN' } } as never),
-      facturas: [factura()], cobros: [cobro(1160)],
+      facturas: [factura()], pagos: [cobro(1160)],
     }));
     expect(r.pago.listo).toBe(false);
     expect(r.pago.faltantes[0]).toContain('sin facturar');
@@ -115,7 +121,7 @@ describe('cierre de pago — facturar no es cobrar', () => {
   it('una factura cancelada no exige cobro', () => {
     const r = evaluarCierres(ctx({
       facturas: [factura({ estado: 'cancelada' }), factura({ id: 'F2', numero: 'A-101', total: 500 })],
-      cobros: [cobro(500, { facturaId: 'F2' })],
+      pagos: [cobro(500, { facturaId: 'F2' })],
     }));
     expect(r.pago.listo).toBe(true);
   });
@@ -155,7 +161,7 @@ describe('lo marcado contra lo que dicen los datos', () => {
   it('marcar «pago» con la factura sin cobrar produce una discrepancia', () => {
     const r = evaluarCierres(ctx({
       embarque: embarque({ cierres: { operativo: true, pago: true, administrativo: false } }),
-      facturas: [factura()], cobros: [],
+      facturas: [factura()], pagos: [],
     }));
     expect(r.discrepancias.map(d => d.cierre)).toContain('pago');
     expect(r.discrepancias[0].detalle).toContain('A-100');

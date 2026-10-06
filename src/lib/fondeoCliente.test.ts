@@ -12,6 +12,8 @@ import {
   CONCEPTOS_IMPUESTO,
 } from './fondeoCliente';
 import type { DepositoCliente, OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
+import type { CobroCliente } from '../components/facturas/FacturasData';
+import { pagoDesdeCobro, pagoDesdeDeposito, entradasDeFondeo } from './pagos';
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -165,35 +167,53 @@ describe('el flag «No pagar» gana sobre las cuentas', () => {
 });
 
 // ─── E · El cobro al cliente fondea igual que el depósito (2.3) ──────────────
+//
+// Tarea 67 · Las entradas ya no son dos listas (depósitos y cobros): son los
+// pagos del cliente leídos con `entradasDeFondeo`. Las cifras no se movieron.
+
+const cobro = (monto: number, over: Partial<CobroCliente> = {}) => pagoDesdeCobro({
+  id: `cob-${monto}`, facturaId: 'FAC-1', facturaNumero: 'A-100',
+  embarqueId: 'EMB-1', embarqueFolio: 'VLIM-0001',
+  clienteId: 'CLI-1', clienteNombre: 'Cliente',
+  monto, moneda: 'MXN', fechaCobro: '2026-09-20', banco: 'bbva', referencia: 'R1',
+  registradoPor: { uid: 'u', nombre: 'Julio' },
+  activo: true, createdAt: '', updatedAt: '',
+  ...over,
+});
+
+/** El fondeo de EMB-1 leído de la lista unificada de pagos del cliente. */
+const fondeoDe = (
+  pagos: ReturnType<typeof pagoDesdeCobro>[],
+  ordenes: OrdenCompra[] = [],
+) => calcularFondeo(entradasDeFondeo(pagos, 'EMB-1'), ordenes);
 
 describe('cobrar al cliente libera el pago al proveedor', () => {
   it('un cobro suma al fondeo igual que un depósito', () => {
-    const f = calcularFondeo([], [], [{ monto: 50000, moneda: 'MXN' }]);
-    expect(f.depositado.MXN).toBe(50000);
+    expect(fondeoDe([cobro(50000)]).depositado.MXN).toBe(50000);
   });
 
   it('depósito y cobro se suman: son el mismo dinero por dos puertas', () => {
-    const f = calcularFondeo([deposito(20000)], [], [{ monto: 30000, moneda: 'MXN' }]);
+    const f = fondeoDe([pagoDesdeDeposito(deposito(20000)), cobro(30000)]);
     expect(f.depositado.MXN).toBe(50000);
   });
 
   it('un cobro anulado deja de fondear', () => {
-    const f = calcularFondeo([], [], [{ monto: 50000, moneda: 'MXN', activo: false }]);
-    expect(f.depositado.MXN).toBe(0);
+    expect(fondeoDe([cobro(50000, { activo: false })]).depositado.MXN).toBe(0);
   });
 
   it('§4.3: un cobro en USD no fondea una orden de impuestos en MXN', () => {
-    const f = calcularFondeo([], [], [{ monto: 90000, moneda: 'USD' }]);
+    const f = fondeoDe([cobro(90000, { moneda: 'USD' })]);
     const v = evaluarFondeo(oc({ conceptoId: 'CON-010', monto: 80000, moneda: 'MXN' }), f);
     expect(v.puedeAutorizar).toBe(false);
   });
 
   it('el cobro completo desbloquea la OC de impuestos que estaba frenada', () => {
-    const sinCobro = calcularFondeo([], []);
     const orden = oc({ conceptoId: 'CON-010', monto: 80000 });
-    expect(evaluarFondeo(orden, sinCobro).puedeAutorizar).toBe(false);
+    expect(evaluarFondeo(orden, fondeoDe([])).puedeAutorizar).toBe(false);
+    expect(evaluarFondeo(orden, fondeoDe([cobro(80000)])).puedeAutorizar).toBe(true);
+  });
 
-    const conCobro = calcularFondeo([], [], [{ monto: 80000, moneda: 'MXN' }]);
-    expect(evaluarFondeo(orden, conCobro).puedeAutorizar).toBe(true);
+  it('el dinero de OTRO embarque no fondea este', () => {
+    expect(fondeoDe([cobro(50000, { embarqueId: 'EMB-9' })]).depositado.MXN).toBe(0);
   });
 });

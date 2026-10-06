@@ -21,6 +21,7 @@ import {
   Download, SlidersHorizontal,
 } from 'lucide-react';
 import type { FacturaCliente, CobroCliente } from './FacturasData';
+import type { Pago } from '../../lib/pagos';
 import {
   cartera, resumenCartera, agruparPorCliente, montoCobrable,
   ETIQUETA_ESTADO_COBRO, type EstadoCobro, type FacturaEnCartera, type ClienteEnCartera,
@@ -44,7 +45,8 @@ import {
 
 interface Props {
   facturas: FacturaCliente[];
-  cobros: CobroCliente[];
+  /** Tarea 67 · La lista unificada: un cobro viejo es un pago con una aplicación. */
+  pagos: Pago[];
   puedeCobrar: boolean;
   onCobrar: (c: Omit<CobroCliente, 'id' | 'registradoPor' | 'activo' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   /** Inyectable para pruebas; default hoy. */
@@ -62,7 +64,7 @@ const ESTADO_CLS: Record<EstadoCobro, string> = {
 
 const SELECT = 'bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-gray-700 outline-none focus:border-primario';
 
-export default function PanelCuentasPorCobrar({ facturas, cobros, puedeCobrar, onCobrar, hoy }: Props) {
+export default function PanelCuentasPorCobrar({ facturas, pagos, puedeCobrar, onCobrar, hoy }: Props) {
   const fecha = hoy ?? new Date().toISOString().slice(0, 10);
   const { user } = useAuth();
   const [filtros, setFiltros] = useState<FiltrosPorCobrar>(FILTROS_POR_COBRAR_VACIOS);
@@ -80,8 +82,8 @@ export default function PanelCuentasPorCobrar({ facturas, cobros, puedeCobrar, o
   const modo: 'cliente' | 'factura' = prefs.vistaCuentasPorCobrar ?? 'cliente';
 
   // La cartera completa (para los KPIs) y la filtrada (para la lista).
-  const items = useMemo(() => cartera(facturas, cobros, fecha), [facturas, cobros, fecha]);
-  const resumen = useMemo(() => resumenCartera(items, cobros, fecha), [items, cobros, fecha]);
+  const items = useMemo(() => cartera(facturas, pagos, fecha), [facturas, pagos, fecha]);
+  const resumen = useMemo(() => resumenCartera(items, pagos, fecha), [items, pagos, fecha]);
 
   const visibles = useMemo(() => aplicarFiltrosPorCobrar(items, filtros), [items, filtros]);
   const grupos = useMemo(() => agruparPorCliente(visibles), [visibles]);

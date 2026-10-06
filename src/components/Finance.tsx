@@ -4,6 +4,7 @@ import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import { useDepositosCliente } from '../hooks/useDepositosCliente';
 import { useFacturas } from '../hooks/useFacturas';
 import { calcularFondeo } from '../lib/fondeoCliente';
+import { pagosDeCliente, entradasDeFondeo } from '../lib/pagos';
 import PanelPagos from './ordenesCompra/PanelPagos';
 import BandejaOC from './ordenesCompra/BandejaOC';
 import FichaOC from './ordenesCompra/FichaOC';
@@ -67,12 +68,19 @@ export default function Finance() {
   // ── 1.1 / 2.3 · El fondeo del cliente ─────────────────────────────────────
   // Depósitos Y cobros: son el mismo dinero entrando por dos puertas — el
   // anticipo que se pide antes de operar y la factura que se cobra después.
+  // Tarea 67 · Por eso se leen como UNA lista de pagos: el depósito es un
+  // pago sin aplicaciones, el cobro uno con una. Antes eran dos listas y cada
+  // call site tenía que acordarse de pasar las dos.
   const { depositos, registrarDeposito } = useDepositosCliente();
   const { facturas, cobros, registrarCobro } = useFacturas();
+  const pagosCliente = useMemo(
+    () => pagosDeCliente([], cobros, depositos),
+    [cobros, depositos],
+  );
   const carteraResumen = useMemo(() => {
     const hoy = new Date().toISOString().slice(0, 10);
-    return resumenCartera(cartera(facturas, cobros, hoy), cobros, hoy);
-  }, [facturas, cobros]);
+    return resumenCartera(cartera(facturas, pagosCliente, hoy), pagosCliente, hoy);
+  }, [facturas, pagosCliente]);
 
   /*
    * C-2 · La orden abierta se DERIVA del listener, no se guarda en estado.
@@ -111,9 +119,8 @@ export default function Finance() {
      */
     const fondeo = conCambios.embarqueId
       ? calcularFondeo(
-          depositos.filter(d => d.embarqueId === conCambios.embarqueId),
+          entradasDeFondeo(pagosCliente, conCambios.embarqueId),
           ordenes.filter(o => o.embarqueId === conCambios.embarqueId),
-          cobros.filter(c => c.embarqueId === conCambios.embarqueId),
         )
       : undefined;
 
@@ -214,9 +221,8 @@ export default function Finance() {
           } : undefined}
           fondeo={ocAbierta.embarqueId
             ? calcularFondeo(
-                depositos.filter(d => d.embarqueId === ocAbierta.embarqueId),
+                entradasDeFondeo(pagosCliente, ocAbierta.embarqueId),
                 ordenes.filter(o => o.embarqueId === ocAbierta.embarqueId),
-                cobros.filter(c => c.embarqueId === ocAbierta.embarqueId),
               )
             : undefined}
         />
@@ -321,7 +327,7 @@ export default function Finance() {
                 {activeTab === 'Cuentas por cobrar' && (
                    <PanelCuentasPorCobrar
                      facturas={facturas}
-                     cobros={cobros}
+                     pagos={pagosCliente}
                      puedeCobrar={puede('factura.generar')}
                      onCobrar={async (c) => {
                        // El mismo registro que desde el embarque: el cobro

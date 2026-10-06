@@ -3,6 +3,7 @@ import {
   diasEntre, evaluarFactura, cartera, resumenCartera, agruparPorCliente, resumenDeCliente, montoCobrable,
 } from './cuentasPorCobrar';
 import type { FacturaCliente, CobroCliente } from '../components/facturas/FacturasData';
+import { pagoDesdeCobro, type Pago } from './pagos';
 
 const HOY = '2026-09-10';
 
@@ -15,7 +16,12 @@ const factura = (over: Partial<FacturaCliente>): FacturaCliente => ({
   ...over,
 } as FacturaCliente);
 
-const cobro = (over: Partial<CobroCliente>): CobroCliente => ({
+/**
+ * Tarea 67 · El cobro se construye igual y se LEE como pago. Ningún cuerpo de
+ * test cambió: las cifras que fijan la cartera son las mismas antes y después
+ * de la lectura unificada.
+ */
+const cobro = (over: Partial<CobroCliente>): Pago => pagoDesdeCobro({
   id: 'C1', facturaId: 'F1', facturaNumero: 'A-1', embarqueId: 'E1', embarqueFolio: 'VLIM-1',
   clienteId: 'CLI-1', clienteNombre: 'Alfa', monto: 5000, moneda: 'MXN', fechaCobro: '2026-09-05',
   banco: 'Santander', referencia: 'REF', registradoPor: { uid: 'u', nombre: 'n' }, activo: true,
