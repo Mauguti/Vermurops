@@ -1334,9 +1334,8 @@ falla de infraestructura, y en un lote de 15 uno así tiraría los 15.
     dos cosas: qué leyó el agente y qué decidió la persona. Guardar solo lo
     segundo esconde que el clasificador se equivocó, que es justo lo que hay
     que ver para arreglar el flujo de n8n. Vive en `observaciones`, el campo
-    que ya existía. El **expediente del proveedor no lo persiste**:
-    `ArchivoExpediente` no tiene dónde, y agregarle un campo no estaba en el
-    modelo aprobado — está propuesto en el reporte 63.
+    que ya existía. El expediente del proveedor no lo persistía —
+    `ArchivoExpediente` no tenía dónde—; **lo cierra la tarea 71** (§4.34).
 
 **Los complementos de pago del proveedor ya tienen dónde ir** (§4.24): la
 orden de compra tiene `documentos?: DocumentoOC[]`, lista **opcional y
@@ -1656,6 +1655,41 @@ el botón de quitar no aparece, se dice por qué.
 `DepositoCliente` no tiene dónde guardarlo (§10.2 del plan) y el modelo no se
 toca en este paso. El cobro contra factura sí lo pregunta, como siempre. No se
 ofrece un selector cuyo valor se tiraría al guardar.
+
+## 4.34 El tercer destino también guarda quién corrigió el tipo (tarea 71, 5-oct-2026)
+
+La 63 dejó el registro de la corrección del tipo en dos de sus tres destinos.
+En el del proveedor se perdía, y no por descuido: `ArchivoExpediente` solo
+guardaba `storagePath`, `url`, `nombre`, `subidoPor` y `fecha`, y agregarle un
+campo no estaba en el modelo aprobado de esa tarea. Ahora tiene
+`clasificacion?: { tipoCrudo?, confianza?, observaciones? }`, **opcional y
+aditivo**: los archivos que ya existen no lo traen y se leen igual.
+
+**El texto no se duplica: se empaca.** `clasificacionDeLinea` (en
+`lib/loteDocumentos.ts`, junto a `textoCorreccionTipo` y
+`observacionesConCorreccion`, que es quien lo redacta) devuelve el objeto que
+el expediente guarda. Los tres destinos dicen lo mismo con las mismas
+palabras; una tercera copia habría divergido en el primer ajuste de redacción.
+  - **Omite las claves vacías y devuelve `undefined` cuando no hay nada que
+    registrar.** Firestore rechaza `undefined` y tumba la escritura entera
+    (§3): aquí eso sería el lote de 15 archivos perdido con cara de guardado.
+  - **La casilla lo ENSEÑA**: la confianza del clasificador junto a la fecha y
+    el autor, y la nota de corrección debajo. Guardarlo sin mostrarlo sería
+    otro dato que nadie mira —la variante de «regla sin call site» de §4.26—, y
+    es justo lo que hay que leer para arreglar el flujo de n8n.
+  - **`confianza` acepta la escala de texto y un número.** El modelo aprobado
+    la declaró `number`; el clasificador de esta plataforma contesta
+    `'alta' | 'media' | 'baja'` (`NivelConfianza`), que es lo que de verdad
+    llega. Aceptar las dos escribe lo que hay sin dejar de leer la forma
+    aprobada. **La escala de un número no se interpreta**: se enseña tal cual,
+    porque «80%» donde el agente quiso decir 0.8 de otra cosa es una
+    afirmación que nadie hizo.
+  - El «Reemplazar» por casilla sigue sin clasificar —es un archivo dirigido a
+    un destino que ya se sabe— y al reemplazar, la clasificación del anterior
+    se va con él: el registro describe al archivo que está, no al que estuvo.
+  - **El expediente del cliente guarda el registro y tampoco lo enseña**
+    (`DocExpediente.observaciones`, que la casilla no pinta). Es el mismo
+    arreglo de una línea y está anotado, sin tocar: la tarea era el proveedor.
 
 ## 5. Estado de los módulos
 
