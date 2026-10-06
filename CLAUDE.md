@@ -2138,6 +2138,29 @@ un embarque abrían 2×(facturas, cobros) + depósitos + pagos; ahora 4 en total
 uno por colección. Sin cambio de lo que se ve, de reglas ni de modelo. Un fallo
 de la lectura deja la lista vacía y `loading` en false, como antes.
 
+## 4.53 Higiene de los e2e (tarea 90, 6-oct-2026)
+
+  - **`./scripts/e2e-completo.sh`** (`npm run e2e:completo`) corre el recorrido
+    y después todos los demás specs: 232 tests, ~11 min, verde en una pasada.
+    Quedan fuera `gestion-usuarios` y `capturas-21`: necesitan el emulador de
+    Functions (:5001), que el script no levanta (`CON_FUNCTIONS=1
+    ./scripts/dev-emuladores.sh`). `REPETIR=2` repite la suite sobre los mismos
+    emuladores.
+  - **`tests/e2e/preferencias.ts`**: `fijarPreferencias()` en el `beforeAll` de
+    cada spec que toca Finanzas deja las vistas por default y BORRA las vistas
+    guardadas (`vistasUsuario`). 67 y 69 declaran `factura`: dependían, sin
+    decirlo, de la contaminación que dejaba otro spec.
+  - **`84-reglas-pago-grupo.spec.ts`**: segundo camino (pantalla + emulador) para
+    anticipo cruzado, proveedores distintos y monedas mezcladas. Mutadas una por
+    una en `pagos.ts`, cada regla tumba su test.
+  - 🔴 **Hallazgo real:** `transferenciasDelDia` copiaba cada orden con el monto
+    ya neto pero CONSERVANDO `anticiposCruzados`; el modal de «Registrar pago»
+    volvía a restar el anticipo (13,500 se veía 11,000). El pago guardado salía
+    bien (se calcula con las órdenes reales); lo que se mostraba, no. Corregido
+    con `anticiposCruzados: []` en la copia + test unitario.
+  - **Pendiente:** el recorrido NO se puede repetir sobre los mismos emuladores
+    (la 2ª vuelta falla en pasos que dependen de datos de la 1ª).
+
 ---
 
 ## 5. Estado de los módulos
