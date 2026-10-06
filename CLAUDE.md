@@ -2173,6 +2173,27 @@ futura, no anterior a la autorización; el botón se deshabilita y dice por qué
 El hook la vuelve a validar (la pantalla se puede esquivar). Sin fecha
 (llamadas viejas) rige la de captura; la hora sigue en `historialEstados`.
 
+## 4.55 Un listener por colección en el resto de la app (tarea 93, 6-oct-2026)
+
+Lo mismo que la 82 y la 89, para `clientes/`, `proveedores/`, `embarques/` y
+`cotizaciones/` (`hooks/tiendasCatalogos.ts`). `useClientes`, `useProveedores`,
+`useEmbarques` y `useCotizaciones` ya no abren `onSnapshot`: leen la tienda
+compartida con `useTiendaCatalogo`; las escrituras no cambiaron.
+  - **El seed vive en la apertura de la tienda**, con su candado de módulo y
+    `evaluarSeed` + `getDocsFromServer`: un solo listener, un solo sembrador.
+    Embarques sigue SIN seed (§3).
+  - **El orden es puro y exportado** (`ordenarPorNombre`, `ordenarPorCreacion`)
+    y no muta la entrada. Un documento sin `nombre` / `createdAt` no tira la lista.
+  - `crearTiendaCompartida` ahora puede llevar el mensaje de error (`error?`)
+    para que los hooks conserven su `error: string | null`; sin mensaje el
+    estado queda como antes.
+  - Los tests cubren compartir, orden/datos y seed, y cada uno se comprobó por
+    mutación (orden, candado, compartir, evaluarSeed).
+  - **Ojo:** el SDK de Firestore ya fusiona queries idénticas en un solo target
+    del lado de la red; la ganancia es sobre todo en estado de React y
+    procesamiento por montaje, no en menos tráfico. La medición en navegador
+    (conteo de `addTarget`) fue ruidosa y no es concluyente.
+
 ---
 
 ## 5. Estado de los módulos
