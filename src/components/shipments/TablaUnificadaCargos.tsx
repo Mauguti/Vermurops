@@ -24,7 +24,7 @@ import {
   agruparCargos, desviacionDe, montoOriginal, type GrupoCargos,
 } from '../../lib/cargosEditables';
 import {
-  margenDelConcepto, estadoMenosFirme,
+  margenDelConcepto, estadoMenosFirme, totalesDelConcepto,
   type ContextoMargen, type DesfaseOC, type EstadoCosto, type MargenMoneda,
   type OCParaMargen,
 } from '../../lib/margenRealConcepto';
@@ -172,9 +172,9 @@ function FilaConcepto({
   const tieneVariosProveedores = proveedorIds.length > 1;
 
   // Totales para la fila del concepto
-  const costoTotal = filasMar.reduce((a, f) => a + f.costo, 0);
-  const profitTotal = filasMar.reduce((a, f) => a + f.profit, 0);
-  const ventaTotal = filasMar.reduce((a, f) => a + f.venta, 0);
+  // Tarea 75 · Un total solo existe con UNA moneda (§4.3); con varias se
+  // muestra una cifra por moneda.
+  const { unica: totalUnico, margen: margenConcepto } = totalesDelConcepto(filasMar);
 
   // Moneda principal (la más representativa)
   const monedaPrincipal = filasMar.length > 0 ? filasMar[0].moneda : (gastos[0]?.moneda ?? ingresos[0]?.moneda ?? 'USD');
@@ -183,8 +183,6 @@ function FilaConcepto({
   // Impuesto del concepto (del ingreso, que es el que se le cobra al cliente)
   const impuestoIngreso = ingresos[0]?.impuesto;
 
-  // Margen a nivel concepto
-  const margenConcepto = ventaTotal === 0 ? null : profitTotal / ventaTotal;
 
   // Un proveedor nombrable
   const proveedorUnico = gastos.length === 1
@@ -194,7 +192,8 @@ function FilaConcepto({
       : null; // múltiples → se muestran abajo
 
   // Excedente total
-  const excedenteTotal = filasMar.reduce((a, f) => a + f.excedente, 0);
+  const excedentes = filasMar.filter(f => f.excedente > 0);
+  const textoExcedente = excedentes.map(f => `+$${money(f.excedente)}${filasMar.length > 1 ? ` ${f.moneda}` : ''}`).join(' / ');
 
   if (!tieneVariosProveedores) {
     // ── Concepto con un solo proveedor: una sola fila ──────────────────────
@@ -260,9 +259,9 @@ function FilaConcepto({
         {/* Estado */}
         <td className="px-3 py-2">
           <BadgeEstado estado={estado} />
-          {excedenteTotal > 0 && (
-            <span className="ml-1 text-[10px] font-bold text-peligro" title={`Excedente: +$${money(excedenteTotal)}`}>
-              +${money(excedenteTotal)}
+          {excedentes.length > 0 && (
+            <span className="ml-1 text-[10px] font-bold text-peligro" title={`Excedente: ${textoExcedente}`}>
+              {textoExcedente}
             </span>
           )}
         </td>
@@ -318,7 +317,19 @@ function FilaConcepto({
 
         {/* Costo total del concepto */}
         <td className="px-3 py-2 text-right tabular-nums font-semibold text-gray-700">
-          ${money(costoTotal)}
+          {filasMar.length === 0
+            ? <span className="text-gray-300">—</span>
+            : totalUnico
+              ? `$${money(totalUnico.costo)}`
+              : (
+                <div className="space-y-0.5">
+                  {filasMar.map(f => (
+                    <div key={f.moneda} className="text-[11px]">
+                      ${money(f.costo)} <span className="text-gray-400 font-mono text-[9px]">{f.moneda}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
         </td>
 
         {/* Moneda */}
@@ -340,9 +351,19 @@ function FilaConcepto({
 
         {/* Venta a nivel concepto (no se prorratea) */}
         <td className="px-3 py-2 text-right tabular-nums font-semibold text-[#18181B]">
-          {ingresos.length > 0
-            ? `$${money(ingresos.reduce((a, c) => a + c.monto, 0))}`
-            : <span className="text-gray-300">—</span>}
+          {ingresos.length === 0
+            ? <span className="text-gray-300">—</span>
+            : totalUnico
+              ? `$${money(totalUnico.venta)}`
+              : (
+                <div className="space-y-0.5">
+                  {filasMar.filter(f => f.venta !== 0).map(f => (
+                    <div key={f.moneda} className="text-[11px]">
+                      ${money(f.venta)} <span className="text-gray-400 font-mono text-[9px]">{f.moneda}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
         </td>
 
         {/* Margen a nivel concepto */}
@@ -353,9 +374,9 @@ function FilaConcepto({
         {/* Estado */}
         <td className="px-3 py-2">
           <BadgeEstado estado={estado} />
-          {excedenteTotal > 0 && (
-            <span className="ml-1 text-[10px] font-bold text-peligro" title={`Excedente: +$${money(excedenteTotal)}`}>
-              +${money(excedenteTotal)}
+          {excedentes.length > 0 && (
+            <span className="ml-1 text-[10px] font-bold text-peligro" title={`Excedente: ${textoExcedente}`}>
+              {textoExcedente}
             </span>
           )}
         </td>

@@ -317,8 +317,8 @@ export interface DepositoCliente {
   moneda: 'MXN' | 'USD';
   /** YYYY-MM-DD */
   fechaDeposito: string;
-  /** Referencia bancaria. */
-  referencia: string;
+  /** Referencia bancaria. `null` (o '' en lo viejo) = sin referencia: llega después del pago. */
+  referencia: string | null;
   /** URL del comprobante. */
   comprobante: string | null;
   registradoPor: { uid: string; nombre: string };

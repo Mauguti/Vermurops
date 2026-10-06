@@ -897,6 +897,12 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
                                 {docGuardado.fechaSubida.slice(0, 10)}
                                 {docGuardado.subidoPor && ` · ${docGuardado.subidoPor}`}
                               </p>
+                              {/* Tarea 75 (M-J) · La corrección de tipo, igual que en
+                                  el expediente del proveedor (tarea 71): qué leyó el
+                                  agente y qué decidió la persona. */}
+                              {docGuardado.observaciones && (
+                                <p className="text-[10px] text-text-muted">{docGuardado.observaciones}</p>
+                              )}
                               {docGuardado.avisos.map(a => (
                                 <p key={a} className="text-[10px] text-amber-700 flex items-start gap-1">
                                   <AlertTriangle className="w-3 h-3 mt-px shrink-0" />

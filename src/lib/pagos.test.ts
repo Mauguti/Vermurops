@@ -135,6 +135,11 @@ describe('aplicacionesA', () => {
     expect(aplicacionesA('F1', pagos).some(a => a.monto === 999)).toBe(false);
   });
 
+  it('por omisión aplicacionesConPago NO lista el pago anulado (la pestaña Facturas del embarque, M-I)', () => {
+    const vivas = aplicacionesConPago('F1', pagos);
+    expect(vivas.map(x => x.pago.id)).toEqual(['P1', 'P2']);
+  });
+
   it('con incluirAnulados se ven igual, para las pantallas que los listan', () => {
     const todas = aplicacionesConPago('F1', pagos, { incluirAnulados: true });
     expect(todas).toHaveLength(3);

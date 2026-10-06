@@ -1920,6 +1920,26 @@ pagadera antes de tener la factura del proveedor. `lib/prefactura.ts` (17 tests)
     abierta para Julio), el cotejo factura-vs-pagado (§5.3) y el correo (fase 2,
     espera al correo).
 
+## 4.40 Arreglos chicos de pagos y expediente (tarea 75, 6-oct-2026)
+
+  - **M-I:** la pestaña Facturas del embarque ya no lista cobros anulados
+    (`aplicacionesConPago` sin `incluirAnulados`); antes mostraban su botón
+    «Anular». La ficha del pago los sigue enseñando con el filtro «Anulados».
+  - **M-J:** la casilla del expediente del CLIENTE pinta
+    `DocExpediente.observaciones`, donde la 63 guarda la corrección de tipo,
+    igual que la del proveedor (§4.34).
+  - **Sumas sin clasificar de `TablaUnificadaCargos`:** estaban MAL, no
+    legítimas. El renglón encabezado de un concepto con varios proveedores
+    sumaba con `reduce` las filas por moneda de `margenDelConcepto` (costo,
+    venta, excedente, margen): con USD y MXN daba un total revuelto (§4.3).
+    Ahora `totalesDelConcepto` da total y margen solo con una moneda; con
+    varias se pinta una cifra por moneda y el margen queda en «—».
+  - `DepositoCliente.referencia` pasa a `string | null`; `''` guardado se
+    lee como «sin referencia». Nada se migra.
+  - **El build SÍ corre tsc** (`tsc --noEmit && vite build`, línea base 0).
+    La nota vieja de «build sin typecheck, ~10 errores» ya no es cierta; no
+    estaba en este CLAUDE.md sino en la memoria de la sesión.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

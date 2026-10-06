@@ -266,13 +266,11 @@ export default function PanelFacturasEmbarque({
           <div className="space-y-3">
             {facturas.map(f => {
               /*
-               * Tarea 67 · Los anulados se incluyen a propósito: esta lista
-               * los pinta desde que existe, y P1 no cambia ninguna pantalla.
-               * `saldoDeFactura` los descarta él solo, así que el saldo es el
-               * mismo. Que un cobro anulado se siga viendo aquí está anotado
-               * como hallazgo, sin tocar.
+               * Tarea 75 (M-I) · Un cobro anulado ya no se lista: no cuenta
+               * para el saldo y dejaba visible su botón «Anular». La ficha
+               * del pago los sigue mostrando con el filtro «Anulados».
                */
-              const suyos = aplicacionesConPago(f.id, pagos, { incluirAnulados: true });
+              const suyos = aplicacionesConPago(f.id, pagos);
               const saldo = saldoDeFactura(f, suyos.map(x => x.aplicacion));
               return (
                 <FilaFactura
