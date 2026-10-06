@@ -1955,6 +1955,20 @@ escriben siempre, así que hoy un cliente nace sin él solo por consola o por un
 script nuevo. Quedan sin cambiar, por decisión de alcance, los selectores que
 filtran `=== 'ACTIVO'` (`ProductosEmbarque`) y `cotizacionAEmbarque`.
 
+## 4.42 Una ausencia sin su positivo no prueba nada (tarea 77, 6-oct-2026)
+
+Barrido de los 49 `toHaveCount(0)` / `not.toBeVisible` del e2e. Un
+`toHaveCount(0)` contra un nombre que cambió pasa sin comprobar nada.
+**Regla: cada ausencia lleva junto su positivo** — el mismo localizador
+visible en otro rol o estado, o la fila/columna que prueba que la pantalla
+cargó. Para un nombre RETIRADO («Registrar depósito», «Usar el de Banxico»)
+el positivo es el sucesor, y la ausencia se escribe como regex que cubre
+los dos nombres.
+  - **Una era vacía de verdad:** capturas-61 filtraba MXN antes de «No
+    pagar», y la orden 0613 es USD: la moneda ya la escondía y el filtro de
+    «No pagar» no probaba nada. Se reordenó.
+  - Se agregaron positivos en recorrido, 56, 57, 59, 61 y 69; se rompió cada
+    uno a propósito y falló. Las demás ya traían el par (ver reporte 77).
 
 ## 5. Estado de los módulos
 

@@ -142,12 +142,14 @@ test('Altas muestra la columna OneDrive y el filtro saca los que no tienen carpe
   await filtro.selectOption('no');
   await page.waitForTimeout(600);
   const conCarpeta = page.locator('td').filter({ hasText: /^Sí$/ });
+  await expect(page.locator('td').filter({ hasText: /^No$/ }).first()).toBeVisible();
   await expect(conCarpeta).toHaveCount(0);
   await page.screenshot({ path: `${IMG}/57-onedrive-filtro-sin-carpeta-desktop.png`, fullPage: false });
 
   // Y «Con carpeta» no puede dejar ningún «No».
   await filtro.selectOption('si');
   await page.waitForTimeout(600);
+  await expect(conCarpeta.first()).toBeVisible();
   await expect(page.locator('td').filter({ hasText: /^No$/ })).toHaveCount(0);
 
   await filtro.selectOption('todos');

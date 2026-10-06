@@ -307,7 +307,9 @@ test('Operaciones · abre el embarque con serie, captura, concilia la factura y 
   await expect(page.getByText('Entradas de dinero del cliente', { exact: false })).toBeVisible();
   await expect(page.getByText(/Todavía no ha entrado dinero/)).toBeVisible();
   await expect(page.getByText(/Los cobros los registra Administración en Cuentas por cobrar/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Registrar depósito' })).toHaveCount(0);
+  // «Registrar depósito» es un nombre retirado: se cubre también el vigente
+  // («Registrar entrada de dinero»), que Administración SÍ usa más abajo.
+  await expect(page.getByRole('button', { name: /Registrar (depósito|entrada de dinero)/ })).toHaveCount(0);
   // Y tampoco el atajo a cobranza: no tiene `cobro.registrar`.
   await expect(page.getByRole('button', { name: /Ir a Cuentas por cobrar/ })).toHaveCount(0);
 

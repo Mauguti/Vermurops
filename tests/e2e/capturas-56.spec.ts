@@ -88,7 +88,9 @@ test('la captura del tipo de cambio abre en el de Pricing y enseña el FIX como 
 
   // Por defecto: Pricing rate, y el FIX de Banxico solo informativo.
   await expect(page.getByText('FIX Banxico del 2 oct 2026: 18.1903')).toBeVisible();
-  await expect(page.getByRole('button', { name: /Usar el de Banxico/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Usar (el|la) .*(Banxico|SAT|Banamex)/ })).toHaveCount(0);
+  // Positivo: el selector de fuente SÍ está, así que la pantalla cargó.
+  await expect(page.locator('select').filter({ has: page.locator('option[value="pricing_rate"]') }).first()).toBeVisible();
   const select = page.locator('select').filter({ has: page.locator('option[value="pricing_rate"]') }).first();
   await expect(select).toHaveValue('pricing_rate');
 
