@@ -116,5 +116,11 @@ export function useDepositosCliente(embarqueId?: string) {
     throw new Error(`No se encontró el depósito ${id} para anularlo.`);
   };
 
-  return { depositos, pagosNuevos, pagos, loading, registrarDeposito, anularDeposito };
+  /*
+   * `pagos` NO se expone: hoy solo lo usa `anularDeposito` para saber en qué
+   * colección anular. Exportar una lista que nadie consume es la «regla sin
+   * call site» al revés — superficie que parece una fuente de verdad. Quien
+   * necesite el fondeo del embarque la arma con `pagosDeCliente` (Finance).
+   */
+  return { depositos, loading, registrarDeposito, anularDeposito };
 }
