@@ -28,7 +28,7 @@ import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 import { conAviso } from '../lib/erroresEscritura';
 import { idUnico } from '../lib/idUnico';
 import { generateFolioPago } from '../lib/folioServicePago';
-import type { ContextoPago, Pago } from '../lib/pagos';
+import type { AplicacionPago, ContextoPago, Pago } from '../lib/pagos';
 
 const COL = 'pagos';
 
@@ -111,5 +111,24 @@ export function usePagos(embarqueId?: string) {
       }) as Record<string, unknown>));
   }, []);
 
-  return { pagos, loading, contextoNuevo, guardarPago, anularPago };
+  /**
+   * Tarea 72 · P5 · Cambia las aplicaciones de un pago (aplicar el saldo a
+   * favor, o quitar una).
+   *
+   * `aplicaciones`, `destinoIds` y `embarqueIds` se escriben en la MISMA
+   * operación (§1.1): el índice con el que se consulta «pagos de esta
+   * factura» no puede quedar apuntando a lo que ya no está. Quien arma el
+   * patch es `lib/reversaPagos.ts`; aquí solo se guarda.
+   */
+  const actualizarAplicaciones = useCallback(async (
+    id: string,
+    patch: { aplicaciones: AplicacionPago[]; destinoIds: string[]; embarqueIds: string[] },
+  ): Promise<void> => {
+    await conAviso('el pago', () =>
+      updateDoc(doc(db, COL, id), sanitizarParaFirestore({
+        ...patch, updatedAt: new Date().toISOString(),
+      }) as Record<string, unknown>));
+  }, []);
+
+  return { pagos, loading, contextoNuevo, guardarPago, anularPago, actualizarAplicaciones };
 }

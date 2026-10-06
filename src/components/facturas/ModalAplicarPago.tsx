@@ -16,7 +16,7 @@
 import { useMemo, useState } from 'react';
 import { X, Clock, Wand2, AlertTriangle } from 'lucide-react';
 import type { FacturaEnCartera } from '../../lib/cuentasPorCobrar';
-import type { DatosPagoAplicado } from '../../lib/pagos';
+import { sinAplicar as sinAplicarDe, type AplicacionPago, type DatosPagoAplicado, type Pago } from '../../lib/pagos';
 import type { Moneda } from '../../lib/sumarPorMoneda';
 import { BANCOS_VERMUR, BANCO_COBRO_DEFAULT } from '../../lib/cuentasPago';
 import {
@@ -29,30 +29,52 @@ const money = (n: number) =>
   n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 interface Props {
-  /** La factura desde la que se abrió: queda preseleccionada. */
-  item: FacturaEnCartera;
+  /** La factura desde la que se abrió: queda preseleccionada. Ausente en el
+   *  modo de saldo a favor, donde se abre desde el pago. */
+  item?: FacturaEnCartera;
+  /**
+   * Tarea 72 · P5 · MODO «aplicar el saldo a favor»: el pago YA existe, así que
+   * el dinero (monto, moneda, fecha, cuenta, referencia) se muestra y no se
+   * edita, y lo que se reparte es lo que le sobra. Es el mismo reparto, las
+   * mismas facturas ofrecidas y las mismas validaciones: lo único que cambia
+   * es que no se crea un pago, se le agregan aplicaciones al que ya está.
+   */
+  saldoDe?: Pago;
+  onAplicarSaldo?: (aplicaciones: AplicacionPago[], embarqueIds: string[]) => Promise<void>;
   /** La cartera completa, para ofrecer las demás del mismo cliente. */
   items: FacturaEnCartera[];
   hoy: string;
   onCancelar: () => void;
-  onConfirmar: (datos: DatosPagoAplicado) => Promise<void>;
+  onConfirmar?: (datos: DatosPagoAplicado) => Promise<void>;
   /** Quién aplica. Se congela en cada aplicación (§1.1). */
   por: { uid: string; nombre: string };
 }
 
-export default function ModalAplicarPago({ item, items, hoy, onCancelar, onConfirmar, por }: Props) {
-  const f = item.factura;
+export default function ModalAplicarPago({
+  item, saldoDe, onAplicarSaldo, items, hoy, onCancelar, onConfirmar, por,
+}: Props) {
+  /* La fuente del cliente: la factura desde la que se abrió, o el pago. */
+  const f = item?.factura ?? {
+    id: '', clienteId: saldoDe?.terceroId ?? null, clienteNombre: saldoDe?.terceroNombre ?? '',
+    moneda: saldoDe?.moneda ?? 'MXN',
+  };
   const clienteClave = claveDeCliente(f);
+  const aSaldo = !!saldoDe;
+  const montoSaldo = saldoDe ? sinAplicarDe(saldoDe) : 0;
 
   /* La moneda sale de la factura desde la que se abrió: no se adivina, se
      hereda del destino que la persona ya eligió. Se puede cambiar, y al
      cambiarla la lista de facturas cambia con ella (§4). */
   const [moneda, setMoneda] = useState<Moneda>(f.moneda);
-  const [monto, setMonto] = useState(String(item.saldo));
-  const [fecha, setFecha] = useState(hoy);
-  const [banco, setBanco] = useState(BANCO_COBRO_DEFAULT.nombre);
-  const [referencia, setReferencia] = useState('');
-  const [reparto, setReparto] = useState<Reparto>({ [f.id]: item.saldo });
+  const [monto, setMonto] = useState(saldoDe ? String(montoSaldo) : String(item?.saldo ?? 0));
+  const [fecha, setFecha] = useState(saldoDe ? saldoDe.fecha : hoy);
+  const [banco, setBanco] = useState(saldoDe ? (saldoDe.banco ?? '') : BANCO_COBRO_DEFAULT.nombre);
+  const [referencia, setReferencia] = useState(saldoDe?.referencia ?? '');
+  const [reparto, setReparto] = useState<Reparto>(() => {
+    if (item) return { [f.id]: item.saldo };
+    // Saldo a favor: se propone lo más vencido primero, editable.
+    return repartirEnCascada(montoSaldo, facturasAplicables(items, { clienteClave, moneda: f.moneda }));
+  });
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,7 +92,10 @@ export default function ModalAplicarPago({ item, items, hoy, onCancelar, onConfi
   const problemasLinea = aplicables
     .map(i => problemaDeLinea(i, reparto[i.factura.id] ?? 0))
     .filter((p): p is string => !!p);
-  const problema = problemasLinea[0] ?? problemaAplicacion({ monto: n, moneda, fecha, banco }, resumen);
+  /* En el modo de saldo el pago ya existe: su cuenta y su fecha son las que
+     tiene (un anticipo de P3 no trae cuenta y no se la vamos a exigir aquí). */
+  const problema = problemasLinea[0] ?? problemaAplicacion(
+    { monto: n, moneda, fecha, banco: aSaldo ? (saldoDe?.banco ?? 'sin cuenta') : banco }, resumen);
 
   const cambiarMoneda = (m: Moneda) => {
     setMoneda(m);
@@ -100,7 +125,14 @@ export default function ModalAplicarPago({ item, items, hoy, onCancelar, onConfi
     if (problema || guardando) return;
     setGuardando(true); setError(null);
     try {
-      await onConfirmar({
+      if (aSaldo) {
+        await onAplicarSaldo?.(
+          aplicacionesDelReparto(reparto, aplicables, { moneda, por, fecha: hoy }),
+          embarquesDelReparto(reparto, aplicables),
+        );
+        return;
+      }
+      await onConfirmar?.({
         terceroId: f.clienteId ?? null,
         terceroNombre: f.clienteNombre,
         monto: Math.round(n * 100) / 100,
@@ -122,9 +154,13 @@ export default function ModalAplicarPago({ item, items, hoy, onCancelar, onConfi
       <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col">
         <div className="px-5 py-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50 shrink-0">
           <div>
-            <h3 className="text-[14px] font-bold text-[#18181B]">Aplicar pago · {f.clienteNombre}</h3>
+            <h3 className="text-[14px] font-bold text-[#18181B]">
+              {aSaldo ? `Aplicar saldo a favor de ${saldoDe!.folio}` : 'Aplicar pago'} · {f.clienteNombre}
+            </h3>
             <p className="text-[11px] text-gray-500">
-              El dinero que entró, repartido entre sus facturas pendientes en {moneda}
+              {aSaldo
+                ? `Lo que sobró de ese pago, repartido entre sus facturas pendientes en ${moneda}`
+                : `El dinero que entró, repartido entre sus facturas pendientes en ${moneda}`}
             </p>
           </div>
           <button onClick={onCancelar} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar"><X className="w-4 h-4" /></button>
@@ -136,10 +172,11 @@ export default function ModalAplicarPago({ item, items, hoy, onCancelar, onConfi
             <h4 className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2">El dinero que entró</h4>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <label className="block">
-                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Monto</span>
+                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">{aSaldo ? 'Saldo a favor' : 'Monto'}</span>
                 <input
                   type="number" min={0} step="0.01" value={monto} onChange={e => setMonto(e.target.value)}
-                  aria-label="Monto del pago"
+                  disabled={aSaldo}
+                  aria-label={aSaldo ? 'Saldo a favor por aplicar' : 'Monto del pago'}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario tabular-nums"
                 />
               </label>
@@ -147,6 +184,7 @@ export default function ModalAplicarPago({ item, items, hoy, onCancelar, onConfi
                 <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Moneda</span>
                 <select
                   value={moneda} onChange={e => cambiarMoneda(e.target.value as Moneda)}
+                  disabled={aSaldo}
                   aria-label="Moneda del pago"
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario bg-white"
                 >
@@ -158,6 +196,7 @@ export default function ModalAplicarPago({ item, items, hoy, onCancelar, onConfi
                 <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Fecha del pago</span>
                 <input
                   type="date" value={fecha} onChange={e => setFecha(e.target.value)}
+                  disabled={aSaldo}
                   aria-label="Fecha del pago"
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario"
                 />
@@ -166,9 +205,15 @@ export default function ModalAplicarPago({ item, items, hoy, onCancelar, onConfi
                 <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Cuenta de Vermur</span>
                 <select
                   value={banco} onChange={e => setBanco(e.target.value)}
+                  disabled={aSaldo}
                   aria-label="Cuenta de Vermur"
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario bg-white"
                 >
+                  {/* El pago ya tiene su cuenta (o ninguna, si es un anticipo): se
+                      muestra tal cual, sin cambiarla por la primera de la lista. */}
+                  {aSaldo && !BANCOS_VERMUR.some(b => b.nombre === banco) && (
+                    <option value={banco}>{banco || 'Sin cuenta registrada'}</option>
+                  )}
                   {BANCOS_VERMUR.map(b => (
                     <option key={b.id} value={b.nombre} title={b.usoHabitual}>{b.nombre} — {b.usoHabitual}</option>
                   ))}
@@ -179,6 +224,7 @@ export default function ModalAplicarPago({ item, items, hoy, onCancelar, onConfi
               <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Referencia (opcional)</span>
               <input
                 value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="Puede llegar después"
+                disabled={aSaldo}
                 aria-label="Referencia bancaria"
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario font-mono"
               />
@@ -320,7 +366,7 @@ export default function ModalAplicarPago({ item, items, hoy, onCancelar, onConfi
             onClick={confirmar} disabled={!!problema || guardando}
             className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-5 py-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {guardando ? 'Guardando…' : 'Registrar pago'}
+            {guardando ? 'Guardando…' : aSaldo ? 'Aplicar saldo' : 'Registrar pago'}
           </button>
         </div>
       </div>

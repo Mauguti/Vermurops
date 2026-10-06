@@ -275,9 +275,14 @@ test('una vista guardada devuelve las columnas y los filtros', async ({ browser 
 
   // El escenario de Julio: lo autorizado, en pesos, sin «No pagar».
   await page.getByRole('button', { name: /^Autorizadas/ }).click();
-  await page.getByTitle('Moneda de la orden').selectOption('MXN');
+  // 0613 es USD y está marcada «No pagar». Si se filtrara la moneda primero, la
+  // ausencia ya no probaría el filtro de «No pagar»: por eso éste va antes.
+  await expect(page.getByRole('cell', { name: 'OC-2026-0613' })).toBeVisible();
   await page.getByTitle('Flag «No pagar»').selectOption('no');
+  await expect(page.getByRole('cell', { name: 'OC-2026-0611' })).toBeVisible();
   await expect(page.getByRole('cell', { name: 'OC-2026-0613' })).toHaveCount(0);
+  await page.getByTitle('Moneda de la orden').selectOption('MXN');
+  await expect(page.getByRole('cell', { name: 'OC-2026-0611' })).toBeVisible();
 
   await page.getByTitle('Guardar vista actual').click();
   await page.getByPlaceholder('Nombre de la vista...').fill('Pesos autorizados');
@@ -325,6 +330,7 @@ test('Cuentas por cobrar: «Por factura» es tabla y «Por cliente» sigue agrup
   await page.setViewportSize({ width: 1440, height: 900 });
 
   // El agrupado no se perdió: sigue con su total por cliente y por moneda.
+  await expect(page.getByRole('columnheader', { name: 'Moneda', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Por cliente' }).click();
   await expect(page.getByRole('columnheader', { name: 'Moneda', exact: true })).toHaveCount(0);
   await expect(page.getByText('Debe').first()).toBeVisible();
@@ -346,6 +352,7 @@ test('el CSV trae las columnas de la vista, no una lista fija', async ({ browser
   await abrirPorPagar(page);
 
   // Se quita una columna de la vista: el archivo tiene que quedarse sin ella.
+  await expect(page.getByRole('columnheader', { name: 'Proveedor', exact: true })).toBeVisible();
   await page.getByTitle('Configurar columnas').click();
   await ocultarColumna(page, 'Proveedor');
   await cerrarPanel(page);

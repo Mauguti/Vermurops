@@ -26,13 +26,17 @@ import type { ReglaIVA } from '../conceptos/ConceptosData';
 import { compararIVAFactura, type ResultadoComparacionIVA } from '../../lib/ivaOrdenCompra';
 import CargarFacturaOC from './CargarFacturaOC';
 import DocumentosOC from './DocumentosOC';
+import type { Pago } from '../../lib/pagos';
 import {
   AVISO_COBRO_EN_COBRANZA, type EntradaDeEmbarque,
 } from '../../lib/entradaDinero';
 import {
   puedeMarcarNoPagar as rolPuedeMarcarNoPagar,
   puedeLiberarNoPagar as rolPuedeLiberarNoPagar,
+  puedeMarcarPrefactura as rolPuedeMarcarPrefactura,
 } from '../../auth/permisos';
+import BadgePrefactura from './BadgePrefactura';
+import { PanelPrefactura } from './PanelPrefactura';
 
 /**
  * C-2. La ficha de una orden de compra: el flujo de dos áreas.
@@ -113,6 +117,11 @@ interface Props {
   onIrACobranza?: () => void;
   /** Etiqueta del botón regresar cuando se llegó desde otra ficha. */
   regresarLabel?: string;
+  /**
+   * Tarea 73 · P6 · El pago a proveedor que cubrió esta orden, si fue uno
+   * registrado desde P6. Las pagadas antes no lo tienen y no se migran.
+   */
+  pagoProveedor?: Pago | null;
 }
 
 const money = (n: number) =>
@@ -120,7 +129,7 @@ const money = (n: number) =>
 
 export default function FichaOC({
   oc, rol, onBack, onTransicionar, onActualizar, fondeo, proveedor, categoriaConcepto,
-  reglaIVA, todasLasOrdenes = [], entradas = [], onIrACobranza, regresarLabel,
+  reglaIVA, todasLasOrdenes = [], entradas = [], onIrACobranza, regresarLabel, pagoProveedor,
 }: Props) {
   const [motivo, setMotivo] = useState(oc.motivoRechazo ?? '');
   const [comprobante, setComprobante] = useState(oc.comprobantePago ?? '');
@@ -222,6 +231,7 @@ export default function FichaOC({
             </BadgeEstado>
             {oc.urgencia === 'urgente' && <BadgeEstado tono="peligro">Urgente</BadgeEstado>}
             {oc.esAnticipo && <BadgeEstado tono="neutro">Anticipo</BadgeEstado>}
+            <BadgePrefactura oc={oc} vacio={false} />
             <BadgeEstado tono="neutro">
               {oc.origen === 'embarque' ? 'De un embarque' : 'Gasto de oficina'}
             </BadgeEstado>
@@ -276,6 +286,13 @@ export default function FichaOC({
        * que comparten FichaLayout no se tocan.
        */}
       <div className="flex-1 overflow-y-auto pb-6">
+      {/* Tarea 74 · P7 · Operaciones declara que esta orden se paga antes de
+          tener la factura. Editable por quien puede; los demás la leen. */}
+      <PanelPrefactura
+        oc={oc}
+        puedeEditar={rolPuedeMarcarPrefactura(rol) && oc.estado !== 'rechazada'}
+        onActualizar={onActualizar}
+      />
       {oc.origen === 'embarque' && oc.embarqueId && (
         <div className="px-6 pt-3">
           <BloqueEnlaces
@@ -685,6 +702,16 @@ export default function FichaOC({
               onGuardar={() => onActualizar({ comprobantePago: comprobante.trim() || null })}
               soloLectura={terminada}
             />
+
+            {pagoProveedor && (
+              <p data-testid="pago-que-cubrio" className="text-[12px] text-gray-600">
+                Cubierta por el pago <span className="font-mono font-bold">{pagoProveedor.folio}</span>
+                {' · '}{pagoProveedor.moneda} {money(pagoProveedor.monto)}
+                {pagoProveedor.aplicaciones.length > 1
+                  ? ` · una sola transferencia que cubrió ${pagoProveedor.aplicaciones.length} órdenes`
+                  : ''}
+              </p>
+            )}
           </div>
 
           {/* ── Tarea 63 · Documentos de la orden, con un solo botón ───── */}

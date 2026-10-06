@@ -26,6 +26,7 @@ import { formatearPorMoneda } from '../../lib/sumarPorMoneda';
 import { usuariosPorRol, useAuth } from '../../auth/AuthContext';
 import EditorContactos from '../ui/EditorContactos';
 import { TIPOS_CONTACTO_CLIENTE, contactosActivos, contactosParaGuardar } from '../../lib/contactos';
+import { estatusDeCliente, ETIQUETA_ESTATUS } from '../../lib/estatusCliente';
 import {
   REGIMENES_FISCALES, estadoFiscal, faltantesFiscales,
   validarCodigoPostal, esRFCExtranjero,
@@ -369,7 +370,10 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
         nombre: draft.nombre, comercial: draft.comercial,
         representante: draft.representante, rfc: draft.rfc,
         domicilio: draft.domicilio, telefono: draft.telefono,
-        correo: draft.correo, statusOperativo: draft.statusOperativo,
+        correo: draft.correo,
+        // Sin estatus guardado no se escribe uno por ocultar la selección: solo
+        // si alguien eligió ACTIVO o INACTIVO (undefined lo descarta el sanitizador).
+        statusOperativo: estatusDeCliente(draft) === 'sin_estatus' ? undefined : draft.statusOperativo,
         fechaAlta: draft.fechaAlta, comentarios: draft.comentarios,
         codigoPostal: draft.codigoPostal || null,
         regimenFiscal: draft.regimenFiscal || null,
@@ -422,8 +426,8 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
         regresarLabel={regresarLabel}
         badges={
           <>
-            <BadgeEstado tono={cliente.statusOperativo === 'ACTIVO' ? 'exito' : 'neutro'}>
-              {cliente.statusOperativo}
+            <BadgeEstado tono={estatusDeCliente(cliente) === 'activo' ? 'exito' : estatusDeCliente(cliente) === 'sin_estatus' ? 'espera' : 'neutro'}>
+              {estatusDeCliente(cliente) === 'sin_estatus' ? ETIQUETA_ESTATUS.sin_estatus : cliente.statusOperativo}
             </BadgeEstado>
             <BadgeEstado tono={estadoExp === 'sin_validar' ? 'espera' : 'exito'} title={etiquetaValidacion(cliente)}>
               {estadoExp === 'validado' ? 'Expediente validado' : estadoExp === 'heredado_magaya' ? 'Validado · heredado de Magaya' : 'Expediente sin validar'}
@@ -601,8 +605,11 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
                     onChange={e => set('correo', e.target.value)} />
                 </Field>
                 <Field label="Estatus operativo">
-                  <select className={INPUT} value={draft.statusOperativo}
+                  <select className={INPUT} value={estatusDeCliente(draft) === 'sin_estatus' ? '' : draft.statusOperativo}
                     onChange={e => set('statusOperativo', e.target.value as 'ACTIVO' | 'INACTIVO')}>
+                    {estatusDeCliente(draft) === 'sin_estatus' && (
+                      <option value="" disabled>{ETIQUETA_ESTATUS.sin_estatus}</option>
+                    )}
                     <option value="ACTIVO">ACTIVO</option>
                     <option value="INACTIVO">INACTIVO</option>
                   </select>
@@ -897,6 +904,12 @@ export default function FichaCliente({ cliente, onBack, onUpdate, regresarLabel 
                                 {docGuardado.fechaSubida.slice(0, 10)}
                                 {docGuardado.subidoPor && ` · ${docGuardado.subidoPor}`}
                               </p>
+                              {/* Tarea 75 (M-J) · La corrección de tipo, igual que en
+                                  el expediente del proveedor (tarea 71): qué leyó el
+                                  agente y qué decidió la persona. */}
+                              {docGuardado.observaciones && (
+                                <p className="text-[10px] text-text-muted">{docGuardado.observaciones}</p>
+                              )}
                               {docGuardado.avisos.map(a => (
                                 <p key={a} className="text-[10px] text-amber-700 flex items-start gap-1">
                                   <AlertTriangle className="w-3 h-3 mt-px shrink-0" />

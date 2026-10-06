@@ -361,3 +361,21 @@ export function margenDelEmbarque(
       };
     });
 }
+
+/**
+ * Tarea 75 · Los totales de un concepto, sin mezclar monedas (§4.3).
+ *
+ * `margenDelConcepto` devuelve UNA fila por moneda. La tabla de cargos las
+ * sumaba con `reduce` para el renglón encabezado: con dos monedas daba
+ * «USD 1,500 + MXN 8,000 = 9,500». Aquí el total solo existe cuando hay una
+ * sola moneda; con varias, `unica` es null y el margen no se calcula —un
+ * margen de importes en monedas distintas se ve creíble y es basura.
+ */
+export function totalesDelConcepto(filas: MargenMoneda[]): {
+  unica: MargenMoneda | null;
+  margen: number | null;
+} {
+  const unica = filas.length === 1 ? filas[0] : null;
+  const margen = unica && unica.venta !== 0 ? unica.profit / unica.venta : null;
+  return { unica, margen };
+}

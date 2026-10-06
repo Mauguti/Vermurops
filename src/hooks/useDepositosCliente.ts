@@ -29,6 +29,8 @@ import {
   type DatosDeposito, type Pago,
 } from '../lib/pagos';
 import { usePagos } from './usePagos';
+import { anotarBitacora } from './anotarBitacora';
+import { problemaMotivo, textoAnulacion } from '../lib/reversaPagos';
 
 const COL = 'depositosCliente';
 
@@ -101,19 +103,32 @@ export function useDepositosCliente(embarqueId?: string) {
    * ninguna de las dos: anular en la colección equivocada dejaría el
    * movimiento vivo donde sí está.
    */
-  const anularDeposito = async (id: string): Promise<void> => {
+  const anularDeposito = async (id: string, motivo: string): Promise<void> => {
     exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
+    const problema = problemaMotivo(motivo);
+    if (problema) throw new Error(problema);
+    const pago = pagos.find(p => p.id === id);
 
     const donde = coleccionDelPago(id, pagos);
-    if (donde === 'pagos') { await anularPago(id); return; }
-    if (donde === 'depositosCliente') {
+    if (donde === 'pagos') {
+      await anularPago(id);
+    } else if (donde === 'depositosCliente') {
       await conAviso('el depósito', () =>
         updateDoc(doc(db, COL, id), sanitizarParaFirestore({
           activo: false, updatedAt: new Date().toISOString(),
         }) as Record<string, unknown>));
-      return;
+    } else {
+      throw new Error(`No se encontró el depósito ${id} para anularlo.`);
     }
-    throw new Error(`No se encontró el depósito ${id} para anularlo.`);
+
+    /* Tarea 72 · P5 · Quién, cuándo y por qué, en la bitácora del embarque
+       al que el anticipo fondeaba: es donde Operaciones mira por qué una
+       orden dejó de estar fondeada. */
+    if (pago) {
+      const autor = { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' };
+      const t = textoAnulacion(pago, autor.nombre, motivo);
+      for (const e of new Set(pago.embarqueIds)) await anotarBitacora(e, 'cobro', t.titulo, autor, t.detalle);
+    }
   };
 
   /*

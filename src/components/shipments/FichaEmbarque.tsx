@@ -1600,8 +1600,8 @@ export default function FichaEmbarque({
                 setAvisoOC({ mensaje: `No se pudo registrar el cobro: ${err instanceof Error ? err.message : err}`, tipo: 'error' });
               }
             }}
-            onAnularCobro={async (id) => {
-              try { await anularCobro(id); }
+            onAnularCobro={async (id, motivo) => {
+              try { await anularCobro(id, motivo); }
               catch (err) { setAvisoOC({ mensaje: `No se pudo anular: ${err instanceof Error ? err.message : err}`, tipo: 'error' }); }
             }}
           />

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import type { CargoDetalle } from '../components/shipments/EmbarquesData';
 import { agruparCargos } from './cargosEditables';
 import {
+  totalesDelConcepto, type MargenMoneda,
   costoDeCargo, margenDelConcepto, margenDelEmbarque, estadoMenosFirme,
   type OCParaMargen, type ContextoMargen,
 } from './margenRealConcepto';
@@ -321,5 +322,27 @@ describe('margenDelEmbarque', () => {
     const cargos = [ingreso(), gasto({ monto: 20000, moneda: 'MXN' })];
     const filas = margenDelEmbarque(cargos, ctxDe(cargos));
     expect(filas.map(f => f.moneda)).toEqual(['USD', 'MXN']);
+  });
+});
+
+describe('totalesDelConcepto (tarea 75, §4.3)', () => {
+  const fila = (moneda: 'USD' | 'MXN', venta: number, profit: number): MargenMoneda =>
+    ({ moneda, venta, profit, costo: venta - profit, cotizado: 0, excedente: 0 } as unknown as MargenMoneda);
+
+  it('una moneda: hay total y margen', () => {
+    const t = totalesDelConcepto([fila('USD', 1000, 250)]);
+    expect(t.unica?.venta).toBe(1000);
+    expect(t.margen).toBe(0.25);
+  });
+
+  it('dos monedas: no hay total ni margen, nunca 1,000 USD + 8,000 MXN', () => {
+    const t = totalesDelConcepto([fila('USD', 1000, 250), fila('MXN', 8000, 1000)]);
+    expect(t.unica).toBeNull();
+    expect(t.margen).toBeNull();
+  });
+
+  it('sin filas o venta en cero: margen null', () => {
+    expect(totalesDelConcepto([]).margen).toBeNull();
+    expect(totalesDelConcepto([fila('USD', 0, 0)]).margen).toBeNull();
   });
 });

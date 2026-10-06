@@ -146,6 +146,11 @@ test('el filtro separa impo de expo y se combina con modalidad', async ({ browse
   const { page, ctx } = await entrar(browser, 'operaciones@vermur.com');
   await abrirEmbarques(page);
 
+  // Positivo previo: sin filtro, TODAS las filas existen; así cada ausencia de
+  // abajo es del filtro y no de un folio mal escrito.
+  for (const f of ['VLIM-59-591', 'VLEM-59-592', 'VLIA-59-593', 'BOL 9016599']) {
+    await expect(fila(page, f)).toBeVisible({ timeout: 15_000 });
+  }
   await selTrafico(page).selectOption('impo');
   await page.waitForTimeout(500);
   await expect(fila(page, 'VLIM-59-591')).toBeVisible();
@@ -179,6 +184,9 @@ test('el mes de cierre usa el arribo en impo y la salida en expo', async ({ brow
   const { page, ctx } = await entrar(browser, 'operaciones@vermur.com');
   await abrirEmbarques(page);
 
+  for (const f of ['VLIM-59-591', 'VLEM-59-592', 'VLIA-59-593', 'VLET-59-594', 'BOL 9016599']) {
+    await expect(fila(page, f)).toBeVisible({ timeout: 15_000 });
+  }
   // Septiembre: la impo que arribó el 18-sep y el desconocido que arribó el
   // 30-sep. La expo zarpó en AGOSTO, así que no cierra en septiembre aunque
   // su ETA sea del 25-sep.
@@ -213,6 +221,7 @@ test('una vista guardada conserva el tráfico y el mes de cierre', async ({ brow
   await sembrarCasos();
   const { page, ctx } = await entrar(browser, 'operaciones@vermur.com');
   await abrirEmbarques(page);
+  await expect(fila(page, 'VLEM-59-592')).toBeVisible({ timeout: 15_000 });
 
   await selTrafico(page).selectOption('impo');
   await selMes(page).selectOption('2026-09');

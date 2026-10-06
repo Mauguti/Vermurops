@@ -274,6 +274,14 @@ export interface OrdenCompra {
   noPagar?: boolean;
   /** Por qué se marcó «No pagar». Se muestra a quien intente autorizarla. */
   motivoNoPagar?: string | null;
+  /**
+   * Tarea 74 · P7 · Operaciones declara que esta orden se paga ANTES de tener
+   * la factura (la naviera cobra primero). Ausente = no es prefactura. Lo
+   * demás —pendiente, días, recibida— se deriva en `lib/prefactura.ts`.
+   */
+  esPrefactura?: boolean;
+  /** Por qué se paga antes de facturar. Libre y opcional. */
+  motivoPrefactura?: string | null;
 
   // ── Anticipos ──────────────────────────────────────────────────────────────
   esAnticipo: boolean;
@@ -309,8 +317,8 @@ export interface DepositoCliente {
   moneda: 'MXN' | 'USD';
   /** YYYY-MM-DD */
   fechaDeposito: string;
-  /** Referencia bancaria. */
-  referencia: string;
+  /** Referencia bancaria. `null` (o '' en lo viejo) = sin referencia: llega después del pago. */
+  referencia: string | null;
   /** URL del comprobante. */
   comprobante: string | null;
   registradoPor: { uid: string; nombre: string };

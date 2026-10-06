@@ -17,6 +17,8 @@ import { ESTADOS_OC_MAP } from './OrdenesCompraData';
 import type { VistaConfig } from '../table/SpreadsheetTable';
 import { EnlaceEntidad } from '../ui/ficha/EnlaceEntidad';
 import type { EtiquetaIVA } from '../../lib/ivaOrdenCompra';
+import { estadoPrefactura, textoFacturaPendiente } from '../../lib/prefactura';
+import BadgePrefactura from './BadgePrefactura';
 
 const col = createColumnHelper<OrdenCompra>();
 
@@ -197,6 +199,19 @@ export function columnasOC({ etiquetaIVA }: OpcionesColumnasOC = {}) {
         )
         : <span className="text-gray-300">—</span>,
     }),
+    /* Tarea 74 · Prefactura: marcada, pendiente de factura o ya recibida. */
+    col.accessor(oc => estadoPrefactura(oc), {
+      id: 'prefactura', header: 'Prefactura', size: 170,
+      meta: {
+        csv: (oc: OrdenCompra) => {
+          const e = estadoPrefactura(oc);
+          if (e === 'no_aplica') return '';
+          if (e === 'factura_pendiente') return textoFacturaPendiente(oc);
+          return e === 'factura_recibida' ? 'Factura recibida' : 'Prefactura';
+        },
+      },
+      cell: info => <BadgePrefactura oc={info.row.original} />,
+    }),
     col.accessor('descripcion', {
       id: 'descripcion', header: 'Descripción', size: 220,
       cell: info => <span className="truncate block text-gray-500" title={info.getValue()}>{info.getValue() || '—'}</span>,
@@ -213,7 +228,7 @@ export const VISTA_DEFAULT_POR_PAGAR: VistaConfig = {
   columnas: [
     { id: 'folio' }, { id: 'estado' }, { id: 'proveedor' }, { id: 'concepto' },
     { id: 'monto' }, { id: 'moneda' }, { id: 'factura' }, { id: 'fechaPago' },
-    { id: 'origen' }, { id: 'iva' }, { id: 'noPagar' },
+    { id: 'origen' }, { id: 'iva' }, { id: 'noPagar' }, { id: 'prefactura' },
   ],
   ordenamiento: { columnaId: 'fechaPago', direccion: 'asc' },
 };

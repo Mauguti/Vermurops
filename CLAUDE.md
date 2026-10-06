@@ -1812,6 +1812,177 @@ no tendría embarque y no fondearía nada, aunque se vería igual en la lista.
 emuladores y el último FIJA el aviso del bloqueo, con la versión en verde
 escrita y comentada para el día que la regla entre.
 
+## 4.37 La ficha del pago: aplicar el saldo, quitar una aplicación y anular (tarea 72, 6-oct-2026)
+
+Paso **P5** de `docs/sprint-post-junta/PLAN-PAGOS.md` (§1.5 y §7.3).
+Finanzas estrena la pestaña **Pagos**: cada movimiento de dinero del cliente
+con su folio `PAG-…`, lo aplicado, lo que queda a favor y su estado, sobre
+`SpreadsheetTable` con vistas guardables y filtros que se guardan con la vista
+(módulo `pagos`), igual que Cuentas por cobrar (§4.27). Las reglas viven en
+`lib/reversaPagos.ts` (29 tests); la pantalla en `components/pagos/`.
+
+  - **Estado y «a favor» se DERIVAN** (`estadoDePago`, `aFavorDe`): aplicado ·
+    parcial · sin aplicar · anulado. Un peso de redondeo no es saldo a favor.
+    Los totales de arriba van por moneda (§4.3).
+  - **Los anulados no se esconden:** salen de «Vigentes» (el default) y se ven
+    con el filtro «Anulados» o «Todos».
+  - **Aplicar el saldo a favor** reusa `ModalAplicarPago` en un MODO nuevo
+    (`saldoDe`): el dinero se muestra y no se edita, y el reparto, las facturas
+    ofrecidas (mismo cliente y moneda, con saldo) y las validaciones son las
+    mismas. Se agregan aplicaciones al pago que ya existe; no se crea otro.
+  - **Quitar una aplicación** y **anular** piden MOTIVO (`problemaMotivo`) y el
+    hook lo vuelve a exigir. Nada se borra: el pago anulado queda en la lista.
+  - **`embarqueIds` falla cerrado.** Al quitar la última aplicación, un pago de
+    UN embarque lo sigue fondeando; uno de VARIOS queda en `[]` (a favor sin
+    embarque), porque dejarlo en los dos contaría el monto completo en cada
+    uno y autorizaría un pago descubierto. Aplicar saldo a una factura de otro
+    embarque deja el pago repartido; Finance le pasa a `entradasDeFondeo` el
+    resolvedor factura → embarque para que cada uno cuente lo que le toca.
+  - **`anularDeposito` ya tiene call site:** el botón «Anular pago» de un pago
+    sin aplicaciones. `anularCobro` y `anularDeposito` reciben el motivo; la
+    pestaña Facturas del embarque lo pide con `window.prompt` (provisional,
+    como el `confirm` que reemplaza).
+  - **Permisos:** `cobro.registrar` (administracion y admin). Operaciones lee
+    la ficha y no ve los botones, y la ficha lo dice.
+  - **⚠️ Dónde queda el motivo:** el contrato de la tarea fue «Modelo: no» y
+    `Pago` no tiene campos de anulación, así que quién, cuándo y por qué viajan
+    a la **bitácora de cada embarque** que el pago tocó (`anotarBitacora`,
+    evento `cobro`) y la ficha los lee de ahí, uniéndolos por el folio. Una
+    aplicación quitada SÍ sale de `aplicaciones[]`; su rastro es esa entrada.
+    Un pago anulado que no toca ningún embarque no deja rastro con motivo. Si se
+    aprueban `anulacion` y `aplicacionesQuitadas` en `Pago`, la ficha deja de
+    depender de la bitácora (pregunta en el reporte).
+  - **Lo viejo no se reaplica:** un cobro o depósito leído de `cobros/` o
+    `depositosCliente/` se lee y se anula, pero no se le aplica saldo ni se le
+    quita una aplicación: esas colecciones ya no se escriben (§4.35).
+
+## 4.38 Un pago a proveedor cubre varias órdenes (tarea 73, 6-oct-2026)
+
+Paso **P6** de `docs/sprint-post-junta/PLAN-PAGOS.md` (§7.2). «Registrar pago»
+en Programación de pagos escribe **UN** `Pago` (`lado: 'proveedor'`) con una
+aplicación por orden, en vez del loop de N escrituras con la misma cadena
+copiada. `construirPagoDeGrupo`, `problemasDelGrupo`, `pagosDeProveedor` y
+`pagoQueCubrio` viven en `lib/pagos.ts`; el call site, en
+`Finance.registrarPagoDelGrupo`.
+
+  - **Se valida TODO el grupo antes de escribir.** Mezcla de proveedores o de
+    monedas (§4.3), una orden sin monto o una que la máquina de estados no deja
+    pasar a `pagada` detienen el pago completo: no se guarda ni el pago ni
+    ninguna orden. Antes, si fallaba a la mitad, unas quedaban pagadas y otras no.
+  - **El monto es lo que SALE del banco:** monto menos anticipos cruzados
+    (`montoATransferir`), el mismo total que enseña la tarjeta del grupo.
+  - **Las órdenes siguen pasando a `pagada` con `comprobantePago` = referencia**
+    (la máquina lo exige y los paneles lo leen). Lo que cambia es que además
+    existe el pago, con folio `PAG-…`, y la ficha de la orden dice «Cubierta por
+    el pago PAG-… · una sola transferencia que cubrió N órdenes»
+    (`pagoQueCubrio`, derivado: no se agregó campo a la orden).
+  - **Nada se migra, sin doble conteo.** `pagosDeProveedor` lee `pagos/` y le
+    quita a `pagosDesdeOrdenes` las órdenes que un pago vivo ya cubre; las
+    pagadas antes de P6 siguen leyéndose por el adaptador de la 67. Un pago
+    anulado deja de cubrir y sus órdenes vuelven a leerse por lo viejo.
+  - **Una orden sin factura del proveedor entra igual**: se paga lo autorizado
+    y la factura puede llegar después.
+  - ⚠️ Si falla el paso de las órdenes DESPUÉS de guardar el pago, el aviso lo
+    dice con el folio («PAG-… quedó registrado, pero no se pudieron marcar…»).
+    Sigue sin ser una transacción de Firestore; la validación previa es lo que
+    hace raro ese caso.
+  - Depende de la regla de `pagos/` publicada (§4.35), igual que P2.
+  - **Fuera de alcance, anotado:** el formulario de §7.2 con checkboxes por
+    factura, la fecha elegida por quien paga y el comprobante adjunto. Hoy la
+    fecha del pago es la del día de captura. La lista de la pestaña Pagos
+    sigue siendo solo del lado cliente.
+
+## 4.39 Prefactura: se declara, y lo demás se deriva (tarea 74, 6-oct-2026)
+
+Paso **P7** de `docs/sprint-post-junta/PLAN-PAGOS.md` (§5). «Las navieras
+cobran antes de facturar»: una orden de compra que Operaciones declara
+pagadera antes de tener la factura del proveedor. `lib/prefactura.ts` (17 tests).
+
+  - **Lo único que se guarda** son `OrdenCompra.esPrefactura` y
+    `motivoPrefactura`, opcionales. Pendiente, días y recibida se DERIVAN:
+    marcada + pagada + sin factura (`identificarFactura`, las tres vías) =
+    «Factura pendiente · N días» desde `pagadaPor.fecha`.
+  - **La marca es la que manda.** Una orden pagada y sin factura que nadie
+    marcó NO es prefactura: sin eso el contador contaría toda orden a la que
+    todavía no le suben el PDF, y a los dos días nadie lo lee.
+  - **Dónde se ve:** casilla + motivo en la ficha de la orden
+    (`PanelPrefactura`), `BadgePrefactura` en la ficha, en la columna
+    «Prefactura» de «Por orden» (entra a la vista por defecto, y al CSV) y junto
+    a cada COD en «Por proveedor»; filtro «Prefactura» (marcadas / factura
+    pendiente) que se guarda con la vista; contador ámbar arriba de la bandeja
+    («2 prefacturas pagadas sin factura · la más vieja de 24 días»), sobre TODAS
+    las órdenes aunque haya filtro puesto.
+  - **Quién marca:** `puedeMarcarPrefactura` = `ordenCompra.gestionar`
+    (Operaciones y admin). Administración la lee, no la edita.
+  - **Quitar la marca** escribe `false` y `null`, nunca `undefined`. **Llegar la
+    factura NO la quita:** cambia lo que se deriva y la marca queda como registro.
+  - **No se hizo, a propósito:** el freno del cierre administrativo (J6, pregunta
+    abierta para Julio), el cotejo factura-vs-pagado (§5.3) y el correo (fase 2,
+    espera al correo).
+
+## 4.40 Arreglos chicos de pagos y expediente (tarea 75, 6-oct-2026)
+
+  - **M-I:** la pestaña Facturas del embarque ya no lista cobros anulados
+    (`aplicacionesConPago` sin `incluirAnulados`); antes mostraban su botón
+    «Anular». La ficha del pago los sigue enseñando con el filtro «Anulados».
+  - **M-J:** la casilla del expediente del CLIENTE pinta
+    `DocExpediente.observaciones`, donde la 63 guarda la corrección de tipo,
+    igual que la del proveedor (§4.34).
+  - **Sumas sin clasificar de `TablaUnificadaCargos`:** estaban MAL, no
+    legítimas. El renglón encabezado de un concepto con varios proveedores
+    sumaba con `reduce` las filas por moneda de `margenDelConcepto` (costo,
+    venta, excedente, margen): con USD y MXN daba un total revuelto (§4.3).
+    Ahora `totalesDelConcepto` da total y margen solo con una moneda; con
+    varias se pinta una cifra por moneda y el margen queda en «—».
+  - `DepositoCliente.referencia` pasa a `string | null`; `''` guardado se
+    lee como «sin referencia». Nada se migra.
+  - **El build SÍ corre tsc** (`tsc --noEmit && vite build`, línea base 0).
+    La nota vieja de «build sin typecheck, ~10 errores» ya no es cierta; no
+    estaba en este CLAUDE.md sino en la memoria de la sesión.
+
+## 4.41 «Sin estatus»: ningún cliente invisible en Altas (tarea 76, 6-oct-2026)
+
+La lista de Altas filtraba por `statusOperativo === 'ACTIVO'`: un cliente sin
+el campo, o con un valor fuera de la lista, existía y no se veía. Ahora
+`lib/estatusCliente.ts` (6 tests) lo LEE como activo / inactivo / **sin
+estatus**; solo los inactivos se esconden (con «Mostrar inactivos»), y el
+hueco se ve con la etiqueta ámbar «Sin estatus» en la columna, en la ficha y
+en un contador junto al de la lista. **No se escribe el campo en ningún
+documento**: la ficha no lo guarda a menos que alguien elija ACTIVO o
+INACTIVO. Los scripts de la 65 y `minarRFCMagaya.ts` solo hacen `update` de
+documentos existentes; el alta de VermurOps, el seed y la importación lo
+escriben siempre, así que hoy un cliente nace sin él solo por consola o por un
+script nuevo. Quedan sin cambiar, por decisión de alcance, los selectores que
+filtran `=== 'ACTIVO'` (`ProductosEmbarque`) y `cotizacionAEmbarque`.
+
+## 4.42 Una ausencia sin su positivo no prueba nada (tarea 77, 6-oct-2026)
+
+Barrido de los 49 `toHaveCount(0)` / `not.toBeVisible` del e2e. Un
+`toHaveCount(0)` contra un nombre que cambió pasa sin comprobar nada.
+**Regla: cada ausencia lleva junto su positivo** — el mismo localizador
+visible en otro rol o estado, o la fila/columna que prueba que la pantalla
+cargó. Para un nombre RETIRADO («Registrar depósito», «Usar el de Banxico»)
+el positivo es el sucesor, y la ausencia se escribe como regex que cubre
+los dos nombres.
+  - **Una era vacía de verdad:** capturas-61 filtraba MXN antes de «No
+    pagar», y la orden 0613 es USD: la moneda ya la escondía y el filtro de
+    «No pagar» no probaba nada. Se reordenó.
+  - Se agregaron positivos en recorrido, 56, 57, 59, 61 y 69; se rompió cada
+    uno a propósito y falló. Las demás ya traían el par (ver reporte 77).
+
+## 4.43 Limpieza: huérfanos y rutas sin módulo (tarea 78, 6-oct-2026)
+
+Se borraron `Customs.tsx`, `Documents.tsx`, `ClientPortal.tsx`, `Warehouse.tsx`,
+`Pricing.tsx`, `pricing/PricingData.ts` y `pricing/FichaRFQ.tsx` (este último
+solo lo importaba `Pricing.tsx`, y sin él `PricingData` no se podía borrar).
+Nada los importaba; tsc y build lo confirman. Con ellos se fueron los datos de
+ejemplo que §4.23 dejó anotados; los seeds de `src/data.ts` siguen.
+  - **Reservas y Recolecciones: sin ruta ni permiso.** Se quitó `bookings` y
+    `pickups` de `App.tsx` (render y etiquetas) y del rol admin en
+    `auth/users.ts`. `Bookings.tsx` y `Pickups.tsx` se conservan, ya sin
+    importador, como punto de partida para cuando exista el módulo: entonces
+    vuelven con ruta, permiso y entrada de menú juntos.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

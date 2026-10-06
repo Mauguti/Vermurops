@@ -231,6 +231,15 @@ export function puedeMarcarNoPagar(rol: UserRole | undefined | null): boolean {
   return puede(rol, 'ordenCompra.gestionar') || puede(rol, 'ordenCompra.autorizar');
 }
 
+/**
+ * Tarea 74 · Marcar una orden como prefactura es de quien habla con la naviera
+ * (`ordenCompra.gestionar`: Operaciones, y admin). Pagarla sigue siendo de
+ * Administración. PLAN-PAGOS §6.
+ */
+export function puedeMarcarPrefactura(rol: UserRole | undefined | null): boolean {
+  return puede(rol, 'ordenCompra.gestionar');
+}
+
 /** ¿Este rol puede QUITAR la marca y dejar que el pago salga? */
 export function puedeLiberarNoPagar(rol: UserRole | undefined | null): boolean {
   return puede(rol, 'ordenCompra.autorizar');

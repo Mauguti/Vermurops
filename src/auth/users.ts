@@ -72,7 +72,7 @@ export const ALLOWED_VIEWS_BY_ROLE: Record<UserRole, string[]> = {
   administracion: ['dashboard', 'clients', 'finance', 'shipments', 'exchange', 'puertos', 'reports', 'settings'],
 
   admin: [
-    'dashboard', 'quotes', 'bookings', 'pickups',
+    'dashboard', 'quotes',
     'shipments', 'finance', 'exchange', 'clients',
     'puertos', 'rates', 'reports', 'settings',
   ],

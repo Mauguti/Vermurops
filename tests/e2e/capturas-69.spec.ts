@@ -145,6 +145,8 @@ test('Cuentas por cobrar · el botón de entrada de dinero (Administración)', a
   const { page, ctx } = await entrar(browser, 'administracion@vermur.com');
   await abrirPorCobrar(page);
   await expect(page.getByRole('button', { name: 'Registrar entrada de dinero' })).toBeVisible();
+  // Par positivo de la ausencia de Operaciones (más abajo): mismo nombre.
+  await expect(page.getByRole('button', { name: 'Aplicar pago' }).first()).toBeVisible();
   await foto(page, 'por-cobrar-admin');
 
   await page.setViewportSize(ANCHO);
@@ -173,6 +175,8 @@ test('Cuentas por cobrar · el modal del anticipo, con la moneda y sin referenci
 test('Cuentas por cobrar · Operaciones ya no puede cobrar', async ({ browser }) => {
   const { page, ctx } = await entrar(browser, 'operaciones@vermur.com');
   await abrirPorCobrar(page);
+  // Sin esto, un nombre cambiado haría pasar las dos ausencias: la tabla tiene que haber cargado.
+  await expect(page.getByRole('columnheader', { name: 'Factura', exact: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Registrar entrada de dinero' })).toHaveCount(0);
   // Tarea 70 · el botón del renglón se llama «Aplicar pago» desde P4.
   await expect(page.getByRole('button', { name: 'Aplicar pago' })).toHaveCount(0);
@@ -187,7 +191,7 @@ test('la ficha de la orden · el panel de entradas, en solo lectura', async ({ b
   // El depósito viejo se lee igual, y se dice que es anticipo a cuenta.
   await expect(page.getByText('anticipo a cuenta')).toBeVisible();
   await expect(page.getByRole('button', { name: /Ir a Cuentas por cobrar/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Registrar depósito' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Registrar (depósito|entrada de dinero)/ })).toHaveCount(0);
   await foto(page, 'ficha-oc-solo-lectura');
 
   await page.setViewportSize(ANCHO);

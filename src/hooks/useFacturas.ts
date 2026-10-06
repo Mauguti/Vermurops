@@ -22,6 +22,11 @@ import {
   aplicacionesA, coleccionDelPago, construirPagoAplicado, construirPagoDeCobro,
   pagosDeCliente, type DatosCobro, type DatosPagoAplicado, type Pago,
 } from '../lib/pagos';
+import {
+  pagoConAplicaciones, pagoSinAplicacion, problemaMotivo,
+  textoAnulacion, textoAplicacionNueva, textoAplicacionQuitada,
+} from '../lib/reversaPagos';
+import type { AplicacionPago } from '../lib/pagos';
 import { usePagos } from './usePagos';
 import { anotarBitacora } from './anotarBitacora';
 
@@ -34,7 +39,7 @@ export function useFacturas(embarqueId?: string) {
   const [cobros, setCobros] = useState<CobroCliente[]>([]);
   const [loading, setLoading] = useState(true);
   // Tarea 68 · `pagos/` es donde se escribe desde P2; `cobros/` solo se lee.
-  const { pagos: pagosNuevos, contextoNuevo, guardarPago, anularPago } = usePagos(embarqueId);
+  const { pagos: pagosNuevos, contextoNuevo, guardarPago, anularPago, actualizarAplicaciones } = usePagos(embarqueId);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
@@ -246,7 +251,42 @@ export function useFacturas(embarqueId?: string) {
   };
 
   /**
+   * El estado guardado de cada factura tocada, recalculado sobre la lista de
+   * pagos COMO QUEDÓ (no sobre el snapshot, que todavía no se refresca).
+   *
+   * Es un índice para filtrar, no la verdad (§1.4): si falla, los saldos se
+   * siguen derivando de las aplicaciones vivas.
+   */
+  const sincronizarEstados = async (destinoIds: readonly string[], pagosDespues: readonly Pago[]) => {
+    const ahora = new Date().toISOString();
+    for (const id of new Set(destinoIds)) {
+      const factura = facturas.find(f => f.id === id);
+      if (!factura) continue;
+      const { estado } = saldoDeFactura(factura, aplicacionesA(factura.id, pagosDespues));
+      if (estado === factura.estado) continue;
+      await conAviso('el estado de la factura', () =>
+        updateDoc(doc(db, COL_FACTURAS, factura.id), sanitizarParaFirestore({
+          estado, updatedAt: ahora,
+        }) as Record<string, unknown>));
+    }
+  };
+
+  /** Una entrada por embarque que el pago tocó: quién, cuándo y por qué. */
+  const anotarEnEmbarques = async (
+    embarqueIds: readonly string[], titulo: string, detalle: string,
+  ) => {
+    const autor = { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' };
+    for (const e of new Set(embarqueIds)) await anotarBitacora(e, 'cobro', titulo, autor, detalle);
+  };
+
+  const quienSoy = () => user?.nombre ?? user?.email ?? '';
+
+  /**
    * Anula un cobro mal capturado. El saldo se recalcula solo.
+   *
+   * Tarea 72 · P5 · **El motivo es obligatorio** y queda con quién y cuándo
+   * en la bitácora de cada embarque que el pago tocó. El pago no se borra: su
+   * folio sigue en la lista, filtrable como «Anulado».
    *
    * El id puede ser de `pagos/` (lo registrado desde P2) o de un cobro viejo
    * de `cobros/`: lo decide `coleccionDelPago` por el `origen` que puso el
@@ -254,19 +294,81 @@ export function useFacturas(embarqueId?: string) {
    * en la colección equivocada crearía un documento nuevo con `activo: false`
    * y el movimiento seguiría vivo en la otra.
    */
-  const anularCobro = async (id: string): Promise<void> => {
+  const anularCobro = async (id: string, motivo: string): Promise<void> => {
     exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
+    const problema = problemaMotivo(motivo);
+    if (problema) throw new Error(problema);
 
+    const pago = pagos.find(p => p.id === id);
     const donde = coleccionDelPago(id, pagos);
-    if (donde === 'pagos') { await anularPago(id); return; }
-    if (donde === 'cobros') {
+    if (donde === 'pagos') {
+      await anularPago(id);
+    } else if (donde === 'cobros') {
       await conAviso('el cobro', () =>
         updateDoc(doc(db, COL_COBROS, id), sanitizarParaFirestore({
           activo: false, updatedAt: new Date().toISOString(),
         }) as Record<string, unknown>));
-      return;
+    } else {
+      throw new Error(`No se encontró el cobro ${id} para anularlo.`);
     }
-    throw new Error(`No se encontró el cobro ${id} para anularlo.`);
+
+    if (pago) {
+      const t = textoAnulacion(pago, quienSoy(), motivo);
+      await anotarEnEmbarques(pago.embarqueIds, t.titulo, t.detalle);
+      await sincronizarEstados(
+        pago.destinoIds ?? [],
+        pagos.map(p => p.id === id ? { ...p, activo: false } : p),
+      );
+    }
+  };
+
+  /**
+   * Tarea 72 · P5 · Quita UNA aplicación de un pago: el dinero vuelve a estar
+   * «sin aplicar» y la factura recupera su saldo. Pide motivo.
+   *
+   * Solo un pago de `pagos/`: lo viejo es de solo lectura (`motivoNoEditable`).
+   */
+  const quitarAplicacion = async (pagoId: string, destinoId: string, motivo: string): Promise<void> => {
+    exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
+    const problema = problemaMotivo(motivo);
+    if (problema) throw new Error(problema);
+
+    const pago = pagos.find(p => p.id === pagoId);
+    if (!pago) throw new Error(`No se encontró el pago ${pagoId}.`);
+    const embarqueDe = (fid: string) => facturas.find(f => f.id === fid)?.embarqueId;
+    const patch = pagoSinAplicacion(pago, destinoId, embarqueDe);
+
+    await actualizarAplicaciones(pagoId, patch);
+
+    for (const q of patch.quitadas) {
+      const t = textoAplicacionQuitada(pago, q, quienSoy(), motivo);
+      await anotarEnEmbarques(pago.embarqueIds, t.titulo, t.detalle);
+    }
+    await sincronizarEstados([destinoId], pagos.map(p => p.id === pagoId ? { ...p, ...patch } : p));
+  };
+
+  /**
+   * Tarea 72 · P5 · Aplica el saldo a favor de un pago a otras facturas del
+   * mismo cliente y moneda. Es el MISMO reparto que «Aplicar pago» —las
+   * aplicaciones las arma `aplicacionesDelReparto`— sobre un pago que ya
+   * existe, así que no se crea otro ni se copia lógica.
+   */
+  const aplicarSaldoAFavor = async (
+    pagoId: string, nuevas: AplicacionPago[], embarqueIdsNuevos: string[],
+  ): Promise<Pago> => {
+    exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
+
+    const pago = pagos.find(p => p.id === pagoId);
+    if (!pago) throw new Error(`No se encontró el pago ${pagoId}.`);
+    const patch = pagoConAplicaciones(pago, nuevas, embarqueIdsNuevos);
+
+    await actualizarAplicaciones(pagoId, patch);
+
+    const despues: Pago = { ...pago, ...patch };
+    const t = textoAplicacionNueva(pago, nuevas, quienSoy());
+    await anotarEnEmbarques(despues.embarqueIds, t.titulo, t.detalle);
+    await sincronizarEstados(nuevas.map(a => a.destinoId), pagos.map(p => p.id === pagoId ? despues : p));
+    return despues;
   };
 
   /** Los cobros de una factura, para calcular su saldo. */
@@ -278,6 +380,6 @@ export function useFacturas(embarqueId?: string) {
   return {
     facturas, cobros, pagosNuevos, pagos, loading,
     registrarFactura, cancelarFactura, registrarCobro, registrarPagoAplicado,
-    anularCobro, cobrosDe,
+    anularCobro, quitarAplicacion, aplicarSaldoAFavor, cobrosDe,
   };
 }

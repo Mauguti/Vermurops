@@ -17,6 +17,7 @@ import { nombreDeUsuario } from '../../auth/AuthContext';
 import type { EdicionEnListaMeta } from './edicionMeta';
 import { CeldaEstado, CeldaEjecutivoEditable } from '../table/CeldaEditable';
 import { estadoFiscal } from '../../lib/datosFiscales';
+import { estatusDeCliente, ETIQUETA_ESTATUS } from '../../lib/estatusCliente';
 
 const col = createColumnHelper<ClienteVermur>();
 
@@ -47,7 +48,16 @@ export const CLIENTE_COLUMNS = [
     id: 'statusOperativo', header: 'Estado', size: 100,
     cell: info => {
       const meta = info.table.options.meta as EdicionEnListaMeta | undefined;
-      const activo = info.getValue() === 'ACTIVO';
+      const estatus = estatusDeCliente({ statusOperativo: info.getValue() });
+      const activo = estatus === 'activo';
+      if (estatus === 'sin_estatus') {
+        return (
+          <span title="Este cliente no tiene estatus operativo guardado"
+            className="px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-50 text-amber-700 border-amber-200">
+            {ETIQUETA_ESTATUS.sin_estatus}
+          </span>
+        );
+      }
       if (!meta?.edicion) {
         return (
           <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
