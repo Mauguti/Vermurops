@@ -80,19 +80,22 @@ export function usePagos(embarqueId?: string) {
    * SMTP AUTH de §4.29: un fallo genérico manda a arreglar lo que está bien.
    */
   const guardarPago = useCallback(async (pago: Pago): Promise<Pago> => {
-    try {
-      await conAviso('el pago', () =>
-        setDoc(doc(db, COL, pago.id), sanitizarParaFirestore(pago)));
-    } catch (err) {
-      if ((err as { code?: string })?.code === 'permission-denied') {
-        throw new Error(
-          'Firestore rechazó la escritura en «pagos» y el pago NO se guardó. ' +
-          'Si es la primera vez que pasa, es que esa colección todavía no tiene ' +
-          'su regla publicada: avisa a quien administra la plataforma.',
-        );
+    // La traducción va DENTRO de conAviso: si se envolviera por fuera, el
+    // aviso que ve el usuario sería el genérico y solo el throw sería claro.
+    await conAviso('el pago', async () => {
+      try {
+        return await setDoc(doc(db, COL, pago.id), sanitizarParaFirestore(pago));
+      } catch (err) {
+        if ((err as { code?: string })?.code === 'permission-denied') {
+          throw new Error(
+            'Firestore rechazó la escritura en «pagos». Si es la primera vez que ' +
+            'pasa, esa colección todavía no tiene su regla publicada: avisa a ' +
+            'quien administra la plataforma. No es tu rol.',
+          );
+        }
+        throw err;
       }
-      throw err;
-    }
+    });
     return pago;
   }, []);
 
