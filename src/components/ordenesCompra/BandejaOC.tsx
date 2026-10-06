@@ -17,6 +17,7 @@ import type { OrdenCompra, EstadoOC } from './OrdenesCompraData';
 import EstadoVacio from '../ui/EstadoVacio';
 import { sumarPorMoneda, formatearPorMoneda } from '../../lib/sumarPorMoneda';
 import type { ConceptoVermur } from '../conceptos/ConceptosData';
+import { resumenPrefacturas, textoContadorPrefacturas } from '../../lib/prefactura';
 import { compararIVAFactura, etiquetaIVA, type EtiquetaIVA } from '../../lib/ivaOrdenCompra';
 import VistaFacturasProveedor from './VistaFacturasProveedor';
 import { usePreferenciasUsuario } from '../../hooks/usePreferenciasUsuario';
@@ -138,6 +139,13 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
 
   const totalFiltrado = ordenesFiltradas.length;
 
+  /* Tarea 74 · El contador mira TODAS las órdenes, no las filtradas: es un
+     aviso de lo que falta, y un filtro puesto no debe esconderlo. */
+  const textoPrefacturas = useMemo(
+    () => textoContadorPrefacturas(resumenPrefacturas(ordenes)),
+    [ordenes],
+  );
+
   // Conteo para badges de filtro
   const getConteo = (filtro: EstadoOC | ''): number => {
     if (filtro === '') return ordenes.length;
@@ -181,6 +189,23 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
 
   return (
     <div className="space-y-[20px]">
+      {/* Tarea 74 · Fase 1 del recordatorio: se ve al entrar, sin que nadie lo
+          mande. El correo (fase 2) espera a que se encienda el correo. */}
+      {textoPrefacturas && (
+        <div className="flex items-center justify-between gap-3 flex-wrap rounded-[8px] border border-amber-300 bg-amber-50 px-[14px] py-[8px]">
+          <p className="text-[12px] text-amber-900" data-testid="contador-prefacturas">
+            <strong>{textoPrefacturas}</strong>
+          </p>
+          <button
+            type="button"
+            onClick={() => set('prefactura', filtros.prefactura === 'pendientes' ? '' : 'pendientes')}
+            className="text-[11px] font-bold text-amber-900 underline underline-offset-2"
+          >
+            {filtros.prefactura === 'pendientes' ? 'Quitar filtro' : 'Ver cuáles'}
+          </button>
+        </div>
+      )}
+
       {/* Filtros por estado */}
       <div className="flex flex-wrap gap-[8px]">
         {FILTROS.map(f => {
@@ -246,6 +271,13 @@ export default function BandejaOC({ ordenes, loading, conteosPorEstado, onSelect
           <option value="">No pagar: indistinto</option>
           <option value="si">Solo las detenidas</option>
           <option value="no">Sin «No pagar»</option>
+        </select>
+
+        {/* Tarea 74 · «marcadas» son las declaradas; «pendientes», las pagadas sin factura. */}
+        <select value={filtros.prefactura} onChange={e => set('prefactura', e.target.value as FiltrosPorPagar['prefactura'])} className={SELECT} title="Prefacturas: se pagan antes de tener la factura">
+          <option value="">Prefactura: indistinto</option>
+          <option value="marcadas">Marcadas como prefactura</option>
+          <option value="pendientes">Factura pendiente</option>
         </select>
 
         {activos > 0 && (

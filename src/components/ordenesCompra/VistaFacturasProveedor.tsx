@@ -10,6 +10,7 @@
  * vive en `lib/facturasProveedor.ts`, con el caso fijado en sus tests.
  */
 
+import BadgePrefactura from './BadgePrefactura';
 import React, { useMemo, useState } from 'react';
 import { ChevronRight, FileText, AlertTriangle, CalendarClock } from 'lucide-react';
 import type { OrdenCompra } from './OrdenesCompraData';
@@ -173,6 +174,9 @@ function RenglonFactura({
               {o.folio}
             </button>
           ))}
+          {/* Tarea 74 · una factura repartida en varias órdenes puede traer
+              varias marcas; cada una dice la suya. */}
+          {factura.ordenes.map(o => <BadgePrefactura key={`pf-${o.id}`} oc={o} vacio={false} />)}
           <span className="text-[11px] text-text-muted">
             {factura.fechaPago && `se paga ${factura.fechaPago}`}
           </span>

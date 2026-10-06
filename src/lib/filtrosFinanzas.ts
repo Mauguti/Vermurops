@@ -20,6 +20,7 @@ import type { OrdenCompra, EstadoOC } from '../components/ordenesCompra/OrdenesC
 import type { EtiquetaIVA } from './ivaOrdenCompra';
 import type { EstadoCobro, FacturaEnCartera } from './cuentasPorCobrar';
 import { contiene } from './texto';
+import { esPrefactura, pendienteDeFactura } from './prefactura';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Cuentas por pagar
@@ -38,12 +39,14 @@ export interface FiltrosPorPagar {
   /** De dónde nació la orden. '' = las dos. */
   origen: 'embarque' | 'oficina' | '';
   moneda: 'USD' | 'MXN' | '';
+  /** Tarea 74 · Prefacturas: 'marcadas' = las declaradas, 'pendientes' = pagadas y sin factura. */
+  prefactura: 'marcadas' | 'pendientes' | '';
   /** Folio, proveedor, concepto, cliente, embarque o número de factura. */
   busqueda: string;
 }
 
 export const FILTROS_POR_PAGAR_VACIOS: FiltrosPorPagar = {
-  estado: '', iva: '', noPagar: '', origen: '', moneda: '', busqueda: '',
+  estado: '', iva: '', noPagar: '', origen: '', moneda: '', prefactura: '', busqueda: '',
 };
 
 export interface ContextoPorPagar {
@@ -69,6 +72,8 @@ export function aplicarFiltrosPorPagar(
     if (f.noPagar === 'no' && oc.noPagar) return false;
     if (f.origen && oc.origen !== f.origen) return false;
     if (f.moneda && oc.moneda !== f.moneda) return false;
+    if (f.prefactura === 'marcadas' && !esPrefactura(oc)) return false;
+    if (f.prefactura === 'pendientes' && !pendienteDeFactura(oc)) return false;
     if (q) {
       const texto = [
         oc.folio, oc.proveedorNombre, oc.conceptoNombre, oc.clienteNombre,
@@ -179,6 +184,7 @@ export function filtrosPorPagarDesdeVista(
   if (f.noPagar !== 'si' && f.noPagar !== 'no') f.noPagar = '';
   if (f.origen !== 'embarque' && f.origen !== 'oficina') f.origen = '';
   if (f.moneda !== 'USD' && f.moneda !== 'MXN') f.moneda = '';
+  if (f.prefactura !== 'marcadas' && f.prefactura !== 'pendientes') f.prefactura = '';
   return f;
 }
 

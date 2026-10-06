@@ -33,7 +33,10 @@ import {
 import {
   puedeMarcarNoPagar as rolPuedeMarcarNoPagar,
   puedeLiberarNoPagar as rolPuedeLiberarNoPagar,
+  puedeMarcarPrefactura as rolPuedeMarcarPrefactura,
 } from '../../auth/permisos';
+import BadgePrefactura from './BadgePrefactura';
+import { PanelPrefactura } from './PanelPrefactura';
 
 /**
  * C-2. La ficha de una orden de compra: el flujo de dos áreas.
@@ -228,6 +231,7 @@ export default function FichaOC({
             </BadgeEstado>
             {oc.urgencia === 'urgente' && <BadgeEstado tono="peligro">Urgente</BadgeEstado>}
             {oc.esAnticipo && <BadgeEstado tono="neutro">Anticipo</BadgeEstado>}
+            <BadgePrefactura oc={oc} vacio={false} />
             <BadgeEstado tono="neutro">
               {oc.origen === 'embarque' ? 'De un embarque' : 'Gasto de oficina'}
             </BadgeEstado>
@@ -282,6 +286,13 @@ export default function FichaOC({
        * que comparten FichaLayout no se tocan.
        */}
       <div className="flex-1 overflow-y-auto pb-6">
+      {/* Tarea 74 · P7 · Operaciones declara que esta orden se paga antes de
+          tener la factura. Editable por quien puede; los demás la leen. */}
+      <PanelPrefactura
+        oc={oc}
+        puedeEditar={rolPuedeMarcarPrefactura(rol) && oc.estado !== 'rechazada'}
+        onActualizar={onActualizar}
+      />
       {oc.origen === 'embarque' && oc.embarqueId && (
         <div className="px-6 pt-3">
           <BloqueEnlaces
