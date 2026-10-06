@@ -72,10 +72,16 @@ export default function Finance() {
   // pago sin aplicaciones, el cobro uno con una. Antes eran dos listas y cada
   // call site tenía que acordarse de pasar las dos.
   const { depositos, registrarDeposito } = useDepositosCliente();
-  const { facturas, cobros, registrarCobro } = useFacturas();
+  const { facturas, cobros, pagosNuevos, registrarCobro } = useFacturas();
+  /*
+   * Tarea 68 · Las tres fuentes en una lista: lo que se escribe hoy
+   * (`pagos/`) y los dos legados que ya no se escriben. `pagosNuevos` sale de
+   * `useFacturas` y no de `useDepositosCliente` para no contar dos veces la
+   * misma colección: los dos hooks la escuchan, pero aquí entra UNA.
+   */
   const pagosCliente = useMemo(
-    () => pagosDeCliente([], cobros, depositos),
-    [cobros, depositos],
+    () => pagosDeCliente(pagosNuevos, cobros, depositos),
+    [pagosNuevos, cobros, depositos],
   );
   const carteraResumen = useMemo(() => {
     const hoy = new Date().toISOString().slice(0, 10);
