@@ -23,6 +23,7 @@ import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
 import { conAviso, reportarErrorEscritura } from '../lib/erroresEscritura';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
+import { statusOperativoDesdeActivo } from '../lib/estatusCliente';
 
 /**
  * El candado del seed vive a nivel de MÓDULO, no del hook (1d).
@@ -162,7 +163,7 @@ export function useClientes() {
    * Importa clientes desde el JSON de Magaya.
    * - setDoc con id preservado → idempotente (re-ejecutar no duplica).
    * - Mapea diasCredito.general → dias, guarda objeto completo como diasCreditoPorTipo.
-   * - Mapea activo (boolean) → statusOperativo ('ACTIVO' | 'INACTIVO').
+   * - Mapea activo (boolean) → statusOperativo; ausente no es INACTIVO (estatusCliente.ts).
    * - Retorna cantidad importada.
    */
   const importarClientesDesdeJSON = useCallback(async (): Promise<number> => {
@@ -184,7 +185,7 @@ export function useClientes() {
           nombre: raw.nombre,
           fechaAlta: raw.fechaAlta ?? new Date().toISOString().slice(0, 10),
           dias: dc?.general ?? 0,
-          statusOperativo: raw.activo ? 'ACTIVO' : 'INACTIVO',
+          statusOperativo: statusOperativoDesdeActivo(raw.activo),
           // Magaya identifiers
           idSemantico: raw.idSemantico ?? undefined,
           referenciaMagaya: raw.referenciaMagaya ?? undefined,

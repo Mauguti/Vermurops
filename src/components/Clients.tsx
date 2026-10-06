@@ -25,6 +25,8 @@ import { puedeEditarEnLista, aplicarCambio, CAMPO_EJECUTIVO, ROL_DEL_AREA, type 
 import type { EdicionEnListaMeta } from './clientes/edicionMeta';
 import { visibleEnAltas, contarSinEstatus } from '../lib/estatusCliente';
 import { avisar, confirmar } from './ui/Dialogos';
+import { proveedorOperable } from '../lib/estatusProveedor';
+import { clienteOperable } from '../lib/estatusCliente';
 
 export default function Clients() {
   // Matriz §4.1: las altas definitivas de clientes y proveedores son solo de
@@ -197,7 +199,7 @@ export default function Clients() {
     const resultado = aplicarCambio(
       cliente as any, 'statusOperativo',
       nuevoActivo ? 'ACTIVO' : 'INACTIVO', autorEmail, new Date().toISOString(),
-      { antes: cliente.statusOperativo === 'ACTIVO' ? 'Activo' : 'Inactivo', despues: nuevoActivo ? 'Activo' : 'Inactivo' },
+      { antes: clienteOperable(cliente) ? 'Activo' : 'Inactivo', despues: nuevoActivo ? 'Activo' : 'Inactivo' },
     );
     if (!resultado) return;
     await updateCliente(id, {
@@ -226,7 +228,7 @@ export default function Clients() {
     if (!prov) return;
     const resultado = aplicarCambio(
       prov as any, 'activo', nuevoActivo, autorEmail, new Date().toISOString(),
-      { antes: prov.activo ? 'Activo' : 'Inactivo', despues: nuevoActivo ? 'Activo' : 'Inactivo' },
+      { antes: proveedorOperable(prov) ? 'Activo' : 'Inactivo', despues: nuevoActivo ? 'Activo' : 'Inactivo' },
     );
     if (!resultado) return;
     await updateProveedor(id, {
@@ -272,7 +274,7 @@ export default function Clients() {
   // ANTES de los early returns: React exige que los hooks se llamen siempre.
   const proveedoresEnRevision = useMemo(
     () => proveedores.filter(p =>
-      p.activo !== false &&
+      proveedorOperable(p) &&
       !p.expedienteValidado &&
       !esEntidadDeMagaya(p)
     ).length,

@@ -2118,6 +2118,16 @@ son componentes. Sin host montado caen al nativo, para no quedarse esperando.
   - Formulario de pago a proveedor: con la cuenta en «Sin indicar» sale el aviso
     ámbar «Sin cuenta: Julio no podrá conciliarlo por cuenta». No bloquea.
 
+## 4.51 Un solo criterio de «activo» para clientes y proveedores (tarea 88, 6-oct-2026)
+
+Solo el inactivo EXPLÍCITO queda fuera: `clienteOperable` (`lib/estatusCliente.ts`)
+y `proveedorOperable` (`lib/estatusProveedor.ts`, `activo !== false`). Sin el
+campo = operable. Antes los selectores de proveedores filtraban `p.activo`
+(sin campo = fuera) mientras la cabecera de la ficha decía «Activo».
+`statusOperativoDesdeActivo` reemplaza el `raw.activo ? 'ACTIVO' : 'INACTIVO'`
+de la importación de `useClientes`: ausente ya no vuelve inactivo. No se escribe
+ningún campo nuevo ni se migra.
+
 ---
 
 ## 5. Estado de los módulos

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { normalizarTexto, compararTexto } from '../../lib/texto';
 import { X, Search, Plus, Building2 } from 'lucide-react';
 import type { ProveedorVermur } from '../proveedores/ProveedoresData';
+import { proveedorOperable } from '../../lib/estatusProveedor';
 
 /**
  * Elegir el proveedor que entra como columna de la comparativa.
@@ -47,7 +48,7 @@ export default function ModalAgregarAgente({
   const filtrados = useMemo(() => {
     const q = norm(busqueda);
     return proveedores
-      .filter(p => p.activo && !yaEsta.has(p.id))
+      .filter(p => proveedorOperable(p) && !yaEsta.has(p.id))
       .filter(p => !q || norm(p.nombre).includes(q) || norm(p.rfc ?? '').includes(q))
       // Los de la modalidad del servicio primero; los demás siguen accesibles.
       .sort((a, b) => {

@@ -21,6 +21,7 @@ import { useProveedores } from '../../hooks/useProveedores';
 import { useConceptos } from '../../hooks/useConceptos';
 import { usePuertos } from '../../hooks/usePuertos';
 import { useAuth } from '../../auth/AuthContext';
+import { proveedorOperable } from '../../lib/estatusProveedor';
 
 // ─── Styles ────────────────────────────────────────────────────────────────
 const CELL = 'w-full px-2 py-1.5 text-[12px] bg-white border border-card-border rounded-[4px] focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand text-text-primary';
@@ -74,7 +75,7 @@ export default function CargaMasivaTarifas({ onClose, onCreate }: Props) {
   const { puertos } = usePuertos();
 
   const provActivos = useMemo(
-    () => proveedores.filter(p => p.activo).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
+    () => proveedores.filter(proveedorOperable).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
     [proveedores],
   );
   const concActivos = useMemo(

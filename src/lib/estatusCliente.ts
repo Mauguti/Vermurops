@@ -41,3 +41,15 @@ export function clienteOperable(c: { statusOperativo?: unknown }): boolean {
 export function contarSinEstatus(clientes: { statusOperativo?: unknown }[]): number {
   return clientes.filter(c => estatusDeCliente(c) === 'sin_estatus').length;
 }
+
+/**
+ * `statusOperativo` a partir del `activo` booleano de un seed o de Magaya.
+ * Solo `activo === false` es INACTIVO; ausente NO se vuelve inactivo (era el
+ * bug de `raw.activo ? 'ACTIVO' : 'INACTIVO'`) ni se inventa un ACTIVO: queda
+ * sin campo y se lee como «sin estatus», operable.
+ */
+export function statusOperativoDesdeActivo(activo: unknown): 'ACTIVO' | 'INACTIVO' | undefined {
+  if (activo === false) return 'INACTIVO';
+  if (activo === true) return 'ACTIVO';
+  return undefined;
+}
