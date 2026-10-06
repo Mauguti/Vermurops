@@ -24,7 +24,17 @@ export const ETIQUETA_ESTATUS: Record<EstatusCliente, string> = {
 
 /** ¿Entra a la lista? Solo los inactivos se esconden, y solo si no se piden. */
 export function visibleEnAltas(c: { statusOperativo?: unknown }, mostrarInactivos: boolean): boolean {
-  return mostrarInactivos || estatusDeCliente(c) !== 'inactivo';
+  return mostrarInactivos || clienteOperable(c);
+}
+
+/**
+ * ¿Se puede operar con este cliente? Un solo criterio para Altas, el selector
+ * de clientes del embarque y el mapeo cotización → embarque: solo el INACTIVO
+ * explícito se excluye. «Sin estatus» es operable (visible, con su etiqueta):
+ * excluirlo esconde clientes reales que nadie marcó como baja.
+ */
+export function clienteOperable(c: { statusOperativo?: unknown }): boolean {
+  return estatusDeCliente(c) !== 'inactivo';
 }
 
 /** Cuántos clientes caen en el hueco, para avisarlo en la pantalla. */
