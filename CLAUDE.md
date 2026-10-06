@@ -2075,6 +2075,23 @@ Reglas puras en `lib/formularioPagoProveedor.ts`; el dinero sigue en
     embarque sobre la misma lista. Se abre con el primer suscriptor y se cierra
     con el último.
 
+## 4.48 Registrar y anular un pago a proveedor, en UNA transacción (tarea 85, 7-oct-2026)
+
+El comentario de §4.38/§4.45 prometía «todo o nada» y el código no lo cumplía:
+guardaba o anulaba el pago y luego marcaba/revertía las órdenes en un bucle,
+así que una falla a la mitad dejaba un pago anulado con órdenes aún `pagada`.
+Ahora `lib/escrituraPagoProveedor.ts` ARMA el plan (pago, cada orden, bitácora
+de cada embarque) y `hooks/escribirAtomico.ts` lo ejecuta con `runTransaction`.
+  - Antes de escribir lee cada orden y exige que siga en el estado sobre el que
+    se calculó el plan; si otra sesión la movió, no se escribe nada.
+  - La bitácora entra en la misma transacción; un embarque inexistente se omite.
+  - El folio del pago se reserva ANTES, en su propia transacción: si lo demás
+    falla queda un hueco de folio, no un duplicado.
+  - Sin cambio de reglas ni de modelo. `transicionarEstado` y `revertirPago` de
+    `useOrdenesCompra` siguen para las demás transiciones.
+  - `escribirAtomico.test.ts` inyecta la falla en la orden 2 y comprueba que no
+    queda nada; probado por mutación (volver a escrituras sueltas lo rompe).
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
