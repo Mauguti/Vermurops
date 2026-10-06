@@ -1,58 +1,44 @@
-# Estado de VermurOps — 7 de octubre de 2026 (corte nocturno)
+# Estado de VermurOps — 6 de octubre de 2026 (corte del sprint nocturno)
 
-**Corte del sprint nocturno de pagos a proveedor: la cadena 79 → 83 está lista y
-SIN PUBLICAR.** Cinco tareas `[x]`, una `[!]` (84, fuera de la cadena), ningún
+**Corte del sprint «Pagos sin cabos sueltos»: la cadena 85 → 89 está lista y SIN
+PUBLICAR.** Cinco tareas `[x]`, una `[!]` (90, fuera de la cadena), ningún
 bloqueo de la guardia.
 
-La cadena 72 → 78 ya está en `main` (`e237219`, merge de `verif/72-78`); esta
-sale de ahí. No verifiqué si su hosting ya se publicó: confirmarlo antes.
+Sale de `sprint/base` = `main` = `7f805c8`, que ya trae 79 → 83. No verifiqué
+si su hosting se publicó: confirmarlo antes.
 
-Punta: `sprint/83-estatus-operativo` — **mergearla trae las cinco**.
+Punta: `sprint/89-listeners` — **mergearla trae las cinco**.
 
-En la punta: **2,645 tests en verde** · `tsc --noEmit` 0 errores · build limpio ·
+En la punta: **2,670 tests en verde** · `tsc --noEmit` 0 errores · build limpio ·
 `./scripts/e2e.sh` 6/6.
 
 **La cadena es solo hosting.** No toca reglas, índices, Functions, secretos ni
-n8n, y no migra datos. Campos nuevos, opcionales: `Pago.anulacion` y
-`Pago.aplicacionesQuitadas`.
+n8n, no migra datos y no agrega campos de modelo.
 
 Resumen con preguntas redactadas: `sprint/reportes/RESUMEN.md` (no versionado).
 
 ---
 
-## 1. La cadena de la noche: 79 → 83, sin publicar
+## 1. La cadena de la noche: 85 → 89, sin publicar
 
 | # | Tarea | Rama | CLAUDE.md |
 |---|---|---|---|
-| 79 | Motivo de anulación dentro del Pago; fuera el `prompt` | `sprint/79-anulacion-en-pago` | §4.44 |
-| 80 | Pagos a proveedor en Pagos; anular revierte sus órdenes | `sprint/80-pagos-proveedor-lista-anular` | §4.45 |
-| 81 | Formulario de pago a proveedor | `sprint/81-formulario-pago-proveedor` | §4.46 |
-| 82 | Entradas de la orden = cálculo del fondeo; un listener de `pagos/` | `sprint/82-entradas-orden-fondeo` | §4.47 |
-| 83 | `clienteOperable`: un criterio de `statusOperativo` | `sprint/83-estatus-operativo` | — |
+| 85 | Registrar y anular pago a proveedor en UNA transacción | `sprint/85-pagos-proveedor-atomico` | §4.48 |
+| 86 | `pagadaPor.fecha` = fecha real del pago; no anterior a la autorización | `sprint/86-fecha-real-pago` | §4.49 |
+| 87 | Modales de la plataforma en lugar de alert/confirm/prompt; aviso «Sin cuenta» | `sprint/87-sin-cuadros-navegador` | §4.50 |
+| 88 | Un criterio de «activo» (`proveedorOperable`, seed de clientes) | `sprint/88-activo-unico` | §4.51 |
+| 89 | Un listener por colección (facturas, cobros, depósitos) | `sprint/89-listeners` | §4.52 |
 
-### Qué trae cada una
+Cambios de comportamiento a avisar: «No pagar» cancelado ya no marca la orden;
+una orden movida por otra sesión detiene el pago con «recarga y reintenta»; el
+seed de clientes ya no vuelve inactivo al que no trae `activo`.
 
-- **79.** `anulacion` y `aplicacionesQuitadas` en el Pago (`en` es ISO, no
-  Timestamp); la ficha lee del Pago y completa con la bitácora lo anterior.
-  Modal de motivo en Facturas del embarque.
-- **80.** Pestaña Pagos con los dos lados y totales por lado. Anular un pago a
-  proveedor regresa cada orden `pagada → autorizada` por un arco aparte
-  (`puedeRevertirPagoOC`), todo o nada.
-- **81.** Modal «Registrar pago»: órdenes con casilla, fecha del pago, cuenta,
-  referencia y comprobante subido una vez y ligado a todas las órdenes.
-- **82.** La ficha de la OC usa `entradasDeFondeo`; `pagos/` pasa de 3
-  listeners a 1 (`tiendaCompartida.ts`).
-- **83.** Altas, selector de cliente del pallet y mapeo a embarque usan
-  `clienteOperable`; los «sin estatus» operan y se etiquetan.
+### Antes del hosting
 
-### Lo que hay que hacer antes del hosting
-
-1. Avisar al equipo que anular un cobro pide motivo en un modal.
-2. Hosting con `--only hosting` desde el checkout principal
+1. Hosting con `--only hosting` desde el checkout principal
    (`cd /Users/mauriciogutierrezmunoz/antigravity/Vermur-Logistics`), leyendo
    `uploading` y no `skipping upload` (§3); luego merge `--no-ff` y push.
-3. Validar en navegador con las tablas de `sprint/reportes/79–83.md`
-   (la 83 no tiene capturas).
+2. Validar en navegador con las tablas de `sprint/reportes/85–89.md`.
 
 **Punto de regreso:** `git revert` del merge. Nada que deshacer en datos.
 
@@ -60,14 +46,13 @@ Resumen con preguntas redactadas: `sprint/reportes/RESUMEN.md` (no versionado).
 
 ## 2. Cola restante
 
-La cola 79–84 terminó a las 11:31. **No hay cola nueva escrita.**
-
 | Qué | Tipo | Bloquea |
 |---|---|---|
-| **Publicar la cadena 79 → 83** (hosting) | Despliegue | — |
-| **84 · Higiene de los e2e** (`[!]`: la sesión salió sin esperar la suite; trabajo a medias en `sprint/84-higiene-e2e`, sin verificar) | Pruebas | Redundancia por mutación de las reglas de dinero de la 73 |
-| Reemplazar los `prompt`/`confirm`/`alert` restantes por modal (lista en `79.md`) | Código | Pregunta 5 de Mau |
-| Armonizar lectores de `statusOperativo`/`activo` de clientes y proveedores (lista en `83.md`) | Código | — |
+| **Publicar la cadena 85 → 89** (hosting) | Despliegue | — |
+| **90 · Higiene de los e2e** (`[!]`, rama `sprint/90-higiene-e2e`): falta que el recorrido se repita sobre los mismos emuladores (la 2ª vuelta falla en el paso 6 de Administración). Trae `e2e-completo.sh` (232 tests, verde) y un fix real de una línea en `programacionPagos.ts` (el modal restaba dos veces el anticipo cruzado) | Pruebas + 1 línea de código | Rescatar el fix aparte si no se toma la rama |
+| Incluir en `e2e-completo.sh` los specs que necesitan el emulador de Functions (`gestion-usuarios`, `capturas-21`) | Pruebas | — |
+| `transicionarEstado` (pago individual desde la orden) aún guarda la fecha de captura | Código | — |
+| Listeners por montaje en `useClientes`, `useProveedores`, `useEmbarques`, `useCotizaciones` | Código | — |
 | Validar 56–66 y 35–55 en navegador (arrastrado) | Validación | Cerrar sprints anteriores |
 | **P8** · flujo de efectivo y `saldosCuenta/` | Código + reglas | Respuesta de Julio |
 | Freno del cierre administrativo por prefactura sin factura (J6) | Código | Respuesta de Julio |
@@ -83,20 +68,20 @@ La cola 79–84 terminó a las 11:31. **No hay cola nueva escrita.**
 
 ## 3. Decisiones de Mau y pendientes de esta cadena
 
-Ya tomadas (7-oct): `anulacion` y `aplicacionesQuitadas` aprobados; no se
-aplican anticipos viejos; prefactura vive en la orden de compra; Administración
-no marca prefactura y se permite retroactiva; los «Sin estatus» no se corrigen
-en lote; FichaRFQ se borró, Bookings y Pickups se conservan.
+Ya tomadas (6-oct): anular un pago a proveedor regresa las órdenes a
+«autorizada» (pendiente de confirmar con Julio); anular un pago heredado no
+revierte nada; un cliente sin estatus es operable; la cuenta de salida queda
+opcional con aviso (87); el anticipo cruzado de una orden revertida espera a
+Julio.
 
-Pendientes (recomendación entre paréntesis, detalle en `RESUMEN.md`):
-- ¿Anular un pago a proveedor regresa a `autorizada` o `en_gestion`? (autorizada)
-- ¿Anular un pago heredado revierte sus órdenes? (no, hasta que se pida)
-- ¿Un cliente «sin estatus» opera o solo se ve? (opera)
-- ¿Cuenta de salida obligatoria en el pago a proveedor? (sí, cuando Julio concilie por cuenta)
-- ¿Modal de motivo para los `prompt` restantes? (sí, tarea chica)
-- ¿Pago repartido sin resolvedor: omitir o listar con aviso? (omitir)
-- ¿Se libera el anticipo cruzado de una orden revertida? (revisar con Julio)
+Pendientes (recomendación entre paréntesis):
+- ¿El seed de clientes escribe ACTIVO explícito cuando falta `activo`? (no)
+- ¿`e2e-completo.sh` levanta también el emulador de Functions? (sí, otra tarea)
+- ¿Se rescata aparte el fix de una línea de la 90? (sí)
 - Para Julio: ¿los días de una prefactura cuentan desde la fecha del pago o de la captura?
+- Para Julio: confirmar que anular regresa a «autorizada» y qué pasa con el anticipo cruzado.
+
+---
 
 ---
 
