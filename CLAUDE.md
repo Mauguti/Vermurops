@@ -2103,6 +2103,21 @@ autorización de cualquiera de las órdenes elegidas y dice cuál y qué fecha
 `lib/formularioPagoProveedor.ts`); una orden sin autorización registrada no
 bloquea. Legacy: las pagadas antes de la 86 conservan su timestamp de captura.
 
+## 4.50 Fuera los cuadros del navegador, y aviso de «Sin cuenta» (tarea 87, 7-oct-2026)
+
+`components/ui/Dialogos.tsx`: `avisar`, `confirmar` y `pedirTexto` con la forma
+de los nativos (`await`) pero como modal de la plataforma; `<DialogosHost />`
+vive en la raíz de `App.tsx`, así que también se llaman desde funciones que no
+son componentes. Sin host montado caen al nativo, para no quedarse esperando.
+  - Se reemplazaron los ~30 `alert`/`confirm`/`prompt` de `src/`; el grep
+    `\b(alert|confirm|prompt)\(` ya solo da un comentario. Lo peligroso
+    (eliminar, desactivar, importar) pide confirmar en rojo; el resto, morado.
+  - «No pagar» ya no se marca si se cancela el modal (antes marcaba con motivo null).
+  - **Un spec que aceptaba el nativo ahora debe pulsar el botón del modal**
+    (`getByTestId('dialogo')`); el recorrido lo hace en «Marcar ganada» y «No pagar».
+  - Formulario de pago a proveedor: con la cuenta en «Sin indicar» sale el aviso
+    ámbar «Sin cuenta: Julio no podrá conciliarlo por cuenta». No bloquea.
+
 ---
 
 ## 5. Estado de los módulos

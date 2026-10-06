@@ -40,6 +40,7 @@ import { useOrdenesCompra } from '../../hooks/useOrdenesCompra';
 import Toast, { TipoToast } from '../ui/Toast';
 import { sumarPorMoneda, formatearPorMoneda } from '../../lib/sumarPorMoneda';
 import { ETIQUETA_FUENTE } from '../../lib/monedaComparativa';
+import { avisar, confirmar } from '../ui/Dialogos';
 
 /**
  * Las pestañas, en el orden en que se trabaja (decisión de Mau, 10-sep-2026):
@@ -237,13 +238,13 @@ export default function FichaEmbarque({
     guardar(updated);
   };
 
-  const handleToggleCierre = (cierreType: 'operativo' | 'pago' | 'administrativo') => {
+  const handleToggleCierre = async (cierreType: 'operativo' | 'pago' | 'administrativo') => {
     // §4.7: operativo → pago → administrativo. No se bloquea marcar fuera de
     // orden —a veces se cobra antes de que Operaciones termine— pero cerrar
     // administrativamente algo sin cobrar suele ser un clic mal dado.
     if (!embarque.cierres[cierreType]) {
       const aviso = avisoDeOrden(cierreType, embarque.cierres);
-      if (aviso && !window.confirm(`${aviso}\n\n¿Marcarlo de todos modos?`)) return;
+      if (aviso && !await confirmar({ mensaje: `${aviso}\n\n¿Marcarlo de todos modos?`, confirmar: 'Marcar' })) return;
     }
     const updated: EmbarqueCompleto = {
       ...embarque,
@@ -493,7 +494,7 @@ export default function FichaEmbarque({
       nuevoId = await generateFolioEmbarque();
     } catch (err) {
       // Sin esto el onClick deja una promesa rechazada sin atrapar en consola.
-      alert(`No se pudo generar el folio del HBL hijo: ${err instanceof Error ? err.message : err}`);
+      void avisar(`No se pudo generar el folio del HBL hijo: ${err instanceof Error ? err.message : err}`);
       return;
     }
     const nextNum = parseFolioNumero(nuevoId);
@@ -536,7 +537,7 @@ export default function FichaEmbarque({
     };
 
     guardar(nuevoHijo); // Esta acción la registra en el listado central
-    alert(`Se ha creado el HBL Hijo ${nuevoHijo.folio}. Puedes buscarlo en la lista.`);
+    void avisar(`Se ha creado el HBL Hijo ${nuevoHijo.folio}. Puedes buscarlo en la lista.`);
   };
 
   const PESTANAS = [

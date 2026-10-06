@@ -22,6 +22,7 @@ import {
 } from '../../lib/facturacionEmbarque';
 import { BANCOS_VERMUR, BANCO_COBRO_DEFAULT } from '../../lib/cuentasPago';
 import { AVISO_COBRO_EN_COBRANZA } from '../../lib/entradaDinero';
+import { avisar, pedirTexto } from '../ui/Dialogos';
 
 const money = (n: number) =>
   n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -83,7 +84,7 @@ export default function PanelFacturasEmbarque({
 
   const registrar = () => {
     if (!propuesta.ok) return;
-    if (!numero.trim()) { window.alert('Captura el número de la factura que emitiste.'); return; }
+    if (!numero.trim()) { void avisar('Captura el número de la factura que emitiste.'); return; }
     const p = propuesta.propuesta;
     onRegistrar({
       numero: numero.trim(),
@@ -319,12 +320,12 @@ function FilaFactura({
 
   const registrarCobro = () => {
     const n = Number(monto);
-    if (!(n > 0)) { window.alert('Captura el monto cobrado.'); return; }
+    if (!(n > 0)) { void avisar('Captura el monto cobrado.'); return; }
     if (n > saldo.saldo + 1) {
-      window.alert(`La factura solo debe ${factura.moneda} ${money(saldo.saldo)}. Cobrar de más deja un saldo a favor que nadie rastrea.`);
+      void avisar(`La factura solo debe ${factura.moneda} ${money(saldo.saldo)}. Cobrar de más deja un saldo a favor que nadie rastrea.`);
       return;
     }
-    if (!referencia.trim()) { window.alert('Captura la referencia bancaria.'); return; }
+    if (!referencia.trim()) { void avisar('Captura la referencia bancaria.'); return; }
     onCobrar({
       facturaId: factura.id, facturaNumero: factura.numero,
       embarqueId: embarque.id, embarqueFolio: embarque.folio,
@@ -393,9 +394,9 @@ function FilaFactura({
           {puedeFacturar && !cancelada && cobros.length === 0 && (
             <button
               type="button"
-              onClick={() => {
-                const m = window.prompt('¿Por qué se cancela esta factura?');
-                if (m?.trim()) onCancelar(factura.id, m.trim());
+              onClick={async () => {
+                const m = await pedirTexto({ titulo: '¿Por qué se cancela esta factura?', confirmar: 'Cancelar factura', obligatorio: true, multilinea: true });
+                if (m) onCancelar(factura.id, m);
               }}
               className="text-gray-300 hover:text-red-600 p-1"
               title="Cancelar la factura"

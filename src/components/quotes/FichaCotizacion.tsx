@@ -108,6 +108,7 @@ import TablaPorProveedor, { ToggleVistaCargos } from '../cargos/TablaPorProveedo
 import { consolidarPorProveedor, desdeLineas } from '../../lib/cargosPorProveedor';
 import { usePreferenciasUsuario } from '../../hooks/usePreferenciasUsuario';
 import ConceptoSelector from '../conceptos/ConceptoSelector';
+import { avisar, confirmar } from '../ui/Dialogos';
 
 // ─── Re-exports for backward compat (other files may import these from here) ──
 export { ServicioSection } from './ServicioSection';
@@ -313,7 +314,7 @@ export default function FichaCotizacion({
     // ── Guard E5.2: validar transición antes de ejecutar ──────────────────
     const guard = puedeTransicionarA(quote.etapa, newEtapa, rolActivo, quote);
     if (!guard.ok) {
-      alert(guard.razon ?? 'Transición no permitida.');
+      void avisar(guard.razon ?? 'Transición no permitida.');
       return;
     }
 
@@ -1154,7 +1155,7 @@ export default function FichaCotizacion({
     onUpdateQuote(elegirCelda(quote, fila.servicioId, fila.id, agenteId));
   };
 
-  const handleElegirColumnaCompleta = (agenteId: string) => {
+  const handleElegirColumnaCompleta = async (agenteId: string) => {
     if (!matrizActiva) return;
     const { matriz, servicioId } = matrizActiva;
     const nombre = matriz.agentes.find(a => a.id === agenteId)?.nombre ?? '';
@@ -1173,9 +1174,10 @@ export default function FichaCotizacion({
         : '',
     ].filter(Boolean);
 
-    if (avisos.length > 0 && !window.confirm(
-      `Elegir a ${nombre} para todas las filas.\n\n${avisos.join('\n\n')}\n\n¿Continuar?`
-    )) return;
+    if (avisos.length > 0 && !await confirmar({
+      mensaje: `Elegir a ${nombre} para todas las filas.\n\n${avisos.join('\n\n')}\n\n¿Continuar?`,
+      confirmar: 'Elegir',
+    })) return;
 
     onUpdateQuote(elegirColumna(quote, servicioId, agenteId));
   };
@@ -1408,9 +1410,9 @@ export default function FichaCotizacion({
       : undefined;
 
   /** Avanza de etapa. Ganada pide confirmación: de ahí nace el embarque. */
-  const avanzarA = (hacia: PipelineStageId, justificacionSalto?: string) => {
+  const avanzarA = async (hacia: PipelineStageId, justificacionSalto?: string) => {
     if (hacia === 'ganada') {
-      if (confirm(`¿Marcar ${quote.id} como GANADA?\n\nSe generará el embarque en automático con los conceptos a cobrar y a pagar, y la cotización quedará congelada.`)) {
+      if (await confirmar({ titulo: 'Marcar como ganada', confirmar: 'Marcar ganada', mensaje: `¿Marcar ${quote.id} como GANADA?\n\nSe generará el embarque en automático con los conceptos a cobrar y a pagar, y la cotización quedará congelada.` })) {
         handleStageChange('ganada', null, justificacionSalto);
       }
       return;

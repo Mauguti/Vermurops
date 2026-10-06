@@ -43,6 +43,7 @@ import { idUnico } from '../lib/idUnico';
 import {
   medirCotizacionCreada, medirFlujoIniciado, medirFlujoTerminado, medirFlujoAbandonado,
 } from '../lib/analitica';
+import { avisar, confirmar } from './ui/Dialogos';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Componente principal del módulo de Cotizaciones
@@ -540,14 +541,15 @@ export default function Quotes() {
     setShowForm(false);
   };
 
-  const cambiarModalidad = (m: ModalidadSolicitud) => {
+  const cambiarModalidad = async (m: ModalidadSolicitud) => {
     const actual = formCargas[0];
     if (actual && modalidadDeCarga(actual.carga) === m) return;
     if (actual && borradorTieneDatos(actual)) {
       const desde = ETIQUETA_MODALIDAD[modalidadDeCarga(actual.carga)];
-      if (!window.confirm(
-        `Cambiar de ${desde} a ${ETIQUETA_MODALIDAD[m]} descarta lo que capturaste en esta modalidad. ¿Continuar?`,
-      )) return;
+      if (!await confirmar({
+        mensaje: `Cambiar de ${desde} a ${ETIQUETA_MODALIDAD[m]} descarta lo que capturaste en esta modalidad. ¿Continuar?`,
+        confirmar: 'Cambiar', peligro: true,
+      })) return;
     }
     setFormCargas([nuevoDraft(m)]);
     setFormTrafico('');
@@ -673,7 +675,7 @@ export default function Quotes() {
 
   const handleCreateQuote = async (stage: 'solicitud_cliente' | 'solicitado_pricing' | 'pricing_solicitando') => {
     if (!formEmpresa.trim() || formCargas.length === 0) {
-      alert('Por favor introduce la empresa y agrega al menos una modalidad.');
+      void avisar('Por favor introduce la empresa y agrega al menos una modalidad.');
       medirFlujoAbandonado(FLUJO_SOLICITUD, 'sin_empresa', 'validacion');
       return;
     }
@@ -683,7 +685,7 @@ export default function Quotes() {
     const errores = formCargas.flatMap(d =>
       validarCarga(d.carga).map(m => `${ETIQUETA_MODALIDAD[modalidadDeCarga(d.carga)]}: ${m}`));
     if (errores.length > 0) {
-      alert(`Faltan datos de la carga:\n\n${errores.join('\n')}`);
+      void avisar(`Faltan datos de la carga:\n\n${errores.join('\n')}`);
       // Dónde se atoran: la carga incompleta es el punto de fricción más
       // probable del formulario nuevo.
       medirFlujoAbandonado(FLUJO_SOLICITUD, 'datos_carga', 'validacion');
@@ -1413,7 +1415,7 @@ export default function Quotes() {
                   };
                   await createCotizacion(newQuote);
                   agregarNotificacion({ id: `notif-${Date.now()}`, tipo: 'cambio_etapa', titulo: 'Prospecto convertido', mensaje: `${p.empresa} fue convertido a cotización ${folio}`, cotizacionId: folio, etapaAnterior: 'nuevo_lead', etapaNueva: 'solicitud_cliente', destinatarios: ['ventas', 'admin'], leida: false, fecha: new Date().toISOString() });
-                  setTimeout(() => { if (window.confirm(`Cotización ${folio} creada desde prospecto ${p.folio}\n\n¿Ir a Cotizaciones?`)) { setViewMode('kanban'); } }, 100);
+                  setTimeout(async () => { if (await confirmar({ mensaje: `Cotización ${folio} creada desde prospecto ${p.folio}\n\n¿Ir a Cotizaciones?`, confirmar: 'Ir a Cotizaciones' })) { setViewMode('kanban'); } }, 100);
                 }}
                 prospectos={prospectos}
                 setProspectos={setProspectos}
@@ -1496,7 +1498,7 @@ export default function Quotes() {
                         <Upload className="w-8 h-8 text-gray-400 mb-2" />
                         <p className="text-xs font-semibold text-gray-600 mb-1">Arrastra tu archivo CSV aquí</p>
                         <p className="text-[10px] text-gray-400 mb-4">o haz clic para seleccionar</p>
-                        <button onClick={() => { alert('Demo: La importación abriría el selector y procesaría los datos.'); setShowQuoteImportModal(false); }} className="bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
+                        <button onClick={() => { void avisar('Demo: La importación abriría el selector y procesaría los datos.'); setShowQuoteImportModal(false); }} className="bg-gray-800 hover:bg-gray-900 text-white text-xs font-bold px-4 py-2 rounded-lg transition-colors">
                           Seleccionar archivo
                         </button>
                       </div>

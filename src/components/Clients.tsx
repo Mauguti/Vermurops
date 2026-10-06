@@ -24,6 +24,7 @@ import type { ClienteVermur } from './clientes/ClientesData';
 import { puedeEditarEnLista, aplicarCambio, CAMPO_EJECUTIVO, ROL_DEL_AREA, type AreaEjecutivo } from '../lib/edicionEnLista';
 import type { EdicionEnListaMeta } from './clientes/edicionMeta';
 import { visibleEnAltas, contarSinEstatus } from '../lib/estatusCliente';
+import { avisar, confirmar } from './ui/Dialogos';
 
 export default function Clients() {
   // Matriz §4.1: las altas definitivas de clientes y proveedores son solo de
@@ -48,7 +49,7 @@ export default function Clients() {
       // se pisan, no un aproximado. Es una escritura contra la base en uso.
       const { total, aSobrescribir, nuevos } = await analizarImportacionClientes();
 
-      const ok = window.confirm(
+      const ok = await confirmar({ titulo: 'Importar catálogo de clientes', confirmar: 'Importar', peligro: true, mensaje:
         `IMPORTAR CATÁLOGO DE CLIENTES DESDE MAGAYA\n\n` +
         `Se escribirán ${total} registros:\n` +
         `  • ${aSobrescribir} SOBRESCRIBEN clientes que ya existen\n` +
@@ -57,13 +58,13 @@ export default function Clients() {
         `equipo está trabajando ahora mismo. Todo cambio hecho sobre ellos desde ` +
         `la última carga se pierde.\n\n` +
         `Esta acción no se puede deshacer. ¿Continuar?`
-      );
+      });
       if (!ok) return;
 
       const count = await importarClientesDesdeJSON();
-      window.alert(`Importación completa: ${count} clientes escritos.`);
+      void avisar(`Importación completa: ${count} clientes escritos.`);
     } catch (err) {
-      window.alert(`Error al importar: ${err instanceof Error ? err.message : err}`);
+      void avisar(`Error al importar: ${err instanceof Error ? err.message : err}`);
     } finally {
       setSeedingClientes(false);
     }

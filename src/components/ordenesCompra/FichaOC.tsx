@@ -37,6 +37,7 @@ import {
 } from '../../auth/permisos';
 import BadgePrefactura from './BadgePrefactura';
 import { PanelPrefactura } from './PanelPrefactura';
+import { avisar, pedirTexto } from '../ui/Dialogos';
 
 /**
  * C-2. La ficha de una orden de compra: el flujo de dos áreas.
@@ -412,11 +413,12 @@ export default function FichaOC({
               {puedeTocarNoPagar && !terminada && (
                 <button
                   type="button"
-                  onClick={() => onActualizar(
-                    oc.noPagar
-                      ? { noPagar: false, motivoNoPagar: null }
-                      : { noPagar: true, motivoNoPagar: window.prompt('¿Por qué se detiene este pago?')?.trim() || null },
-                  )}
+                  onClick={async () => {
+                    if (oc.noPagar) { onActualizar({ noPagar: false, motivoNoPagar: null }); return; }
+                    const motivo = await pedirTexto({ titulo: '¿Por qué se detiene este pago?', confirmar: 'Detener pago', multilinea: true });
+                    if (motivo === null) return;
+                    onActualizar({ noPagar: true, motivoNoPagar: motivo || null });
+                  }}
                   className={`shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-md border transition-colors ${
                     oc.noPagar
                       ? 'border-red-300 bg-red-100 text-red-800 hover:bg-red-200'
@@ -629,18 +631,19 @@ export default function FichaOC({
                     </span>
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={async () => {
                         // Se aplica lo que alcance: nunca más de lo disponible
                         // ni más de lo que la orden debe.
                         const sugerido = Math.min(disponible, aTransferir);
-                        const texto = window.prompt(
-                          `¿Cuánto de ${anticipo.folio} se aplica a esta orden? (máximo ${anticipo.moneda} ${money(sugerido)})`,
-                          String(sugerido),
-                        );
+                        const texto = await pedirTexto({
+                          titulo: `¿Cuánto de ${anticipo.folio} se aplica a esta orden?`,
+                          mensaje: `Máximo ${anticipo.moneda} ${money(sugerido)}`,
+                          valorInicial: String(sugerido), confirmar: 'Aplicar', obligatorio: true,
+                        });
                         if (texto === null) return;
                         const monto = Number(texto);
                         const r = aplicarAnticipo(oc, anticipo, monto, todasLasOrdenes);
-                        if (!r.ok) { window.alert(r.error); return; }
+                        if (!r.ok) { void avisar(r.error); return; }
                         onActualizar(r.cambios!);
                       }}
                       className="text-[10px] font-bold text-brand hover:text-brand-hover"

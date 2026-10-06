@@ -245,6 +245,8 @@ test('Ventas · envía la cotización al cliente y la marca ganada', async ({ br
   await page.getByText(S.folio, { exact: true }).first().click();
   await page.getByRole('button', { name: 'Enviar al cliente' }).click();
   await page.getByRole('button', { name: 'Marcar ganada' }).click();
+  // Tarea 87: la confirmación es un modal de la plataforma, no el cuadro nativo.
+  await page.getByTestId('dialogo').getByRole('button', { name: 'Marcar ganada' }).click();
   // La etapa se verifica en la base: en la ficha «Ganada» vive en un badge
   // que Ventas ve con otra etiqueta (línea de tiempo colapsada).
   await expect.poll(async () => {
@@ -317,8 +319,10 @@ test('Operaciones · abre el embarque con serie, captura, concilia la factura y 
   await expect(page.getByText('En gestión').first()).toBeVisible({ timeout: 15_000 });
 
   // Operaciones MARCA «No pagar» y no la puede quitar (minuta §5).
-  // El motivo lo pide un window.prompt; `entrar` ya acepta todo diálogo.
+  // Tarea 87: el motivo lo pide un modal de la plataforma (antes, window.prompt).
   await page.getByRole('button', { name: 'Marcar «No pagar»' }).click();
+  await page.getByTestId('dialogo').getByLabel('¿Por qué se detiene este pago?').fill('El cliente aún no fondea');
+  await page.getByTestId('dialogo').getByRole('button', { name: 'Detener pago' }).click();
   await expect(page.getByText(/La quita Administración/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('button', { name: 'Quitar «No pagar»' })).toHaveCount(0);
 

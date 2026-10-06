@@ -6,6 +6,7 @@ import { useProveedores } from '../../hooks/useProveedores';
 import AltaRapidaProveedorModal from '../proveedores/AltaRapidaProveedorModal';
 import { storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { avisar } from '../ui/Dialogos';
 
 export interface FormProveedorFichaProps {
   onGuardar: (cp: CotizacionProveedor) => void;
@@ -51,7 +52,7 @@ export function FormProveedorFicha({ onGuardar, onCancelar, servicioTipo, provee
       });
     } catch (err) {
       console.error("Error subiendo archivo:", err);
-      alert("Hubo un error al subir el archivo.");
+      void avisar("Hubo un error al subir el archivo.");
     } finally {
       setUploading(false);
     }

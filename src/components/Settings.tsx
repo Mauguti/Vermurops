@@ -11,6 +11,7 @@ import GestionUsuarios from './settings/GestionUsuarios';
 import CatalogoConceptos from './conceptos/CatalogoConceptos';
 import ConfiguracionEmpresaForm from './settings/ConfiguracionEmpresa';
 import CorreoSaliente from './settings/CorreoSaliente';
+import { confirmar } from './ui/Dialogos';
 
 export default function Settings() {
   const { user, logout } = useAuth();
@@ -326,7 +327,7 @@ export default function Settings() {
                                  <td className="py-[12px] px-[16px] text-right">
                                     {!srv.esDefault ? (
                                        <button 
-                                          onClick={() => { if(confirm('¿Eliminar este servicio?')) deleteServicio(srv.id) }} 
+                                          onClick={async () => { if(await confirmar({ mensaje: '¿Eliminar este servicio?', confirmar: 'Eliminar', peligro: true })) deleteServicio(srv.id) }} 
                                           className="text-text-muted hover:text-danger-text p-1 transition-colors"
                                           title="Eliminar servicio"
                                        >
