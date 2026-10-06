@@ -13,10 +13,12 @@
 export interface EstadoTienda<T> {
   datos: T[];
   loading: boolean;
+  /** Mensaje del último error de la suscripción (tarea 93); ausente = sin error. */
+  error?: string | null;
 }
 
 export function crearTiendaCompartida<T>(
-  abrir: (alDato: (datos: T[]) => void, alError: () => void) => () => void,
+  abrir: (alDato: (datos: T[]) => void, alError: (mensaje?: string) => void) => () => void,
 ) {
   let estado: EstadoTienda<T> = { datos: [], loading: true };
   const oyentes = new Set<(e: EstadoTienda<T>) => void>();
@@ -39,7 +41,9 @@ export function crearTiendaCompartida<T>(
         abiertas += 1;
         cerrar = abrir(
           datos => emitir({ datos, loading: false }),
-          () => emitir({ datos: estado.datos, loading: false }),
+          mensaje => emitir(mensaje === undefined
+            ? { datos: estado.datos, loading: false }
+            : { datos: estado.datos, loading: false, error: mensaje }),
         );
       } else {
         oyente(estado);

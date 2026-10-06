@@ -11,106 +11,22 @@
  *  3. Expone { proveedores, loading, error, createProveedor, updateProveedor }.
  */
 
-import { useState, useEffect } from 'react';
-import { compararTexto } from '../lib/texto';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, setDoc, updateDoc, getDocsFromServer } from 'firebase/firestore';
-import { evaluarSeed } from '../lib/seedGuard';
-import { ProveedorVermur, initialProveedores } from '../components/proveedores/ProveedoresData';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { useTiendaCatalogo, tiendaProveedores } from './tiendasCatalogos';
+import { ProveedorVermur } from '../components/proveedores/ProveedoresData';
 import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
 import { conAviso } from '../lib/erroresEscritura';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 
-/**
- * El candado del seed vive a nivel de MÓDULO, no del hook (1d).
- *
- * Era un `useRef`, o sea uno por INSTANCIA: montar el hook en dos lugares
- * creaba dos sembradores compitiendo. Ya pasó con useConceptos al montarlo
- * también en Embarques —el recorrido e2e falló dos veces seguidas con el
- * catálogo a medio sembrar— y se arregló así.
- *
- * `evaluarSeed` descarta los snapshots de caché y `getDocsFromServer`
- * confirma contra el servidor antes de escribir, pero las dos barreras son
- * POR INSTANCIA: dos hooks pueden pasarlas a la vez. El candado compartido
- * cierra la ventana en el cliente, que es donde nace.
- *
- * Aquí el riesgo no se había materializado porque este hook se monta en un
- * solo lugar. Se cierra antes de que alguien lo monte en dos.
- */
-let seedIntentado = false;
+/* El seed y su candado viven en tiendasCatalogos.ts (tarea 93). */
 
 export function useProveedores() {
   const { user } = useAuth();
 
-  const [proveedores, setProveedores] = useState<ProveedorVermur[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = onSnapshot(
-      collection(db, 'proveedores'),
-      async (snapshot) => {
-        // ── ¿Se puede sembrar? ────────────────────────────────────────────
-        // evaluarSeed descarta los snapshots de caché: uno vacío NO prueba que
-        // la colección esté vacía en el servidor, solo que este cliente aún no
-        // la bajó. Ver src/lib/seedGuard.ts.
-        if (evaluarSeed(snapshot, seedIntentado).sembrar) {
-          seedIntentado = true;
-          try {
-            // Segunda barrera, ya con el servidor de por medio: confirma que
-            // 'proveedores' sigue vacía justo antes de escribir. Cubre la carrera
-            // con otra pestaña sembrando al mismo tiempo, y falla si no hay red
-            // en vez de sembrar a ciegas.
-            const enServidor = await getDocsFromServer(collection(db, 'proveedores'));
-            if (!enServidor.empty) {
-              console.warn('[seed] proveedores: el servidor ya tiene ' + enServidor.size + ' documentos. No se siembra.');
-              return;
-            }
-
-            await conAviso('los proveedores iniciales', () => Promise.all(
-              initialProveedores.map(p =>
-                setDoc(doc(db, 'proveedores', p.id), sanitizarParaFirestore(p))
-              )
-            ));
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Error al sembrar proveedores iniciales';
-            setError(msg);
-            setLoading(false);
-          }
-          return;
-        }
-
-        // Snapshot que no autoriza sembrar: se pinta tal cual. Si venía de
-        // caché, el snapshot del servidor llegará después y volverá a evaluar.
-
-        // ── Snapshot con datos (normal o post-seed) ───────────────────────
-        const data: ProveedorVermur[] = [];
-        snapshot.forEach(docSnap => {
-          data.push({ id: docSnap.id, ...docSnap.data() } as ProveedorVermur);
-        });
-
-        // Alfabético por razón social.
-        // Bloque 4: un documento sin `nombre` tiraba la app entera al cargar.
-        data.sort((a, b) => compararTexto(a.nombre, b.nombre));
-
-        setProveedores(data);
-        setLoading(false);
-      },
-      (err) => {
-        setError(err.message);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [user]);
+  const { datos: proveedores, loading, error } = useTiendaCatalogo(tiendaProveedores, !!user);
 
   // ── Writes ───────────────────────────────────────────────────────────────
 

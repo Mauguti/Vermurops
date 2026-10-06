@@ -17,12 +17,10 @@
  * En E3.4 se añadirán createCotizacion y updateCotizacion.
  */
 
-import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, setDoc, updateDoc, getDocsFromServer } from 'firebase/firestore';
-import { KanbanQuote, initialKanbanQuotes } from '../components/quotes/QuotesData';
-import { initContadorDesdeFolios } from '../lib/folioService';
-import { evaluarSeed } from '../lib/seedGuard';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { KanbanQuote } from '../components/quotes/QuotesData';
+import { useTiendaCatalogo, tiendaCotizaciones } from './tiendasCatalogos';
 import { useAuth } from '../auth/AuthContext';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 import { puedeCrearCotizacion, PermisoDenegadoError } from '../auth/permisos';
@@ -31,113 +29,12 @@ import { conAviso } from '../lib/erroresEscritura';
 import { estaCongelada, cambiosBloqueados } from '../lib/lineasCotizacion';
 import { guardadoAtrasado, numeroVersionActual, sinCamposDeVersion } from '../lib/versionesCotizacion';
 
-/**
- * El candado del seed vive a nivel de MÓDULO, no del hook (1d).
- *
- * Era un `useRef`, o sea uno por INSTANCIA: montar el hook en dos lugares
- * creaba dos sembradores compitiendo. Ya pasó con useConceptos al montarlo
- * también en Embarques —el recorrido e2e falló dos veces seguidas con el
- * catálogo a medio sembrar— y se arregló así.
- *
- * `evaluarSeed` descarta los snapshots de caché y `getDocsFromServer`
- * confirma contra el servidor antes de escribir, pero las dos barreras son
- * POR INSTANCIA: dos hooks pueden pasarlas a la vez. El candado compartido
- * cierra la ventana en el cliente, que es donde nace.
- *
- * Este hook se monta en SIETE lugares (Dashboard, CRM, Embarques, Altas, la
- * ficha del prospecto, la del cliente y el catálogo de conceptos), así que
- * aquí el candado por instancia eran siete sembradores.
- */
-let seedIntentado = false;
+/* El seed y su candado viven en tiendasCatalogos.ts (tarea 93). */
 
 export function useCotizaciones() {
   const { user } = useAuth();
 
-  const [quotes, setQuotes]   = useState<KanbanQuote[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState<string | null>(null);
-
-  useEffect(() => {
-    // Guarda de autenticación: no abrir el listener hasta tener usuario.
-    // AuthProvider ya resolvió onAuthStateChanged antes de renderizar hijos,
-    // pero el token interno de Firestore puede propagarse con un tick de retraso.
-    // Dependiendo de `user` del contexto garantizamos que el token está listo.
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = onSnapshot(
-      collection(db, 'cotizaciones'),
-      async (snapshot) => {
-        // ── ¿Se puede sembrar? ────────────────────────────────────────────
-        //
-        // Antes decía `snapshot.empty && !seedIntentado`, sin evaluarSeed. Un
-        // snapshot de caché de una colección todavía no descargada llega con
-        // `empty: true`, así que bastaba para escribir las ocho cotizaciones
-        // de ejemplo ENCIMA de las reales: `setDoc` sin merge reemplaza el
-        // documento entero, y los ids del seed son folios que producción usa
-        // (COT-2026-0001 … 0008).
-        //
-        // Era el último hook con la guarda vieja, y el más expuesto: se monta
-        // en siete lugares —Dashboard, CRM, Embarques, Altas, la ficha del
-        // prospecto, la del cliente y el catálogo de conceptos—.
-        if (evaluarSeed(snapshot, seedIntentado).sembrar) {
-          seedIntentado = true;
-          try {
-            // Segunda barrera, ya con el servidor de por medio: confirma que
-            // 'cotizaciones' sigue vacía justo antes de escribir. Cubre la
-            // carrera con otra pestaña y falla si no hay red, en vez de
-            // sembrar a ciegas.
-            const enServidor = await getDocsFromServer(collection(db, 'cotizaciones'));
-            if (!enServidor.empty) {
-              console.warn('[seed] cotizaciones: el servidor ya tiene ' + enServidor.size + ' documentos. No se siembra.');
-              return;
-            }
-
-            // setDoc preserva el folio como document ID (no usa addDoc).
-            // Dos sesiones simultáneas producirían writes idénticos → sin daño.
-            await conAviso('las cotizaciones iniciales', () => Promise.all(
-              initialKanbanQuotes.map(q =>
-                setDoc(doc(db, 'cotizaciones', q.id), sanitizarParaFirestore(q))
-              )
-            ));
-            // Inicializar el contador al máximo folio del seed (→ 8).
-            // El siguiente generateFolio() devolverá COT-2026-0009.
-            await initContadorDesdeFolios(initialKanbanQuotes.map(q => q.id));
-            // onSnapshot disparará de nuevo con los 8 documentos escritos.
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Error al sembrar cotizaciones iniciales';
-            setError(msg);
-            setLoading(false);
-          }
-          return; // Esperar el siguiente disparo de onSnapshot con datos
-        }
-
-        // Snapshot que no autoriza sembrar: se pinta tal cual. Si venía de
-        // caché, el del servidor llegará después y volverá a evaluar.
-
-        // ── Snapshot con datos (normal o post-seed) ───────────────────────
-        const data: KanbanQuote[] = [];
-        snapshot.forEach(docSnap => {
-          data.push({ id: docSnap.id, ...docSnap.data() } as KanbanQuote);
-        });
-
-        // Más reciente primero (alineado con la convención de Quotes.tsx
-        // que hace [newQuote, ...rest] al crear).
-        data.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-
-        setQuotes(data);
-        setLoading(false);
-      },
-      (err) => {
-        setError(err.message);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [user]); // Re-corre cuando cambia el usuario (login / logout)
+  const { datos: quotes, loading, error } = useTiendaCatalogo(tiendaCotizaciones, !!user);
 
   // ── Writes ───────────────────────────────────────────────────────────────
 
