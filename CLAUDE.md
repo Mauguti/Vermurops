@@ -2106,8 +2106,14 @@ Los 10 «servicios» del selector viejo no están en Firestore: lo que
 Administración edita en Configuración solo cambia SU navegador y nadie más lo
 ve. Además `ServicioSolicitado.tipo` guarda a veces `'maritimo'` y a veces
 `'srv-def-1'` según de dónde se marcó. El rediseño de la solicitud (sep-2026)
-lo retiró del formulario; siguen leyéndolo Settings, Shipments y FichaRFQ —
-retiro gradual pendiente. No agregar consumidores nuevos.
+lo retiró del formulario, pero **no del código**: al 6-oct-2026 lo leen DOCE
+archivos, no los tres que esta nota decía (`Quotes`, `Settings`, `Shipments`,
+`FichaCotizacion`, `KanbanProspeccion`, `QuotesData`, `SelectorServicios`,
+`agrupacionModalidad`, `crearEmbarquesGanada`, `operacionServicio`,
+`planEmbarquesGanada`, `traficoServicio`). `FichaRFQ` salió de la lista
+porque la tarea 78 lo borró con `Pricing.tsx`, el único que lo importaba.
+El retiro gradual es más grande de lo que esta nota prometía y toca la
+creación de embarques. **No agregar consumidores nuevos.**
 
 **`getCostoOficial` suma tarifas sin mirar la moneda.**
 Con multi-selección de tarifas, `getCostoOficial` hace `reduce((a, t) => a + t.monto)`
