@@ -73,7 +73,7 @@ export default function Finance() {
   // pago sin aplicaciones, el cobro uno con una. Antes eran dos listas y cada
   // call site tenía que acordarse de pasar las dos.
   const { depositos, registrarDeposito } = useDepositosCliente();
-  const { facturas, cobros, pagosNuevos, registrarCobro } = useFacturas();
+  const { facturas, cobros, pagosNuevos, registrarPagoAplicado } = useFacturas();
   /*
    * Tarea 68 · Las tres fuentes en una lista: lo que se escribe hoy
    * (`pagos/`) y los dos legados que ya no se escriben. `pagosNuevos` sale de
@@ -344,11 +344,20 @@ export default function Finance() {
                         `factura.generar`: facturar es de las dos áreas y
                         recibir el dinero es solo de Administración. */
                      puedeCobrar={puede('cobro.registrar')}
-                     onCobrar={async (c) => {
-                       // El mismo registro que desde el embarque: el cobro
-                       // fondea las OC de ese embarque (1.1).
-                       await registrarCobro(c);
-                       setToast({ mensaje: `Cobro de ${c.moneda} ${c.monto.toLocaleString('en-US', { minimumFractionDigits: 2 })} registrado contra ${c.facturaNumero}.`, tipo: 'exito' });
+                     /* Tarea 70 · P4 · UN pago repartido entre varias
+                        facturas. El cobro contra una sola es este mismo pago
+                        con una aplicación, y fondea las OC de los embarques
+                        de las facturas que cubrió (1.1). */
+                     onAplicarPago={async (datos) => {
+                       const pago = await registrarPagoAplicado(datos);
+                       const cuantas = pago.aplicaciones.length;
+                       const sobra = Math.round((pago.monto - pago.aplicaciones.reduce((a, x) => a + x.monto, 0)) * 100) / 100;
+                       setToast({
+                         mensaje: `${pago.folio}: ${pago.moneda} ${pago.monto.toLocaleString('en-US', { minimumFractionDigits: 2 })} `
+                           + `aplicados a ${cuantas} factura${cuantas !== 1 ? 's' : ''}`
+                           + (sobra > 1 ? `, con ${pago.moneda} ${sobra.toLocaleString('en-US', { minimumFractionDigits: 2 })} a favor del cliente.` : '.'),
+                         tipo: 'exito',
+                       });
                      }}
                      embarquesFondeables={embarquesDisponibles}
                      onRegistrarAnticipo={puede('cobro.registrar') ? async (a) => {

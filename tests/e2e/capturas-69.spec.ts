@@ -174,7 +174,8 @@ test('Cuentas por cobrar · Operaciones ya no puede cobrar', async ({ browser })
   const { page, ctx } = await entrar(browser, 'operaciones@vermur.com');
   await abrirPorCobrar(page);
   await expect(page.getByRole('button', { name: 'Registrar entrada de dinero' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Registrar cobro' })).toHaveCount(0);
+  // Tarea 70 · el botón del renglón se llama «Aplicar pago» desde P4.
+  await expect(page.getByRole('button', { name: 'Aplicar pago' })).toHaveCount(0);
   await foto(page, 'por-cobrar-operaciones');
   await ctx.close();
 });

@@ -19,8 +19,8 @@ import { idUnico } from '../lib/idUnico';
 import type { FacturaCliente, CobroCliente } from '../components/facturas/FacturasData';
 import { saldoDeFactura } from '../lib/facturacionEmbarque';
 import {
-  aplicacionesA, coleccionDelPago, construirPagoDeCobro, pagosDeCliente,
-  type DatosCobro, type Pago,
+  aplicacionesA, coleccionDelPago, construirPagoAplicado, construirPagoDeCobro,
+  pagosDeCliente, type DatosCobro, type DatosPagoAplicado, type Pago,
 } from '../lib/pagos';
 import { usePagos } from './usePagos';
 import { anotarBitacora } from './anotarBitacora';
@@ -182,6 +182,70 @@ export function useFacturas(embarqueId?: string) {
   };
 
   /**
+   * Tarea 70 · P4 · Un pago repartido entre VARIAS facturas (§7.1).
+   *
+   * Es el mismo documento que `registrarCobro` escribe —`construirPagoAplicado`
+   * es la forma general y el cobro es su caso de una aplicación— así que no
+   * hay dos caminos de escritura que puedan divergir. Lo que esta función
+   * agrega es lo que pasa DESPUÉS de guardar, y que un cobro contra una sola
+   * factura ya hacía: la bitácora del embarque y el estado de la factura, en
+   * plural.
+   *
+   * **El pago se escribe primero y una sola vez.** Si la bitácora o un estado
+   * fallaran después, el dinero ya quedó registrado y los saldos se siguen
+   * derivando de las aplicaciones: el estado guardado es un índice para
+   * filtrar, no la verdad (§1.4). Al revés —derivar antes de guardar— sí
+   * dejaría facturas marcadas como cobradas por un pago que no existe.
+   */
+  const registrarPagoAplicado = async (datos: DatosPagoAplicado): Promise<Pago> => {
+    exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
+
+    const ctx = await contextoNuevo();
+    const pago = construirPagoAplicado(datos, ctx);
+    await guardarPago(pago);
+
+    /*
+     * Una entrada por embarque, diciendo qué facturas de ESE embarque cubrió.
+     * Un pago que cruza dos embarques deja una entrada en cada bitácora con
+     * lo que le toca: anotar el total en los dos haría parecer que entró el
+     * doble (§4.3 en su versión de bitácora).
+     */
+    for (const embarqueId of pago.embarqueIds) {
+      const suyas = pago.aplicaciones.filter(a =>
+        facturas.some(f => f.id === a.destinoId && f.embarqueId === embarqueId));
+      if (suyas.length === 0) continue;
+      const total = Math.round(suyas.reduce((acc, a) => acc + a.monto, 0) * 100) / 100;
+      await anotarBitacora(embarqueId, 'cobro',
+        `${pago.registradoPor.nombre} registró un cobro de ${pago.terceroNombre} contra `
+        + `${suyas.map(a => a.destinoNumero).join(', ')}`,
+        pago.registradoPor,
+        `${pago.moneda} ${total.toLocaleString('es-MX', { minimumFractionDigits: 2 })} · `
+        + `${pago.banco ?? 'sin cuenta'} · ${pago.referencia ?? 'sin referencia'} · ${pago.folio}`
+        + (pago.aplicaciones.length > suyas.length ? ` · el pago cubrió ${pago.aplicaciones.length} facturas en total` : ''));
+    }
+
+    /*
+     * El estado de cada factura tocada, por el motivo de siempre: los paneles
+     * filtran por él y filtrar en Firestore exige el campo. La fuente de
+     * verdad sigue siendo `saldoDeFactura` sobre las aplicaciones vivas — si
+     * los dos discrepan, gana el cálculo.
+     */
+    for (const a of pago.aplicaciones) {
+      const factura = facturas.find(f => f.id === a.destinoId);
+      if (!factura) continue;
+      const aplicaciones = [...aplicacionesA(factura.id, pagos), a];
+      const { estado } = saldoDeFactura(factura, aplicaciones);
+      if (estado === factura.estado) continue;
+      await conAviso('el estado de la factura', () =>
+        updateDoc(doc(db, COL_FACTURAS, factura.id), sanitizarParaFirestore({
+          estado, updatedAt: ctx.ahora,
+        }) as Record<string, unknown>));
+    }
+
+    return pago;
+  };
+
+  /**
    * Anula un cobro mal capturado. El saldo se recalcula solo.
    *
    * El id puede ser de `pagos/` (lo registrado desde P2) o de un cobro viejo
@@ -213,6 +277,7 @@ export function useFacturas(embarqueId?: string) {
 
   return {
     facturas, cobros, pagosNuevos, pagos, loading,
-    registrarFactura, cancelarFactura, registrarCobro, anularCobro, cobrosDe,
+    registrarFactura, cancelarFactura, registrarCobro, registrarPagoAplicado,
+    anularCobro, cobrosDe,
   };
 }

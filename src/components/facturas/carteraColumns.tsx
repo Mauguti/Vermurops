@@ -173,7 +173,7 @@ export function columnasCartera({ onCobrar }: OpcionesColumnasCartera = {}) {
               onClick={e => { e.stopPropagation(); onCobrar(i); }}
               className="text-[10px] font-bold uppercase tracking-wider text-primario hover:underline whitespace-nowrap"
             >
-              Registrar cobro
+              Aplicar pago
             </button>
           );
         },
