@@ -1594,6 +1594,59 @@ del §2.2 del plan —`cuentasPorCobrar`, `fondeoCliente`, `cierresEmbarque`,
     `pagada_parcial` a la máquina**: tiene 54 tests y `pagada` es terminal.
     Lo parcial es un avance; el estado entra si Julio lo pide para filtrar.
 
+## 4.33 El cobro y el depósito se escriben en `pagos/` (tarea 68, 5-oct-2026)
+
+Paso **P2** del plan. La 67 unificó la LECTURA; esta cambia la ESCRITURA.
+`registrarCobro` y `registrarDeposito` dejan de escribir en `cobros/` y
+`depositosCliente/` y crean **un documento en `pagos/`**: un cobro es un pago
+con una sola aplicación, un depósito uno con cero.
+
+**La firma de los dos hooks no cambia.** Lo que entra es exactamente lo que
+entraba, y `construirPagoDeCobro` / `construirPagoDeDeposito` lo convierten
+—funciones puras en `lib/pagos.ts`, no lógica dentro del hook, para que la
+conversión se pruebe sin Firestore. Ninguna pantalla cambió.
+
+**Lo viejo queda de SOLO LECTURA.** Deja de escribirse, no se migra y no se
+borra. Un movimiento vive en `pagos` **o** en lo viejo, nunca en los dos: esa
+es toda la defensa contra el doble conteo, y es la razón para no migrar.
+  - `pagos.liberaPago.test.ts` recorre la cadena completa —cobro → fondeo →
+    autorización de la OC → saldo de la factura— y corre **el caso espejo al
+    lado**: el mismo cobro leído de `cobros/` como antes tiene que dar
+    exactamente lo mismo. Si un día difieren, el cobro dejó de liberar el
+    pago al proveedor, y eso es dinero que se queda sin salir.
+  - **El folio es atómico**: `PAG-2026-0001` en `contadores/pagos`
+    (`folioServicePago.ts`), y se reserva ANTES de armar el documento: si
+    falla, no se escribe un pago sin folio. No reinicia en enero, igual que
+    los folios de embarque (§4.31).
+  - **`coleccionDelPago` decide dónde se anula**, por el `origen` que puso el
+    adaptador y nunca por la forma del id. Un id que no está en la lista **no
+    se escribe en ninguna de las dos**: anular en la colección equivocada
+    crearía un documento nuevo con `activo: false` y el movimiento seguiría
+    vivo en la otra.
+  - **Un monto que no es mayor que cero lanza antes de escribir.** Firestore
+    acepta un cero y guarda un `NaN` tal cual, y un pago de cero se ve igual
+    que uno de verdad en la lista.
+  - La referencia vacía se guarda como `null`, no como `''`: puede llegar
+    DESPUÉS del pago y nunca es obligatoria (§0.3 del plan).
+
+**🔴 `pagos/` NECESITA su regla publicada, y el sprint no la pudo escribir.**
+El bloque exacto, dónde va y cómo se verifica están en
+`docs/sprint-post-junta/REGLA-PAGOS.md`. Es la lección de §3 en su forma más
+directa: **la regla escrita no basta, hay que publicarla** — con la diferencia
+de que aquí no se traga en silencio. La escritura falla con un aviso rojo que
+dice qué pasó, y el mensaje genérico de `permission-denied` («no tienes
+permiso») se traduce a propósito: quien lo lea pensaría que es su rol, y no lo
+es. Es la misma trampa del SMTP AUTH de §4.29.
+  - **Orden de publicación: reglas PRIMERO, hosting después.** Al revés deja a
+    Administración sin poder registrar un cobro durante la ventana entre los
+    dos despliegues.
+  - Mientras no esté, `./scripts/e2e.sh` falla en el paso 6 —el de
+    Administración— justo en el primer `pagos/`. Los cinco pasos anteriores
+    pasan: es el único punto que toca la colección nueva.
+  - Nace con `esDelEquipo()` como todo lo demás, así que **cualquiera del
+    equipo puede escribir un pago desde la consola**. Con dinero de verdad en
+    esa colección, la deuda de §6 sube de prioridad.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
