@@ -484,25 +484,18 @@ function exigirMonto(monto: number, que: string): number {
  * pantalla no se mueve al cambiar la escritura.
  */
 export function construirPagoDeCobro(datos: DatosCobro, ctx: ContextoPago): Pago {
-  const monto = exigirMonto(datos.monto, 'el cobro');
   if (!datos.facturaId) {
     throw new Error('el cobro: falta la factura a la que se aplica.');
   }
-  const referencia = (datos.referencia ?? '').trim();
-  return {
-    id: ctx.id,
-    folio: ctx.folio,
-    lado: 'cliente',
-    terceroTipo: 'cliente',
+  const monto = exigirMonto(datos.monto, 'el cobro');
+  return construirPagoAplicado({
     terceroId: datos.clienteId ?? null,
     terceroNombre: datos.clienteNombre ?? '',
     monto,
     moneda: datos.moneda,
     fecha: datos.fechaCobro,
     banco: datos.banco || null,
-    // Puede llegar DESPUÉS del pago (§0.3). Vacía se guarda como null, no como ''.
-    referencia: referencia || null,
-    comprobante: null,
+    referencia: datos.referencia ?? null,
     aplicaciones: [{
       destinoTipo: 'factura',
       destinoId: datos.facturaId,
@@ -511,8 +504,100 @@ export function construirPagoDeCobro(datos: DatosCobro, ctx: ContextoPago): Pago
       moneda: datos.moneda,
       aplicadaPor: { uid: ctx.por.uid, nombre: ctx.por.nombre, fecha: datos.fechaCobro },
     }],
-    destinoIds: [datos.facturaId],
     embarqueIds: datos.embarqueId ? [datos.embarqueId] : [],
+  }, ctx, 'el cobro');
+}
+
+/** Lo que se captura de un pago repartido entre varias facturas (tarea 70 · P4). */
+export interface DatosPagoAplicado {
+  terceroId: string | null;
+  terceroNombre: string;
+  monto: number;
+  moneda: Moneda;
+  /** YYYY-MM-DD: el día en que el dinero se movió, no el de captura. */
+  fecha: string;
+  banco: string | null;
+  referencia: string | null;
+  /** Puede estar vacío: eso es el «a cuenta». Lo arma `aplicacionesDelReparto`. */
+  aplicaciones: AplicacionPago[];
+  /** Derivado de las facturas aplicadas: `embarquesDelReparto`. */
+  embarqueIds: string[];
+}
+
+/**
+ * Un pago con N aplicaciones (§7.1 · paso P4).
+ *
+ * Es la forma general, y `construirPagoDeCobro` es su caso de UNA aplicación:
+ * un cobro contra una factura siempre fue esto con N = 1. Un solo constructor
+ * para que los dos caminos escriban exactamente el mismo documento — si se
+ * escribieran aparte, el pago de doce facturas podría nacer con un campo de
+ * menos y nadie lo vería hasta leerlo.
+ *
+ * **Lo que NO deja escribir:**
+ *
+ *  - Un pago que aplica más de lo que movió. Es la regla del punto 1 de la
+ *    tarea, y se valida aquí además de en la pantalla: el botón se puede
+ *    esquivar —otra pestaña, un reparto que quedó viejo— y un pago que
+ *    liquida 130,000 con 120,000 se ve perfectamente bien en la lista. Lo
+ *    que sobra sí se permite: es el «a cuenta» de `sinAplicar`.
+ *  - Una aplicación en otra moneda. §4: un pago tiene UNA moneda, y una
+ *    aplicación con otra no contaría para el saldo de su factura
+ *    (`saldoDeFactura` la descarta) pero sí se vería como aplicada.
+ *  - Una aplicación sin destino, o con monto que no sea mayor que cero.
+ */
+export function construirPagoAplicado(
+  datos: DatosPagoAplicado,
+  ctx: ContextoPago,
+  que = 'el pago',
+): Pago {
+  const monto = exigirMonto(datos.monto, que);
+  const aplicaciones = datos.aplicaciones ?? [];
+
+  for (const a of aplicaciones) {
+    if (!a.destinoId) throw new Error(`${que}: hay una aplicación sin factura.`);
+    if (!Number.isFinite(a.monto) || a.monto <= 0) {
+      throw new Error(`${que}: la aplicación a ${a.destinoNumero || a.destinoId} no tiene monto.`);
+    }
+    if (a.moneda !== datos.moneda) {
+      throw new Error(
+        `${que}: la aplicación a ${a.destinoNumero || a.destinoId} está en ${a.moneda} `
+        + `y el pago en ${datos.moneda}. Un pago no se aplica a destinos de otra moneda (§4.3).`,
+      );
+    }
+  }
+
+  // Una sola moneda por construcción: el bucle de arriba lo garantiza (§4.3).
+  const aplicado = redondear(aplicaciones.reduce((acc, a) => acc + a.monto, 0));
+  // Un peso de tolerancia, el mismo de `saldoDeFactura`: los redondeos de IVA
+  // dejan centavos que no son una deuda.
+  if (aplicado > monto + 1) {
+    throw new Error(
+      `${que}: se está aplicando ${aplicado.toLocaleString('en-US', { minimumFractionDigits: 2 })} `
+      + `de un pago de ${monto.toLocaleString('en-US', { minimumFractionDigits: 2 })}.`,
+    );
+  }
+
+  const referencia = (datos.referencia ?? '').trim();
+  return {
+    id: ctx.id,
+    folio: ctx.folio,
+    lado: 'cliente',
+    terceroTipo: 'cliente',
+    terceroId: datos.terceroId || null,
+    terceroNombre: datos.terceroNombre ?? '',
+    monto,
+    moneda: datos.moneda,
+    fecha: datos.fecha,
+    banco: datos.banco || null,
+    // Puede llegar DESPUÉS del pago (§0.3). Vacía se guarda como null, no como ''.
+    referencia: referencia || null,
+    comprobante: null,
+    aplicaciones,
+    /* `destinoIds` se deriva de `aplicaciones` y se escribe en la MISMA
+       operación (§1.1): es el índice con el que se consulta «pagos de esta
+       factura», y un índice que se escribe aparte se desincroniza. */
+    destinoIds: [...new Set(aplicaciones.map(a => a.destinoId))],
+    embarqueIds: [...new Set((datos.embarqueIds ?? []).filter(Boolean))],
     origen: 'app',
     registradoPor: ctx.por,
     activo: true,
