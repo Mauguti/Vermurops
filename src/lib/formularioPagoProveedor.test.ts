@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   hoyLocal, problemaFechaPago, problemaComprobante, totalElegido, bancoInicial,
-  problemasDelFormulario,
+  problemasDelFormulario, diaAutorizacion, problemasFechaContraAutorizacion,
 } from './formularioPagoProveedor';
 import type { OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
 
@@ -64,5 +64,29 @@ describe('problemasDelFormulario', () => {
     expect(problemasDelFormulario({ ...base, referencia: '  ' })[0]).toMatch(/referencia/);
     expect(problemasDelFormulario({ ...base, fecha: '2026-10-09' })[0]).toMatch(/futura/);
     expect(problemasDelFormulario({ ...base, archivo: { nombre: 'x.exe', tamano: 5 } })[0]).toMatch(/PDF o imagen/);
+  });
+});
+
+describe('fecha del pago contra la autorización (tarea 86)', () => {
+  const aut = (id: string, iso: string) => oc(id, 1, { autorizadaPor: { uid: 'u', nombre: 'A', fecha: iso } });
+
+  it('lee el día de autorización, con respaldo en el historial', () => {
+    expect(diaAutorizacion(aut('A', '2026-10-05T15:00:00'))).toBe('2026-10-05');
+    const h = oc('B', 1, { autorizadaPor: null, historialEstados: [{ estado: 'autorizada', fecha: '2026-10-04T12:00:00' }] as never });
+    expect(diaAutorizacion(h)).toBe('2026-10-04');
+    expect(diaAutorizacion(oc('C', 1, { autorizadaPor: null }))).toBeNull();
+  });
+  it('rechaza una fecha anterior y dice qué orden y qué fecha', () => {
+    const p = problemasFechaContraAutorizacion('2026-10-03', [aut('OC-1', '2026-10-05T12:00:00'), aut('OC-2', '2026-10-01T12:00:00')]);
+    expect(p).toHaveLength(1);
+    expect(p[0]).toMatch(/OC-1.*2026-10-05.*2026-10-03/);
+  });
+  it('el mismo día de la autorización sirve', () => {
+    expect(problemasFechaContraAutorizacion('2026-10-05', [aut('OC-1', '2026-10-05T23:00:00')])).toEqual([]);
+  });
+  it('entra al formulario solo con fecha válida', () => {
+    const o = [aut('OC-1', '2026-10-05T12:00:00')];
+    expect(problemasDelFormulario({ elegidas: 1, referencia: 'x', fecha: '2026-10-04', hoy: '2026-10-06', ordenes: o })[0]).toMatch(/OC-1/);
+    expect(problemasDelFormulario({ elegidas: 1, referencia: 'x', fecha: '2026-10-07', hoy: '2026-10-06', ordenes: o })).toHaveLength(1);
   });
 });

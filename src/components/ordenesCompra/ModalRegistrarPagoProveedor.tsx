@@ -51,6 +51,7 @@ export default function ModalRegistrarPagoProveedor({ grupo, hoy, onConfirmar, o
   const total = totalElegido(grupo.items, elegidas);
   const problemas = problemasDelFormulario({
     elegidas: elegidas.size, referencia, fecha, hoy: fechaHoy,
+    ordenes: grupo.items.filter(o => elegidas.has(o.id)),
     archivo: archivo ? { nombre: archivo.name, tamano: archivo.size } : null,
   });
 

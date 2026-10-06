@@ -207,7 +207,7 @@ export default function Finance() {
       throw new Error('No se registró el pago: alguna orden del grupo ya no existe en la lista.');
     }
     const problemasForm = problemasDelFormulario({
-      elegidas: grupo.length, referencia, fecha, hoy: hoyLocal(),
+      elegidas: grupo.length, referencia, fecha, hoy: hoyLocal(), ordenes: grupo,
       archivo: datos.comprobante ? { nombre: datos.comprobante.name, tamano: datos.comprobante.size } : null,
     });
     const rechazos: string[] = [...problemasForm, ...problemasDelGrupo(grupo)];
@@ -240,7 +240,7 @@ export default function Finance() {
         comprobante: archivo ? { url: archivo.url, nombre: archivo.nombre, subidoEn: ctx.ahora } : null,
       }, ctx);
       await escribirAtomico(
-        planRegistroPagoProveedor({ pago, grupo, referencia, archivo, rol: rolOC, usuario, ahora: ctx.ahora }),
+        planRegistroPagoProveedor({ pago, grupo, referencia, fecha, archivo, rol: rolOC, usuario, ahora: ctx.ahora }),
         'el pago y sus órdenes',
       );
     } catch (err) {

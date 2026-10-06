@@ -65,6 +65,9 @@ async function sembrar() {
       facturaAsociada: o.factura ? S(o.factura) : NULO, comprobantePago: NULO,
       bancoSalida: S('santander_gastos'), cuentaBancariaId: S('cta-81'), cuentaSalida: NULO,
       urgencia: S('normal'), fechaRequerida: S('2026-10-01'), fechaSugeridaPago: S('2026-10-01'),
+      // Tarea 86: A y B se autorizaron el 1-oct; C, hoy (ayer ya sería anterior).
+      autorizadaPor: { mapValue: { fields: { uid: S('u-adm'), nombre: S('Admin 81'),
+        fecha: S(o.id === 'OC-81-C' ? new Date().toISOString() : '2026-10-01T12:00:00.000Z') } } },
       historialEstados: ARR([]), anticiposCruzados: ARR([]),
       createdAt: S('2026-10-01T09:00:00.000Z'), updatedAt: S('2026-10-01T09:00:00.000Z'),
     });
@@ -115,6 +118,16 @@ test('Administración paga dos de tres órdenes con fecha de ayer y comprobante 
   await expect(modal.getByTestId('total-pago')).toContainText('73,600.00');
   await page.screenshot({ path: `${IMG}/81-modal-inicial.png`, fullPage: true });
 
+  // Tarea 86: la fecha del pago no puede ser anterior a la autorización de ninguna orden.
+  await modal.getByLabel('Referencia de la transferencia').fill('TR-8101');
+  await modal.getByLabel('Fecha del pago').fill(ayer());
+  await expect(modal.getByRole('button', { name: 'Confirmar pago' })).toBeDisabled();
+  await expect(modal.getByRole('alert')).toContainText(`OC-2026-0813 se autorizó el`);
+  await expect(modal.getByRole('alert')).toContainText(`(${ayer()})`);
+  await expect(modal.getByRole('alert')).not.toContainText('OC-2026-0811');
+  await page.screenshot({ path: `${IMG}/86-fecha-anterior-a-autorizacion.png`, fullPage: true });
+  await modal.getByLabel('Referencia de la transferencia').fill('');
+
   // Se desmarca la de 5,200: el total baja a lo que sí sale del banco.
   await modal.getByLabel('Incluir OC-2026-0813').uncheck();
   await expect(modal.getByTestId('total-pago')).toContainText('68,400.00');
@@ -163,6 +176,14 @@ test('Administración paga dos de tres órdenes con fecha de ayer y comprobante 
     expect(docs).toHaveLength(1);
     expect(docs[0].mapValue.fields.tipo.stringValue).toBe('comprobante_pago');
     rutas.push(docs[0].mapValue.fields.storagePath.stringValue);
+  }
+  // Tarea 86: pagadaPor.fecha es la fecha ELEGIDA (ayer); la captura queda en el historial.
+  for (const id of ['OC-81-A', 'OC-81-B']) {
+    const f = (await leerDoc(`ordenesCompra/${id}`)).fields;
+    expect(f.pagadaPor.mapValue.fields.fecha.stringValue).toBe(ayer());
+    const h = f.historialEstados.arrayValue.values.at(-1).mapValue.fields;
+    expect(h.estado.stringValue).toBe('pagada');
+    expect(h.fecha.stringValue).toMatch(/T/);
   }
   expect(rutas[0]).toBe(rutas[1]);
   expect(rutas[0]).toMatch(/^ordenesCompra\/OC-81-[AB]\/documentos\/.+spei\.jpg$/);

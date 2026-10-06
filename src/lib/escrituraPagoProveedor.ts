@@ -60,12 +60,15 @@ export function planRegistroPagoProveedor(args: {
   pago: Pago;
   grupo: readonly OrdenCompra[];
   referencia: string;
+  /** Día del pago (YYYY-MM-DD) que eligió quien lo registró (tarea 81). */
+  fecha: string;
   archivo: ArchivoComprobante | null;
   rol: RolOC;
   usuario: Autor;
+  /** Momento de captura: va a `historialEstados` y `updatedAt`, no a `pagadaPor`. */
   ahora: string;
 }): PlanEscritura {
-  const { pago, grupo, referencia, archivo, rol, usuario, ahora } = args;
+  const { pago, grupo, referencia, fecha, archivo, rol, usuario, ahora } = args;
   const documentos: EscrituraDoc[] = [{ coleccion: 'pagos', id: pago.id, tipo: 'crear', datos: pago as unknown as Record<string, unknown> }];
   const bitacora: EscrituraBitacora[] = [];
 
@@ -94,7 +97,8 @@ export function planRegistroPagoProveedor(args: {
         } : {}),
         estado: 'pagada',
         historialEstados: [...orden.historialEstados, registro],
-        pagadaPor: { uid: usuario.uid, nombre: usuario.nombre, fecha: ahora },
+        // Tarea 86: la fecha REAL del pago; la hora de captura queda en historialEstados.
+        pagadaPor: { uid: usuario.uid, nombre: usuario.nombre, fecha },
         updatedAt: ahora,
       },
     });

@@ -74,7 +74,7 @@ describe('registrar un pago a proveedor', () => {
   const o1 = orden('1'); const o2 = orden('2');
   const plan = () => {
     const pago = construirPagoDeGrupo([o1, o2], { referencia: 'TR-1', fecha: '2026-10-06' }, ctx);
-    return planRegistroPagoProveedor({ pago, grupo: [o1, o2], referencia: 'TR-1', archivo: null, rol: 'administracion', usuario, ahora: AHORA });
+    return planRegistroPagoProveedor({ pago, grupo: [o1, o2], referencia: 'TR-1', fecha: '2026-10-05', archivo: null, rol: 'administracion', usuario, ahora: AHORA });
   };
 
   it('caso feliz: pago, dos órdenes pagadas y una entrada de bitácora por orden', async () => {
@@ -85,6 +85,15 @@ describe('registrar un pago a proveedor', () => {
     expect(almacen.get('ordenesCompra/2')!.estado).toBe('pagada');
     expect(almacen.get('ordenesCompra/2')!.comprobantePago).toBe('TR-1');
     expect(almacen.get('embarques/EMB-1')!.bitacora).toHaveLength(2);
+  });
+
+  it('tarea 86: un pago con fecha de ayer deja pagadaPor.fecha en ayer; la captura queda en el historial', async () => {
+    siembra([o1, o2]);
+    await escribirAtomico(plan(), 'el pago');
+    const o = almacen.get('ordenesCompra/1')!;
+    expect((o.pagadaPor as { fecha: string }).fecha).toBe('2026-10-05');
+    expect((o.historialEstados as { estado: string; fecha: string }[]).at(-1)).toMatchObject({ estado: 'pagada', fecha: AHORA });
+    expect(o.updatedAt).toBe(AHORA);
   });
 
   it('si falla la escritura de la orden 2 NO queda nada: ni pago, ni orden 1, ni bitácora', async () => {
@@ -112,7 +121,7 @@ describe('registrar un pago a proveedor', () => {
 
   it('el plan lanza si una orden no puede pasar a pagada (rol sin permiso)', () => {
     const pago = construirPagoDeGrupo([o1, o2], { referencia: 'TR-1', fecha: '2026-10-06' }, ctx);
-    expect(() => planRegistroPagoProveedor({ pago, grupo: [o1, o2], referencia: 'TR-1', archivo: null, rol: 'ventas', usuario, ahora: AHORA })).toThrow(/OC-1/);
+    expect(() => planRegistroPagoProveedor({ pago, grupo: [o1, o2], referencia: 'TR-1', fecha: '2026-10-05', archivo: null, rol: 'ventas', usuario, ahora: AHORA })).toThrow(/OC-1/);
   });
 });
 

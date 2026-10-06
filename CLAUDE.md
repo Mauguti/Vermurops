@@ -2092,6 +2092,19 @@ de cada embarque) y `hooks/escribirAtomico.ts` lo ejecuta con `runTransaction`.
   - `escribirAtomico.test.ts` inyecta la falla en la orden 2 y comprueba que no
     queda nada; probado por mutación (volver a escrituras sueltas lo rompe).
 
+## 4.49 La fecha real del pago llega a la orden (tarea 86, 7-oct-2026)
+
+`pagadaPor.fecha` de cada orden pagada es el DÍA que eligió quien registró el
+pago (tarea 81, `YYYY-MM-DD`), no el de captura; la hora de captura sigue en
+`historialEstados` y `updatedAt`. Los lectores (`pagos.ts`, `prefactura.ts`)
+ya aceptan la fecha sola. El formulario rechaza una fecha anterior a la
+autorización de cualquiera de las órdenes elegidas y dice cuál y qué fecha
+(`problemasFechaContraAutorizacion`, `diaAutorizacion` en
+`lib/formularioPagoProveedor.ts`); una orden sin autorización registrada no
+bloquea. Legacy: las pagadas antes de la 86 conservan su timestamp de captura.
+
+---
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
