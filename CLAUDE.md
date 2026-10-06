@@ -2128,6 +2128,16 @@ campo = operable. Antes los selectores de proveedores filtraban `p.activo`
 de la importación de `useClientes`: ausente ya no vuelve inactivo. No se escribe
 ningún campo nuevo ni se migra.
 
+## 4.52 Un listener por colección en Finanzas (tarea 89, 7-oct-2026)
+
+La 82 compartió `pagos/`; la 89 hace lo mismo con `facturas/`, `cobros/` y
+`depositosCliente/` (`hooks/tiendasFinanzas.ts`, sobre `crearTiendaCompartida`).
+`useFacturas` y `useDepositosCliente` ya no abren `onSnapshot`: leen la lista
+compartida y filtran por `embarqueId` en memoria. Antes, Finanzas + la ficha de
+un embarque abrían 2×(facturas, cobros) + depósitos + pagos; ahora 4 en total,
+uno por colección. Sin cambio de lo que se ve, de reglas ni de modelo. Un fallo
+de la lectura deja la lista vacía y `loading` en false, como antes.
+
 ---
 
 ## 5. Estado de los módulos
