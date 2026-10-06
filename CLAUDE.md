@@ -1892,6 +1892,34 @@ copiada. `construirPagoDeGrupo`, `problemasDelGrupo`, `pagosDeProveedor` y
     fecha del pago es la del día de captura. La lista de la pestaña Pagos
     sigue siendo solo del lado cliente.
 
+## 4.39 Prefactura: se declara, y lo demás se deriva (tarea 74, 6-oct-2026)
+
+Paso **P7** de `docs/sprint-post-junta/PLAN-PAGOS.md` (§5). «Las navieras
+cobran antes de facturar»: una orden de compra que Operaciones declara
+pagadera antes de tener la factura del proveedor. `lib/prefactura.ts` (22 tests).
+
+  - **Lo único que se guarda** son `OrdenCompra.esPrefactura` y
+    `motivoPrefactura`, opcionales. Pendiente, días y recibida se DERIVAN:
+    marcada + pagada + sin factura (`identificarFactura`, las tres vías) =
+    «Factura pendiente · N días» desde `pagadaPor.fecha`.
+  - **La marca es la que manda.** Una orden pagada y sin factura que nadie
+    marcó NO es prefactura: sin eso el contador contaría toda orden a la que
+    todavía no le suben el PDF, y a los dos días nadie lo lee.
+  - **Dónde se ve:** casilla + motivo en la ficha de la orden
+    (`PanelPrefactura`), `BadgePrefactura` en la ficha, en la columna
+    «Prefactura» de «Por orden» (entra a la vista por defecto, y al CSV) y junto
+    a cada COD en «Por proveedor»; filtro «Prefactura» (marcadas / factura
+    pendiente) que se guarda con la vista; contador ámbar arriba de la bandeja
+    («2 prefacturas pagadas sin factura · la más vieja de 24 días»), sobre TODAS
+    las órdenes aunque haya filtro puesto.
+  - **Quién marca:** `puedeMarcarPrefactura` = `ordenCompra.gestionar`
+    (Operaciones y admin). Administración la lee, no la edita.
+  - **Quitar la marca** escribe `false` y `null`, nunca `undefined`. **Llegar la
+    factura NO la quita:** cambia lo que se deriva y la marca queda como registro.
+  - **No se hizo, a propósito:** el freno del cierre administrativo (J6, pregunta
+    abierta para Julio), el cotejo factura-vs-pagado (§5.3) y el correo (fase 2,
+    espera al correo).
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

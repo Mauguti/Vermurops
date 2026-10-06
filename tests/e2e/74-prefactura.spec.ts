@@ -96,7 +96,9 @@ test('Operaciones marca la prefactura desde la ficha y queda guardada', async ({
 
   const panel = page.getByTestId('panel-prefactura');
   await expect(panel).toBeVisible({ timeout: 15_000 });
-  await panel.getByRole('checkbox').check();
+  // Controlada: cambia cuando vuelve el snapshot, no al instante (check() lo exigiría).
+  await panel.getByRole('checkbox').click();
+  await expect(panel.getByRole('checkbox')).toBeChecked({ timeout: 15_000 });
   await panel.getByLabel('Motivo de la prefactura').fill('la naviera cobra antes de facturar');
   await panel.getByLabel('Motivo de la prefactura').blur();
 
@@ -111,7 +113,8 @@ test('Operaciones marca la prefactura desde la ficha y queda guardada', async ({
   await page.screenshot({ path: `${IMG}/74-ficha-operaciones-angosto.png`, fullPage: true });
 
   // Quitar la marca: la bandera vuelve a false y el motivo a null, no undefined.
-  await panel.getByRole('checkbox').uncheck();
+  await panel.getByRole('checkbox').click();
+  await expect(panel.getByRole('checkbox')).not.toBeChecked({ timeout: 15_000 });
   await expect(async () => {
     const f = (await leerDoc('ordenesCompra/OC-74-A')).fields;
     expect(f.esPrefactura.booleanValue).toBe(false);
