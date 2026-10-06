@@ -4,7 +4,7 @@ import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import { useDepositosCliente } from '../hooks/useDepositosCliente';
 import { useFacturas } from '../hooks/useFacturas';
 import { calcularFondeo } from '../lib/fondeoCliente';
-import { pagosDeCliente, entradasDeFondeo, problemasDelGrupo, construirPagoDeGrupo, pagoQueCubrio, type Pago } from '../lib/pagos';
+import { pagosDeCliente, entradasDeFondeo, problemasDelGrupo, construirPagoDeGrupo, pagoQueCubrio, pagosDeProveedor, planAnulacionProveedor, type Pago } from '../lib/pagos';
 import { puedeTransicionarOC } from '../lib/stateMachineOC';
 import { usePagos } from '../hooks/usePagos';
 import { embarquesFondeables, entradasDelEmbarque } from '../lib/entradaDinero';
@@ -63,7 +63,7 @@ export default function Finance() {
   // ── OC: datos reales de Firestore ─────────────────────────────────────────
   const {
     ordenes, loading: loadingOC, porPagar, conteosPorEstado,
-    transicionarEstado, updateOrden, createOrden,
+    transicionarEstado, revertirPago, updateOrden, createOrden,
   } = useOrdenesCompra();
 
   /** C-3 · El gasto de oficina lo carga Administración. */
@@ -76,7 +76,7 @@ export default function Finance() {
   // pago sin aplicaciones, el cobro uno con una. Antes eran dos listas y cada
   // call site tenía que acordarse de pasar las dos.
   const { depositos, registrarDeposito, anularDeposito } = useDepositosCliente();
-  const { pagos: pagosEscritos, contextoNuevo: contextoPago, guardarPago } = usePagos();
+  const { pagos: pagosEscritos, contextoNuevo: contextoPago, guardarPago, anularPago: anularPagoDoc } = usePagos();
   const { facturas, cobros, pagosNuevos, registrarPagoAplicado, anularCobro, quitarAplicacion, aplicarSaldoAFavor } = useFacturas();
   /*
    * Tarea 68 · Las tres fuentes en una lista: lo que se escribe hoy
@@ -106,6 +106,16 @@ export default function Finance() {
   const embarqueDeFactura = useCallback(
     (facturaId: string) => facturas.find(f => f.id === facturaId)?.embarqueId,
     [facturas],
+  );
+
+  /*
+   * Tarea 80 · La pestaña Pagos muestra los dos lados: el del cliente (ya
+   * unificado en `pagosCliente`) y el del proveedor, que además de `pagos/`
+   * lee las órdenes pagadas antes de P6 (`pagosDeProveedor`).
+   */
+  const pagosTodos = useMemo(
+    () => [...pagosCliente, ...pagosDeProveedor(pagosEscritos, ordenes)],
+    [pagosCliente, pagosEscritos, ordenes],
   );
 
   const carteraResumen = useMemo(() => {
@@ -225,6 +235,39 @@ export default function Finance() {
     setToast(fallidas.length === 0
       ? { mensaje: `${pago.folio}: ${grupo.length} orden(es) marcadas como pagadas.`, tipo: 'exito' }
       : { mensaje: `${pago.folio} quedó registrado, pero no se pudieron marcar: ${fallidas.join(' · ')}`, tipo: 'error' });
+  };
+
+  /*
+   * Tarea 80 · Anular un pago a proveedor: cada orden que cubría regresa a
+   * «autorizada» POR LA MÁQUINA DE ESTADOS (`revertirPago` valida el arco),
+   * con el motivo. TODO O NADA: el plan se calcula antes de escribir, y si
+   * una orden no puede regresar no se anula el pago ni se toca ninguna.
+   */
+  const anularPagoDeProveedor = async (pago: Pago, motivo: string) => {
+    const usuario = { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' };
+    const plan = planAnulacionProveedor(pago, ordenes, rolOC);
+    if (plan.problemas.length > 0) {
+      const msg = `No se anuló ${pago.folio}: ${plan.problemas.join(' · ')}`;
+      setToast({ mensaje: msg, tipo: 'error' });
+      throw new Error(msg);
+    }
+    await anularPagoDoc(pago.id, { motivo: motivo.trim(), por: usuario.nombre, en: new Date().toISOString() });
+    const fallidas: string[] = [];
+    for (const orden of plan.ordenes) {
+      try {
+        const r = await revertirPago(orden, rolOC, usuario, { folioPago: pago.folio, motivo });
+        if (!r.ok) fallidas.push(`${orden.folio}: ${r.razon}`);
+      } catch (err) {
+        fallidas.push(`${orden.folio}: ${err instanceof Error ? err.message : err}`);
+      }
+    }
+    if (fallidas.length === 0) {
+      setToast({ mensaje: `${pago.folio} anulado: ${plan.ordenes.length} orden(es) regresaron a «autorizada».`, tipo: 'exito' });
+    } else {
+      const msg = `${pago.folio} quedó anulado, pero no se pudieron regresar: ${fallidas.join(' · ')}`;
+      setToast({ mensaje: msg, tipo: 'error' });
+      throw new Error(msg);
+    }
   };
 
   const handleActualizarOC = (cambios: Partial<OrdenCompra>) => {
@@ -425,13 +468,17 @@ export default function Finance() {
                 {activeTab === 'Pagos' && (
                    <PanelListaPagos
                      facturas={facturas}
-                     pagos={pagosCliente}
+                     pagos={pagosTodos}
                      puedeEditar={puede('cobro.registrar')}
+                     puedeAnularProveedor={rolOC === 'administracion' || rolOC === 'admin'}
+                     ordenes={ordenes}
+                     rolOC={rolOC}
                      onQuitarAplicacion={async (pagoId, destinoId, motivo) => {
                        await quitarAplicacion(pagoId, destinoId, motivo);
                        setToast({ mensaje: 'Aplicación quitada: ese dinero volvió a quedar sin aplicar y la factura recuperó su saldo.', tipo: 'exito' });
                      }}
                      onAnularPago={async (pago, motivo) => {
+                       if (pago.lado === 'proveedor') { await anularPagoDeProveedor(pago, motivo); return; }
                        /* Un anticipo (sin aplicaciones) se anula con `anularDeposito`,
                           que existía sin una sola pantalla que lo llamara. Las dos
                           resuelven la colección con `coleccionDelPago`. */

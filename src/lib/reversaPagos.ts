@@ -29,7 +29,7 @@
  * Sin React, sin Firestore.
  */
 
-import type { AplicacionPago, Pago } from './pagos';
+import type { AplicacionPago, LadoPago, Pago } from './pagos';
 import { aplicado, sinAplicar } from './pagos';
 import type { EntradaBitacora } from '../components/shipments/EmbarquesData';
 import { contiene } from './texto';
@@ -105,10 +105,12 @@ export interface FiltrosPagos {
   mes: string;
   /** Folio, cliente, referencia o folio de factura aplicada. */
   busqueda: string;
+  /** Tarea 80 · Quién movió el dinero: el cliente (entra) o Vermur al proveedor (sale). '' = los dos. */
+  lado: LadoPago | '';
 }
 
 export const FILTROS_PAGOS_VACIOS: FiltrosPagos = {
-  estado: 'vigentes', clienteId: '', moneda: '', mes: '', busqueda: '',
+  estado: 'vigentes', clienteId: '', moneda: '', mes: '', busqueda: '', lado: '',
 };
 
 const ESTADOS_VALIDOS: EstadoPago[] = ['aplicado', 'parcial', 'sin_aplicar', 'anulado'];
@@ -119,6 +121,7 @@ export function aplicarFiltrosPagos(pagos: readonly Pago[], f: FiltrosPagos): Pa
     const e = estadoDePago(p);
     if (f.estado === 'vigentes') { if (e === 'anulado') return false; }
     else if (f.estado !== 'todos' && e !== f.estado) return false;
+    if (f.lado && p.lado !== f.lado) return false;
     if (f.clienteId && p.terceroId !== f.clienteId) return false;
     if (f.moneda && p.moneda !== f.moneda) return false;
     if (f.mes && (p.fecha ?? '').slice(0, 7) !== f.mes) return false;
@@ -185,6 +188,7 @@ export function filtrosPagosDesdeVista(
     f.estado = 'vigentes';
   }
   if (f.moneda !== 'USD' && f.moneda !== 'MXN') f.moneda = '';
+  if (f.lado !== 'cliente' && f.lado !== 'proveedor') f.lado = '';
   if (!/^\d{4}-\d{2}$/.test(f.mes)) f.mes = '';
   return f;
 }
@@ -196,6 +200,10 @@ export function filtrosPagosDesdeVista(
 /** Por qué NO se puede reaplicar o quitar una aplicación. null = se puede. */
 export function motivoNoEditable(p: Pago): string | null {
   if (p.activo === false) return 'Este pago está anulado: no se le puede aplicar ni quitar nada.';
+  if (p.lado === 'proveedor') {
+    return 'Un pago a proveedor no se reaplica ni se le quita una orden: se anula completo, '
+      + 'y cada orden que cubría regresa a «autorizada».';
+  }
   if (!esPagoEditable(p)) {
     return 'Es un registro anterior (de Cobros o Depósitos): se lee y se puede anular, '
       + 'pero no se reaplica porque esas colecciones ya no se escriben.';

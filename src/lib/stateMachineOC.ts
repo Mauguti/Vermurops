@@ -137,6 +137,37 @@ const TRANSITIONS_OC: Record<EstadoOC, TransitionDefOC[]> = {
   rechazada: [],
 };
 
+// ─── La reversa de un pago (tarea 80) ──────────────────────────────────────────
+
+/**
+ * Roles que pueden devolver una orden de `pagada` a `autorizada`: los mismos
+ * que la pagan (`autorizada → pagada`). Quien registra el pago es quien lo
+ * corrige.
+ */
+const ROLES_REVERSA_PAGO: RolOC[] = ['administracion', 'admin'];
+
+/** El estado al que vuelve una orden cuando se anula el pago que la cubría. */
+export const ESTADO_TRAS_REVERSA_PAGO: EstadoOC = 'autorizada';
+
+/**
+ * Tarea 80 · ¿Se puede devolver esta orden de `pagada` a `autorizada`?
+ *
+ * Es UN arco aparte de `TRANSITIONS_OC`, a propósito: `pagada` sigue siendo
+ * terminal para el flujo normal (`transicionesDisponiblesOC` no la ofrece a
+ * ningún rol, y los tests lo fijan), y el único camino de vuelta es anular el
+ * pago que la cubrió. Un botón suelto «regresar a autorizada» permitiría
+ * deshacer un pago sin que el pago lo sepa.
+ */
+export function puedeRevertirPagoOC(rol: RolOC, oc: OrdenCompra): TransicionResultOC {
+  if (oc.estado !== 'pagada') {
+    return { ok: false, razon: `solo una orden pagada se revierte, y esta está «${oc.estado}».` };
+  }
+  if (!ROLES_REVERSA_PAGO.includes(rol)) {
+    return { ok: false, razon: `tu rol (${rol}) no puede revertir un pago.` };
+  }
+  return { ok: true };
+}
+
 // ─── API pública ───────────────────────────────────────────────────────────────
 
 export interface TransicionResultOC {

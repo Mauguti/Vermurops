@@ -15,7 +15,9 @@
 
 import { useMemo, useState } from 'react';
 import { X, Banknote, AlertTriangle, History } from 'lucide-react';
-import { aplicado, type Pago } from '../../lib/pagos';
+import { aplicado, planAnulacionProveedor, type Pago } from '../../lib/pagos';
+import type { OrdenCompra } from '../ordenesCompra/OrdenesCompraData';
+import type { RolOC } from '../../lib/stateMachineOC';
 import {
   aFavorDe, correccionesDelPago, estadoDePago, ETIQUETA_ESTADO_PAGO, motivoNoEditable,
 } from '../../lib/reversaPagos';
@@ -37,6 +39,9 @@ interface Props {
   hayFacturasParaAplicar: boolean;
   /** Las bitácoras de los embarques que el pago tocó, para el rastro de correcciones. */
   bitacoras: (EntradaBitacora[] | undefined)[];
+  /** Tarea 80 · Las órdenes de compra, para el pago a proveedor: su estado y si pueden regresar. */
+  ordenes?: OrdenCompra[];
+  rolOC?: RolOC;
   onCerrar: () => void;
   onAplicarSaldo: () => void;
   onQuitar: (pagoId: string, destinoId: string, motivo: string) => Promise<void>;
@@ -44,7 +49,7 @@ interface Props {
 }
 
 export default function FichaPago({
-  pago, puedeEditar, hayFacturasParaAplicar, bitacoras,
+  pago, puedeEditar, hayFacturasParaAplicar, bitacoras, ordenes = [], rolOC = 'ventas',
   onCerrar, onAplicarSaldo, onQuitar, onAnular,
 }: Props) {
   const [pendiente, setPendiente] = useState<Pendiente | null>(null);
@@ -52,6 +57,13 @@ export default function FichaPago({
   const anulado = estado === 'anulado';
   const aFavor = aFavorDe(pago);
   const noEditable = motivoNoEditable(pago);
+  const esProveedor = pago.lado === 'proveedor';
+  // Tarea 80 · Qué pasaría con cada orden si se anula. Se calcula ANTES de
+  // abrir el motivo: si una no puede regresar, el botón dice cuál y por qué.
+  const plan = useMemo(
+    () => esProveedor ? planAnulacionProveedor(pago, ordenes, rolOC) : null,
+    [esProveedor, pago, ordenes, rolOC],
+  );
   const rastro = useMemo(() => correccionesDelPago(pago, bitacoras), [pago, bitacoras]);
 
   return (
@@ -75,10 +87,10 @@ export default function FichaPago({
           <section className="grid grid-cols-2 md:grid-cols-4 gap-3 text-[12px]">
             <Dato t="Monto" v={`${pago.moneda} ${money(pago.monto)}`} fuerte />
             <Dato t="Fecha" v={pago.fecha || '—'} />
-            <Dato t="Cuenta de Vermur" v={pago.banco || 'Sin cuenta registrada'} />
+            <Dato t={esProveedor ? 'Cuenta de salida' : 'Cuenta de Vermur'} v={pago.banco || 'Sin cuenta registrada'} />
             <Dato t="Referencia" v={pago.referencia || 'Sin referencia'} mono />
             <Dato t="Aplicado" v={`${pago.moneda} ${money(anulado ? 0 : aplicado(pago))}`} />
-            <Dato t="A favor del cliente" v={`${pago.moneda} ${money(aFavor)}`} />
+            <Dato t={esProveedor ? 'Sin aplicar' : 'A favor del cliente'} v={`${pago.moneda} ${money(aFavor)}`} />
             <Dato t="Registró" v={pago.registradoPor?.nombre || '—'} />
             <Dato t="Origen" v={pago.origen && pago.origen !== 'app' ? 'Registro anterior' : 'Pago'} />
           </section>
@@ -95,7 +107,7 @@ export default function FichaPago({
 
           {/* ── Sus aplicaciones ───────────────────────────────────────── */}
           <section>
-            <h4 className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2">A qué se aplicó</h4>
+            <h4 className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2">{esProveedor ? 'Órdenes que cubrió' : 'A qué se aplicó'}</h4>
             {(pago.aplicaciones ?? []).length === 0 ? (
               <p className="text-[11px] text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
                 Este pago no cubre ninguna factura todavía: es dinero a cuenta del cliente.
@@ -105,9 +117,10 @@ export default function FichaPago({
                 <table className="w-full text-[12px]">
                   <thead>
                     <tr className="bg-gray-50/70 text-[9px] font-bold text-gray-400 uppercase tracking-wider">
-                      <th className="px-3 py-2 text-left">Factura</th>
+                      <th className="px-3 py-2 text-left">{esProveedor ? 'Orden' : 'Factura'}</th>
                       <th className="px-3 py-2 text-right">Monto</th>
                       <th className="px-3 py-2 text-left">Aplicó</th>
+                      {esProveedor && <th className="px-3 py-2 text-left">Estado hoy</th>}
                       <th className="px-3 py-2 w-28" />
                     </tr>
                   </thead>
@@ -119,8 +132,13 @@ export default function FichaPago({
                         <td className="px-3 py-2 text-gray-500">
                           {a.aplicadaPor?.nombre || '—'}{a.aplicadaPor?.fecha ? ` · ${a.aplicadaPor.fecha.slice(0, 10)}` : ''}
                         </td>
+                        {esProveedor && (
+                          <td className="px-3 py-2 text-gray-700" data-testid="estado-orden-pago">
+                            {ordenes.find(o => o.id === a.destinoId)?.estado ?? 'no encontrada'}
+                          </td>
+                        )}
                         <td className="px-3 py-2 text-right">
-                          {puedeEditar && !noEditable && (
+                          {puedeEditar && !noEditable && !esProveedor && (
                             <button
                               onClick={() => { setPendiente({ tipo: 'quitar', destinoId: a.destinoId, numero: a.destinoNumero }); }}
                               className="text-[10px] font-bold uppercase tracking-wider text-primario hover:underline whitespace-nowrap"
@@ -151,7 +169,9 @@ export default function FichaPago({
               )}
               <button
                 onClick={() => { setPendiente({ tipo: 'anular' }); }}
-                className="text-[11px] font-bold uppercase tracking-wider text-peligro border border-peligro/40 hover:bg-peligro/5 px-3 py-2 rounded-lg"
+                disabled={!!plan && plan.problemas.length > 0}
+                data-testid="anular-pago"
+                className="disabled:opacity-40 disabled:cursor-not-allowed text-[11px] font-bold uppercase tracking-wider text-peligro border border-peligro/40 hover:bg-peligro/5 px-3 py-2 rounded-lg"
               >
                 Anular pago
               </button>
@@ -162,10 +182,17 @@ export default function FichaPago({
               )}
             </section>
           )}
-          {puedeEditar && !anulado && noEditable && (
+          {puedeEditar && !anulado && noEditable && !esProveedor && (
             <p className="text-[10px] text-gray-500 flex items-start gap-1.5">
               <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0 text-amber-600" />{noEditable}
             </p>
+          )}
+          {esProveedor && !anulado && plan && plan.problemas.length > 0 && (
+            <div className="text-[11px] text-gray-800 bg-amber-50 border border-amber-300 rounded-lg px-3 py-2" data-testid="problemas-anulacion">
+              <p className="font-bold mb-1 flex items-center gap-1.5"><AlertTriangle className="w-3 h-3 text-amber-600" /> No se puede anular este pago:</p>
+              <ul className="list-disc pl-5 space-y-0.5">{plan.problemas.map(x => <li key={x}>{x}</li>)}</ul>
+              <p className="mt-1 text-gray-600">No se anula nada a medias: o regresan todas las órdenes o ninguna.</p>
+            </div>
           )}
           {!puedeEditar && (
             <p className="text-[10px] text-gray-500">
@@ -176,7 +203,9 @@ export default function FichaPago({
           {/* ── El motivo ──────────────────────────────────────────────── */}
           {pendiente && (
             <MotivoCorreccion
-              descripcion={pendiente.tipo === 'anular'
+              descripcion={pendiente.tipo === 'anular' && esProveedor
+                ? `Anular ${pago.folio}: ${pago.moneda} ${money(pago.monto)} dejan de contar. ${plan?.ordenes.length ?? 0} orden(es) regresan a «autorizada» y vuelven a Programación de pagos.`
+                : pendiente.tipo === 'anular'
                 ? `Anular ${pago.folio}: ${pago.moneda} ${money(pago.monto)} dejan de contar. Las facturas que cubría recuperan su saldo.`
                 : `Quitar la aplicación a ${pendiente.numero}: ese dinero vuelve a quedar sin aplicar y la factura recupera su saldo.`}
               confirmar={pendiente.tipo === 'anular' ? 'Anular pago' : 'Quitar aplicación'}

@@ -2008,6 +2008,33 @@ motivo.
     varios `confirm`/`alert` en Cotizaciones, Clientes, Settings, Usuarios,
     Tarifas, VistaSelector y FichaEmbarque.
 
+## 4.45 Los pagos a proveedor en la pestaña Pagos, y anular revierte sus órdenes (tarea 80, 6-oct-2026)
+
+Cierra la pregunta 4 de §4.37/§4.38: los pagos `lado: 'proveedor'` de la 73
+existían en `pagos/` sin lista ni ficha.
+  - **Finanzas → Pagos muestra los dos lados** con el filtro «Cliente y
+    proveedor / Cliente / Proveedor» (`FiltrosPagos.lado`, se guarda con la
+    vista; un valor basura se descarta). La lista del proveedor es
+    `pagosDeProveedor` (los de `pagos/` más las órdenes pagadas antes de P6).
+    **Los totales van por lado**: «Entrado» (cliente) y «Pagado a proveedores»
+    son dos tarjetas, nunca una suma (§4.3).
+  - **La ficha de un pago a proveedor** lista sus órdenes con su estado de hoy;
+    no ofrece quitar aplicación ni aplicar saldo (se anula completo).
+  - **Anular revierte por la máquina**: `puedeRevertirPagoOC` es un arco aparte
+    de `TRANSITIONS_OC` (`pagada → autorizada`, solo administracion y admin: los
+    que registran el pago). `pagada` sigue terminal para el flujo normal. El
+    único camino de vuelta es anular el pago. `revertirPago`
+    (`useOrdenesCompra`) valida con ese arco, limpia `comprobantePago` y
+    `pagadaPor`, deja motivo en `historialEstados` y entrada en la bitácora.
+  - **Todo o nada**: `planAnulacionProveedor` evalúa cada orden ANTES de
+    escribir; si una no puede regresar (ya no existe, no está pagada, rol) no se
+    anula nada y la ficha dice cuál y por qué (botón deshabilitado).
+  - Orden de escritura: pago anulado primero (con `anulacion`, tarea 79) y luego
+    las órdenes, como `registrarPagoDelGrupo`; si falla una orden, el aviso dice
+    el folio. Sigue sin ser transacción.
+  - Un pago a proveedor leído de las órdenes (`legacy_comprobante_oc`) se ve pero
+    no se anula: no tiene documento propio.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
