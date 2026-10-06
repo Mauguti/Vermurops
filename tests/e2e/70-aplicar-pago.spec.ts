@@ -142,6 +142,18 @@ async function abrirModal(page: Page) {
   await expect(page.getByRole('heading', { name: `Aplicar pago · ${CLIENTE}` })).toBeVisible({ timeout: 15_000 });
 }
 
+/**
+ * El renglón de una factura DENTRO del modal.
+ *
+ * Se localiza por su casilla y no por el número: la tabla de la cartera sigue
+ * detrás del modal con los mismos folios, y buscar por texto encuentra las
+ * dos. Es la misma trampa que el modo estricto de Playwright existe para
+ * atrapar.
+ */
+function renglon(page: Page, numero: string) {
+  return page.getByRole('row').filter({ has: page.getByRole('checkbox', { name: `Aplicar a ${numero}` }) });
+}
+
 test('siembra el cliente con cuatro facturas y un cobro viejo', async () => {
   await sembrar();
 });
@@ -158,7 +170,7 @@ test('la lista ofrece las tres facturas en pesos y NO la de dólares', async ({ 
   await expect(page.getByRole('checkbox', { name: 'Aplicar a A-7004' })).toHaveCount(0);
 
   // El saldo de la tercera ya trae descontado el cobro viejo: 38,000 − 8,000.
-  await expect(page.getByRole('row', { name: /A-7003/ })).toContainText('30,000.00');
+  await expect(renglon(page, 'A-7003')).toContainText('30,000.00');
 
   await foto(page, 'modal-abierto');
   await ctx.close();
@@ -178,7 +190,7 @@ test('el reparto en cascada aplica un pago a tres facturas y cuadra', async ({ b
   await expect(page.getByLabel('Monto aplicado a A-7003')).toHaveValue('15000');
 
   // Punto 3: el restante de cada factura, a la vista.
-  await expect(page.getByRole('row', { name: /A-7003/ })).toContainText('15,000.00');
+  await expect(renglon(page, 'A-7003')).toContainText('15,000.00');
   await expect(page.getByText('✓ cuadra')).toBeVisible();
   await expect(page.getByText(/Aplicado MXN 120,000.00/)).toBeVisible();
   await expect(page.getByText(/3 facturas, 2 quedan cobradas, 1 parcial/)).toBeVisible();
@@ -282,7 +294,11 @@ test('el guardado espera la regla de pagos/, y lo dice', async ({ browser }) => 
   await page.getByRole('button', { name: 'Aplicar lo más vencido primero' }).click();
   await page.getByRole('button', { name: 'Registrar pago' }).click();
 
-  await expect(page.getByText(/no tiene su regla publicada/)).toBeVisible({ timeout: 15_000 });
+  /* Sale DOS veces y las dos están bien: el toast de arriba y el renglón de
+     error dentro del modal, que es el que deja el reparto capturado en vez de
+     tirarlo. */
+  await expect(page.getByText(/no tiene su regla publicada/).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/no tiene su regla publicada/)).toHaveCount(2);
   await foto(page, 'guardado-sin-regla');
   await ctx.close();
 

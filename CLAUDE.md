@@ -1709,6 +1709,75 @@ es. Es la misma trampa del SMTP AUTH de §4.29.
     equipo puede escribir un pago desde la consola**. Con dinero de verdad en
     esa colección, la deuda de §6 sube de prioridad.
 
+## 4.35 Un pago, varias facturas: «Aplicar pago» (tarea 70, 5-oct-2026)
+
+Paso **P4** de `docs/sprint-post-junta/PLAN-PAGOS.md` (§7.1), el flujo de
+Magaya que describió Julio. `lib/aplicarPago.ts` (36 tests) y
+`components/facturas/ModalAplicarPago.tsx`.
+
+El renglón de Cuentas por cobrar dice **«Aplicar pago»** donde decía
+«Registrar cobro», y abre el reparto: arriba el dinero que entró —monto,
+moneda, fecha, cuenta, referencia opcional— y abajo las facturas pendientes
+**del mismo cliente y en la misma moneda**, con «se aplica» y «queda» por
+renglón. El caso de siempre no cambia de esfuerzo: se abre desde la factura
+con el monto y el reparto ya puestos en su saldo, así que cobrar una sola
+sigue siendo abrir y guardar. `ModalCobro` se retiró: era ese mismo caso con
+un formulario aparte.
+
+**Lo que sobra es saldo a favor, y se ve.** «Aplicar lo más vencido primero»
+reparte en cascada —propuesta editable, como la comparativa preselecciona el
+paquete más barato (§4.9)— y **no mete el excedente a la fuerza en la última
+factura**: queda como `sinAplicar` del pago, el pie lo dice («quedan MXN
+65,000.00 a favor del cliente») y se aplica después. Rellenar para cuadrar
+dejaría una factura sobrecobrada, que hoy es invisible (§10.5 del plan).
+  - **Lo que FALTA no se guarda.** El botón lo explica con los dos números:
+    «estás aplicando 143,000.00 de un pago de 120,000.00».
+  - **La regla se valida dos veces, y la segunda es la que importa.**
+    `construirPagoAplicado` lanza antes de escribir si lo aplicado pasa del
+    monto o si una aplicación trae otra moneda. El botón se puede esquivar
+    —otra pestaña, un reparto que quedó viejo— y un pago que liquida 130,000
+    con 120,000 se ve perfectamente bien en la lista.
+  - `construirPagoAplicado` es la forma GENERAL y `construirPagoDeCobro` pasó
+    a ser su caso de UNA aplicación. Un solo constructor: escritos aparte, el
+    pago de doce facturas podría nacer con un campo de menos.
+
+**La moneda no se convierte, y se dice.** §4 del plan, salida (a): el dinero
+que entró al banco está en una sola moneda y es la que Julio concilia.
+Cambiar la moneda del pago cambia la lista; cuando el cliente solo debe en la
+otra, la pantalla lo EXPLICA («lo que debe está en USD 3,000.00…») en vez de
+dejar la lista vacía, que se leería como «no debe nada». La conversión
+declarada es la salida (b) y espera la respuesta de Julio (J3).
+
+**Un pago cruza embarques, y cada bitácora anota lo suyo.** `embarqueIds` se
+deriva de las facturas aplicadas, así que una transferencia que cubre dos
+embarques fondea los dos por lo que les toca (`entradasDeFondeo`, caso 3) —
+el caso que `CobroCliente.embarqueId`, un solo string, no podía representar.
+`registrarPagoAplicado` deja UNA entrada por embarque con el total de ESE
+embarque: anotar el total en los dos haría parecer que entró el doble.
+
+**Desde la factura se ve qué pagos la cubrieron** (`coberturaDeFactura`): el
+«Cobrado» del renglón es el enlace, y abajo salen folio, fecha, monto, cuenta
+y referencia. Un cobro viejo de `cobros/` sale igual, marcado **«registro
+anterior»** porque no tiene folio de pago ni ficha propia. Dos aplicaciones
+del mismo pago a la misma factura son UN renglón: son un movimiento.
+**La vista al revés —un pago con todas sus facturas, quitar una aplicación,
+anular— es P5 y no se hizo.**
+  - **«Parcial» se pinta JUNTO al estado, no en su lugar.** El estado
+    contesta cuánto falta para el vencimiento y lo parcial, cuánto falta de
+    dinero: las dos preguntas se hacen a la vez. `EstadoCobro` no creció, así
+    que los filtros y las vistas guardadas de la 61 no cambian.
+
+**Un pago sin ninguna aplicación no se guarda desde aquí**, y es decisión de
+interfaz: el dinero que no cubre factura es el anticipo, y su formulario ya
+existe —«Registrar entrada de dinero» (§4.33)— donde además se elige el
+embarque, que es lo que lo hace fondear. Un pago nacido aquí sin aplicaciones
+no tendría embarque y no fondearía nada, aunque se vería igual en la lista.
+
+⚠️ **Esta pantalla NO guarda hasta que `pagos/` tenga su regla publicada**
+(§4.34). `tests/e2e/70-aplicar-pago.spec.ts` recorre los nueve casos contra
+emuladores y el último FIJA el aviso del bloqueo, con la versión en verde
+escrita y comentada para el día que la regla entre.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
