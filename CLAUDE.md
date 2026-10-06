@@ -1940,6 +1940,22 @@ pagadera antes de tener la factura del proveedor. `lib/prefactura.ts` (17 tests)
     La nota vieja de «build sin typecheck, ~10 errores» ya no es cierta; no
     estaba en este CLAUDE.md sino en la memoria de la sesión.
 
+## 4.41 «Sin estatus»: ningún cliente invisible en Altas (tarea 76, 6-oct-2026)
+
+La lista de Altas filtraba por `statusOperativo === 'ACTIVO'`: un cliente sin
+el campo, o con un valor fuera de la lista, existía y no se veía. Ahora
+`lib/estatusCliente.ts` (6 tests) lo LEE como activo / inactivo / **sin
+estatus**; solo los inactivos se esconden (con «Mostrar inactivos»), y el
+hueco se ve con la etiqueta ámbar «Sin estatus» en la columna, en la ficha y
+en un contador junto al de la lista. **No se escribe el campo en ningún
+documento**: la ficha no lo guarda a menos que alguien elija ACTIVO o
+INACTIVO. Los scripts de la 65 y `minarRFCMagaya.ts` solo hacen `update` de
+documentos existentes; el alta de VermurOps, el seed y la importación lo
+escriben siempre, así que hoy un cliente nace sin él solo por consola o por un
+script nuevo. Quedan sin cambiar, por decisión de alcance, los selectores que
+filtran `=== 'ACTIVO'` (`ProductosEmbarque`) y `cotizacionAEmbarque`.
+
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

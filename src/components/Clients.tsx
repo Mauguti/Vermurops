@@ -23,6 +23,7 @@ import { PROVEEDOR_COLUMNS, VISTA_DEFAULT_PROVEEDORES } from './proveedores/prov
 import type { ClienteVermur } from './clientes/ClientesData';
 import { puedeEditarEnLista, aplicarCambio, CAMPO_EJECUTIVO, ROL_DEL_AREA, type AreaEjecutivo } from '../lib/edicionEnLista';
 import type { EdicionEnListaMeta } from './clientes/edicionMeta';
+import { visibleEnAltas, contarSinEstatus } from '../lib/estatusCliente';
 
 export default function Clients() {
   // Matriz §4.1: las altas definitivas de clientes y proveedores son solo de
@@ -297,8 +298,8 @@ export default function Clients() {
   }
 
   const filteredClients = clientes.filter(c => {
-    // Filtro por estatus: por default solo activos
-    if (!showInactivos && c.statusOperativo !== 'ACTIVO') return false;
+    // Filtro por estatus: los inactivos se esconden; «sin estatus» se ve siempre.
+    if (!visibleEnAltas(c, showInactivos)) return false;
     // `expedienteDrive` ausente cuenta como «no»: el cliente no tiene carpeta.
     if (filtroOneDrive !== 'todos' && (c.expedienteDrive ? 'si' : 'no') !== filtroOneDrive) return false;
     const q = searchTerm.trim();
@@ -386,6 +387,11 @@ export default function Clients() {
                 </select>
               </label>
               <span className="text-[11px] text-text-muted tabular-nums">{filteredClients.length} de {clientes.length}</span>
+              {contarSinEstatus(clientes) > 0 && (
+                <span className="text-[11px] text-amber-700" title="Clientes sin estatus operativo guardado: se muestran con la etiqueta «Sin estatus»">
+                  {contarSinEstatus(clientes)} sin estatus
+                </span>
+              )}
             </div>
             <div className="flex items-center space-x-[12px]">
               {/* Importar Magaya sobrescribe el catálogo completo contra la base
