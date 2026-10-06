@@ -351,7 +351,7 @@ export default function Finance() {
           reglaIVA={conceptos.find(c => c.id === ocAbierta.conceptoId)?.reglaIVA}
           /* Tarea 69 · P3 · El panel es de SOLO LECTURA: lo depositado, con
              enlace a Cuentas por cobrar, que es donde ahora se captura. */
-          entradas={entradasDelEmbarque(pagosCliente, ocAbierta.embarqueId ?? '')}
+          entradas={entradasDelEmbarque(pagosCliente, ocAbierta.embarqueId ?? '', embarqueDeFactura)}
           onIrACobranza={puede('cobro.registrar') ? () => {
             setOcAbiertaId(null);
             setOrigenNav(null);

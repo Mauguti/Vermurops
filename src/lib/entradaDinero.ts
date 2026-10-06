@@ -27,7 +27,7 @@
  */
 
 import type { OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
-import type { Pago } from './pagos';
+import { entradasDeFondeo, type Pago } from './pagos';
 import { sumarPorMoneda, type TotalPorMoneda, type Moneda } from './sumarPorMoneda';
 
 /** Contra qué se liga el dinero que entró. */
@@ -183,7 +183,10 @@ export interface EntradaDeEmbarque {
   pagoId: string;
   folio: string;
   fecha: string;
+  /** Lo que este pago aporta a ESTE embarque: es el MISMO número que le suma al fondeo. */
   monto: number;
+  /** El monto completo del pago; difiere de `monto` cuando el pago se repartió entre embarques. */
+  montoDelPago: number;
   moneda: Moneda;
   referencia: string | null;
   /** Números de factura que este pago cubrió en ESTE embarque; vacío si es anticipo. */
@@ -204,21 +207,37 @@ export interface EntradaDeEmbarque {
 export function entradasDelEmbarque(
   pagos: readonly Pago[],
   embarqueId: string,
+  embarqueDeDestino?: (destinoId: string) => string | null | undefined,
 ): EntradaDeEmbarque[] {
   if (!embarqueId) return [];
 
-  return pagos
-    .filter(p => p.lado === 'cliente' && p.activo !== false && (p.embarqueIds ?? []).includes(embarqueId))
-    .map(p => ({
+  /*
+   * Tarea 82 · El monto sale de `entradasDeFondeo`, la MISMA función que
+   * alimenta el fondeo de la orden, pasándole un pago a la vez. Antes aquí se
+   * leía `p.monto` completo: con un pago repartido entre dos embarques la
+   * ficha decía 100,000 y el fondeo contaba 60,000 para este. Sin resolvedor
+   * un pago repartido no cuenta —igual que en el fondeo— y por tanto no se
+   * lista: dos cifras distintas para el mismo dinero es peor que una ausencia.
+   */
+  const out: EntradaDeEmbarque[] = [];
+  for (const p of pagos) {
+    if (p.lado !== 'cliente' || p.activo === false) continue;
+    const aporte = entradasDeFondeo([p], embarqueId, embarqueDeDestino);
+    if (aporte.length === 0) continue;
+    const repartido = new Set(p.embarqueIds ?? []).size > 1;
+    out.push({
       pagoId: p.id,
       folio: p.folio || p.id,
       fecha: p.fecha,
-      monto: p.monto,
+      monto: aporte.reduce((acc, e) => acc + e.monto, 0),
+      montoDelPago: p.monto,
       moneda: p.moneda,
       referencia: p.referencia ?? null,
       aplicadoA: (p.aplicaciones ?? [])
         .filter(a => a.destinoTipo === 'factura')
+        .filter(a => !repartido || embarqueDeDestino?.(a.destinoId) === embarqueId)
         .map(a => a.destinoNumero || a.destinoId),
-    }))
-    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+    });
+  }
+  return out.sort((a, b) => b.fecha.localeCompare(a.fecha));
 }

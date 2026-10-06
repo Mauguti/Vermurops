@@ -2060,6 +2060,21 @@ Reglas puras en `lib/formularioPagoProveedor.ts`; el dinero sigue en
     guarda null. Sin elegir nada el comportamiento es el de la 73.
   - Sin cambio de modelo, de reglas ni de Functions.
 
+## 4.47 La ficha de la orden cuenta como el fondeo, y `pagos/` tiene un solo listener (tarea 82, 6-oct-2026)
+
+  - **`entradasDelEmbarque` ya no lee `p.monto`**: llama a `entradasDeFondeo`
+    (un pago a la vez) y recibe el mismo resolvedor factura → embarque que el
+    fondeo. Un pago de 100,000 repartido 60,000 / 40,000 entre dos embarques
+    muestra 60,000 en la ficha del primero —«de 100,000.00 del pago» aparte— y
+    solo las facturas de ESE embarque. Sin resolvedor un pago repartido no se
+    lista, igual que no fondea: dos cifras para el mismo dinero es peor que una
+    ausencia. `EntradaDeEmbarque.monto` es el aporte; `montoDelPago`, el total.
+  - **Un solo `onSnapshot` sobre `pagos/`** (`lib/tiendaCompartida.ts`, con
+    refcount): `useFacturas`, `useDepositosCliente` y `Finance` montaban
+    `usePagos` y abrían tres. Ahora los hooks comparten una y filtran por
+    embarque sobre la misma lista. Se abre con el primer suscriptor y se cierra
+    con el último.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

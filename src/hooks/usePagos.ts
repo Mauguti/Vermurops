@@ -20,42 +20,55 @@
  * que el §6 del CLAUDE.md pone peor que no guardar.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { db } from '../firebase';
 import { collection, doc, onSnapshot, setDoc, updateDoc, query, orderBy, arrayUnion } from 'firebase/firestore';
 import { useAuth } from '../auth/AuthContext';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 import { conAviso } from '../lib/erroresEscritura';
 import { idUnico } from '../lib/idUnico';
+import { crearTiendaCompartida } from '../lib/tiendaCompartida';
 import { generateFolioPago } from '../lib/folioServicePago';
 import type { AplicacionPago, AplicacionQuitada, ContextoPago, MotivoCorreccion, Pago } from '../lib/pagos';
 
 const COL = 'pagos';
 
+/*
+ * Tarea 82 · UNA suscripción a `pagos/` para toda la app. `useFacturas`,
+ * `useDepositosCliente` y `Finance` montan este hook a la vez; cada uno abría
+ * su propio `onSnapshot` (tres lecturas de la colección). Ahora comparten una,
+ * y cada hook filtra por embarque sobre la misma lista.
+ */
+const tiendaPagos = crearTiendaCompartida<Pago>((alDato, alError) =>
+  onSnapshot(
+    query(collection(db, COL), orderBy('fecha', 'desc')),
+    snap => {
+      const data: Pago[] = [];
+      snap.forEach(d => data.push({ id: d.id, ...d.data() } as Pago));
+      alDato(data);
+    },
+    alError,
+  ));
+
 export function usePagos(embarqueId?: string) {
   const { user } = useAuth();
-  const [pagos, setPagos] = useState<Pago[]>([]);
+  const [todos, setTodos] = useState<Pago[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
-    const unsub = onSnapshot(
-      query(collection(db, COL), orderBy('fecha', 'desc')),
-      snap => {
-        const data: Pago[] = [];
-        snap.forEach(d => data.push({ id: d.id, ...d.data() } as Pago));
-        /*
-         * El embarque filtra por `embarqueIds`, no por un `embarqueId`
-         * suelto: un pago puede tocar varios, y es justo el caso que
-         * `CobroCliente` no podía representar (§1.4).
-         */
-        setPagos(embarqueId ? data.filter(p => (p.embarqueIds ?? []).includes(embarqueId)) : data);
-        setLoading(false);
-      },
-      () => setLoading(false),
-    );
-    return () => unsub();
-  }, [user, embarqueId]);
+    return tiendaPagos.suscribir(e => { setTodos(e.datos); setLoading(e.loading); });
+  }, [user]);
+
+  /*
+   * El embarque filtra por `embarqueIds`, no por un `embarqueId` suelto: un
+   * pago puede tocar varios, y es justo el caso que `CobroCliente` no podía
+   * representar (§1.4).
+   */
+  const pagos = useMemo(
+    () => (embarqueId ? todos.filter(p => (p.embarqueIds ?? []).includes(embarqueId)) : todos),
+    [todos, embarqueId],
+  );
 
   /**
    * El contexto de un pago nuevo: id, folio reservado, quién y cuándo.
