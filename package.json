@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "./scripts/e2e.sh",
+    "e2e:completo": "./scripts/e2e-completo.sh",
     "test:reglas": "./scripts/testReglas.sh"
   },
   "dependencies": {
