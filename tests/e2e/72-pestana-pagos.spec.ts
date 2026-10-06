@@ -212,7 +212,7 @@ async function cobradoYResta(page: Page, numero: string): Promise<{ cobrado: str
 
 test('siembra: un cliente, tres facturas y tres pagos', async () => { await sembrar(); });
 
-test('la lista muestra los tres pagos con su estado y los totales por moneda', async ({ browser }) => {
+test('la lista muestra los pagos con su estado y los totales por moneda', async ({ browser }) => {
   const { page, ctx } = await entrar(browser, 'administracion@vermur.com');
   await abrirPagos(page);
 
@@ -220,9 +220,9 @@ test('la lista muestra los tres pagos con su estado y los totales por moneda', a
   await expect(page.getByRole('row').filter({ hasText: PAGOS.X.folio })).toContainText('Parcial');
   await expect(page.getByRole('row').filter({ hasText: PAGOS.Y.folio })).toContainText('Sin aplicar');
   await expect(page.getByRole('row').filter({ hasText: PAGOS.Z.folio })).toContainText('Aplicado');
-  // Totales por moneda, sin mezclar: 23,000 entrados y 7,000 a favor (2,000 + 5,000).
-  await expect(page.getByTestId('totales-pagos')).toContainText('MXN 23,000.00');
-  await expect(page.getByTestId('totales-pagos')).toContainText('MXN 7,000.00');
+  // Totales por moneda, sin mezclar: 26,000 entrados y 10,000 a favor (2,000 + 5,000 + 3,000 del pago sin embarque, tarea 79).
+  await expect(page.getByTestId('totales-pagos')).toContainText('MXN 26,000.00');
+  await expect(page.getByTestId('totales-pagos')).toContainText('MXN 10,000.00');
 
   await foto(page, 'lista');
   await page.setViewportSize({ width: 390, height: 900 });
@@ -407,6 +407,9 @@ test('C3 · tarea 79 · un pago SIN embarque anulado deja su motivo en el pago y
   expect(doc.anulacion.por).toBeTruthy();
   expect(doc.anulacion.en).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   await foto(page, 'anulado-sin-embarque');
+  await page.screenshot({ path: `${IMG}/79-anulado-sin-embarque-escritorio.png` });
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.screenshot({ path: `${IMG}/79-anulado-sin-embarque-angosto.png` });
 
   await ctx.close();
 });

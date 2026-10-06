@@ -1983,6 +1983,31 @@ ejemplo que §4.23 dejó anotados; los seeds de `src/data.ts` siguen.
     importador, como punto de partida para cuando exista el módulo: entonces
     vuelven con ruta, permiso y entrada de menú juntos.
 
+## 4.44 El motivo de la corrección vive en el Pago (tarea 79, 6-oct-2026)
+
+Cierra la pregunta 1 de §4.37: `Pago.anulacion?: { motivo, por, en }` y
+`Pago.aplicacionesQuitadas?: Array<AplicacionPago & { motivo, por, en }>`,
+opcionales y aditivos. Anular y quitar una aplicación los escriben **además**
+de la bitácora del embarque; un pago sin embarque anulado ya no pierde el
+motivo.
+  - **`en` es ISO 8601, no `Timestamp`**: el contrato decía Timestamp, pero
+    todo el modelo de pagos (`fecha`, `createdAt`, `updatedAt`) son strings ISO
+    y mezclar dos tipos de fecha en un documento complica los filtros.
+  - `aplicacionesQuitadas` se escribe con `arrayUnion`: dos correcciones
+    simultáneas no se pisan la lista.
+  - **La ficha lee el Pago primero y la bitácora para lo anterior**
+    (`correccionesDelPago` en `lib/reversaPagos.ts`): una anulación o quitada
+    hecha antes de la 79 no trae campo y se sigue leyendo de la bitácora; lo
+    que el pago ya dice no se repite (se reconoce por factura y motivo).
+  - **Un solo campo de motivo** (`components/pagos/MotivoCorreccion.tsx`): en
+    línea en la ficha del pago y en modal (`ModalMotivoCorreccion`) en la
+    pestaña Facturas del embarque, donde antes era `window.prompt`.
+  - Quedan con cuadro nativo en pantallas de usuario (no tocados, fuera de
+    alcance): cancelar factura (`PanelFacturasEmbarque`), «Copiar detalle» y
+    «Registrar pago» (`PanelPagos`), «No pagar» y otra nota (`FichaOC`), y
+    varios `confirm`/`alert` en Cotizaciones, Clientes, Settings, Usuarios,
+    Tarifas, VistaSelector y FichaEmbarque.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
