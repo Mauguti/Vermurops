@@ -70,10 +70,29 @@ export function usePagos(embarqueId?: string) {
     ahora: new Date().toISOString(),
   }), [user]);
 
-  /** Escribe el pago. Quien lo arma es `lib/pagos.ts`; aquí solo se guarda. */
+  /**
+   * Escribe el pago. Quien lo arma es `lib/pagos.ts`; aquí solo se guarda.
+   *
+   * Un `permission-denied` se traduce: el mensaje genérico es «No tienes
+   * permiso para guardar este cambio», y quien lo lea va a pensar que es su
+   * rol. No lo es —`pagos/` nace con `esDelEquipo()`, igual que `cobros/`—,
+   * es que la regla puede no estar publicada todavía. Es la lección del
+   * SMTP AUTH de §4.29: un fallo genérico manda a arreglar lo que está bien.
+   */
   const guardarPago = useCallback(async (pago: Pago): Promise<Pago> => {
-    await conAviso('el pago', () =>
-      setDoc(doc(db, COL, pago.id), sanitizarParaFirestore(pago)));
+    try {
+      await conAviso('el pago', () =>
+        setDoc(doc(db, COL, pago.id), sanitizarParaFirestore(pago)));
+    } catch (err) {
+      if ((err as { code?: string })?.code === 'permission-denied') {
+        throw new Error(
+          'Firestore rechazó la escritura en «pagos» y el pago NO se guardó. ' +
+          'Si es la primera vez que pasa, es que esa colección todavía no tiene ' +
+          'su regla publicada: avisa a quien administra la plataforma.',
+        );
+      }
+      throw err;
+    }
     return pago;
   }, []);
 
