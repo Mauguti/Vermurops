@@ -12,6 +12,7 @@ import type { DocsAlta } from '../clientes/ClientesData';
 import type { DocExpedienteConfig } from '../../lib/expedienteProveedor';
 import type { EntidadValidable } from '../../lib/estadoValidacion';
 import { estadoValidacion, etiquetaValidacion } from '../../lib/estadoValidacion';
+import { etiquetaConfianza, type ClasificacionArchivo } from '../../lib/loteDocumentos';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../firebase';
 
@@ -23,6 +24,16 @@ export interface ArchivoExpediente {
   nombre: string;
   subidoPor: string;
   fecha: string;
+  /**
+   * Tarea 71 · Lo que dijo el clasificador y, si alguien corrigió el tipo a
+   * mano, el registro de quién y cuándo.
+   *
+   * Opcional y aditivo: los archivos que ya existen no lo traen y se leen
+   * igual que siempre. Hasta hoy el proveedor era el único de los tres
+   * destinos del botón único que perdía ese registro, porque no tenía dónde
+   * guardarlo.
+   */
+  clasificacion?: ClasificacionArchivo;
 }
 
 export interface ExpedientePanelProps {
@@ -222,6 +233,7 @@ export default function ExpedientePanel({
           const marcado = docsAlta[campo];
           const archivo = archivos?.[campo];
           const subiendoEste = subiendo === campo;
+          const confianza = etiquetaConfianza(archivo?.clasificacion?.confianza);
           return (
             <div
               key={campo}
@@ -249,7 +261,17 @@ export default function ExpedientePanel({
                       <p className="text-[10px] text-text-muted">
                         {archivo.fecha.slice(0, 10)}
                         {archivo.subidoPor && ` · ${archivo.subidoPor}`}
+                        {confianza && ` · confianza ${confianza}`}
                       </p>
+                      {/* Tarea 71 · Si el tipo se corrigió a mano, aquí se lee
+                          qué leyó el agente y qué decidió la persona.
+                          Guardarlo sin enseñarlo sería un dato que nadie mira,
+                          y es justo lo que hay que ver para arreglar n8n. */}
+                      {archivo.clasificacion?.observaciones && (
+                        <p className="text-[10px] text-text-muted">
+                          {archivo.clasificacion.observaciones}
+                        </p>
+                      )}
                     </div>
                   ) : marcado ? (
                     <p className="text-[10px] text-text-muted mt-1">

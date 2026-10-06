@@ -19,8 +19,9 @@
 
 import type { EmbarqueCompleto } from '../components/shipments/EmbarquesData';
 import type { OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
-import type { FacturaCliente, CobroCliente } from '../components/facturas/FacturasData';
+import type { FacturaCliente } from '../components/facturas/FacturasData';
 import { saldoDeFactura } from './facturacionEmbarque';
+import { aplicacionesA, type Pago } from './pagos';
 import { lineasFacturables } from '../components/shipments/EmbarquesData';
 
 export type TipoCierre = 'operativo' | 'pago' | 'administrativo';
@@ -51,8 +52,12 @@ export interface ContextoCierres {
   ordenes: OrdenCompra[];
   /** Facturas emitidas de este embarque. */
   facturas: FacturaCliente[];
-  /** Cobros recibidos, para saber si las facturas están liquidadas. */
-  cobros: CobroCliente[];
+  /**
+   * Los pagos del cliente, para saber si las facturas están liquidadas.
+   * Tarea 67 · Era la lista de cobros; ahora es la lista unificada, donde un
+   * cobro viejo es un pago con una sola aplicación.
+   */
+  pagos: Pago[];
 }
 
 const money = (n: number, m: string) =>
@@ -111,7 +116,7 @@ function evaluarPago(ctx: ContextoCierres): EvaluacionCierre {
   }
 
   for (const f of vivas) {
-    const { saldo } = saldoDeFactura(f, ctx.cobros.filter(c => c.facturaId === f.id));
+    const { saldo } = saldoDeFactura(f, aplicacionesA(f.id, ctx.pagos));
     if (saldo > 1) {
       faltantes.push(`La factura ${f.numero} debe ${money(saldo, f.moneda)}.`);
     } else {

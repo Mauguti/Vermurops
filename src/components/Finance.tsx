@@ -4,6 +4,8 @@ import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import { useDepositosCliente } from '../hooks/useDepositosCliente';
 import { useFacturas } from '../hooks/useFacturas';
 import { calcularFondeo } from '../lib/fondeoCliente';
+import { pagosDeCliente, entradasDeFondeo } from '../lib/pagos';
+import { embarquesFondeables, entradasDelEmbarque } from '../lib/entradaDinero';
 import PanelPagos from './ordenesCompra/PanelPagos';
 import BandejaOC from './ordenesCompra/BandejaOC';
 import FichaOC from './ordenesCompra/FichaOC';
@@ -67,12 +69,27 @@ export default function Finance() {
   // ── 1.1 / 2.3 · El fondeo del cliente ─────────────────────────────────────
   // Depósitos Y cobros: son el mismo dinero entrando por dos puertas — el
   // anticipo que se pide antes de operar y la factura que se cobra después.
+  // Tarea 67 · Por eso se leen como UNA lista de pagos: el depósito es un
+  // pago sin aplicaciones, el cobro uno con una. Antes eran dos listas y cada
+  // call site tenía que acordarse de pasar las dos.
   const { depositos, registrarDeposito } = useDepositosCliente();
   const { facturas, cobros, registrarCobro } = useFacturas();
+  const pagosCliente = useMemo(
+    () => pagosDeCliente([], cobros, depositos),
+    [cobros, depositos],
+  );
+  /*
+   * Tarea 69 · P3 · A qué embarque se le puede anticipar dinero. Se deriva de
+   * las órdenes de pago abiertas: un anticipo se liga «al embarque y a la
+   * orden de pago que fondea», así que un embarque sin ninguna orden
+   * esperando dinero no es un destino, es un renglón que no hace nada.
+   */
+  const embarquesDisponibles = useMemo(() => embarquesFondeables(ordenes), [ordenes]);
+
   const carteraResumen = useMemo(() => {
     const hoy = new Date().toISOString().slice(0, 10);
-    return resumenCartera(cartera(facturas, cobros, hoy), cobros, hoy);
-  }, [facturas, cobros]);
+    return resumenCartera(cartera(facturas, pagosCliente, hoy), pagosCliente, hoy);
+  }, [facturas, pagosCliente]);
 
   /*
    * C-2 · La orden abierta se DERIVA del listener, no se guarda en estado.
@@ -111,9 +128,8 @@ export default function Finance() {
      */
     const fondeo = conCambios.embarqueId
       ? calcularFondeo(
-          depositos.filter(d => d.embarqueId === conCambios.embarqueId),
+          entradasDeFondeo(pagosCliente, conCambios.embarqueId),
           ordenes.filter(o => o.embarqueId === conCambios.embarqueId),
-          cobros.filter(c => c.embarqueId === conCambios.embarqueId),
         )
       : undefined;
 
@@ -201,22 +217,18 @@ export default function Finance() {
           proveedor={proveedores.find(p => p.id === ocAbierta.proveedorId) ?? null}
           categoriaConcepto={conceptos.find(c => c.id === ocAbierta.conceptoId)?.categoria}
           reglaIVA={conceptos.find(c => c.id === ocAbierta.conceptoId)?.reglaIVA}
-          onRegistrarDeposito={puede('ordenCompra.autorizar') && ocAbierta.embarqueId ? async (d) => {
-            await registrarDeposito({
-              ...d,
-              embarqueId: ocAbierta.embarqueId!,
-              embarqueFolio: ocAbierta.embarqueFolio ?? '',
-              clienteId: ocAbierta.clienteId ?? '',
-              clienteNombre: ocAbierta.clienteNombre ?? '',
-              comprobante: null,
-            });
-            setToast({ mensaje: `Depósito de ${d.moneda} ${d.monto.toLocaleString('en-US', { minimumFractionDigits: 2 })} registrado. Ya fondea las órdenes del embarque.`, tipo: 'exito' });
+          /* Tarea 69 · P3 · El panel es de SOLO LECTURA: lo depositado, con
+             enlace a Cuentas por cobrar, que es donde ahora se captura. */
+          entradas={entradasDelEmbarque(pagosCliente, ocAbierta.embarqueId ?? '')}
+          onIrACobranza={puede('cobro.registrar') ? () => {
+            setOcAbiertaId(null);
+            setOrigenNav(null);
+            setActiveTab('Cuentas por cobrar');
           } : undefined}
           fondeo={ocAbierta.embarqueId
             ? calcularFondeo(
-                depositos.filter(d => d.embarqueId === ocAbierta.embarqueId),
+                entradasDeFondeo(pagosCliente, ocAbierta.embarqueId),
                 ordenes.filter(o => o.embarqueId === ocAbierta.embarqueId),
-                cobros.filter(c => c.embarqueId === ocAbierta.embarqueId),
               )
             : undefined}
         />
@@ -321,14 +333,22 @@ export default function Finance() {
                 {activeTab === 'Cuentas por cobrar' && (
                    <PanelCuentasPorCobrar
                      facturas={facturas}
-                     cobros={cobros}
-                     puedeCobrar={puede('factura.generar')}
+                     pagos={pagosCliente}
+                     /* Tarea 69 · P3 · `cobro.registrar`, no
+                        `factura.generar`: facturar es de las dos áreas y
+                        recibir el dinero es solo de Administración. */
+                     puedeCobrar={puede('cobro.registrar')}
                      onCobrar={async (c) => {
                        // El mismo registro que desde el embarque: el cobro
                        // fondea las OC de ese embarque (1.1).
                        await registrarCobro(c);
                        setToast({ mensaje: `Cobro de ${c.moneda} ${c.monto.toLocaleString('en-US', { minimumFractionDigits: 2 })} registrado contra ${c.facturaNumero}.`, tipo: 'exito' });
                      }}
+                     embarquesFondeables={embarquesDisponibles}
+                     onRegistrarAnticipo={puede('cobro.registrar') ? async (a) => {
+                       await registrarDeposito({ ...a, comprobante: null });
+                       setToast({ mensaje: `Entrada de ${a.moneda} ${a.monto.toLocaleString('en-US', { minimumFractionDigits: 2 })} registrada en ${a.embarqueFolio}. Ya fondea sus órdenes de pago.`, tipo: 'exito' });
+                     } : undefined}
                    />
                 )}
 

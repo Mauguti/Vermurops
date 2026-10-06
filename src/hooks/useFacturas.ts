@@ -7,7 +7,7 @@
  * Nada de esto timbra ni pretende hacerlo.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { db } from '../firebase';
 import { collection, doc, onSnapshot, setDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { useAuth } from '../auth/AuthContext';
@@ -18,6 +18,7 @@ import { conAviso } from '../lib/erroresEscritura';
 import { idUnico } from '../lib/idUnico';
 import type { FacturaCliente, CobroCliente } from '../components/facturas/FacturasData';
 import { saldoDeFactura } from '../lib/facturacionEmbarque';
+import { pagosDeCliente, type Pago } from '../lib/pagos';
 import { anotarBitacora } from './anotarBitacora';
 
 const COL_FACTURAS = 'facturas';
@@ -106,11 +107,16 @@ export function useFacturas(embarqueId?: string) {
    * Cobrar al cliente es lo que libera el pago al proveedor: este cobro entra
    * al fondeo del embarque. Por eso el cobro guarda `embarqueId` — sin él, el
    * dinero entraría a la contabilidad pero no desbloquearía nada.
+   *
+   * ── Tarea 69 · Quién cobra ───────────────────────────────────────────────
+   * `cobro.registrar`, no `factura.generar`: emitir la factura es de las dos
+   * áreas (§4.1) y recibir el dinero es solo de Administración. Es lo único
+   * que P3 QUITA de lo que hoy funciona, y es lo que dice la minuta §5.
    */
   const registrarCobro = async (
     datos: Omit<CobroCliente, 'id' | 'registradoPor' | 'activo' | 'createdAt' | 'updatedAt'>,
   ): Promise<CobroCliente> => {
-    exigir(user?.rol as UserRole | undefined, 'factura.generar');
+    exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
 
     const ahora = new Date().toISOString();
     const cobro: CobroCliente = {
@@ -153,7 +159,7 @@ export function useFacturas(embarqueId?: string) {
 
   /** Anula un cobro mal capturado. El saldo se recalcula solo. */
   const anularCobro = async (id: string): Promise<void> => {
-    exigir(user?.rol as UserRole | undefined, 'factura.generar');
+    exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
     await conAviso('el cobro', () =>
       updateDoc(doc(db, COL_COBROS, id), sanitizarParaFirestore({
         activo: false, updatedAt: new Date().toISOString(),
@@ -166,8 +172,25 @@ export function useFacturas(embarqueId?: string) {
     [cobros],
   );
 
+  /**
+   * Tarea 67 · La lista unificada de pagos del lado cliente.
+   *
+   * `cobros` es la lectura cruda de Firestore; `pagos` es la lente con la que
+   * se lee: un cobro es un pago con una sola aplicación. No son dos verdades
+   * —una se deriva de la otra— y es lo que consumen las pantallas, para que
+   * el día que `pagos/` exista no haya que recorrer diez call sites otra vez.
+   *
+   * El primer argumento va vacío a propósito: en P1 la colección `pagos/`
+   * todavía no tiene regla publicada, y un listener contra ella solo
+   * produciría «permission denied» en la consola. P2 lo llena.
+   *
+   * Los depósitos del cliente NO están aquí: los lee `useDepositosCliente` y
+   * los suma quien necesite el fondeo (Finance), con `pagosDeCliente`.
+   */
+  const pagos = useMemo<Pago[]>(() => pagosDeCliente([], cobros, []), [cobros]);
+
   return {
-    facturas, cobros, loading,
+    facturas, cobros, pagos, loading,
     registrarFactura, cancelarFactura, registrarCobro, anularCobro, cobrosDe,
   };
 }

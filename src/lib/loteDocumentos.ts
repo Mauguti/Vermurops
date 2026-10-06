@@ -319,3 +319,90 @@ export function observacionesConCorreccion(
   );
   return partes.length > 0 ? partes.join(' · ') : undefined;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5 · El registro, empacado para el expediente (tarea 71)
+//
+// La tarea 63 dejó el registro en los otros dos destinos —el expediente del
+// cliente y la orden de compra— porque los dos ya tenían campos planos donde
+// escribirlo (`observaciones`, `tipoCrudo`, `confianza`). El expediente del
+// PROVEEDOR no tenía dónde: `ArchivoExpediente` solo guarda ruta, url,
+// nombre, quién y cuándo. Con el campo aprobado (`clasificacion`, opcional y
+// aditivo) ya hay lugar, y lo que lo llena es esta función, para que los tres
+// destinos redacten la corrección con el MISMO texto en vez de tres copias.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Lo que el clasificador dijo de un archivo del expediente.
+ *
+ * `confianza` acepta la escala de texto y un número: el modelo aprobado la
+ * declaró `number | null` y el clasificador de esta plataforma contesta
+ * `'alta' | 'media' | 'baja'` (`NivelConfianza`). Aceptar las dos es lo que
+ * permite escribir lo que de verdad llega sin dejar de leer la forma
+ * aprobada. La escala de un número NO se interpreta —no se sabe si viene en
+ * 0-1 o en 0-100—, se enseña tal cual.
+ */
+export interface ClasificacionArchivo {
+  /** Lo que contestó el agente, literal. Ausente = no contestó. */
+  tipoCrudo?: string | null;
+  confianza?: 'alta' | 'media' | 'baja' | number | null;
+  /** Observaciones del agente y, si alguien corrigió el tipo, el registro. */
+  observaciones?: string | null;
+}
+
+/** Quién confirmó el lote, para firmar la corrección. */
+export interface AutorCorreccion {
+  /** Correo o nombre. */
+  por: string;
+  /** ISO. */
+  fecha: string;
+  etiqueta: (tipo: string) => string;
+}
+
+/**
+ * El `clasificacion` de un renglón del lote, o `undefined` si no hay nada que
+ * registrar.
+ *
+ * Devuelve `undefined` —y omite las claves vacías— en vez de un objeto con
+ * `undefined` dentro: Firestore rechaza `undefined` y tumba la escritura
+ * entera, que en esta pantalla sería el lote completo perdido con cara de
+ * guardado (§3).
+ */
+export function clasificacionDeLinea(
+  l: LineaLote,
+  autor: AutorCorreccion,
+): ClasificacionArchivo | undefined {
+  const correccion = l.corregidoAMano && l.tipoElegido
+    ? textoCorreccionTipo({
+        tipoCrudo: l.tipoCrudo,
+        tipoFinal: l.tipoElegido,
+        por: autor.por,
+        fecha: autor.fecha,
+        etiqueta: autor.etiqueta,
+      })
+    : null;
+
+  const clasificacion: ClasificacionArchivo = {};
+  if (l.tipoCrudo.trim()) clasificacion.tipoCrudo = l.tipoCrudo.trim();
+  if (l.confianza) clasificacion.confianza = l.confianza;
+  const observaciones = observacionesConCorreccion(l.observaciones, correccion);
+  if (observaciones) clasificacion.observaciones = observaciones;
+
+  return Object.keys(clasificacion).length > 0 ? clasificacion : undefined;
+}
+
+/**
+ * Cómo se lee la confianza en pantalla.
+ *
+ * Un número se enseña tal cual, sin convertirlo a porcentaje: inventarle la
+ * escala pondría «80%» donde el agente quiso decir 0.8 de otra cosa.
+ */
+export function etiquetaConfianza(
+  valor: ClasificacionArchivo['confianza'],
+): string | null {
+  if (valor === null || valor === undefined) return null;
+  // `String()` y no un casteo: un documento viejo puede traer cualquier cosa
+  // en ese campo, y un '' guardado no debe pintar «confianza » a secas.
+  const texto = String(valor).trim();
+  return texto === '' ? null : texto;
+}

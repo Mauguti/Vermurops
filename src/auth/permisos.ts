@@ -39,6 +39,8 @@ export type Capacidad =
   | 'embarque.generar'        // Generar el embarque desde la cotización
   | 'factura.generar'         // Generar factura dentro del embarque
   | 'notaCredito.generar'     // Generar nota de crédito
+  // Cobranza (P3 del plan de pagos): la entrada de dinero del cliente
+  | 'cobro.registrar'         // Registrar y anular la entrada de dinero del cliente
   // Órdenes de compra (C-2): tres áreas, tres capacidades
   | 'ordenCompra.solicitar'   // Pedir que se le pague a un proveedor
   | 'ordenCompra.gestionar'   // Revisar la solicitud y prepararla para autorizar
@@ -66,6 +68,7 @@ export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
   'embarque.generar',
   'factura.generar',
   'notaCredito.generar',
+  'cobro.registrar',
   'ordenCompra.solicitar',
   'ordenCompra.gestionar',
   'ordenCompra.autorizar',
@@ -96,6 +99,18 @@ export const TODAS_LAS_CAPACIDADES: Capacidad[] = [
  *
  *  - `factura.generar` la comparten Administración y Operaciones: es la única
  *    celda de la matriz con dos áreas marcadas.
+ *
+ *  - `cobro.registrar` NO la comparten, y eso QUITA algo que hoy funciona.
+ *    Hasta la tarea 69, registrar un cobro exigía `factura.generar`, así que
+ *    Operaciones podía hacerlo. Gaby: «quien hace la solicitud de pago es
+ *    Operaciones, pero quien recibe el dinero del cliente es Administración»,
+ *    y la minuta §5 pone la cobranza y los estados de cuenta en Administración.
+ *    Facturar sigue siendo de las dos áreas; COBRAR es de una sola.
+ *
+ *    Por eso es una capacidad nueva y no un rol más en `factura.generar`:
+ *    emitir la factura y recibir el dinero son dos actos distintos y a partir
+ *    de aquí los hace gente distinta. Donde Operaciones veía el formulario
+ *    ahora lee a dónde ir (§4.33).
  *
  *  - Las órdenes de compra son de DOS áreas, no de tres:
  *
@@ -157,6 +172,7 @@ export const CAPACIDADES_POR_ROL: Record<UserRole, Capacidad[]> = {
     'puerto.alta',
     'factura.generar',
     'notaCredito.generar',
+    'cobro.registrar',
     'ordenCompra.solicitar',
     'ordenCompra.autorizar',
     'tipoCambio.actualizar',
@@ -192,6 +208,32 @@ export function puedeCrearCotizacion(
   if (puede(rol, 'cotizacion.crear')) return true;
   if (!puede(rol, 'cotizacion.solicitar')) return false;
   return (ETAPAS_DE_SOLICITUD as readonly string[]).includes(etapa);
+}
+
+// ─── «No pagar»: marcar y liberar no son el mismo acto ───────────────────────
+
+/*
+ * Tarea 69 · La asimetría es textual de la minuta §5: «marcar / liberar no
+ * pagar → Admin y Operaciones», con la cobranza en Administración.
+ *
+ * Marcar es AVISAR —Operaciones es quien sabe que el cliente no ha fondeado y
+ * que la orden no debe salir— y liberar es DECIDIR que el dinero ya está, que
+ * es de quien concilia el banco. Hasta aquí las dos eran de Administración, y
+ * eso dejaba a Operaciones sin forma de detener un pago que sabía descubierto:
+ * tenía que rechazar la orden entera o mandar un correo.
+ *
+ * Viven aquí y no como un `if` en `FichaOC.tsx` para que la asimetría quede
+ * fijada por un test. Un `if` en la pantalla se endurece sin que nadie lo note.
+ */
+
+/** ¿Este rol puede DETENER un pago con la marca «No pagar»? */
+export function puedeMarcarNoPagar(rol: UserRole | undefined | null): boolean {
+  return puede(rol, 'ordenCompra.gestionar') || puede(rol, 'ordenCompra.autorizar');
+}
+
+/** ¿Este rol puede QUITAR la marca y dejar que el pago salga? */
+export function puedeLiberarNoPagar(rol: UserRole | undefined | null): boolean {
+  return puede(rol, 'ordenCompra.autorizar');
 }
 
 // ─── Error de permiso ─────────────────────────────────────────────────────────

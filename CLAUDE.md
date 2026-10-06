@@ -1334,9 +1334,8 @@ falla de infraestructura, y en un lote de 15 uno así tiraría los 15.
     dos cosas: qué leyó el agente y qué decidió la persona. Guardar solo lo
     segundo esconde que el clasificador se equivocó, que es justo lo que hay
     que ver para arreglar el flujo de n8n. Vive en `observaciones`, el campo
-    que ya existía. El **expediente del proveedor no lo persiste**:
-    `ArchivoExpediente` no tiene dónde, y agregarle un campo no estaba en el
-    modelo aprobado — está propuesto en el reporte 63.
+    que ya existía. El expediente del proveedor no lo persistía —
+    `ArchivoExpediente` no tenía dónde—; **lo cierra la tarea 71** (§4.34).
 
 **Los complementos de pago del proveedor ya tienen dónde ir** (§4.24): la
 orden de compra tiene `documentos?: DocumentoOC[]`, lista **opcional y
@@ -1548,6 +1547,149 @@ busca el prefijo al principio, con `(?![A-Za-z])` para no casar `VLIMEX`.
     a la ruta. No se prohíbe —si Vermur confirma BLIM, el prefijo es el
     correcto—; lo que tiene que aprenderlo es `traficoDeFolio`, y eso es otra
     tarea. Adivinarlo sería clasificar un embarque en el mes equivocado.
+
+## 4.32 El pago es la entidad, y lo aplicado se deriva (tarea 67, 5-oct-2026)
+
+Paso **P1** de `docs/sprint-post-junta/PLAN-PAGOS.md`. Es el principio de
+`anticipos.ts` subido un nivel: **el dinero que se movió es un hecho; a qué se
+aplicó es una decisión reversible.** `lib/pagos.ts` (42 tests) tiene el modelo
+—`Pago` con sus `AplicacionPago[]`— y las derivaciones: `aplicado`,
+`sinAplicar`, `aplicacionesA`, `avanceDeDestino`. Ninguna se guarda.
+
+Lo que resolvía que hoy no se podía: `CobroCliente` apunta a UNA factura y
+`DepositoCliente` a NINGUNA, y las dos exigen `embarqueId`. «Un cliente paga
+doce facturas con una transferencia» eran doce documentos con la misma
+referencia copiada a mano, y ninguno sabía de los otros.
+
+**P1 no escribe nada en `pagos/`: unifica la LECTURA.** Los diez call sites
+del §2.2 del plan —`cuentasPorCobrar`, `fondeoCliente`, `cierresEmbarque`,
+`Finance`, `PanelCuentasPorCobrar`, `PanelFacturasEmbarque`, `FichaEmbarque`,
+`FichaCliente`— consumen una sola lista. **Cero cambios de pantalla**, y
+`pagos.equivalencia.test.ts` lo fija con los números que el código viejo daba.
+  - **Tres adaptadores, nada se migra.** Un `CobroCliente` es un pago con UNA
+    aplicación; un `DepositoCliente`, uno con CERO; las órdenes que comparten
+    `comprobantePago` —dentro del mismo proveedor y la misma moneda— son el
+    pago consolidado que nunca existió como entidad (`pagosDesdeOrdenes`, su
+    call site llega en P6). **No hay doble conteo por construcción:** un
+    movimiento vive en `pagos` **o** en lo viejo, nunca en los dos. Esa es
+    toda la regla, y es la razón para no migrar.
+  - **`saldoDeFactura` no se tocó.** Recibe `{monto, moneda, activo}` y ahora
+    le llegan las aplicaciones en vez de los cobros. Cambió quien le pasa la
+    lista, no la regla.
+  - **`calcularFondeo` recibía depósitos Y cobros** —«el mismo dinero por dos
+    puertas»— y ahora recibe UNA lista de entradas, armada con
+    `entradasDeFondeo`. Era la dualidad de §6 en miniatura.
+  - **Un pago repartido entre dos embarques fondea cada uno por lo que le
+    toca**, y es la primera vez que el caso se puede representar. Sin el
+    resolvedor de embarque por destino **no se cuenta** en vez de contarse
+    entero en los dos: inflar el fondeo autoriza un pago descubierto.
+  - **«Cobrado del mes» suma APLICACIONES, no montos de pago.** Un depósito a
+    cuenta es dinero que entró y todavía no cobra ninguna factura; sumarlo
+    pondría en el KPI un número del que nadie podría decir de dónde salió. El
+    mes se mira sobre la fecha del PAGO, que para un cobro viejo es su
+    `fechaCobro`.
+  - `avanceDeDestino` da «se le abonaron 20,000 de 50,000» para la orden de
+    compra, que hoy solo salta a `pagada`, entera. **No agrega
+    `pagada_parcial` a la máquina**: tiene 54 tests y `pagada` es terminal.
+    Lo parcial es un avance; el estado entra si Julio lo pide para filtrar.
+
+## 4.33 El cobro se registra en cobranza, y cobrar ya no es facturar (tarea 69, 5-oct-2026)
+
+Paso **P3** de `docs/sprint-post-junta/PLAN-PAGOS.md`, el bloque 1 de Gaby:
+*«quien hace la solicitud de pago es Operaciones, pero quien recibe el dinero
+del cliente es Administración»*. `lib/entradaDinero.ts` (30 tests).
+
+**El formulario del depósito vivía en la cuenta por PAGAR.** «Registrar
+depósito del cliente» estaba dentro de `FichaOC.tsx` —la ficha de la orden de
+pago a un proveedor— y era la **única** pantalla que llamaba a
+`registrarDeposito`. Para capturar el dinero que entró había que entrar a una
+orden. Ahora «Registrar entrada de dinero» vive en **Finanzas → Cuentas por
+cobrar**, junto al cobro contra factura, que ya estaba ahí.
+
+**Tres cosas se ELIGEN donde antes se heredaban o se exigían:**
+  - **El embarque.** El anticipo se liga al embarque y con eso fondea sus
+    órdenes (1.1). El selector sale de `embarquesFondeables(ordenes)`: solo
+    los que tienen alguna orden esperando dinero, con lo que piden **por
+    moneda** (§4.3). Un embarque sin orden abierta no es un destino.
+  - **La moneda.** Antes era `moneda: oc.moneda`: un depósito en pesos contra
+    una orden en dólares se guardaba como dólares y se veía perfectamente
+    bien. No hay default — un «MXN» precargado se aprieta por reflejo, como
+    el botón del TC de Banxico de §4.3.
+  - **La referencia bancaria deja de ser obligatoria**, en los dos
+    formularios. «Aparece después del pago, no antes». Una referencia
+    inventada se ve igual que una real y descuadra la conciliación de Julio
+    sin que nadie se entere; vacía es verdad.
+
+**La ficha de la orden se queda con el dato, en solo lectura**
+(`entradasDelEmbarque`): qué entró, cuándo, contra qué factura —o «anticipo a
+cuenta» si todavía no cobra ninguna—, el enlace a Cuentas por cobrar y el
+aviso de quién lo registra ahora. Quitar el formulario sin dejar el dato
+convertiría «no hay fondeo» en un misterio justo donde se autoriza el pago. Un
+pago anulado no se lista: el panel contesta «cuánto hay», no «qué se capturó».
+
+**`cobro.registrar`: cobrar deja de ser facturar.** Capacidad nueva, de
+**administracion y admin**. Reemplaza a `factura.generar` en `registrarCobro`
+y `anularCobro`, y a `ordenCompra.autorizar` en `registrarDeposito` —el
+permiso que esa escritura pedía era el de la PANTALLA donde estaba el botón, y
+se queda viejo cuando el botón se mueve.
+  - **Esto QUITA algo que hoy funciona: Operaciones deja de poder cobrar.** Es
+    lo que dice la minuta §5 y lo decidió Mau en la cola. Donde Operaciones
+    veía el formulario —Cuentas por cobrar y la pestaña Facturas del
+    embarque— ahora lee `AVISO_COBRO_EN_COBRANZA`, una constante única para
+    que los dos lugares digan lo mismo. Un «ya no está aquí» sin el «está
+    allá» manda a buscar.
+  - **Facturar sigue siendo de las dos áreas** (§4.1). Lo que se partió es el
+    booleano: `PanelFacturasEmbarque` recibía un solo `puedeFacturar` para las
+    dos cosas. Anular un cobro también es cobranza.
+
+**«No pagar» se parte, y la asimetría es textual de la minuta §5:**
+**Operaciones MARCA, solo Administración LIBERA.** Marcar es avisar —es quien
+sabe que el cliente no ha fondeado—; liberar es decidir que el dinero está.
+Hasta aquí las dos eran de Administración, así que Operaciones tenía que
+rechazar la orden entera o mandar un correo. Las dos reglas viven en
+`permisos.ts` (`puedeMarcarNoPagar`, `puedeLiberarNoPagar`) y no como un `if`
+en la ficha: un `if` en la pantalla se endurece sin que nadie lo note. Donde
+el botón de quitar no aparece, se dice por qué.
+
+**Lo que NO cambió, a propósito:** el anticipo **no pregunta el banco**, porque
+`DepositoCliente` no tiene dónde guardarlo (§10.2 del plan) y el modelo no se
+toca en este paso. El cobro contra factura sí lo pregunta, como siempre. No se
+ofrece un selector cuyo valor se tiraría al guardar.
+
+## 4.34 El tercer destino también guarda quién corrigió el tipo (tarea 71, 5-oct-2026)
+
+La 63 dejó el registro de la corrección del tipo en dos de sus tres destinos.
+En el del proveedor se perdía, y no por descuido: `ArchivoExpediente` solo
+guardaba `storagePath`, `url`, `nombre`, `subidoPor` y `fecha`, y agregarle un
+campo no estaba en el modelo aprobado de esa tarea. Ahora tiene
+`clasificacion?: { tipoCrudo?, confianza?, observaciones? }`, **opcional y
+aditivo**: los archivos que ya existen no lo traen y se leen igual.
+
+**El texto no se duplica: se empaca.** `clasificacionDeLinea` (en
+`lib/loteDocumentos.ts`, junto a `textoCorreccionTipo` y
+`observacionesConCorreccion`, que es quien lo redacta) devuelve el objeto que
+el expediente guarda. Los tres destinos dicen lo mismo con las mismas
+palabras; una tercera copia habría divergido en el primer ajuste de redacción.
+  - **Omite las claves vacías y devuelve `undefined` cuando no hay nada que
+    registrar.** Firestore rechaza `undefined` y tumba la escritura entera
+    (§3): aquí eso sería el lote de 15 archivos perdido con cara de guardado.
+  - **La casilla lo ENSEÑA**: la confianza del clasificador junto a la fecha y
+    el autor, y la nota de corrección debajo. Guardarlo sin mostrarlo sería
+    otro dato que nadie mira —la variante de «regla sin call site» de §4.26—, y
+    es justo lo que hay que leer para arreglar el flujo de n8n.
+  - **`confianza` acepta la escala de texto y un número.** El modelo aprobado
+    la declaró `number`; el clasificador de esta plataforma contesta
+    `'alta' | 'media' | 'baja'` (`NivelConfianza`), que es lo que de verdad
+    llega. Aceptar las dos escribe lo que hay sin dejar de leer la forma
+    aprobada. **La escala de un número no se interpreta**: se enseña tal cual,
+    porque «80%» donde el agente quiso decir 0.8 de otra cosa es una
+    afirmación que nadie hizo.
+  - El «Reemplazar» por casilla sigue sin clasificar —es un archivo dirigido a
+    un destino que ya se sabe— y al reemplazar, la clasificación del anterior
+    se va con él: el registro describe al archivo que está, no al que estuvo.
+  - **El expediente del cliente guarda el registro y tampoco lo enseña**
+    (`DocExpediente.observaciones`, que la casilla no pinta). Es el mismo
+    arreglo de una línea y está anotado, sin tocar: la tarea era el proveedor.
 
 ## 5. Estado de los módulos
 

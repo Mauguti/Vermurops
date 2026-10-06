@@ -15,7 +15,7 @@ import { docsParaProveedor, esProveedorExtranjero, DOCS_ALTA_PROVEEDOR_DEFAULT }
 import ExpedientePanel, { type ArchivoExpediente } from '../expediente/ExpedientePanel';
 import SubirDocumentosLote from '../documentos/SubirDocumentosLote';
 import { useSubidaClasificada } from '../../hooks/useSubidaClasificada';
-import type { LineaLote, TipoDocLote } from '../../lib/loteDocumentos';
+import { clasificacionDeLinea, type LineaLote, type TipoDocLote } from '../../lib/loteDocumentos';
 
 interface Props {
   proveedor: ProveedorVermur;
@@ -68,18 +68,30 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit, onUp
     [docsProveedor],
   );
 
+  /*
+   * ── Tarea 71 · El registro de la corrección, también aquí ───────────────
+   * La 63 lo dejó escrito en el expediente del cliente y en la orden de
+   * compra, y en el proveedor se perdía: `ArchivoExpediente` no tenía dónde.
+   * Con `clasificacion` (campo aprobado, opcional) ya hay lugar, y el texto lo
+   * redacta `clasificacionDeLinea` —el mismo de los otros dos— en vez de una
+   * tercera copia. La clave se omite cuando no hay nada que registrar:
+   * Firestore rechaza `undefined` y tumbaría el lote completo (§3).
+   */
   const guardarLoteExpediente = async (lineas: LineaLote[]) => {
     const prevArchivos = proveedor.archivosExpediente ?? {};
     const archivos = { ...prevArchivos };
     const docsAlta = { ...(proveedor.docsAlta ?? DOCS_ALTA_PROVEEDOR_DEFAULT) };
+    const autor = { por: user?.email ?? user?.nombre ?? '', fecha: new Date().toISOString(), etiqueta: etiquetaLote };
     for (const l of lineas) {
       const campo = l.tipoElegido as keyof DocsAlta;
+      const clasificacion = clasificacionDeLinea(l, autor);
       archivos[campo] = {
         storagePath: l.storagePath,
         url: l.url,
         nombre: l.nombreArchivo,
-        subidoPor: user?.email ?? '',
-        fecha: new Date().toISOString(),
+        subidoPor: autor.por,
+        fecha: autor.fecha,
+        ...(clasificacion ? { clasificacion } : {}),
       };
       docsAlta[campo] = true;
     }

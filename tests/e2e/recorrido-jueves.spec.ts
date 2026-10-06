@@ -297,8 +297,28 @@ test('Operaciones · abre el embarque con serie, captura, concilia la factura y 
   await irA(page, 'Finanzas');
   await page.getByRole('button', { name: 'Cuentas por pagar' }).click();
   await page.getByText(S.ocFolio).first().click();
+
+  /*
+   * Tarea 69 · P3 · Operaciones YA NO VE el formulario del depósito: la
+   * entrada de dinero del cliente se registra en Cuentas por cobrar y es de
+   * Administración. Lo que sí ve es el panel de solo lectura con el aviso de
+   * quién lo hace ahora.
+   */
+  await expect(page.getByText('Entradas de dinero del cliente', { exact: false })).toBeVisible();
+  await expect(page.getByText(/Todavía no ha entrado dinero/)).toBeVisible();
+  await expect(page.getByText(/Los cobros los registra Administración en Cuentas por cobrar/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Registrar depósito' })).toHaveCount(0);
+  // Y tampoco el atajo a cobranza: no tiene `cobro.registrar`.
+  await expect(page.getByRole('button', { name: /Ir a Cuentas por cobrar/ })).toHaveCount(0);
+
   await page.getByRole('button', { name: 'Tomar y gestionar' }).click();
   await expect(page.getByText('En gestión').first()).toBeVisible({ timeout: 15_000 });
+
+  // Operaciones MARCA «No pagar» y no la puede quitar (minuta §5).
+  // El motivo lo pide un window.prompt; `entrar` ya acepta todo diálogo.
+  await page.getByRole('button', { name: 'Marcar «No pagar»' }).click();
+  await expect(page.getByText(/La quita Administración/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: 'Quitar «No pagar»' })).toHaveCount(0);
 
   const embs = await leerColeccion('operaciones@vermur.com', 'embarques');
   S.embarqueId = String(embs.find(e => e.folio === S.embarqueFolio)!.__id);
@@ -316,16 +336,34 @@ test('Operaciones · abre el embarque con serie, captura, concilia la factura y 
 
 test('Administración · depósito, autoriza y paga la OC, factura y cobra al cliente, cierra', async ({ browser }) => {
   const { page, ctx } = await entrar(browser, 'administracion@vermur.com');
+
+  /*
+   * Tarea 69 · P3 · La entrada de dinero se registra en COBRANZA, no dentro
+   * de la orden de pago. Es el bloque 1 completo: Administración captura el
+   * anticipo en Cuentas por cobrar —embarque y moneda elegidos, SIN
+   * referencia, que llega después— y con eso la orden del embarque se puede
+   * autorizar.
+   */
   await irA(page, 'Finanzas');
+  await page.getByRole('button', { name: 'Cuentas por cobrar' }).click();
+  await page.getByRole('button', { name: 'Registrar entrada de dinero' }).click();
+  await page.getByLabel('A qué embarque entra').selectOption(S.embarqueId);
+  await page.getByLabel('Monto', { exact: true }).fill('5000');
+  await page.getByLabel('Moneda').selectOption('USD');
+  await page.getByRole('button', { name: 'Registrar entrada', exact: true }).click();
+  await expect(page.getByText(/Entrada de USD 5,000.00 registrada/)).toBeVisible({ timeout: 15_000 });
+
   await page.getByRole('button', { name: 'Cuentas por pagar' }).click();
   await page.getByText(S.ocFolio).first().click();
 
-  // Sin fondeo no se autoriza: el depósito del cliente lo libera.
-  await expect(page.getByText(/Para «Autorizar el pago»/)).toBeVisible();
-  await page.getByPlaceholder('0.00').fill('5000');
-  await page.getByPlaceholder('Ref. bancaria').fill('DEP-0921-001');
-  await page.getByRole('button', { name: 'Registrar depósito' }).click();
-  await expect(page.getByText(/Depósito de USD 5,000.00 registrado/)).toBeVisible({ timeout: 15_000 });
+  // El panel de solo lectura ya enseña lo que entró, como anticipo a cuenta.
+  await expect(page.getByText('anticipo a cuenta')).toBeVisible();
+
+  // Operaciones la detuvo: la marca la quita Administración, y hasta entonces
+  // no se autoriza nada.
+  await expect(page.getByText(/Marcada «No pagar»/).first()).toBeVisible();
+  await page.getByRole('button', { name: 'Quitar «No pagar»' }).click();
+  await expect(page.getByRole('button', { name: 'Quitar «No pagar»' })).toHaveCount(0, { timeout: 15_000 });
   await page.getByRole('button', { name: 'Autorizar el pago' }).click({ timeout: 15_000 });
   await expect(page.getByText('Autorizada').first()).toBeVisible({ timeout: 15_000 });
 

@@ -13,12 +13,14 @@ import { Plus, AlertTriangle, Ban, Check } from 'lucide-react';
 import type { EmbarqueCompleto } from '../shipments/EmbarquesData';
 import { lineasFacturables, gruposDeFacturacion } from '../shipments/EmbarquesData';
 import type { FacturaCliente, CobroCliente } from './FacturasData';
+import { aplicacionesConPago, type Pago, type AplicacionPago } from '../../lib/pagos';
 import type { ConceptoVermur } from '../conceptos/ConceptosData';
 import {
   proponerFactura, diasCreditoDe, vencimientoFactura, saldoDeFactura,
   type CreditoCliente, type ResultadoPropuesta,
 } from '../../lib/facturacionEmbarque';
 import { BANCOS_VERMUR, BANCO_COBRO_DEFAULT } from '../../lib/cuentasPago';
+import { AVISO_COBRO_EN_COBRANZA } from '../../lib/entradaDinero';
 
 const money = (n: number) =>
   n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -26,13 +28,21 @@ const money = (n: number) =>
 interface Props {
   embarque: EmbarqueCompleto;
   facturas: FacturaCliente[];
-  cobros: CobroCliente[];
+  /** Tarea 67 · La lista unificada. Un cobro viejo es un pago con una aplicación. */
+  pagos: Pago[];
   conceptos: ConceptoVermur[];
   /** Tráfico del embarque, derivado de su folio. null si no se sabe. */
   trafico: 'impo' | 'expo' | null;
   clienteId: string | null;
   credito: CreditoCliente | null;
   puedeFacturar: boolean;
+  /**
+   * Tarea 69 · P3 · Registrar la entrada de dinero es de Administración, no
+   * de quien factura. Hasta aquí era el MISMO booleano, así que Operaciones
+   * cobraba por ser quien emite la factura. Son dos actos y a partir de aquí
+   * los hace gente distinta (minuta §5).
+   */
+  puedeCobrar: boolean;
   onRegistrar: (f: Omit<FacturaCliente, 'id' | 'registradaPor' | 'activo' | 'createdAt' | 'updatedAt'>, cargoIds: string[]) => void;
   onCancelar: (facturaId: string, motivo: string) => void;
   onCobrar: (c: Omit<CobroCliente, 'id' | 'registradoPor' | 'activo' | 'createdAt' | 'updatedAt'>) => void;
@@ -40,8 +50,8 @@ interface Props {
 }
 
 export default function PanelFacturasEmbarque({
-  embarque, facturas, cobros, conceptos, trafico, clienteId, credito,
-  puedeFacturar, onRegistrar, onCancelar, onCobrar, onAnularCobro,
+  embarque, facturas, pagos, conceptos, trafico, clienteId, credito,
+  puedeFacturar, puedeCobrar, onRegistrar, onCancelar, onCobrar, onAnularCobro,
 }: Props) {
   const detalles = embarque.cargos?.detalles ?? [];
   const grupos = useMemo(() => gruposDeFacturacion(detalles), [detalles]);
@@ -255,14 +265,21 @@ export default function PanelFacturasEmbarque({
         ) : (
           <div className="space-y-3">
             {facturas.map(f => {
-              const suyos = cobros.filter(c => c.facturaId === f.id);
-              const saldo = saldoDeFactura(f, suyos);
+              /*
+               * Tarea 67 · Los anulados se incluyen a propósito: esta lista
+               * los pinta desde que existe, y P1 no cambia ninguna pantalla.
+               * `saldoDeFactura` los descarta él solo, así que el saldo es el
+               * mismo. Que un cobro anulado se siga viendo aquí está anotado
+               * como hallazgo, sin tocar.
+               */
+              const suyos = aplicacionesConPago(f.id, pagos, { incluirAnulados: true });
+              const saldo = saldoDeFactura(f, suyos.map(x => x.aplicacion));
               return (
                 <FilaFactura
                   key={f.id}
                   factura={f} cobros={suyos} saldo={saldo}
                   embarque={embarque} clienteId={clienteId}
-                  puedeFacturar={puedeFacturar}
+                  puedeFacturar={puedeFacturar} puedeCobrar={puedeCobrar}
                   onCancelar={onCancelar} onCobrar={onCobrar} onAnularCobro={onAnularCobro}
                 />
               );
@@ -277,15 +294,16 @@ export default function PanelFacturasEmbarque({
 // ─── Una factura con sus cobros ──────────────────────────────────────────────
 
 function FilaFactura({
-  factura, cobros, saldo, embarque, clienteId, puedeFacturar,
+  factura, cobros, saldo, embarque, clienteId, puedeFacturar, puedeCobrar,
   onCancelar, onCobrar, onAnularCobro,
 }: {
   factura: FacturaCliente;
-  cobros: CobroCliente[];
+  cobros: { pago: Pago; aplicacion: AplicacionPago }[];
   saldo: ReturnType<typeof saldoDeFactura>;
   embarque: EmbarqueCompleto;
   clienteId: string | null;
   puedeFacturar: boolean;
+  puedeCobrar: boolean;
   onCancelar: (id: string, motivo: string) => void;
   onCobrar: Props['onCobrar'];
   onAnularCobro: (id: string) => void;
@@ -356,7 +374,14 @@ function FilaFactura({
             )}
           </div>
 
-          {puedeFacturar && !cancelada && saldo.saldo > 1 && (
+          {/* Tarea 69 · P3 · Donde Operaciones veía el botón ahora lee a
+              dónde ir. Quitarlo sin decirlo se lee como que se rompió. */}
+          {!puedeCobrar && puedeFacturar && !cancelada && saldo.saldo > 1 && (
+            <p className="text-[10px] text-text-muted max-w-[190px] text-right shrink-0">
+              {AVISO_COBRO_EN_COBRANZA}
+            </p>
+          )}
+          {puedeCobrar && !cancelada && saldo.saldo > 1 && (
             <button
               type="button"
               onClick={() => setAbierto(v => !v)}
@@ -391,17 +416,20 @@ function FilaFactura({
       {/* Cobros recibidos */}
       {cobros.length > 0 && (
         <div className="border-t border-gray-100 divide-y divide-gray-50">
-          {cobros.map(c => (
-            <div key={c.id} className="px-4 py-1.5 flex items-center justify-between gap-3 text-[12px]">
+          {cobros.map(({ pago: p, aplicacion: a }) => (
+            <div key={`${p.id}:${a.destinoId}`} className="px-4 py-1.5 flex items-center justify-between gap-3 text-[12px]">
               <span className="text-gray-600">
-                {c.fechaCobro} · {c.banco} · <span className="font-mono text-[11px]">{c.referencia}</span>
+                {p.fecha} · {p.banco} · <span className="font-mono text-[11px]">{p.referencia}</span>
               </span>
               <span className="flex items-center gap-2 shrink-0">
-                <span className="font-semibold tabular-nums">{c.moneda} {money(c.monto)}</span>
-                {puedeFacturar && (
+                <span className="font-semibold tabular-nums">{a.moneda} {money(a.monto)}</span>
+                {/* Anular un cobro es cobranza, no facturación: el hook exige
+                    `cobro.registrar` y el botón tiene que decir lo mismo, o
+                    Operaciones lo aprieta y se lleva un error de permiso. */}
+                {puedeCobrar && (
                   <button
                     type="button"
-                    onClick={() => { if (window.confirm('¿Anular este cobro?')) onAnularCobro(c.id); }}
+                    onClick={() => { if (window.confirm('¿Anular este cobro?')) onAnularCobro(p.id); }}
                     className="text-[10px] font-bold text-gray-400 hover:text-red-600"
                   >
                     Anular

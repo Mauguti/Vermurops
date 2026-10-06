@@ -31,8 +31,8 @@ const ESTADO_CLS: Record<EstadoCobro, string> = {
 };
 
 export interface OpcionesColumnasCartera {
-  /** Si no se puede cobrar (`factura.generar`), la columna de acción no se
-   *  arma: un botón que no hace nada es peor que no tenerlo. */
+  /** Si no se puede cobrar (`cobro.registrar`, tarea 69), la columna de acción
+   *  no se arma: un botón que no hace nada es peor que no tenerlo. */
   onCobrar?: (i: FacturaEnCartera) => void;
 }
 

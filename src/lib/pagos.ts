@@ -1,0 +1,487 @@
+/**
+ * pagos.ts — el movimiento de dinero como entidad, y la lectura unificada
+ * de lo que ya existe (PLAN-PAGOS §1.1, §1.4, §2.1 · paso P1).
+ *
+ * ── El principio ───────────────────────────────────────────────────────────
+ * Es el de `anticipos.ts`, subido un nivel: **el dinero que se movió es un
+ * hecho; a qué se aplicó es una decisión reversible.** Por eso el pago y sus
+ * aplicaciones viven en un documento, y lo aplicado se DERIVA — nunca se
+ * guarda como un saldo que alguien tenga que recordar actualizar.
+ *
+ * ── Qué resuelve que hoy no se puede ──────────────────────────────────────
+ * Hoy el lado del cliente tiene dos formas incompatibles: `CobroCliente`
+ * apunta a UNA factura y `DepositoCliente` a NINGUNA, y las dos exigen
+ * `embarqueId`. «Un cliente paga doce facturas con una transferencia» son
+ * doce documentos con la misma referencia copiada a mano, y ninguno sabe de
+ * los otros. Un pago con N aplicaciones es un documento.
+ *
+ * ── Qué hace este archivo HOY (P1) ────────────────────────────────────────
+ * **Nada se escribe todavía en `pagos/`.** Este paso solo unifica la
+ * LECTURA: los cobros y los depósitos que ya están en Firestore se leen
+ * como pagos —`pagoDesdeCobro`, `pagoDesdeDeposito`— y los diez call sites
+ * del §2.2 pasan a consumir una sola lista. El número en pantalla es el
+ * mismo antes y después; `pagos.equivalencia.test.ts` lo fija.
+ *
+ * **No hay riesgo de doble conteo, y es por construcción:** un movimiento de
+ * dinero vive en `pagos` **o** en `cobros`/`depositosCliente`, nunca en los
+ * dos. Lo nuevo solo se escribirá en `pagos`; lo viejo solo se lee. Esa es
+ * toda la regla, y es la razón para no migrar: una migración sí introduciría
+ * el riesgo que no existe.
+ *
+ * Sin React, sin Firestore, sin red.
+ */
+
+import type { CobroCliente } from '../components/facturas/FacturasData';
+import type { DepositoCliente, OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
+import type { Moneda } from './sumarPorMoneda';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1 · El modelo (§1.1)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type LadoPago = 'cliente' | 'proveedor';
+
+/** El comprobante del pago en Storage: `pagos/{id}/`. */
+export interface ArchivoPago {
+  url: string;
+  nombre: string;
+  /** ISO. */
+  subidoEn: string;
+}
+
+/** A qué se aplicó una parte de un pago. */
+export interface AplicacionPago {
+  /** Qué se está liquidando. */
+  destinoTipo: 'factura' | 'orden';
+  /** FK → facturas/{id} (cliente) u ordenesCompra/{id} (proveedor). */
+  destinoId: string;
+  /** Folio legible, congelado: «F-2026-0145», «OC-2026-0088». */
+  destinoNumero: string;
+  /** Lo que se aplica a ESTE destino. Puede ser parcial. */
+  monto: number;
+  /** Igual a `pago.moneda`. Se repite para que la línea se lea sola. */
+  moneda: Moneda;
+  /** Quién y cuándo la aplicó. Una aplicación se quita, no se edita. */
+  aplicadaPor: { uid: string; nombre: string; fecha: string };
+}
+
+export interface Pago {
+  id: string;
+  /** «PAG-2026-0001». Folio atómico con folioService, como la OC. */
+  folio: string;
+
+  lado: LadoPago;
+
+  // ── El tercero. Uno solo por pago: un pago no cubre a dos proveedores ─────
+  terceroTipo: 'cliente' | 'proveedor';
+  /** FK → clientes/ o proveedores/. */
+  terceroId: string | null;
+  terceroNombre: string;
+
+  // ── El movimiento ─────────────────────────────────────────────────────────
+  monto: number;
+  moneda: Moneda;
+  /** YYYY-MM-DD. La fecha en que el dinero se movió, no la de captura. */
+  fecha: string;
+  /** Cuenta de Vermur: el id o el nombre guardado; se resuelve con `resolverBancoVermur`. */
+  banco: string | null;
+  /** Puede llegar DESPUÉS del pago (bloque 1). Nunca obligatoria. */
+  referencia: string | null;
+  /** Comprobante en Storage: `pagos/{id}/`. */
+  comprobante: ArchivoPago | null;
+
+  // ── Las aplicaciones ──────────────────────────────────────────────────────
+  aplicaciones: AplicacionPago[];
+  /**
+   * Índice denormalizado = aplicaciones.map(a => a.destinoId).
+   * Existe solo para poder consultar «pagos que tocan esta factura» sin bajar
+   * la colección: Firestore no sabe buscar dentro de un array de objetos.
+   * Se escribe en la MISMA transacción que `aplicaciones`.
+   */
+  destinoIds: string[];
+
+  // ── Contexto heredado, informativo ────────────────────────────────────────
+  /**
+   * Embarques que tocan sus aplicaciones. DERIVADO al guardar.
+   *
+   * Es lo que `CobroCliente.embarqueId` —un solo string obligatorio— no podía
+   * representar: una transferencia que cubre facturas de dos embarques fondea
+   * los dos, cada uno por lo que le toca (ver `entradasDeFondeo`).
+   */
+  embarqueIds: string[];
+
+  // ── De dónde vino, para leer lo viejo sin migrarlo (§2) ───────────────────
+  origen?: 'app' | 'legacy_cobro' | 'legacy_deposito' | 'legacy_comprobante_oc';
+
+  registradoPor: { uid: string; nombre: string };
+  activo: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const redondear = (n: number) => Math.round(n * 100) / 100;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2 · Las derivaciones: aplicado, restante, estado
+//
+// Ninguna se guarda. §1.1: «lo aplicado se DERIVA, nunca se guarda como saldo
+// que alguien tenga que recordar actualizar».
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Lo aplicado de un pago.
+ *
+ * §4.3: solo suma las aplicaciones de LA MONEDA del pago. Por construcción
+ * son todas —`aplicacion.moneda` es igual a `pago.moneda`— pero el filtro
+ * está escrito porque un documento de Firestore puede traer cualquier cosa,
+ * y un total que mezcle monedas se ve perfectamente bien.
+ */
+export function aplicado(pago: Pick<Pago, 'moneda' | 'aplicaciones'>): number {
+  const deLaMoneda = (pago.aplicaciones ?? []).filter(
+    a => (a.moneda ?? pago.moneda) === pago.moneda,
+  );
+  return redondear(deLaMoneda.reduce((acc, a) => acc + (a.monto ?? 0), 0));
+}
+
+/** Lo que del pago todavía no se aplicó a nada: el «a cuenta». */
+export function sinAplicar(pago: Pick<Pago, 'monto' | 'moneda' | 'aplicaciones'>): number {
+  return redondear(pago.monto - aplicado(pago));
+}
+
+/** Un pago vivo. Un pago anulado no mueve ningún saldo. */
+const vivo = (p: Pick<Pago, 'activo'>) => p.activo !== false;
+
+/**
+ * Las aplicaciones VIVAS a un destino, con el pago que las originó.
+ *
+ * `incluirAnulados` existe para las pantallas que hoy listan los cobros
+ * anulados —la pestaña Facturas del embarque lo hace— y que no deben cambiar
+ * en este paso.
+ */
+export function aplicacionesConPago(
+  destinoId: string,
+  pagos: readonly Pago[],
+  opciones: { incluirAnulados?: boolean } = {},
+): { pago: Pago; aplicacion: AplicacionPago }[] {
+  const out: { pago: Pago; aplicacion: AplicacionPago }[] = [];
+  for (const p of pagos) {
+    if (!opciones.incluirAnulados && !vivo(p)) continue;
+    for (const a of p.aplicaciones ?? []) {
+      if (a.destinoId === destinoId) out.push({ pago: p, aplicacion: a });
+    }
+  }
+  return out;
+}
+
+/**
+ * Las aplicaciones vivas a un destino.
+ *
+ * Es lo que `saldoDeFactura` espera —`{ monto, moneda }`— así que la factura
+ * sigue calculando su saldo con la misma función de siempre, sin cambios:
+ * lo único que cambia es quién le pasa la lista.
+ */
+export function aplicacionesA(destinoId: string, pagos: readonly Pago[]): AplicacionPago[] {
+  return aplicacionesConPago(destinoId, pagos).map(x => x.aplicacion);
+}
+
+export interface AvanceDestino {
+  /** Σ de las aplicaciones vivas en la moneda del destino. */
+  aplicado: number;
+  /** total − aplicado. Negativo = sobrepagado. */
+  restante: number;
+  estado: 'sin_pago' | 'parcial' | 'liquidado';
+  /** Hay aplicaciones en otra moneda que no cuentan para este saldo (§4.3). */
+  avisoMoneda?: string;
+}
+
+/**
+ * Cuánto se ha pagado de un destino y cuánto falta.
+ *
+ * La misma forma que `saldoDeFactura`, que se conserva intacta para las
+ * facturas (§1.3). Esta sirve al lado proveedor, donde la orden de compra no
+ * tiene nada equivalente: hoy solo salta a `pagada`, entera, y «se le
+ * abonaron 20,000 de 50,000» no existe.
+ *
+ * **No agrega el estado `pagada_parcial` a la máquina de la OC** (§1.5): lo
+ * parcial se lee como un AVANCE. La máquina tiene 54 tests y `pagada` es
+ * terminal; el estado entra después, si Julio lo pide para filtrar.
+ *
+ * Tolerancia de un peso, como `saldoDeFactura`: los redondeos de IVA dejan
+ * centavos que no son una deuda y nadie va a perseguir.
+ */
+export function avanceDeDestino(
+  destino: { id: string; monto: number; moneda: Moneda },
+  pagos: readonly Pago[],
+): AvanceDestino {
+  const todas = aplicacionesA(destino.id, pagos);
+  const deLaMoneda = todas.filter(a => (a.moneda ?? destino.moneda) === destino.moneda);
+  const enOtraMoneda = todas.length - deLaMoneda.length;
+
+  // Una sola moneda por construcción: el filtro de arriba lo garantiza.
+  const ap = redondear(deLaMoneda.reduce((acc, a) => acc + (a.monto ?? 0), 0));
+  const restante = redondear(destino.monto - ap);
+
+  return {
+    aplicado: ap,
+    restante,
+    estado: restante <= 1 ? 'liquidado' : ap > 0 ? 'parcial' : 'sin_pago',
+    ...(enOtraMoneda > 0
+      ? { avisoMoneda: `${enOtraMoneda} aplicación(es) en otra moneda no cuentan para el saldo en ${destino.moneda}.` }
+      : {}),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3 · Los adaptadores de lo viejo (§2.1)
+//
+// Rellenan lo que al dato viejo le falta, sin tocarlo. Nada se migra.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Un cobro viejo leído como pago: **un pago con una sola aplicación**.
+ *
+ * El folio es su propio id (`COB-…`): no hay folio de pago que inventarle, y
+ * un folio inventado se vería igual que uno real.
+ */
+export function pagoDesdeCobro(c: CobroCliente): Pago {
+  const quien = c.registradoPor ?? { uid: '', nombre: '' };
+  return {
+    id: c.id,
+    folio: c.id,
+    lado: 'cliente',
+    terceroTipo: 'cliente',
+    terceroId: c.clienteId ?? null,
+    terceroNombre: c.clienteNombre ?? '',
+    monto: c.monto,
+    moneda: c.moneda,
+    fecha: c.fechaCobro,
+    banco: c.banco ?? null,
+    referencia: c.referencia ?? null,
+    comprobante: null,
+    aplicaciones: [{
+      destinoTipo: 'factura',
+      destinoId: c.facturaId,
+      destinoNumero: c.facturaNumero ?? '',
+      monto: c.monto,
+      moneda: c.moneda,
+      aplicadaPor: { uid: quien.uid, nombre: quien.nombre, fecha: c.fechaCobro },
+    }],
+    destinoIds: [c.facturaId],
+    embarqueIds: c.embarqueId ? [c.embarqueId] : [],
+    origen: 'legacy_cobro',
+    registradoPor: quien,
+    activo: c.activo !== false,
+    createdAt: c.createdAt ?? '',
+    updatedAt: c.updatedAt ?? '',
+  };
+}
+
+/**
+ * Un depósito viejo leído como pago: **un pago con CERO aplicaciones**.
+ *
+ * `DepositoCliente` no tiene banco (§10.2 del plan): un depósito viejo no se
+ * puede conciliar contra una cuenta, así que queda en `null` y en el flujo de
+ * efectivo entrará a «sin cuenta identificada» en vez de repartirse por azar.
+ * Un depósito en la cuenta equivocada descuadra la conciliación de Julio, que
+ * es justo lo que la pantalla viene a arreglar.
+ */
+export function pagoDesdeDeposito(d: DepositoCliente): Pago {
+  const quien = d.registradoPor ?? { uid: '', nombre: '' };
+  return {
+    id: d.id,
+    folio: d.id,
+    lado: 'cliente',
+    terceroTipo: 'cliente',
+    terceroId: d.clienteId ?? null,
+    terceroNombre: d.clienteNombre ?? '',
+    monto: d.monto,
+    moneda: d.moneda,
+    fecha: d.fechaDeposito,
+    banco: null,
+    referencia: d.referencia ?? null,
+    comprobante: d.comprobante
+      ? { url: d.comprobante, nombre: 'Comprobante', subidoEn: d.fechaAlta ?? '' }
+      : null,
+    aplicaciones: [],
+    destinoIds: [],
+    embarqueIds: d.embarqueId ? [d.embarqueId] : [],
+    origen: 'legacy_deposito',
+    registradoPor: quien,
+    activo: d.activo !== false,
+    createdAt: d.fechaAlta ?? '',
+    updatedAt: d.updatedAt ?? '',
+  };
+}
+
+/**
+ * Todos los pagos del lado cliente, nuevos y viejos, en una lista.
+ *
+ * `pagos` llega vacío en P1: la colección todavía no se escribe ni se lee
+ * —no tiene regla publicada— y un listener contra ella solo produciría
+ * «permission denied» en la consola. El parámetro está para que P2 sea una
+ * línea en el hook, no un recorrido por diez call sites otra vez.
+ */
+export function pagosDeCliente(
+  pagos: readonly Pago[],
+  cobros: readonly CobroCliente[],
+  depositos: readonly DepositoCliente[],
+): Pago[] {
+  return [
+    ...pagos.filter(p => p.lado === 'cliente'),
+    ...cobros.map(pagoDesdeCobro),
+    ...depositos.map(pagoDesdeDeposito),
+  ];
+}
+
+/**
+ * Las órdenes pagadas leídas como pagos, agrupando por `comprobantePago`.
+ *
+ * Hoy un pago a proveedor son **N escrituras independientes con la misma
+ * cadena copiada** (`Finance.tsx:137`). Ese string repetido es el único
+ * rastro de que fue UN pago, y agrupar por él es lo que lo recupera: cada
+ * grupo es un pago consolidado real que nunca existió como entidad.
+ *
+ * Se agrupa **dentro del mismo proveedor**: el «TR-001» de dos proveedores
+ * son dos transferencias, igual que el «A-001» de dos proveedores son dos
+ * facturas (§4.24). La referencia se compara sin guiones, espacios ni
+ * mayúsculas, con el mismo criterio que `facturasProveedor.ts`.
+ *
+ * Una orden pagada **sin** comprobante es su propio pago: juntarla con las
+ * demás afirmaría que las cubrió una transferencia que nadie ha visto. Una
+ * orden en otra moneda tampoco se junta: un pago tiene UNA moneda (§4.3).
+ *
+ * ⚠️ Su call site llega en **P6**, cuando `registrarPagoDelGrupo` pase a
+ * crear un pago. Aquí está porque la tarea 67 pide los tres adaptadores de lo
+ * viejo —`CobroCliente`, `depositosCliente` y `comprobantePago`— y porque el
+ * lector del dato viejo tiene que existir antes de que la escritura cambie.
+ */
+export function pagosDesdeOrdenes(ordenes: readonly OrdenCompra[]): Pago[] {
+  const normalizar = (s: string) => s.replace(/[\s-_.\/]/g, '').toUpperCase();
+
+  const grupos = new Map<string, OrdenCompra[]>();
+  const sueltas: OrdenCompra[] = [];
+
+  for (const o of ordenes) {
+    if (o.activo === false || o.estado !== 'pagada') continue;
+    const ref = (o.comprobantePago ?? '').trim();
+    if (!ref) { sueltas.push(o); continue; }
+    const clave = `${o.proveedorId ?? o.proveedorNombre ?? ''}|${o.moneda}|${normalizar(ref)}`;
+    const g = grupos.get(clave);
+    if (g) g.push(o); else grupos.set(clave, [o]);
+  }
+
+  const dePrimera = (gs: OrdenCompra[]) => gs[0];
+  const armar = (gs: OrdenCompra[], id: string): Pago => {
+    const o = dePrimera(gs);
+    const quien = o.pagadaPor ?? { uid: '', nombre: '' };
+    const fecha = (o.pagadaPor?.fecha ?? o.updatedAt ?? '').slice(0, 10);
+    // Una sola moneda por construcción: la clave del grupo la incluye (§4.3).
+    const monto = redondear(gs.reduce((acc, x) => acc + (x.monto ?? 0), 0));
+    return {
+      id,
+      folio: (o.comprobantePago ?? '').trim() || o.folio,
+      lado: 'proveedor',
+      terceroTipo: 'proveedor',
+      terceroId: o.proveedorId ?? null,
+      terceroNombre: o.proveedorNombre ?? '',
+      monto,
+      moneda: o.moneda,
+      fecha,
+      banco: o.bancoSalida ?? null,
+      referencia: (o.comprobantePago ?? '').trim() || null,
+      comprobante: null,
+      aplicaciones: gs.map(x => ({
+        destinoTipo: 'orden' as const,
+        destinoId: x.id,
+        destinoNumero: x.folio,
+        monto: x.monto,
+        moneda: x.moneda,
+        aplicadaPor: {
+          uid: x.pagadaPor?.uid ?? '',
+          nombre: x.pagadaPor?.nombre ?? '',
+          fecha: (x.pagadaPor?.fecha ?? x.updatedAt ?? '').slice(0, 10),
+        },
+      })),
+      destinoIds: gs.map(x => x.id),
+      embarqueIds: [...new Set(gs.map(x => x.embarqueId).filter((e): e is string => !!e))],
+      origen: 'legacy_comprobante_oc',
+      registradoPor: { uid: quien.uid ?? '', nombre: quien.nombre ?? '' },
+      activo: true,
+      createdAt: fecha,
+      updatedAt: o.updatedAt ?? '',
+    };
+  };
+
+  return [
+    ...[...grupos.entries()].map(([clave, gs]) => armar(gs, `legacy:${clave}`)),
+    ...sueltas.map(o => armar([o], `legacy:sin-comprobante:${o.id}`)),
+  ];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4 · El fondeo del embarque, leído de los pagos
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Una entrada de dinero, en la forma que `calcularFondeo` consume. */
+export interface EntradaFondeo {
+  monto: number;
+  moneda: Moneda;
+  activo?: boolean;
+}
+
+/**
+ * Lo que los pagos del cliente aportan al fondeo de UN embarque.
+ *
+ * Reemplaza los dos argumentos que `calcularFondeo` recibía —depósitos y
+ * cobros— por una sola lista: eran «el mismo dinero entrando por dos
+ * puertas», y leerlos de dos sitios es la dualidad que el CLAUDE.md §6
+ * señala en `CotizacionProveedor`.
+ *
+ * El reparto, en el orden en que decide:
+ *
+ *  1. Un pago **sin aplicaciones** —un depósito a cuenta— aporta su monto
+ *     completo al embarque al que apunta. Es el depósito de siempre.
+ *  2. Un pago cuyas aplicaciones caen TODAS en este embarque aporta su monto
+ *     aplicado. Un cobro viejo tiene una sola aplicación, así que aporta
+ *     exactamente lo que aportaba antes.
+ *  3. Un pago repartido entre VARIOS embarques aporta solo lo que le toca a
+ *     este, resuelto con `embarqueDeDestino`. Es el caso que `CobroCliente`
+ *     no podía representar; sin el resolvedor, el pago **no se cuenta** en
+ *     vez de contarse entero en los dos: inflar el fondeo autoriza un pago
+ *     que no está cubierto, que es justo lo que la regla viene a impedir.
+ */
+export function entradasDeFondeo(
+  pagos: readonly Pago[],
+  embarqueId: string,
+  embarqueDeDestino?: (destinoId: string) => string | null | undefined,
+): EntradaFondeo[] {
+  const out: EntradaFondeo[] = [];
+
+  for (const p of pagos) {
+    if (!vivo(p)) continue;
+    if (p.lado !== 'cliente') continue;
+
+    const apl = p.aplicaciones ?? [];
+    if (apl.length === 0) {
+      if ((p.embarqueIds ?? []).includes(embarqueId)) {
+        out.push({ monto: p.monto, moneda: p.moneda });
+      }
+      continue;
+    }
+
+    const embarques = new Set(p.embarqueIds ?? []);
+    if (embarques.size <= 1) {
+      if (embarques.has(embarqueId)) out.push({ monto: aplicado(p), moneda: p.moneda });
+      continue;
+    }
+
+    if (!embarqueDeDestino) continue;
+    const suyas = apl.filter(a => embarqueDeDestino(a.destinoId) === embarqueId);
+    if (suyas.length === 0) continue;
+    // Una sola moneda: las aplicaciones comparten la del pago (§4.3).
+    const monto = redondear(suyas.reduce((acc, a) => acc + (a.monto ?? 0), 0));
+    if (monto !== 0) out.push({ monto, moneda: p.moneda });
+  }
+
+  return out;
+}

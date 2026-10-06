@@ -124,8 +124,8 @@ export default function FichaEmbarque({
    * cuenta por cobrar: alimenta el fondeo que libera el pago al proveedor.
    */
   const {
-    facturas: facturasDelEmbarque, cobros, registrarFactura, cancelarFactura,
-    registrarCobro, anularCobro,
+    facturas: facturasDelEmbarque, pagos: pagosDelEmbarque, registrarFactura,
+    cancelarFactura, registrarCobro, anularCobro,
   } = useFacturas(embarque.id);
   const { conceptos } = useConceptos();
 
@@ -143,7 +143,7 @@ export default function FichaEmbarque({
     embarque,
     ordenes: ordenes.filter(o => o.embarqueId === embarque.id),
     facturas: facturasDelEmbarque,
-    cobros,
+    pagos: pagosDelEmbarque,
   });
 
   // Por enlace primero; por nombre exacto para los embarques anteriores al enlace.
@@ -1551,7 +1551,7 @@ export default function FichaEmbarque({
           <PanelFacturasEmbarque
             embarque={embarque}
             facturas={facturasDelEmbarque}
-            cobros={cobros}
+            pagos={pagosDelEmbarque}
             conceptos={conceptos}
             trafico={traficoDeFolio(embarque.folio)}
             clienteId={clienteVinculado?.id ?? null}
@@ -1559,6 +1559,10 @@ export default function FichaEmbarque({
               ? (clienteVinculado.diasCreditoPorTipo ?? { general: clienteVinculado.dias })
               : null}
             puedeFacturar={puede('factura.generar')}
+            /* Tarea 69 · P3 · Facturar y cobrar dejan de ser el mismo
+               permiso: Operaciones emite la factura, Administración recibe
+               el dinero (minuta §5). */
+            puedeCobrar={puede('cobro.registrar')}
             onRegistrar={async (datos, cargoIds) => {
               try {
                 const f = await registrarFactura(datos);
