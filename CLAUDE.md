@@ -1594,6 +1594,69 @@ del §2.2 del plan —`cuentasPorCobrar`, `fondeoCliente`, `cierresEmbarque`,
     `pagada_parcial` a la máquina**: tiene 54 tests y `pagada` es terminal.
     Lo parcial es un avance; el estado entra si Julio lo pide para filtrar.
 
+## 4.33 El cobro se registra en cobranza, y cobrar ya no es facturar (tarea 69, 5-oct-2026)
+
+Paso **P3** de `docs/sprint-post-junta/PLAN-PAGOS.md`, el bloque 1 de Gaby:
+*«quien hace la solicitud de pago es Operaciones, pero quien recibe el dinero
+del cliente es Administración»*. `lib/entradaDinero.ts` (30 tests).
+
+**El formulario del depósito vivía en la cuenta por PAGAR.** «Registrar
+depósito del cliente» estaba dentro de `FichaOC.tsx` —la ficha de la orden de
+pago a un proveedor— y era la **única** pantalla que llamaba a
+`registrarDeposito`. Para capturar el dinero que entró había que entrar a una
+orden. Ahora «Registrar entrada de dinero» vive en **Finanzas → Cuentas por
+cobrar**, junto al cobro contra factura, que ya estaba ahí.
+
+**Tres cosas se ELIGEN donde antes se heredaban o se exigían:**
+  - **El embarque.** El anticipo se liga al embarque y con eso fondea sus
+    órdenes (1.1). El selector sale de `embarquesFondeables(ordenes)`: solo
+    los que tienen alguna orden esperando dinero, con lo que piden **por
+    moneda** (§4.3). Un embarque sin orden abierta no es un destino.
+  - **La moneda.** Antes era `moneda: oc.moneda`: un depósito en pesos contra
+    una orden en dólares se guardaba como dólares y se veía perfectamente
+    bien. No hay default — un «MXN» precargado se aprieta por reflejo, como
+    el botón del TC de Banxico de §4.3.
+  - **La referencia bancaria deja de ser obligatoria**, en los dos
+    formularios. «Aparece después del pago, no antes». Una referencia
+    inventada se ve igual que una real y descuadra la conciliación de Julio
+    sin que nadie se entere; vacía es verdad.
+
+**La ficha de la orden se queda con el dato, en solo lectura**
+(`entradasDelEmbarque`): qué entró, cuándo, contra qué factura —o «anticipo a
+cuenta» si todavía no cobra ninguna—, el enlace a Cuentas por cobrar y el
+aviso de quién lo registra ahora. Quitar el formulario sin dejar el dato
+convertiría «no hay fondeo» en un misterio justo donde se autoriza el pago. Un
+pago anulado no se lista: el panel contesta «cuánto hay», no «qué se capturó».
+
+**`cobro.registrar`: cobrar deja de ser facturar.** Capacidad nueva, de
+**administracion y admin**. Reemplaza a `factura.generar` en `registrarCobro`
+y `anularCobro`, y a `ordenCompra.autorizar` en `registrarDeposito` —el
+permiso que esa escritura pedía era el de la PANTALLA donde estaba el botón, y
+se queda viejo cuando el botón se mueve.
+  - **Esto QUITA algo que hoy funciona: Operaciones deja de poder cobrar.** Es
+    lo que dice la minuta §5 y lo decidió Mau en la cola. Donde Operaciones
+    veía el formulario —Cuentas por cobrar y la pestaña Facturas del
+    embarque— ahora lee `AVISO_COBRO_EN_COBRANZA`, una constante única para
+    que los dos lugares digan lo mismo. Un «ya no está aquí» sin el «está
+    allá» manda a buscar.
+  - **Facturar sigue siendo de las dos áreas** (§4.1). Lo que se partió es el
+    booleano: `PanelFacturasEmbarque` recibía un solo `puedeFacturar` para las
+    dos cosas. Anular un cobro también es cobranza.
+
+**«No pagar» se parte, y la asimetría es textual de la minuta §5:**
+**Operaciones MARCA, solo Administración LIBERA.** Marcar es avisar —es quien
+sabe que el cliente no ha fondeado—; liberar es decidir que el dinero está.
+Hasta aquí las dos eran de Administración, así que Operaciones tenía que
+rechazar la orden entera o mandar un correo. Las dos reglas viven en
+`permisos.ts` (`puedeMarcarNoPagar`, `puedeLiberarNoPagar`) y no como un `if`
+en la ficha: un `if` en la pantalla se endurece sin que nadie lo note. Donde
+el botón de quitar no aparece, se dice por qué.
+
+**Lo que NO cambió, a propósito:** el anticipo **no pregunta el banco**, porque
+`DepositoCliente` no tiene dónde guardarlo (§10.2 del plan) y el modelo no se
+toca en este paso. El cobro contra factura sí lo pregunta, como siempre. No se
+ofrece un selector cuyo valor se tiraría al guardar.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
