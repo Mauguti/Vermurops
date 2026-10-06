@@ -1549,6 +1549,51 @@ busca el prefijo al principio, con `(?![A-Za-z])` para no casar `VLIMEX`.
     correcto—; lo que tiene que aprenderlo es `traficoDeFolio`, y eso es otra
     tarea. Adivinarlo sería clasificar un embarque en el mes equivocado.
 
+## 4.32 El pago es la entidad, y lo aplicado se deriva (tarea 67, 5-oct-2026)
+
+Paso **P1** de `docs/sprint-post-junta/PLAN-PAGOS.md`. Es el principio de
+`anticipos.ts` subido un nivel: **el dinero que se movió es un hecho; a qué se
+aplicó es una decisión reversible.** `lib/pagos.ts` (42 tests) tiene el modelo
+—`Pago` con sus `AplicacionPago[]`— y las derivaciones: `aplicado`,
+`sinAplicar`, `aplicacionesA`, `avanceDeDestino`. Ninguna se guarda.
+
+Lo que resolvía que hoy no se podía: `CobroCliente` apunta a UNA factura y
+`DepositoCliente` a NINGUNA, y las dos exigen `embarqueId`. «Un cliente paga
+doce facturas con una transferencia» eran doce documentos con la misma
+referencia copiada a mano, y ninguno sabía de los otros.
+
+**P1 no escribe nada en `pagos/`: unifica la LECTURA.** Los diez call sites
+del §2.2 del plan —`cuentasPorCobrar`, `fondeoCliente`, `cierresEmbarque`,
+`Finance`, `PanelCuentasPorCobrar`, `PanelFacturasEmbarque`, `FichaEmbarque`,
+`FichaCliente`— consumen una sola lista. **Cero cambios de pantalla**, y
+`pagos.equivalencia.test.ts` lo fija con los números que el código viejo daba.
+  - **Tres adaptadores, nada se migra.** Un `CobroCliente` es un pago con UNA
+    aplicación; un `DepositoCliente`, uno con CERO; las órdenes que comparten
+    `comprobantePago` —dentro del mismo proveedor y la misma moneda— son el
+    pago consolidado que nunca existió como entidad (`pagosDesdeOrdenes`, su
+    call site llega en P6). **No hay doble conteo por construcción:** un
+    movimiento vive en `pagos` **o** en lo viejo, nunca en los dos. Esa es
+    toda la regla, y es la razón para no migrar.
+  - **`saldoDeFactura` no se tocó.** Recibe `{monto, moneda, activo}` y ahora
+    le llegan las aplicaciones en vez de los cobros. Cambió quien le pasa la
+    lista, no la regla.
+  - **`calcularFondeo` recibía depósitos Y cobros** —«el mismo dinero por dos
+    puertas»— y ahora recibe UNA lista de entradas, armada con
+    `entradasDeFondeo`. Era la dualidad de §6 en miniatura.
+  - **Un pago repartido entre dos embarques fondea cada uno por lo que le
+    toca**, y es la primera vez que el caso se puede representar. Sin el
+    resolvedor de embarque por destino **no se cuenta** en vez de contarse
+    entero en los dos: inflar el fondeo autoriza un pago descubierto.
+  - **«Cobrado del mes» suma APLICACIONES, no montos de pago.** Un depósito a
+    cuenta es dinero que entró y todavía no cobra ninguna factura; sumarlo
+    pondría en el KPI un número del que nadie podría decir de dónde salió. El
+    mes se mira sobre la fecha del PAGO, que para un cobro viejo es su
+    `fechaCobro`.
+  - `avanceDeDestino` da «se le abonaron 20,000 de 50,000» para la orden de
+    compra, que hoy solo salta a `pagada`, entera. **No agrega
+    `pagada_parcial` a la máquina**: tiene 54 tests y `pagada` es terminal.
+    Lo parcial es un avance; el estado entra si Julio lo pide para filtrar.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
