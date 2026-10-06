@@ -12,6 +12,7 @@ import LoginPage from './components/Login';
 import { SolicitarRecuperacion, RestablecerContrasena } from './components/RecuperarContrasena';
 import { leerAccionDeUrl } from './lib/recuperarContrasena';
 import Sidebar from './components/Sidebar';
+import { DialogosHost } from './components/ui/Dialogos';
 import { NavegacionProvider } from './navegacion/NavegacionContext';
 import { leerEntidadDeUrl, urlSinEntidad } from './lib/enlaceDirecto';
 import EmuladorBadge from './components/ui/EmuladorBadge';
@@ -444,6 +445,7 @@ export default function App() {
           importa también en el login, que es donde eliges con qué cuenta
           entrar y contra qué base. */}
       <EmuladorBadge />
+      <DialogosHost />
       <NotificationsProviderWrapper />
     </AuthProvider>
   );

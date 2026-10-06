@@ -16,6 +16,7 @@ import type { VistaConfig } from '../table/SpreadsheetTable';
 import { nombreDeUsuario } from '../../auth/AuthContext';
 import type { EdicionEnListaMeta } from '../clientes/edicionMeta';
 import { CeldaEstado, CeldaEjecutivoEditable } from '../table/CeldaEditable';
+import { proveedorOperable } from '../../lib/estatusProveedor';
 
 const col = createColumnHelper<ProveedorVermur>();
 
@@ -52,11 +53,11 @@ export const PROVEEDOR_COLUMNS = [
     id: 'tipos', header: 'Tipo', size: 180,
     cell: info => <BadgeTipos tipos={info.row.original.tipos ?? []} />,
   }),
-  col.accessor('activo', {
+  col.accessor(p => proveedorOperable(p), {
     id: 'activo', header: 'Estado', size: 90,
     cell: info => {
       const meta = info.table.options.meta as EdicionEnListaMeta | undefined;
-      const activo = info.getValue();
+      const activo = info.getValue() as boolean;
       if (!meta?.edicion) {
         return (
           <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${

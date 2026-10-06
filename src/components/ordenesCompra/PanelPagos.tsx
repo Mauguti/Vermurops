@@ -19,6 +19,7 @@ import {
 } from '../../lib/programacionPagos';
 import type { GrupoDePago } from '../../lib/calendarioPagos';
 import ModalRegistrarPagoProveedor, { type DatosFormularioPago } from './ModalRegistrarPagoProveedor';
+import { pedirTexto } from '../ui/Dialogos';
 
 const money = (n: number) =>
   n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -67,7 +68,7 @@ export default function PanelPagos({ ordenes, hoy, onAbrirOC, onRegistrarPago, c
     } catch {
       // Sin permiso de portapapeles: se muestra para copiar a mano antes que
       // dejar a Julio sin el detalle.
-      window.prompt('Copia el detalle del pago:', texto);
+      void pedirTexto({ titulo: 'Copia el detalle del pago', valorInicial: texto, multilinea: true, confirmar: 'Cerrar' });
     }
   };
 

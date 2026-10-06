@@ -11,6 +11,7 @@ import {
   ordenesProgramadas, transferenciasDelDia, resumenDelDia, textoComprobante,
 } from './programacionPagos';
 import type { OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
+import { montoATransferir } from './anticipos';
 
 const HOY = '2026-09-15';
 
@@ -132,6 +133,14 @@ describe('transferenciasDelDia', () => {
       { ocId: 'a', folio: 'OC-50', montoAplicado: 15000, moneda: 'MXN', fechaPago: '' },
     ] })], HOY);
     expect(transferenciasDelDia(p, HOY)[0].total).toBe(5000);
+  });
+
+  it('las órdenes del grupo ya vienen netas: recalcular el monto a transferir no resta el anticipo otra vez (tarea 90)', () => {
+    const p = ordenesProgramadas([oc({ monto: 20000, anticiposCruzados: [
+      { ocId: 'a', folio: 'OC-50', montoAplicado: 15000, moneda: 'MXN', fechaPago: '' },
+    ] })], HOY);
+    const [orden] = transferenciasDelDia(p, HOY)[0].items;
+    expect(montoATransferir(orden)).toBe(5000);
   });
 });
 

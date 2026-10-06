@@ -7,6 +7,8 @@ import { calcularFondeo } from '../lib/fondeoCliente';
 import { subirComprobante } from '../lib/subirComprobanteOC';
 import { hoyLocal, problemasDelFormulario } from '../lib/formularioPagoProveedor';
 import type { DatosFormularioPago } from './ordenesCompra/ModalRegistrarPagoProveedor';
+import { escribirAtomico } from '../hooks/escribirAtomico';
+import { planRegistroPagoProveedor, planAnulacionPagoProveedor } from '../lib/escrituraPagoProveedor';
 import { pagosDeCliente, entradasDeFondeo, problemasDelGrupo, construirPagoDeGrupo, pagoQueCubrio, pagosDeProveedor, planAnulacionProveedor, type Pago } from '../lib/pagos';
 import { puedeTransicionarOC } from '../lib/stateMachineOC';
 import { usePagos } from '../hooks/usePagos';
@@ -66,7 +68,7 @@ export default function Finance() {
   // ── OC: datos reales de Firestore ─────────────────────────────────────────
   const {
     ordenes, loading: loadingOC, porPagar, conteosPorEstado,
-    transicionarEstado, revertirPago, updateOrden, createOrden,
+    transicionarEstado, updateOrden, createOrden,
   } = useOrdenesCompra();
 
   /** C-3 · El gasto de oficina lo carga Administración. */
@@ -79,7 +81,7 @@ export default function Finance() {
   // pago sin aplicaciones, el cobro uno con una. Antes eran dos listas y cada
   // call site tenía que acordarse de pasar las dos.
   const { depositos, registrarDeposito, anularDeposito } = useDepositosCliente();
-  const { pagos: pagosEscritos, contextoNuevo: contextoPago, guardarPago, anularPago: anularPagoDoc } = usePagos();
+  const { pagos: pagosEscritos, contextoNuevo: contextoPago} = usePagos();
   const { facturas, cobros, pagosNuevos, registrarPagoAplicado, anularCobro, quitarAplicacion, aplicarSaldoAFavor } = useFacturas();
   /*
    * Tarea 68 · Las tres fuentes en una lista: lo que se escribe hoy
@@ -205,7 +207,7 @@ export default function Finance() {
       throw new Error('No se registró el pago: alguna orden del grupo ya no existe en la lista.');
     }
     const problemasForm = problemasDelFormulario({
-      elegidas: grupo.length, referencia, fecha, hoy: hoyLocal(),
+      elegidas: grupo.length, referencia, fecha, hoy: hoyLocal(), ordenes: grupo,
       archivo: datos.comprobante ? { nombre: datos.comprobante.name, tamano: datos.comprobante.size } : null,
     });
     const rechazos: string[] = [...problemasForm, ...problemasDelGrupo(grupo)];
@@ -228,6 +230,8 @@ export default function Finance() {
       }
     }
 
+    // Tarea 85 · El pago y TODAS sus órdenes (y la bitácora) en una sola
+    // transacción: o se escribe todo o no se escribe nada.
     let pago: Pago;
     try {
       const ctx = await contextoPago();
@@ -235,45 +239,25 @@ export default function Finance() {
         referencia, fecha, banco: datos.banco,
         comprobante: archivo ? { url: archivo.url, nombre: archivo.nombre, subidoEn: ctx.ahora } : null,
       }, ctx);
-      await guardarPago(pago);
+      await escribirAtomico(
+        planRegistroPagoProveedor({ pago, grupo, referencia, fecha, archivo, rol: rolOC, usuario, ahora: ctx.ahora }),
+        'el pago y sus órdenes',
+      );
     } catch (err) {
       throw new Error(`No se registró el pago: ${err instanceof Error ? err.message : err}`);
     }
-
-    const fallidas: string[] = [];
-    for (const orden of grupo) {
-      try {
-        const cambios: Partial<OrdenCompra> = { comprobantePago: referencia };
-        if (archivo) {
-          cambios.documentos = [...(orden.documentos ?? []), {
-            id: `doc-${Date.now()}-${orden.id}`,
-            tipo: 'comprobante_pago',
-            nombre: archivo.nombre,
-            storagePath: archivo.storagePath,
-            url: archivo.url,
-            subidoPor: usuario.nombre,
-            fecha: pago.createdAt,
-          }];
-        }
-        await updateOrden(orden.id, cambios);
-        const r = await transicionarEstado(
-          { ...orden, ...cambios }, 'pagada', rolOC, usuario,
-        );
-        if (!r.ok) fallidas.push(`${orden.folio}: ${r.razon}`);
-      } catch (err) {
-        fallidas.push(`${orden.folio}: ${err instanceof Error ? err.message : err}`);
-      }
-    }
-    setToast(fallidas.length === 0
-      ? { mensaje: `${pago.folio}: ${grupo.length} orden(es) marcadas como pagadas.`, tipo: 'exito' }
-      : { mensaje: `${pago.folio} quedó registrado, pero no se pudieron marcar: ${fallidas.join(' · ')}`, tipo: 'error' });
+    setToast({ mensaje: `${pago.folio}: ${grupo.length} orden(es) marcadas como pagadas.`, tipo: 'exito' });
   };
 
   /*
    * Tarea 80 · Anular un pago a proveedor: cada orden que cubría regresa a
-   * «autorizada» POR LA MÁQUINA DE ESTADOS (`revertirPago` valida el arco),
-   * con el motivo. TODO O NADA: el plan se calcula antes de escribir, y si
-   * una orden no puede regresar no se anula el pago ni se toca ninguna.
+   * «autorizada» POR LA MÁQUINA DE ESTADOS (`puedeRevertirPagoOC`), con el
+   * motivo.
+   *
+   * Tarea 85 · TODO O NADA de verdad: el pago anulado, todas sus órdenes
+   * revertidas y la bitácora de cada embarque se escriben en UNA transacción
+   * de Firestore (`escribirAtomico`). Si cualquier orden no puede regresar, o
+   * cambió en el servidor desde que se calculó el plan, no se escribe nada.
    */
   const anularPagoDeProveedor = async (pago: Pago, motivo: string) => {
     const usuario = { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' };
@@ -283,23 +267,17 @@ export default function Finance() {
       setToast({ mensaje: msg, tipo: 'error' });
       throw new Error(msg);
     }
-    await anularPagoDoc(pago.id, { motivo: motivo.trim(), por: usuario.nombre, en: new Date().toISOString() });
-    const fallidas: string[] = [];
-    for (const orden of plan.ordenes) {
-      try {
-        const r = await revertirPago(orden, rolOC, usuario, { folioPago: pago.folio, motivo });
-        if (!r.ok) fallidas.push(`${orden.folio}: ${r.razon}`);
-      } catch (err) {
-        fallidas.push(`${orden.folio}: ${err instanceof Error ? err.message : err}`);
-      }
-    }
-    if (fallidas.length === 0) {
-      setToast({ mensaje: `${pago.folio} anulado: ${plan.ordenes.length} orden(es) regresaron a «autorizada».`, tipo: 'exito' });
-    } else {
-      const msg = `${pago.folio} quedó anulado, pero no se pudieron regresar: ${fallidas.join(' · ')}`;
+    try {
+      await escribirAtomico(
+        planAnulacionPagoProveedor({ pago, ordenes: plan.ordenes, motivo, rol: rolOC, usuario, ahora: new Date().toISOString() }),
+        'la anulación del pago',
+      );
+    } catch (err) {
+      const msg = `No se anuló ${pago.folio}: ${err instanceof Error ? err.message : err}. No se escribió nada.`;
       setToast({ mensaje: msg, tipo: 'error' });
       throw new Error(msg);
     }
+    setToast({ mensaje: `${pago.folio} anulado: ${plan.ordenes.length} orden(es) regresaron a «autorizada».`, tipo: 'exito' });
   };
 
   const handleActualizarOC = (cambios: Partial<OrdenCompra>) => {

@@ -24,6 +24,9 @@ import type { ClienteVermur } from './clientes/ClientesData';
 import { puedeEditarEnLista, aplicarCambio, CAMPO_EJECUTIVO, ROL_DEL_AREA, type AreaEjecutivo } from '../lib/edicionEnLista';
 import type { EdicionEnListaMeta } from './clientes/edicionMeta';
 import { visibleEnAltas, contarSinEstatus } from '../lib/estatusCliente';
+import { avisar, confirmar } from './ui/Dialogos';
+import { proveedorOperable } from '../lib/estatusProveedor';
+import { clienteOperable } from '../lib/estatusCliente';
 
 export default function Clients() {
   // Matriz §4.1: las altas definitivas de clientes y proveedores son solo de
@@ -48,7 +51,7 @@ export default function Clients() {
       // se pisan, no un aproximado. Es una escritura contra la base en uso.
       const { total, aSobrescribir, nuevos } = await analizarImportacionClientes();
 
-      const ok = window.confirm(
+      const ok = await confirmar({ titulo: 'Importar catálogo de clientes', confirmar: 'Importar', peligro: true, mensaje:
         `IMPORTAR CATÁLOGO DE CLIENTES DESDE MAGAYA\n\n` +
         `Se escribirán ${total} registros:\n` +
         `  • ${aSobrescribir} SOBRESCRIBEN clientes que ya existen\n` +
@@ -57,13 +60,13 @@ export default function Clients() {
         `equipo está trabajando ahora mismo. Todo cambio hecho sobre ellos desde ` +
         `la última carga se pierde.\n\n` +
         `Esta acción no se puede deshacer. ¿Continuar?`
-      );
+      });
       if (!ok) return;
 
       const count = await importarClientesDesdeJSON();
-      window.alert(`Importación completa: ${count} clientes escritos.`);
+      void avisar(`Importación completa: ${count} clientes escritos.`);
     } catch (err) {
-      window.alert(`Error al importar: ${err instanceof Error ? err.message : err}`);
+      void avisar(`Error al importar: ${err instanceof Error ? err.message : err}`);
     } finally {
       setSeedingClientes(false);
     }
@@ -196,7 +199,7 @@ export default function Clients() {
     const resultado = aplicarCambio(
       cliente as any, 'statusOperativo',
       nuevoActivo ? 'ACTIVO' : 'INACTIVO', autorEmail, new Date().toISOString(),
-      { antes: cliente.statusOperativo === 'ACTIVO' ? 'Activo' : 'Inactivo', despues: nuevoActivo ? 'Activo' : 'Inactivo' },
+      { antes: clienteOperable(cliente) ? 'Activo' : 'Inactivo', despues: nuevoActivo ? 'Activo' : 'Inactivo' },
     );
     if (!resultado) return;
     await updateCliente(id, {
@@ -225,7 +228,7 @@ export default function Clients() {
     if (!prov) return;
     const resultado = aplicarCambio(
       prov as any, 'activo', nuevoActivo, autorEmail, new Date().toISOString(),
-      { antes: prov.activo ? 'Activo' : 'Inactivo', despues: nuevoActivo ? 'Activo' : 'Inactivo' },
+      { antes: proveedorOperable(prov) ? 'Activo' : 'Inactivo', despues: nuevoActivo ? 'Activo' : 'Inactivo' },
     );
     if (!resultado) return;
     await updateProveedor(id, {
@@ -271,7 +274,7 @@ export default function Clients() {
   // ANTES de los early returns: React exige que los hooks se llamen siempre.
   const proveedoresEnRevision = useMemo(
     () => proveedores.filter(p =>
-      p.activo !== false &&
+      proveedorOperable(p) &&
       !p.expedienteValidado &&
       !esEntidadDeMagaya(p)
     ).length,

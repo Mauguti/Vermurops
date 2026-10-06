@@ -5,6 +5,7 @@ import { useProveedores } from '../../hooks/useProveedores';
 import { useConceptos } from '../../hooks/useConceptos';
 import { usePuertos } from '../../hooks/usePuertos';
 import { useAuth } from '../../auth/AuthContext';
+import { proveedorOperable } from '../../lib/estatusProveedor';
 
 interface Props {
   mode: 'crear' | 'editar';
@@ -36,7 +37,7 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
   const { conceptos } = useConceptos();
   const { puertos } = usePuertos();
 
-  const proveedoresActivos = proveedores.filter(p => p.activo).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  const proveedoresActivos = proveedores.filter(proveedorOperable).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
   const conceptosActivos = conceptos.filter(c => c.activo).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
   const puertosActivos = puertos.filter(p => p.activo).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 

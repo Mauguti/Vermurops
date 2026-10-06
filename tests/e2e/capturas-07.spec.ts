@@ -5,6 +5,10 @@
  * y un embarque ya creado.
  */
 import { test, expect, type Page, type Browser, type BrowserContext } from '@playwright/test';
+import { fijarPreferencias } from './preferencias';
+
+// Tarea 90: las vistas de Cuentas por cobrar/pagar se guardan por usuario; cada spec parte del default.
+test.beforeAll(async () => { await fijarPreferencias(); });
 
 test.setTimeout(60_000);
 

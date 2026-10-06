@@ -96,4 +96,19 @@ esperar_catalogo terminosPago  25 || fallo=1
 esperar_catalogo cotizaciones   8 || fallo=1
 [[ $fallo -eq 1 ]] && { echo "✗ los catálogos no quedaron completos: el recorrido no corre" >&2; exit 1; }
 
-npx playwright test tests/e2e/recorrido-jueves.spec.ts --workers=1 "$@"
+# Por omisión corre SOLO el recorrido. `e2e-completo.sh` fija ESPECS_DESPUES
+# con el resto de la suite (tarea 84): el recorrido va primero porque crea los
+# datos de los que algunos specs posteriores dependen.
+# REPETIR=2 corre la suite dos veces seguidas sobre los MISMOS emuladores y la
+# misma base (tarea 90): un spec que deja datos o preferencias que rompen al
+# siguiente solo se ve en la segunda vuelta.
+rc=0
+for vuelta in $(seq 1 "${REPETIR:-1}"); do
+  [[ "${REPETIR:-1}" -gt 1 ]] && echo "· vuelta $vuelta de ${REPETIR}"
+  npx playwright test tests/e2e/recorrido-jueves.spec.ts --workers=1 "$@" || rc=$?
+  if [[ -n "${ESPECS_DESPUES:-}" ]]; then
+    # shellcheck disable=SC2086
+    npx playwright test $ESPECS_DESPUES --workers=1 "$@" || rc=$?
+  fi
+done
+exit $rc

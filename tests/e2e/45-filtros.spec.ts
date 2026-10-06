@@ -1,4 +1,8 @@
 import { test, expect, Browser, Page, BrowserContext } from '@playwright/test';
+import { fijarPreferencias } from './preferencias';
+
+// Tarea 90: las vistas de Cuentas por cobrar/pagar se guardan por usuario; cada spec parte del default.
+test.beforeAll(async () => { await fijarPreferencias(); });
 
 /**
  * Tarea 45 · Barrido de filtros: inventario y prueba de cada filtro en cada

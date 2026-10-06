@@ -16,6 +16,10 @@
  */
 
 import { test, expect, type Page, type Browser, type BrowserContext } from '@playwright/test';
+import { fijarPreferencias } from './preferencias';
+
+// Tarea 90: las vistas de Cuentas por cobrar/pagar se guardan por usuario; cada spec parte del default.
+test.beforeAll(async () => { await fijarPreferencias(); });
 
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(120_000);
@@ -232,7 +236,13 @@ test('Administración · valida el expediente del cliente', async ({ browser }) 
   await page.getByPlaceholder('Buscar por razón social, RFC, representante...').fill('Plásticos Ramírez S.A. de C.V.');
   await page.getByText('Plásticos Ramírez S.A. de C.V.').first().click();
   await page.getByRole('button', { name: 'Expediente' }).click();
-  await page.getByPlaceholder(/Notas|checklist/).fill('Prueba: expediente físico completo en archivo de Administración.');
+  // Tarea 90: en la segunda vuelta sobre los mismos emuladores el cliente ya
+  // quedó validado por la primera. Se comprueba que lo está y se sigue.
+  const yaValidado = page.getByText(/Validado por/);
+  const notas = page.getByPlaceholder(/Notas|checklist/);
+  await expect(yaValidado.or(notas).first()).toBeVisible({ timeout: 15_000 });
+  if (await yaValidado.count() > 0 && !(await notas.isVisible().catch(() => false))) { await ctx.close(); return; }
+  await notas.fill('Prueba: expediente físico completo en archivo de Administración.');
   await page.getByRole('button', { name: /Validar expediente|Validar formalmente/ }).click();
   await expect(page.getByText(/Validado por/)).toBeVisible({ timeout: 15_000 });
   await ctx.close();
@@ -245,6 +255,8 @@ test('Ventas · envía la cotización al cliente y la marca ganada', async ({ br
   await page.getByText(S.folio, { exact: true }).first().click();
   await page.getByRole('button', { name: 'Enviar al cliente' }).click();
   await page.getByRole('button', { name: 'Marcar ganada' }).click();
+  // Tarea 87: la confirmación es un modal de la plataforma, no el cuadro nativo.
+  await page.getByTestId('dialogo').getByRole('button', { name: 'Marcar ganada' }).click();
   // La etapa se verifica en la base: en la ficha «Ganada» vive en un badge
   // que Ventas ve con otra etiqueta (línea de tiempo colapsada).
   await expect.poll(async () => {
@@ -317,8 +329,10 @@ test('Operaciones · abre el embarque con serie, captura, concilia la factura y 
   await expect(page.getByText('En gestión').first()).toBeVisible({ timeout: 15_000 });
 
   // Operaciones MARCA «No pagar» y no la puede quitar (minuta §5).
-  // El motivo lo pide un window.prompt; `entrar` ya acepta todo diálogo.
+  // Tarea 87: el motivo lo pide un modal de la plataforma (antes, window.prompt).
   await page.getByRole('button', { name: 'Marcar «No pagar»' }).click();
+  await page.getByTestId('dialogo').getByLabel('¿Por qué se detiene este pago?').fill('El cliente aún no fondea');
+  await page.getByTestId('dialogo').getByRole('button', { name: 'Detener pago' }).click();
   await expect(page.getByText(/La quita Administración/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('button', { name: 'Quitar «No pagar»' })).toHaveCount(0);
 

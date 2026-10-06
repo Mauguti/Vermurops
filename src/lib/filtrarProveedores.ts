@@ -19,6 +19,7 @@
 import type { ProveedorVermur, TipoProveedor } from '../components/proveedores/ProveedoresData';
 import { contactoPrincipal } from '../components/proveedores/ProveedoresData';
 import { contiene } from './texto';
+import { proveedorOperable } from './estatusProveedor';
 
 /** 'todos' es la pestaña por defecto; las demás son tipos reales del modelo. */
 export type PestanaProveedor = 'todos' | TipoProveedor;
@@ -53,7 +54,7 @@ export function filtrarProveedores(
   { pestana = 'todos', busqueda = '', soloActivos = false }: FiltroProveedores = {},
 ): ProveedorVermur[] {
   return proveedores.filter(p => {
-    if (soloActivos && !p.activo) return false;
+    if (soloActivos && !proveedorOperable(p)) return false;
     if (!enPestana(p, pestana)) return false;
     const q = busqueda.trim();
     if (!q) return true;

@@ -15,9 +15,9 @@
  * ya está no se migra y se lee con el adaptador de `lib/pagos.ts`.
  */
 
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, doc, onSnapshot, updateDoc, query, orderBy } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
@@ -29,6 +29,7 @@ import {
   type DatosDeposito, type Pago,
 } from '../lib/pagos';
 import { usePagos } from './usePagos';
+import { useTienda, tiendaDepositos } from './tiendasFinanzas';
 import { anotarBitacora } from './anotarBitacora';
 import { problemaMotivo, textoAnulacion } from '../lib/reversaPagos';
 
@@ -36,25 +37,11 @@ const COL = 'depositosCliente';
 
 export function useDepositosCliente(embarqueId?: string) {
   const { user } = useAuth();
-  const [depositos, setDepositos] = useState<DepositoCliente[]>([]);
-  const [loading, setLoading] = useState(true);
   // Tarea 68 · `pagos/` es donde se escribe; `depositosCliente/` solo se lee.
   const { pagos: pagosNuevos, contextoNuevo, guardarPago, anularPago } = usePagos(embarqueId);
 
-  useEffect(() => {
-    if (!user) { setLoading(false); return; }
-    const unsub = onSnapshot(
-      query(collection(db, COL), orderBy('fechaDeposito', 'desc')),
-      snap => {
-        const data: DepositoCliente[] = [];
-        snap.forEach(d => data.push({ id: d.id, ...d.data() } as DepositoCliente));
-        setDepositos(embarqueId ? data.filter(x => x.embarqueId === embarqueId) : data);
-        setLoading(false);
-      },
-      () => setLoading(false),
-    );
-    return () => unsub();
-  }, [user, embarqueId]);
+  // Tarea 89 · suscripción compartida de `depositosCliente/`.
+  const { datos: depositos, loading } = useTienda(tiendaDepositos, !!user, embarqueId);
 
   /**
    * La lista unificada: los depósitos viejos y los pagos de `pagos/`, en la

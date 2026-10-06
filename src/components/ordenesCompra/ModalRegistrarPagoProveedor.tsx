@@ -51,6 +51,7 @@ export default function ModalRegistrarPagoProveedor({ grupo, hoy, onConfirmar, o
   const total = totalElegido(grupo.items, elegidas);
   const problemas = problemasDelFormulario({
     elegidas: elegidas.size, referencia, fecha, hoy: fechaHoy,
+    ordenes: grupo.items.filter(o => elegidas.has(o.id)),
     archivo: archivo ? { nombre: archivo.name, tamano: archivo.size } : null,
   });
 
@@ -127,6 +128,11 @@ export default function ModalRegistrarPagoProveedor({ grupo, hoy, onConfirmar, o
             </select>
           </label>
         </div>
+        {!banco && (
+          <p className="text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-3 py-2" data-testid="aviso-sin-cuenta">
+            Sin cuenta: Julio no podrá conciliarlo por cuenta. Puedes guardar igual.
+          </p>
+        )}
 
         <label className="block">
           <span className={rotulo}>Referencia de la transferencia</span>

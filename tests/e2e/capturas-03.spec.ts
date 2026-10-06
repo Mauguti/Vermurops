@@ -173,7 +173,7 @@ test('Captura freno de impuesto: bloqueada y desbloqueada', async ({ browser }) 
   await page.getByRole('button', { name: /^Servicios/ }).click();
   await page.getByRole('tab', { name: 'Por concepto' }).click();
   const lineaDoc2 = page.locator('tr', { hasText: 'Documentation' }).filter({ has: page.getByText('HAPAG') }).first();
-  await lineaDoc2.locator('select').selectOption('iva0');
+  await lineaDoc2.locator('select').filter({ has: page.locator('option[value="iva0"]') }).first().selectOption('iva0');
   await page.waitForTimeout(1500); // autoguardado
 
   // Franja desbloqueada

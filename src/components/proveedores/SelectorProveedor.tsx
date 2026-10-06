@@ -2,6 +2,7 @@ import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { compararTexto, normalizarTexto } from '../../lib/texto';
 import { Search, ChevronDown, X, Building2, Check } from 'lucide-react';
 import type { ProveedorVermur, Modalidad } from './ProveedoresData';
+import { proveedorOperable } from '../../lib/estatusProveedor';
 
 /**
  * Selector de proveedor con buscador.
@@ -72,7 +73,7 @@ export default function SelectorProveedor({
   const { relevantes, resto } = useMemo(() => {
     const q = norm(busqueda);
     const base = proveedores
-      .filter(p => p.activo && !excluidos.has(p.id))
+      .filter(p => proveedorOperable(p) && !excluidos.has(p.id))
       .filter(p => !q || norm(p.nombre).includes(q) || norm(p.rfc ?? '').includes(q))
       .sort((a, b) => compararTexto(a.nombre, b.nombre));
 

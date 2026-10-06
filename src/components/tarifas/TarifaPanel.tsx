@@ -22,6 +22,7 @@ import CapturaManualConcepto from './CapturaManualConcepto';
 import type { CotizacionProveedor } from '../quotes/QuotesData';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
+import { confirmar } from '../ui/Dialogos';
 
 // ─── FC-3: Draggable tariff card ────────────────────────────────────────────
 
@@ -509,14 +510,15 @@ export default function TarifaPanel({
           costoSimulado={costoSimuladoByMoneda}
           haySimulacion={simulatedIds.size > 0}
           simuladasCount={simulatedIds.size}
-          onAplicar={() => {
+          onAplicar={async () => {
             const tarifasParaAplicar = vigentes.filter(t => simulatedIds.has(t.id));
             if (tarifasParaAplicar.length === 0) return;
             // Confirmación si son varias
             if (tarifasParaAplicar.length > 1) {
-              const ok = window.confirm(
-                `¿Aplicar ${tarifasParaAplicar.length} tarifas al concepto?\n\nNinguna se marcará como oficial automáticamente — asígnalas en la comparativa.`
-              );
+              const ok = await confirmar({
+                mensaje: `¿Aplicar ${tarifasParaAplicar.length} tarifas al concepto?\n\nNinguna se marcará como oficial automáticamente — asígnalas en la comparativa.`,
+                confirmar: 'Aplicar',
+              });
               if (!ok) return;
             }
             onAplicarSimulacion?.(tarifasParaAplicar);

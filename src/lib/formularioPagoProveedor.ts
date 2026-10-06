@@ -35,6 +35,31 @@ export function problemaFechaPago(fecha: string, hoy: string): string | null {
   return null;
 }
 
+/**
+ * Día (YYYY-MM-DD, hora LOCAL) en que se autorizó la orden: `autorizadaPor` y,
+ * si no, la última entrada «autorizada» del historial. Null si no consta.
+ */
+export function diaAutorizacion(o: OrdenCompra): string | null {
+  const iso = o.autorizadaPor?.fecha
+    ?? [...(o.historialEstados ?? [])].reverse().find(r => r.estado === 'autorizada')?.fecha;
+  if (!iso) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return iso;
+  const t = new Date(iso);
+  return Number.isNaN(t.getTime()) ? null : hoyLocal(t);
+}
+
+/** Una línea por orden cuya autorización es posterior a la fecha del pago. Vacío = sirve. */
+export function problemasFechaContraAutorizacion(fecha: string, ordenes: readonly OrdenCompra[]): string[] {
+  const out: string[] = [];
+  for (const o of ordenes) {
+    const dia = diaAutorizacion(o);
+    if (dia && fecha < dia) {
+      out.push(`${o.folio} se autorizó el ${dia}: el pago no puede tener fecha anterior (${fecha}).`);
+    }
+  }
+  return out;
+}
+
 /** Null si el archivo cabe en la regla de Storage; si no, por qué no. */
 export function problemaComprobante(nombre: string, tamano: number): string | null {
   const ext = nombre.split('.').pop()?.toLowerCase() ?? '';
@@ -64,6 +89,8 @@ export interface EntradaFormularioPago {
   fecha: string;
   hoy: string;
   archivo?: { nombre: string; tamano: number } | null;
+  /** Órdenes elegidas: la fecha no puede ser anterior a su autorización. */
+  ordenes?: readonly OrdenCompra[];
 }
 
 /** Todo lo que impide guardar, en el orden en que se lee el formulario. Vacío = se puede. */
@@ -72,6 +99,7 @@ export function problemasDelFormulario(e: EntradaFormularioPago): string[] {
   if (e.elegidas === 0) out.push('Marca al menos una orden.');
   const f = problemaFechaPago(e.fecha, e.hoy);
   if (f) out.push(f);
+  else if (e.ordenes) out.push(...problemasFechaContraAutorizacion(e.fecha, e.ordenes));
   if (!e.referencia.trim()) out.push('Falta la referencia de la transferencia.');
   if (e.archivo) {
     const c = problemaComprobante(e.archivo.nombre, e.archivo.tamano);

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { VistaUsuario } from './VistasData';
 import type { VistaConfig } from './SpreadsheetTable';
+import { confirmar } from '../ui/Dialogos';
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -203,9 +204,9 @@ export default function VistaSelector({
 
                       {/* Eliminar */}
                       <button
-                        onClick={e => {
+                        onClick={async e => {
                           e.stopPropagation();
-                          if (window.confirm(`¿Eliminar la vista "${v.nombre}"?`)) {
+                          if (await confirmar({ mensaje: `¿Eliminar la vista "${v.nombre}"?`, confirmar: 'Eliminar', peligro: true })) {
                             onEliminar(v.id);
                             if (activa) onSeleccionar(null);
                           }

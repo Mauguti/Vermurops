@@ -16,6 +16,7 @@ import { useConceptos } from '../../hooks/useConceptos';
 import { contactoPrincipal } from '../proveedores/ProveedoresData';
 import { useAuth } from '../../auth/AuthContext';
 import SelectorProveedor from '../proveedores/SelectorProveedor';
+import { proveedorOperable } from '../../lib/estatusProveedor';
 
 interface Props {
   conceptoNombre: string;
@@ -36,7 +37,7 @@ export default function CapturaManualConcepto({ conceptoNombre, onGuardar, onCre
   const [saving, setSaving] = useState(false);
 
   const provActivos = useMemo(
-    () => proveedores.filter(p => p.activo).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
+    () => proveedores.filter(proveedorOperable).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
     [proveedores],
   );
 

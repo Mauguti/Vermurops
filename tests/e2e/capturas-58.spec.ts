@@ -12,6 +12,10 @@
  */
 
 import { test, expect, type Page, type Browser, type BrowserContext } from '@playwright/test';
+import { fijarPreferencias } from './preferencias';
+
+// Tarea 90: las vistas de Cuentas por cobrar/pagar se guardan por usuario; cada spec parte del default.
+test.beforeAll(async () => { await fijarPreferencias(); });
 
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(120_000);
@@ -63,7 +67,28 @@ async function sembrarOC(oc: {
   expect(r.ok).toBe(true);
 }
 
+/**
+ * Tarea 90: otros specs (el 57, el 73…) dejan órdenes de PRV-0001 en la misma
+ * base, y «2 facturas · 3 órdenes» solo es cierto si estas tres son TODAS las
+ * de IDAMEX. Las ajenas se dan de baja lógica (`activo: false`) antes de
+ * sembrar; nada se borra.
+ */
+async function aislarIdamex(propias: string[]) {
+  const r = await fetch(`${FS}/ordenesCompra?pageSize=500`, { headers: { Authorization: 'Bearer owner' } });
+  const d = await r.json() as { documents?: { name: string; fields: Record<string, any> }[] };
+  for (const doc of d.documents ?? []) {
+    const id = doc.name.split('/').pop() as string;
+    if (propias.includes(id) || doc.fields?.proveedorId?.stringValue !== 'PRV-0001') continue;
+    await fetch(`${FS}/ordenesCompra/${id}?updateMask.fieldPaths=activo`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer owner' },
+      body: JSON.stringify({ fields: { activo: { booleanValue: false } } }),
+    });
+  }
+}
+
 async function sembrarCaso() {
+  await aislarIdamex(['OC-58-A', 'OC-58-B', 'OC-58-C']);
   await sembrarOC({ id: 'OC-58-A', folio: 'OC-2026-0581', monto: 12000, moneda: 'MXN', fechaPago: '2026-10-02', factura: 'F-IDA-1201', concepto: 'Maniobras en destino', creado: '2026-10-05T09:00:00.000Z' });
   await sembrarOC({ id: 'OC-58-B', folio: 'OC-2026-0582', monto: 6500,  moneda: 'MXN', fechaPago: '2026-10-05', factura: 'F-IDA-1201', concepto: 'Almacenaje',           creado: '2026-10-05T09:01:00.000Z' });
   await sembrarOC({ id: 'OC-58-C', folio: 'OC-2026-0583', monto: 900,   moneda: 'USD', fechaPago: '2026-10-05', factura: 'F-IDA-1310', concepto: 'Flete internacional', creado: '2026-10-05T09:02:00.000Z' });

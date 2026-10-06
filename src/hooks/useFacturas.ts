@@ -7,9 +7,9 @@
  * Nada de esto timbra ni pretende hacerlo.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { db } from '../firebase';
-import { collection, doc, onSnapshot, setDoc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
@@ -28,6 +28,7 @@ import {
 } from '../lib/reversaPagos';
 import type { AplicacionPago } from '../lib/pagos';
 import { usePagos } from './usePagos';
+import { useTienda, tiendaFacturas, tiendaCobros } from './tiendasFinanzas';
 import { anotarBitacora } from './anotarBitacora';
 
 const COL_FACTURAS = 'facturas';
@@ -35,42 +36,15 @@ const COL_COBROS = 'cobros';
 
 export function useFacturas(embarqueId?: string) {
   const { user } = useAuth();
-  const [facturas, setFacturas] = useState<FacturaCliente[]>([]);
-  const [cobros, setCobros] = useState<CobroCliente[]>([]);
-  const [loading, setLoading] = useState(true);
   // Tarea 68 · `pagos/` es donde se escribe desde P2; `cobros/` solo se lee.
   const { pagos: pagosNuevos, contextoNuevo, guardarPago, anularPago, actualizarAplicaciones } = usePagos(embarqueId);
 
-  useEffect(() => {
-    if (!user) { setLoading(false); return; }
-
-    const unsubF = onSnapshot(
-      query(collection(db, COL_FACTURAS), orderBy('fechaEmision', 'desc')),
-      snap => {
-        const data: FacturaCliente[] = [];
-        snap.forEach(d => data.push({ id: d.id, ...d.data() } as FacturaCliente));
-        setFacturas(embarqueId ? data.filter(f => f.embarqueId === embarqueId) : data);
-        setLoading(false);
-      },
-      () => setLoading(false),
-    );
-
-    /*
-     * Tarea 68 · `cobros/` es de SOLO LECTURA desde P2. Nada nuevo se
-     * escribe aquí; lo que ya está se sigue leyendo y no se migra.
-     */
-    const unsubC = onSnapshot(
-      query(collection(db, COL_COBROS), orderBy('fechaCobro', 'desc')),
-      snap => {
-        const data: CobroCliente[] = [];
-        snap.forEach(d => data.push({ id: d.id, ...d.data() } as CobroCliente));
-        setCobros(embarqueId ? data.filter(c => c.embarqueId === embarqueId) : data);
-      },
-      () => { /* los cobros son secundarios: su fallo no debe tumbar la lista */ },
-    );
-
-    return () => { unsubF(); unsubC(); };
-  }, [user, embarqueId]);
+  /*
+   * Tarea 89 · una suscripción compartida por colección. `cobros/` es de SOLO
+   * LECTURA desde P2 (tarea 68) y es secundaria: su fallo no tumba la lista.
+   */
+  const { datos: facturas, loading } = useTienda(tiendaFacturas, !!user, embarqueId);
+  const { datos: cobros } = useTienda(tiendaCobros, !!user, embarqueId);
 
   /**
    * Registra una factura ya emitida. Es de Administración y de Operaciones:

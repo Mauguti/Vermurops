@@ -6,6 +6,8 @@ import { useProveedores } from '../../hooks/useProveedores';
 import AltaRapidaProveedorModal from '../proveedores/AltaRapidaProveedorModal';
 import { storage } from '../../firebase';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { avisar } from '../ui/Dialogos';
+import { proveedorOperable } from '../../lib/estatusProveedor';
 
 export interface FormProveedorFichaProps {
   onGuardar: (cp: CotizacionProveedor) => void;
@@ -51,7 +53,7 @@ export function FormProveedorFicha({ onGuardar, onCancelar, servicioTipo, provee
       });
     } catch (err) {
       console.error("Error subiendo archivo:", err);
-      alert("Hubo un error al subir el archivo.");
+      void avisar("Hubo un error al subir el archivo.");
     } finally {
       setUploading(false);
     }
@@ -60,7 +62,7 @@ export function FormProveedorFicha({ onGuardar, onCancelar, servicioTipo, provee
   const labelCls = 'block text-[9px] font-bold text-gray-400 uppercase mb-1';
   const inputCls = 'w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario/60 bg-white';
 
-  const availableProviders = proveedores.filter(p => p.activo && (!p.modalidades?.length || p.modalidades.includes(servicioTipo as any)));
+  const availableProviders = proveedores.filter(p => proveedorOperable(p) && (!p.modalidades?.length || p.modalidades.includes(servicioTipo as any)));
 
   const TIPO_A_MODALIDAD: Record<string, Modalidad> = {
     'maritimo': 'maritimo', 'aereo': 'aereo', 'terrestre': 'terrestre', 'aduanal': 'aduanal',

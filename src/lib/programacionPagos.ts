@@ -98,7 +98,10 @@ export function transferenciasDelDia(
 
   // Se agrupa por lo que se TRANSFIERE, no por el monto de la orden: si un
   // anticipo cubrió la mitad, la transferencia es por la mitad.
-  const items = pagables.map(p => ({ ...p.oc, monto: p.aTransferir }));
+  // Tarea 90: la copia lleva el monto YA neto, así que no puede conservar los
+  // anticipos: el modal de «Registrar pago» vuelve a aplicar `montoATransferir`
+  // sobre estas órdenes y restaba el anticipo dos veces (13,500 se veía 11,000).
+  const items = pagables.map(p => ({ ...p.oc, monto: p.aTransferir, anticiposCruzados: [] }));
   return agruparParaPago(items, oc => {
     const prog = pagables.find(p => p.oc.id === oc.id);
     return prog?.fechaPago ?? hasta;

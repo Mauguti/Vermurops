@@ -21,6 +21,7 @@ import {
   type UsuarioRegistrado,
 } from '../../lib/usuarios';
 import type { UserRole } from '../../auth/users';
+import { confirmar } from '../ui/Dialogos';
 
 // ── Estilos de badge por rol ─────────────────────────────────────────────────
 
@@ -304,8 +305,8 @@ function FilaUsuario({
       <td className="py-3 px-4 text-right">
         {!esMismoUsuario && usuario.activo && (
           <button
-            onClick={() => {
-              if (window.confirm(`¿Desactivar a ${usuario.nombre}? Ya no podrá entrar al sistema.`)) {
+            onClick={async () => {
+              if (await confirmar({ mensaje: `¿Desactivar a ${usuario.nombre}? Ya no podrá entrar al sistema.`, confirmar: 'Desactivar', peligro: true })) {
                 onDesactivar(usuario.uid);
               }
             }}

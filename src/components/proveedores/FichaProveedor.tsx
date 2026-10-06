@@ -16,6 +16,7 @@ import ExpedientePanel, { type ArchivoExpediente } from '../expediente/Expedient
 import SubirDocumentosLote from '../documentos/SubirDocumentosLote';
 import { useSubidaClasificada } from '../../hooks/useSubidaClasificada';
 import { clasificacionDeLinea, type LineaLote, type TipoDocLote } from '../../lib/loteDocumentos';
+import { proveedorOperable } from '../../lib/estatusProveedor';
 
 interface Props {
   proveedor: ProveedorVermur;
@@ -130,8 +131,8 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit, onUp
         regresarLabel={regresarLabel}
         badges={
           <>
-            <BadgeEstado tono={proveedor.activo === false ? 'peligro' : 'exito'}>
-              {proveedor.activo === false ? 'Inactivo' : 'Activo'}
+            <BadgeEstado tono={proveedorOperable(proveedor) ? 'exito' : 'peligro'}>
+              {proveedorOperable(proveedor) ? 'Activo' : 'Inactivo'}
             </BadgeEstado>
             {(() => {
               const estado = estadoValidacion(proveedor);
@@ -212,8 +213,8 @@ export default function FichaProveedor({ proveedor, quotes, onBack, onEdit, onUp
                 </div>
               </div>
 
-              <span className={`px-[10px] py-[4px] rounded-md text-[12px] font-semibold tracking-wide ${proveedor.activo ? 'bg-success-bg text-success-text' : 'bg-neutral-bg text-text-secondary'}`}>
-                {proveedor.activo ? 'PROVEEDOR ACTIVO' : 'INACTIVO'}
+              <span className={`px-[10px] py-[4px] rounded-md text-[12px] font-semibold tracking-wide ${proveedorOperable(proveedor) ? 'bg-success-bg text-success-text' : 'bg-neutral-bg text-text-secondary'}`}>
+                {proveedorOperable(proveedor) ? 'PROVEEDOR ACTIVO' : 'INACTIVO'}
               </span>
             </div>
 

@@ -11,6 +11,10 @@
  * Requiere emuladores + app en :3100: `KEEP=1 ./scripts/e2e.sh`.
  */
 import { test, expect, type Page } from '@playwright/test';
+import { fijarPreferencias } from './preferencias';
+
+// Tarea 90: las vistas de Cuentas por cobrar/pagar se guardan por usuario; cada spec parte del default.
+test.beforeAll(async () => { await fijarPreferencias(); });
 
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(120_000);

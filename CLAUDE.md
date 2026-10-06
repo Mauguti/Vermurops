@@ -2075,6 +2075,94 @@ Reglas puras en `lib/formularioPagoProveedor.ts`; el dinero sigue en
     embarque sobre la misma lista. Se abre con el primer suscriptor y se cierra
     con el último.
 
+## 4.48 Registrar y anular un pago a proveedor, en UNA transacción (tarea 85, 7-oct-2026)
+
+El comentario de §4.38/§4.45 prometía «todo o nada» y el código no lo cumplía:
+guardaba o anulaba el pago y luego marcaba/revertía las órdenes en un bucle,
+así que una falla a la mitad dejaba un pago anulado con órdenes aún `pagada`.
+Ahora `lib/escrituraPagoProveedor.ts` ARMA el plan (pago, cada orden, bitácora
+de cada embarque) y `hooks/escribirAtomico.ts` lo ejecuta con `runTransaction`.
+  - Antes de escribir lee cada orden y exige que siga en el estado sobre el que
+    se calculó el plan; si otra sesión la movió, no se escribe nada.
+  - La bitácora entra en la misma transacción; un embarque inexistente se omite.
+  - El folio del pago se reserva ANTES, en su propia transacción: si lo demás
+    falla queda un hueco de folio, no un duplicado.
+  - Sin cambio de reglas ni de modelo. `transicionarEstado` y `revertirPago` de
+    `useOrdenesCompra` siguen para las demás transiciones.
+  - `escribirAtomico.test.ts` inyecta la falla en la orden 2 y comprueba que no
+    queda nada; probado por mutación (volver a escrituras sueltas lo rompe).
+
+## 4.49 La fecha real del pago llega a la orden (tarea 86, 7-oct-2026)
+
+`pagadaPor.fecha` de cada orden pagada es el DÍA que eligió quien registró el
+pago (tarea 81, `YYYY-MM-DD`), no el de captura; la hora de captura sigue en
+`historialEstados` y `updatedAt`. Los lectores (`pagos.ts`, `prefactura.ts`)
+ya aceptan la fecha sola. El formulario rechaza una fecha anterior a la
+autorización de cualquiera de las órdenes elegidas y dice cuál y qué fecha
+(`problemasFechaContraAutorizacion`, `diaAutorizacion` en
+`lib/formularioPagoProveedor.ts`); una orden sin autorización registrada no
+bloquea. Legacy: las pagadas antes de la 86 conservan su timestamp de captura.
+
+## 4.50 Fuera los cuadros del navegador, y aviso de «Sin cuenta» (tarea 87, 7-oct-2026)
+
+`components/ui/Dialogos.tsx`: `avisar`, `confirmar` y `pedirTexto` con la forma
+de los nativos (`await`) pero como modal de la plataforma; `<DialogosHost />`
+vive en la raíz de `App.tsx`, así que también se llaman desde funciones que no
+son componentes. Sin host montado caen al nativo, para no quedarse esperando.
+  - Se reemplazaron los ~30 `alert`/`confirm`/`prompt` de `src/`; el grep
+    `\b(alert|confirm|prompt)\(` ya solo da un comentario. Lo peligroso
+    (eliminar, desactivar, importar) pide confirmar en rojo; el resto, morado.
+  - «No pagar» ya no se marca si se cancela el modal (antes marcaba con motivo null).
+  - **Un spec que aceptaba el nativo ahora debe pulsar el botón del modal**
+    (`getByTestId('dialogo')`); el recorrido lo hace en «Marcar ganada» y «No pagar».
+  - Formulario de pago a proveedor: con la cuenta en «Sin indicar» sale el aviso
+    ámbar «Sin cuenta: Julio no podrá conciliarlo por cuenta». No bloquea.
+
+## 4.51 Un solo criterio de «activo» para clientes y proveedores (tarea 88, 6-oct-2026)
+
+Solo el inactivo EXPLÍCITO queda fuera: `clienteOperable` (`lib/estatusCliente.ts`)
+y `proveedorOperable` (`lib/estatusProveedor.ts`, `activo !== false`). Sin el
+campo = operable. Antes los selectores de proveedores filtraban `p.activo`
+(sin campo = fuera) mientras la cabecera de la ficha decía «Activo».
+`statusOperativoDesdeActivo` reemplaza el `raw.activo ? 'ACTIVO' : 'INACTIVO'`
+de la importación de `useClientes`: ausente ya no vuelve inactivo. No se escribe
+ningún campo nuevo ni se migra.
+
+## 4.52 Un listener por colección en Finanzas (tarea 89, 7-oct-2026)
+
+La 82 compartió `pagos/`; la 89 hace lo mismo con `facturas/`, `cobros/` y
+`depositosCliente/` (`hooks/tiendasFinanzas.ts`, sobre `crearTiendaCompartida`).
+`useFacturas` y `useDepositosCliente` ya no abren `onSnapshot`: leen la lista
+compartida y filtran por `embarqueId` en memoria. Antes, Finanzas + la ficha de
+un embarque abrían 2×(facturas, cobros) + depósitos + pagos; ahora 4 en total,
+uno por colección. Sin cambio de lo que se ve, de reglas ni de modelo. Un fallo
+de la lectura deja la lista vacía y `loading` en false, como antes.
+
+## 4.53 Higiene de los e2e (tarea 90, 6-oct-2026)
+
+  - **`./scripts/e2e-completo.sh`** (`npm run e2e:completo`) corre el recorrido
+    y después todos los demás specs: 232 tests, ~11 min, verde en una pasada.
+    Quedan fuera `gestion-usuarios` y `capturas-21`: necesitan el emulador de
+    Functions (:5001), que el script no levanta (`CON_FUNCTIONS=1
+    ./scripts/dev-emuladores.sh`). `REPETIR=2` repite la suite sobre los mismos
+    emuladores.
+  - **`tests/e2e/preferencias.ts`**: `fijarPreferencias()` en el `beforeAll` de
+    cada spec que toca Finanzas deja las vistas por default y BORRA las vistas
+    guardadas (`vistasUsuario`). 67 y 69 declaran `factura`: dependían, sin
+    decirlo, de la contaminación que dejaba otro spec.
+  - **`84-reglas-pago-grupo.spec.ts`**: segundo camino (pantalla + emulador) para
+    anticipo cruzado, proveedores distintos y monedas mezcladas. Mutadas una por
+    una en `pagos.ts`, cada regla tumba su test.
+  - 🔴 **Hallazgo real:** `transferenciasDelDia` copiaba cada orden con el monto
+    ya neto pero CONSERVANDO `anticiposCruzados`; el modal de «Registrar pago»
+    volvía a restar el anticipo (13,500 se veía 11,000). El pago guardado salía
+    bien (se calcula con las órdenes reales); lo que se mostraba, no. Corregido
+    con `anticiposCruzados: []` en la copia + test unitario.
+  - **Pendiente:** el recorrido NO se puede repetir sobre los mismos emuladores
+    (la 2ª vuelta falla en pasos que dependen de datos de la 1ª).
+
+---
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
