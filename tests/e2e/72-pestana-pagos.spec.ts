@@ -185,16 +185,26 @@ async function abrirFicha(page: Page, folio: string) {
   await expect(page.getByTestId('ficha-pago')).toContainText(folio);
 }
 
-/** Cuánto resta de una factura en Cuentas por cobrar, «Por factura». */
-async function restaDe(page: Page, numero: string): Promise<string> {
+/**
+ * Cobrado y resta de una factura en Cuentas por cobrar, «Por factura», leídos
+ * POR CELDA. Leer el texto del renglón completo no sirve: el total de la
+ * factura aparece ahí y «4,000.00» pasaría aunque el saldo no se hubiera
+ * restaurado.
+ */
+async function cobradoYResta(page: Page, numero: string): Promise<{ cobrado: string; resta: string }> {
   await page.getByRole('button', { name: 'Cuentas por cobrar', exact: true }).first().click();
   await page.getByRole('button', { name: 'Por factura' }).click();
   await page.locator('select').filter({ hasText: 'Cliente: todos' }).selectOption(CLIENTE_ID);
-  await page.locator('select').filter({ hasText: /Estado|Abiertas/ }).first().count();
   await page.getByRole('button', { name: /^Todas/ }).click();
-  const fila = page.getByRole('row').filter({ hasText: numero });
-  await expect(fila.first()).toBeVisible({ timeout: 15_000 });
-  return (await fila.first().innerText()).replace(/\s+/g, ' ');
+  const fila = page.getByRole('row').filter({ hasText: numero }).first();
+  await expect(fila).toBeVisible({ timeout: 15_000 });
+  const celdas = (await fila.getByRole('cell').allInnerTexts()).map(t => t.trim());
+  // Columnas de la vista por defecto: numero, cliente, embarque, vence, total, moneda, cobrado, saldo, estado, accion.
+  expect(celdas[0]).toContain(numero);
+  // «Por factura» se guarda como preferencia del usuario: se devuelve a «Por
+  // cliente» para no dejarle al spec que sigue (el 70) otra pantalla.
+  await page.getByRole('button', { name: 'Por cliente' }).click();
+  return { cobrado: celdas[6], resta: celdas[7] };
 }
 
 test('siembra: un cliente, tres facturas y tres pagos', async () => { await sembrar(); });
@@ -253,7 +263,7 @@ test('A · aplicar el saldo a favor a otra factura', async ({ browser }) => {
   await page.keyboard.press('Escape');
   const { page: p2, ctx: ctx2 } = await entrar(browser, 'administracion@vermur.com');
   await p2.getByRole('button', { name: 'Finanzas', exact: true }).first().click();
-  expect(await restaDe(p2, 'A-7203')).toMatch(/2,000\.00/);
+  expect(await cobradoYResta(p2, 'A-7203')).toEqual({ cobrado: '2,000.00', resta: '2,000.00' });
   await ctx2.close();
   await ctx.close();
 });
@@ -263,6 +273,12 @@ test('B · quitar una aplicación pide motivo y devuelve el saldo', async ({ bro
   await abrirPagos(page);
   await abrirFicha(page, PAGOS.X.folio);
   const ficha = page.getByTestId('ficha-pago');
+
+  // La ficha en angosto: sin desbordes a 390 px.
+  await page.setViewportSize({ width: 390, height: 900 });
+  await foto(page, 'ficha-angosto');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  await page.setViewportSize({ width: 1440, height: 900 });
 
   await ficha.getByRole('row').filter({ hasText: 'A-7203' }).getByRole('button', { name: 'Quitar aplicación' }).click();
   // Sin motivo no se puede.
@@ -286,7 +302,7 @@ test('B · quitar una aplicación pide motivo y devuelve el saldo', async ({ bro
 
   const { page: p2, ctx: ctx2 } = await entrar(browser, 'administracion@vermur.com');
   await p2.getByRole('button', { name: 'Finanzas', exact: true }).first().click();
-  expect(await restaDe(p2, 'A-7203')).toMatch(/4,000\.00/);
+  expect(await cobradoYResta(p2, 'A-7203')).toEqual({ cobrado: '—', resta: '4,000.00' });
   await ctx2.close();
 });
 
@@ -315,7 +331,7 @@ test('C · anular un pago: motivo, sigue en la lista con filtro y la factura rec
   expect((await leer(`pagos/${PAGOS.Z.id}`)).activo).toBe(false);
 
   // Y la factura vuelve a deber lo suyo.
-  expect(await restaDe(page, 'A-7202')).toMatch(/6,000\.00/);
+  expect(await cobradoYResta(page, 'A-7202')).toEqual({ cobrado: '—', resta: '6,000.00' });
   await ctx.close();
 });
 
@@ -332,10 +348,14 @@ test('C2 · anular un anticipo (anularDeposito) y dejarlo en la bitácora del em
   await expect(ficha).toContainText('Anulado', { timeout: 15_000 });
 
   expect((await leer(`pagos/${PAGOS.Y.id}`)).activo).toBe(false);
+  // La bitácora se escribe DESPUÉS del pago: la ficha ya dice «Anulado» y la
+  // entrada puede tardar un instante, así que se espera en vez de leer una vez.
+  await expect.poll(async () => {
+    const emb = await leer(`embarques/${EMB}`);
+    return (emb.bitacora as Record<string, any>[] ?? []).map(e => `${e.titulo} ${e.detalle ?? ''}`).join('\n');
+  }, { timeout: 15_000 }).toContain('Anticipo capturado dos veces');
   const emb = await leer(`embarques/${EMB}`);
-  const textos = (emb.bitacora as Record<string, any>[]).map(e => `${e.titulo} ${e.detalle ?? ''}`).join('\n');
-  expect(textos).toContain(PAGOS.Y.folio);
-  expect(textos).toContain('Anticipo capturado dos veces');
+  expect((emb.bitacora as Record<string, any>[]).map(e => e.titulo).join('\n')).toContain(PAGOS.Y.folio);
   await ctx.close();
 });
 

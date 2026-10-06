@@ -36,6 +36,7 @@ const LEGITIMOS: Record<string, string> = {
   'src/lib/facturacionEmbarque.ts': 'Una factura cubre UNA moneda: proponerFactura rechaza la mezcla antes de sumar, y saldoDeFactura filtra los cobros a la moneda de la factura.',
   'src/lib/aplicarPago.ts': 'Un pago tiene UNA moneda y sus aplicaciones la comparten: construirPagoAplicado lanza antes de escribir si una aplicación trae otra, y el reparto solo ofrece facturas de la moneda del pago (§4 del PLAN-PAGOS).',
   'src/hooks/useFacturas.ts': 'La bitácora suma las aplicaciones de UN pago, que comparten su moneda por construcción (misma garantía que aplicarPago.ts), y la imprime con pago.moneda al lado.',
+  'src/lib/reversaPagos.ts': 'Suma las aplicaciones de UN pago: el bucle de arriba lanza si alguna trae otra moneda que el pago, así que comparten la suya por construcción (misma garantía que construirPagoAplicado). Los totales de la lista sí van por sumarPorMoneda.',
 };
 
 /** Deuda técnica conocida: se sabe que está mal y por qué no se corrige. */

@@ -1812,6 +1812,50 @@ no tendría embarque y no fondearía nada, aunque se vería igual en la lista.
 emuladores y el último FIJA el aviso del bloqueo, con la versión en verde
 escrita y comentada para el día que la regla entre.
 
+## 4.37 La ficha del pago: aplicar el saldo, quitar una aplicación y anular (tarea 72, 6-oct-2026)
+
+Paso **P5** de `docs/sprint-post-junta/PLAN-PAGOS.md` (§1.5 y §7.3).
+Finanzas estrena la pestaña **Pagos**: cada movimiento de dinero del cliente
+con su folio `PAG-…`, lo aplicado, lo que queda a favor y su estado, sobre
+`SpreadsheetTable` con vistas guardables y filtros que se guardan con la vista
+(módulo `pagos`), igual que Cuentas por cobrar (§4.27). Las reglas viven en
+`lib/reversaPagos.ts` (29 tests); la pantalla en `components/pagos/`.
+
+  - **Estado y «a favor» se DERIVAN** (`estadoDePago`, `aFavorDe`): aplicado ·
+    parcial · sin aplicar · anulado. Un peso de redondeo no es saldo a favor.
+    Los totales de arriba van por moneda (§4.3).
+  - **Los anulados no se esconden:** salen de «Vigentes» (el default) y se ven
+    con el filtro «Anulados» o «Todos».
+  - **Aplicar el saldo a favor** reusa `ModalAplicarPago` en un MODO nuevo
+    (`saldoDe`): el dinero se muestra y no se edita, y el reparto, las facturas
+    ofrecidas (mismo cliente y moneda, con saldo) y las validaciones son las
+    mismas. Se agregan aplicaciones al pago que ya existe; no se crea otro.
+  - **Quitar una aplicación** y **anular** piden MOTIVO (`problemaMotivo`) y el
+    hook lo vuelve a exigir. Nada se borra: el pago anulado queda en la lista.
+  - **`embarqueIds` falla cerrado.** Al quitar la última aplicación, un pago de
+    UN embarque lo sigue fondeando; uno de VARIOS queda en `[]` (a favor sin
+    embarque), porque dejarlo en los dos contaría el monto completo en cada
+    uno y autorizaría un pago descubierto. Aplicar saldo a una factura de otro
+    embarque deja el pago repartido; Finance le pasa a `entradasDeFondeo` el
+    resolvedor factura → embarque para que cada uno cuente lo que le toca.
+  - **`anularDeposito` ya tiene call site:** el botón «Anular pago» de un pago
+    sin aplicaciones. `anularCobro` y `anularDeposito` reciben el motivo; la
+    pestaña Facturas del embarque lo pide con `window.prompt` (provisional,
+    como el `confirm` que reemplaza).
+  - **Permisos:** `cobro.registrar` (administracion y admin). Operaciones lee
+    la ficha y no ve los botones, y la ficha lo dice.
+  - **⚠️ Dónde queda el motivo:** el contrato de la tarea fue «Modelo: no» y
+    `Pago` no tiene campos de anulación, así que quién, cuándo y por qué viajan
+    a la **bitácora de cada embarque** que el pago tocó (`anotarBitacora`,
+    evento `cobro`) y la ficha los lee de ahí, uniéndolos por el folio. Una
+    aplicación quitada SÍ sale de `aplicaciones[]`; su rastro es esa entrada.
+    Un pago anulado que no toca ningún embarque no deja rastro con motivo. Si se
+    aprueban `anulacion` y `aplicacionesQuitadas` en `Pago`, la ficha deja de
+    depender de la bitácora (pregunta en el reporte).
+  - **Lo viejo no se reaplica:** un cobro o depósito leído de `cobros/` o
+    `depositosCliente/` se lee y se anula, pero no se le aplica saldo ni se le
+    quita una aplicación: esas colecciones ya no se escriben (§4.35).
+
 ## 5. Estado de los módulos
 
 ### Construido y validado
