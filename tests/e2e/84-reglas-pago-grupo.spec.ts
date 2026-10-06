@@ -61,7 +61,7 @@ async function borrarPagos(prefijoProveedor: string) {
 interface Semilla { id: string; folio: string; monto: number; prov: string; nombre: string; anticipo?: number }
 
 async function sembrar(prefijo: string, ocs: Semilla[]) {
-  await borrarPagos(prefijo);
+  await borrarPagos(`PRV-${prefijo}`);
   await escribir(`embarques/EMB-${prefijo}`, {
     id: S(`EMB-${prefijo}`), folio: S(`VLIM-26-${prefijo}`), bitacora: ARR([]), createdAt: S('2026-10-01T09:00:00.000Z'),
   });

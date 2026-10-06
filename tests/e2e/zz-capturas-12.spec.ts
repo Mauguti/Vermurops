@@ -68,7 +68,9 @@ test('Capturas de «Ver como cliente» en el embarque', async ({ browser }) => {
 
   await page.screenshot({ path: `${IMG}/12-boton-ver-como-cliente-angosto.png`, fullPage: false });
 
-  await btn.click();
+  // Tarea 90: en angosto las acciones secundarias viven en «Más acciones» (tarea 50).
+  await page.getByRole('button', { name: 'Más acciones' }).click();
+  await page.getByRole('button', { name: /Ver como cliente/i }).locator('visible=true').click();
   await expect(page.getByText('Vista previa · Así lo vería el cliente')).toBeVisible({ timeout: 5_000 });
   await page.screenshot({ path: `${IMG}/12-vista-cliente-angosto.png`, fullPage: false });
 

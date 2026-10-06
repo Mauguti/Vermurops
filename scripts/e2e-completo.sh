@@ -15,7 +15,12 @@ REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
 
 # Todo spec salvo el recorrido (va primero) y el calentamiento (ya corrió).
-ESPECS_DESPUES="$(ls tests/e2e/*.spec.ts | grep -v -e '/recorrido-jueves\.spec\.ts$' -e '/calentar\.spec\.ts$' | tr '\n' ' ')"
+# Tampoco entran los que necesitan el emulador de FUNCTIONS (:5001), que este
+# script no levanta: gestion-usuarios y capturas-21 (`CON_FUNCTIONS=1
+# ./scripts/dev-emuladores.sh`, y se lanzan a mano). Con el emulador apagado
+# fallaban con ECONNREFUSED y dejaban la suite en rojo por una causa que no es
+# del código (tarea 90).
+ESPECS_DESPUES="$(ls tests/e2e/*.spec.ts | grep -v -e '/recorrido-jueves\.spec\.ts$' -e '/calentar\.spec\.ts$' -e '/gestion-usuarios\.spec\.ts$' -e '/capturas-21\.spec\.ts$' | tr '\n' ' ')"
 export ESPECS_DESPUES
 
 inicio=$(date +%s)
