@@ -48,11 +48,20 @@ export function useDepositosCliente(embarqueId?: string) {
    *
    * No se edita ni se borra —solo se da de baja— porque un depósito es
    * evidencia de que entró dinero, igual que un comprobante.
+   *
+   * Tarea 69 · La capacidad pasa de `ordenCompra.autorizar` a
+   * `cobro.registrar`. En la práctica es la misma gente —Administración y
+   * admin tienen las dos— pero el motivo cambia: hasta aquí se pedía el
+   * permiso de AUTORIZAR UN PAGO porque el formulario vivía dentro de la
+   * ficha de la orden de compra. Ahora se pide el de RECIBIR DINERO, que es
+   * lo que el acto es. Un permiso que se hereda de la pantalla donde estaba
+   * el botón se queda viejo cuando el botón se mueve, que es justo lo que P3
+   * acaba de hacer.
    */
   const registrarDeposito = async (
     datos: Omit<DepositoCliente, 'id' | 'registradoPor' | 'activo' | 'fechaAlta' | 'updatedAt'>,
   ): Promise<DepositoCliente> => {
-    exigir(user?.rol as UserRole | undefined, 'ordenCompra.autorizar');
+    exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
 
     const ahora = new Date().toISOString();
     const deposito: DepositoCliente = {
@@ -72,7 +81,7 @@ export function useDepositosCliente(embarqueId?: string) {
 
   /** Baja lógica: un depósito mal capturado se anula, no se borra. */
   const anularDeposito = async (id: string): Promise<void> => {
-    exigir(user?.rol as UserRole | undefined, 'ordenCompra.autorizar');
+    exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
     await conAviso('el depósito', () =>
       updateDoc(doc(db, COL, id), sanitizarParaFirestore({
         activo: false, updatedAt: new Date().toISOString(),

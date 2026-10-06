@@ -20,6 +20,7 @@ import {
   type CreditoCliente, type ResultadoPropuesta,
 } from '../../lib/facturacionEmbarque';
 import { BANCOS_VERMUR, BANCO_COBRO_DEFAULT } from '../../lib/cuentasPago';
+import { AVISO_COBRO_EN_COBRANZA } from '../../lib/entradaDinero';
 
 const money = (n: number) =>
   n.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -35,6 +36,13 @@ interface Props {
   clienteId: string | null;
   credito: CreditoCliente | null;
   puedeFacturar: boolean;
+  /**
+   * Tarea 69 · P3 · Registrar la entrada de dinero es de Administración, no
+   * de quien factura. Hasta aquí era el MISMO booleano, así que Operaciones
+   * cobraba por ser quien emite la factura. Son dos actos y a partir de aquí
+   * los hace gente distinta (minuta §5).
+   */
+  puedeCobrar: boolean;
   onRegistrar: (f: Omit<FacturaCliente, 'id' | 'registradaPor' | 'activo' | 'createdAt' | 'updatedAt'>, cargoIds: string[]) => void;
   onCancelar: (facturaId: string, motivo: string) => void;
   onCobrar: (c: Omit<CobroCliente, 'id' | 'registradoPor' | 'activo' | 'createdAt' | 'updatedAt'>) => void;
@@ -43,7 +51,7 @@ interface Props {
 
 export default function PanelFacturasEmbarque({
   embarque, facturas, pagos, conceptos, trafico, clienteId, credito,
-  puedeFacturar, onRegistrar, onCancelar, onCobrar, onAnularCobro,
+  puedeFacturar, puedeCobrar, onRegistrar, onCancelar, onCobrar, onAnularCobro,
 }: Props) {
   const detalles = embarque.cargos?.detalles ?? [];
   const grupos = useMemo(() => gruposDeFacturacion(detalles), [detalles]);
@@ -271,7 +279,7 @@ export default function PanelFacturasEmbarque({
                   key={f.id}
                   factura={f} cobros={suyos} saldo={saldo}
                   embarque={embarque} clienteId={clienteId}
-                  puedeFacturar={puedeFacturar}
+                  puedeFacturar={puedeFacturar} puedeCobrar={puedeCobrar}
                   onCancelar={onCancelar} onCobrar={onCobrar} onAnularCobro={onAnularCobro}
                 />
               );
@@ -286,7 +294,7 @@ export default function PanelFacturasEmbarque({
 // ─── Una factura con sus cobros ──────────────────────────────────────────────
 
 function FilaFactura({
-  factura, cobros, saldo, embarque, clienteId, puedeFacturar,
+  factura, cobros, saldo, embarque, clienteId, puedeFacturar, puedeCobrar,
   onCancelar, onCobrar, onAnularCobro,
 }: {
   factura: FacturaCliente;
@@ -295,6 +303,7 @@ function FilaFactura({
   embarque: EmbarqueCompleto;
   clienteId: string | null;
   puedeFacturar: boolean;
+  puedeCobrar: boolean;
   onCancelar: (id: string, motivo: string) => void;
   onCobrar: Props['onCobrar'];
   onAnularCobro: (id: string) => void;
@@ -365,7 +374,14 @@ function FilaFactura({
             )}
           </div>
 
-          {puedeFacturar && !cancelada && saldo.saldo > 1 && (
+          {/* Tarea 69 · P3 · Donde Operaciones veía el botón ahora lee a
+              dónde ir. Quitarlo sin decirlo se lee como que se rompió. */}
+          {!puedeCobrar && puedeFacturar && !cancelada && saldo.saldo > 1 && (
+            <p className="text-[10px] text-text-muted max-w-[190px] text-right shrink-0">
+              {AVISO_COBRO_EN_COBRANZA}
+            </p>
+          )}
+          {puedeCobrar && !cancelada && saldo.saldo > 1 && (
             <button
               type="button"
               onClick={() => setAbierto(v => !v)}
@@ -407,7 +423,10 @@ function FilaFactura({
               </span>
               <span className="flex items-center gap-2 shrink-0">
                 <span className="font-semibold tabular-nums">{a.moneda} {money(a.monto)}</span>
-                {puedeFacturar && (
+                {/* Anular un cobro es cobranza, no facturación: el hook exige
+                    `cobro.registrar` y el botón tiene que decir lo mismo, o
+                    Operaciones lo aprieta y se lleva un error de permiso. */}
+                {puedeCobrar && (
                   <button
                     type="button"
                     onClick={() => { if (window.confirm('¿Anular este cobro?')) onAnularCobro(p.id); }}

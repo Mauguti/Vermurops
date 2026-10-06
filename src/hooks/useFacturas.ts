@@ -107,11 +107,16 @@ export function useFacturas(embarqueId?: string) {
    * Cobrar al cliente es lo que libera el pago al proveedor: este cobro entra
    * al fondeo del embarque. Por eso el cobro guarda `embarqueId` — sin él, el
    * dinero entraría a la contabilidad pero no desbloquearía nada.
+   *
+   * ── Tarea 69 · Quién cobra ───────────────────────────────────────────────
+   * `cobro.registrar`, no `factura.generar`: emitir la factura es de las dos
+   * áreas (§4.1) y recibir el dinero es solo de Administración. Es lo único
+   * que P3 QUITA de lo que hoy funciona, y es lo que dice la minuta §5.
    */
   const registrarCobro = async (
     datos: Omit<CobroCliente, 'id' | 'registradoPor' | 'activo' | 'createdAt' | 'updatedAt'>,
   ): Promise<CobroCliente> => {
-    exigir(user?.rol as UserRole | undefined, 'factura.generar');
+    exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
 
     const ahora = new Date().toISOString();
     const cobro: CobroCliente = {
@@ -154,7 +159,7 @@ export function useFacturas(embarqueId?: string) {
 
   /** Anula un cobro mal capturado. El saldo se recalcula solo. */
   const anularCobro = async (id: string): Promise<void> => {
-    exigir(user?.rol as UserRole | undefined, 'factura.generar');
+    exigir(user?.rol as UserRole | undefined, 'cobro.registrar');
     await conAviso('el cobro', () =>
       updateDoc(doc(db, COL_COBROS, id), sanitizarParaFirestore({
         activo: false, updatedAt: new Date().toISOString(),

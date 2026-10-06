@@ -26,6 +26,13 @@ import type { ReglaIVA } from '../conceptos/ConceptosData';
 import { compararIVAFactura, type ResultadoComparacionIVA } from '../../lib/ivaOrdenCompra';
 import CargarFacturaOC from './CargarFacturaOC';
 import DocumentosOC from './DocumentosOC';
+import {
+  AVISO_COBRO_EN_COBRANZA, type EntradaDeEmbarque,
+} from '../../lib/entradaDinero';
+import {
+  puedeMarcarNoPagar as rolPuedeMarcarNoPagar,
+  puedeLiberarNoPagar as rolPuedeLiberarNoPagar,
+} from '../../auth/permisos';
 
 /**
  * C-2. La ficha de una orden de compra: el flujo de dos áreas.
@@ -92,11 +99,18 @@ interface Props {
   /** 1.3 · Todas las órdenes, para encontrar los anticipos cruzables. */
   todasLasOrdenes?: OrdenCompra[];
   /**
-   * 1.1 · Registrar el depósito del cliente que fondea esta orden. Solo
-   * Administración; ausente cuando el rol no puede. Antes existía el hook
-   * y ninguna pantalla lo llamaba: el fondeo no se podía registrar.
+   * Tarea 69 · P3 · Las entradas de dinero de este embarque, EN SOLO LECTURA.
+   *
+   * Aquí vivía el formulario «Registrar depósito del cliente» —la única
+   * pantalla que llamaba a `registrarDeposito`— y es la queja del bloque 1:
+   * el cobro estaba dentro de la cuenta por PAGAR. Gaby: «quien hace la
+   * solicitud de pago es Operaciones, pero quien recibe el dinero del cliente
+   * es Administración». Ahora se captura en Cuentas por cobrar y aquí solo se
+   * ve, que es lo que esta pantalla necesita para decidir si autoriza.
    */
-  onRegistrarDeposito?: (d: { monto: number; moneda: 'USD' | 'MXN'; fechaDeposito: string; referencia: string }) => Promise<void>;
+  entradas?: EntradaDeEmbarque[];
+  /** Lleva a Cuentas por cobrar, donde ahora se registra la entrada. */
+  onIrACobranza?: () => void;
   /** Etiqueta del botón regresar cuando se llegó desde otra ficha. */
   regresarLabel?: string;
 }
@@ -106,13 +120,8 @@ const money = (n: number) =>
 
 export default function FichaOC({
   oc, rol, onBack, onTransicionar, onActualizar, fondeo, proveedor, categoriaConcepto,
-  reglaIVA, todasLasOrdenes = [], onRegistrarDeposito, regresarLabel,
+  reglaIVA, todasLasOrdenes = [], entradas = [], onIrACobranza, regresarLabel,
 }: Props) {
-  const [depMonto, setDepMonto] = useState('');
-  const [depFecha, setDepFecha] = useState(new Date().toISOString().slice(0, 10));
-  const [depRef, setDepRef] = useState('');
-  const [depGuardando, setDepGuardando] = useState(false);
-  const [depError, setDepError] = useState<string | null>(null);
   const [motivo, setMotivo] = useState(oc.motivoRechazo ?? '');
   const [comprobante, setComprobante] = useState(oc.comprobantePago ?? '');
   const [factura, setFactura] = useState(oc.facturaAsociada ?? '');
@@ -152,7 +161,22 @@ export default function FichaOC({
     ? evaluarFondeo(ocLocal, fondeo)
     : { puedeAutorizar: true } as ReturnType<typeof evaluarFondeo>;
   const esImpuestos = esPagoDeImpuestos(ocLocal);
-  const puedeMarcarNoPagar = rol === 'administracion' || rol === 'admin';
+  /*
+   * Tarea 69 · Marcar y liberar «No pagar» no son el mismo acto (minuta §5).
+   * Operaciones MARCA —es quien sabe que el cliente no fondeó— y solo
+   * Administración LIBERA, que es decidir que el dinero ya está. Hasta aquí
+   * las dos eran de Administración, así que Operaciones tenía que rechazar la
+   * orden entera o mandar un correo. La regla vive en `permisos.ts`.
+   */
+  /** ¿Puede tocar el botón TAL COMO ESTÁ la marca hoy? */
+  const puedeTocarNoPagar = oc.noPagar
+    ? rolPuedeLiberarNoPagar(rol)
+    : rolPuedeMarcarNoPagar(rol);
+  /*
+   * Aplicar y quitar anticipos cruzados sigue siendo de quien autoriza: es
+   * decidir cuánto sale de la cuenta, no avisar de un riesgo.
+   */
+  const puedeCruzarAnticipos = rolPuedeLiberarNoPagar(rol);
   // Tarea 55 · admin, administracion y operaciones pueden cargar la factura.
   const puedeCargarFactura = rol === 'admin' || rol === 'administracion' || rol === 'operaciones';
 
@@ -358,8 +382,17 @@ export default function FichaOC({
                 )}
               </div>
 
-              {/* El flag manual. Solo Administración, que es quien concilia. */}
-              {puedeMarcarNoPagar && !terminada && (
+              {/* Tarea 69 · El flag manual, asimétrico: Operaciones lo pone,
+                  Administración lo quita. Donde el botón no aparece se dice
+                  por qué — un botón que se fue sin explicación se lee como
+                  que la pantalla se rompió. */}
+              {!puedeTocarNoPagar && !terminada && oc.noPagar && rolPuedeMarcarNoPagar(rol) && (
+                <p className="shrink-0 text-[11px] text-amber-800 max-w-[220px]">
+                  Marcada «No pagar». La quita Administración, que es quien
+                  confirma que el dinero ya está.
+                </p>
+              )}
+              {puedeTocarNoPagar && !terminada && (
                 <button
                   type="button"
                   onClick={() => onActualizar(
@@ -382,49 +415,58 @@ export default function FichaOC({
         </div>
       )}
 
-      {/* ── 1.1 · Registrar el depósito del cliente ─────────────────────────
-          El dinero que fondea esta orden. Sin este formulario el fondeo solo
-          se alimentaba de cobros de facturas; el anticipo previo a operar no
-          se podía capturar en ninguna pantalla. */}
-      {oc.origen === 'embarque' && oc.embarqueId && !terminada && onRegistrarDeposito && (
+      {/* ── Tarea 69 · P3 · Lo que el cliente ya depositó, en SOLO LECTURA ───
+          Aquí vivía el formulario «Registrar depósito del cliente», y era la
+          única pantalla que lo capturaba: la entrada de dinero del cliente
+          dentro de la cuenta por PAGAR. Se movió a Cuentas por cobrar.
+
+          Lo que se queda es lo que esta pantalla necesita para decidir: qué
+          entró, cuándo, contra qué, y a dónde ir si falta. Quitar el
+          formulario sin dejar el dato convertiría «no hay fondeo» en un
+          misterio justo donde se autoriza el pago. */}
+      {oc.origen === 'embarque' && oc.embarqueId && (
         <div className="px-6 pt-3">
           <div className="rounded-lg border border-card-border bg-white px-4 py-3 space-y-2">
-            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">Registrar depósito del cliente</p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
-              <label className="block">
-                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Monto ({oc.moneda})</span>
-                <input type="number" min={0} step="0.01" value={depMonto} onChange={e => setDepMonto(e.target.value)} placeholder="0.00"
-                  className="w-full px-3 py-2 text-[12px] border border-card-border rounded-md outline-none focus:border-brand tabular-nums" />
-              </label>
-              <label className="block">
-                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Fecha</span>
-                <input type="date" value={depFecha} onChange={e => setDepFecha(e.target.value)}
-                  className="w-full px-3 py-2 text-[12px] border border-card-border rounded-md outline-none focus:border-brand" />
-              </label>
-              <label className="block">
-                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Referencia</span>
-                <input value={depRef} onChange={e => setDepRef(e.target.value)} placeholder="Ref. bancaria"
-                  className="w-full px-3 py-2 text-[12px] border border-card-border rounded-md outline-none focus:border-brand font-mono" />
-              </label>
-              <button
-                type="button"
-                disabled={depGuardando || !(Number(depMonto) > 0) || !depRef.trim()}
-                onClick={async () => {
-                  setDepGuardando(true); setDepError(null);
-                  try {
-                    await onRegistrarDeposito({ monto: Math.round(Number(depMonto) * 100) / 100, moneda: oc.moneda, fechaDeposito: depFecha, referencia: depRef.trim() });
-                    setDepMonto(''); setDepRef('');
-                  } catch (err) {
-                    setDepError(err instanceof Error ? err.message : String(err));
-                  } finally { setDepGuardando(false); }
-                }}
-                className="px-3 py-2 bg-[#18181B] hover:bg-black text-white text-[11px] font-bold uppercase tracking-wider rounded-md disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {depGuardando ? 'Guardando…' : 'Registrar depósito'}
-              </button>
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">
+                Entradas de dinero del cliente · {oc.embarqueFolio ?? ''}
+              </p>
+              {onIrACobranza && (
+                <button
+                  type="button"
+                  onClick={onIrACobranza}
+                  className="text-[11px] font-bold text-primario hover:underline shrink-0"
+                >
+                  Ir a Cuentas por cobrar →
+                </button>
+              )}
             </div>
-            {depError && <p className="text-[11px] text-red-600 font-semibold">{depError}</p>}
-            <p className="text-[10px] text-gray-400">Entra al fondeo del embarque {oc.embarqueFolio ?? ''}: es lo que libera este pago y los demás del mismo embarque.</p>
+
+            {entradas.length === 0 ? (
+              <p className="text-[12px] text-gray-500">
+                Todavía no ha entrado dinero de este embarque.
+              </p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {entradas.map(e => (
+                  <li key={e.pagoId} className="py-1.5 flex items-baseline justify-between gap-3 text-[12px]">
+                    <span className="min-w-0">
+                      <span className="tabular-nums text-gray-500">{e.fecha}</span>
+                      {/* Un anticipo no cobra ninguna factura todavía, y eso
+                          se pregunta: por eso se dice, en vez de dejar el
+                          renglón sin contra qué. */}
+                      <span className="ml-2 text-gray-700">
+                        {e.aplicadoA.length > 0 ? `contra ${e.aplicadoA.join(', ')}` : 'anticipo a cuenta'}
+                      </span>
+                      {e.referencia && <span className="ml-2 font-mono text-[11px] text-gray-400">{e.referencia}</span>}
+                    </span>
+                    <strong className="tabular-nums shrink-0">{e.moneda} {money(e.monto)}</strong>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <p className="text-[10px] text-gray-400">{AVISO_COBRO_EN_COBRANZA}</p>
           </div>
         </div>
       )}
@@ -540,7 +582,7 @@ export default function FichaOC({
                   <span className="font-mono text-[11px] text-gray-500">{a.folio}</span>
                   {' · '}<strong>{a.moneda} {money(a.montoAplicado)}</strong>
                 </span>
-                {puedeMarcarNoPagar && (
+                {puedeCruzarAnticipos && (
                   <button
                     type="button"
                     onClick={() => onActualizar(quitarAnticipo(oc, a.ocId))}
@@ -552,7 +594,7 @@ export default function FichaOC({
               </div>
             ))}
 
-            {cruzables.length > 0 && puedeMarcarNoPagar && (
+            {cruzables.length > 0 && puedeCruzarAnticipos && (
               <div className="pt-1 space-y-1.5">
                 <p className="text-[10px] text-gray-400">
                   Pagados a {oc.proveedorNombre} y sin usar:

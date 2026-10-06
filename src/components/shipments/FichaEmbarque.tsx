@@ -1559,6 +1559,10 @@ export default function FichaEmbarque({
               ? (clienteVinculado.diasCreditoPorTipo ?? { general: clienteVinculado.dias })
               : null}
             puedeFacturar={puede('factura.generar')}
+            /* Tarea 69 · P3 · Facturar y cobrar dejan de ser el mismo
+               permiso: Operaciones emite la factura, Administración recibe
+               el dinero (minuta §5). */
+            puedeCobrar={puede('cobro.registrar')}
             onRegistrar={async (datos, cargoIds) => {
               try {
                 const f = await registrarFactura(datos);

@@ -28,6 +28,9 @@ import {
 } from '../../lib/cuentasPorCobrar';
 import { formatearPorMoneda, type TotalPorMoneda } from '../../lib/sumarPorMoneda';
 import { BANCOS_VERMUR, BANCO_COBRO_DEFAULT } from '../../lib/cuentasPago';
+import {
+  problemaAnticipo, type EmbarqueFondeable,
+} from '../../lib/entradaDinero';
 import { EnlaceEntidad } from '../ui/ficha/EnlaceEntidad';
 import EstadoVacio from '../ui/EstadoVacio';
 import SpreadsheetTable, { type VistaConfig } from '../table/SpreadsheetTable';
@@ -49,6 +52,22 @@ interface Props {
   pagos: Pago[];
   puedeCobrar: boolean;
   onCobrar: (c: Omit<CobroCliente, 'id' | 'registradoPor' | 'activo' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  /**
+   * Tarea 69 · P3 · Los embarques a los que se les puede anticipar dinero,
+   * derivados de sus órdenes de pago abiertas. Vacío = no hay ninguna orden
+   * esperando dinero, y entonces el anticipo no tiene a qué ligarse.
+   */
+  embarquesFondeables?: EmbarqueFondeable[];
+  /**
+   * Registra un anticipo sin factura. Es el formulario que vivía dentro de la
+   * ficha de la orden de compra (bloque 1). Ausente = el rol no puede cobrar.
+   */
+  onRegistrarAnticipo?: (a: {
+    embarqueId: string; embarqueFolio: string;
+    clienteId: string; clienteNombre: string;
+    monto: number; moneda: 'USD' | 'MXN';
+    fechaDeposito: string; referencia: string;
+  }) => Promise<void>;
   /** Inyectable para pruebas; default hoy. */
   hoy?: string;
 }
@@ -64,7 +83,10 @@ const ESTADO_CLS: Record<EstadoCobro, string> = {
 
 const SELECT = 'bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-gray-700 outline-none focus:border-primario';
 
-export default function PanelCuentasPorCobrar({ facturas, pagos, puedeCobrar, onCobrar, hoy }: Props) {
+export default function PanelCuentasPorCobrar({
+  facturas, pagos, puedeCobrar, onCobrar,
+  embarquesFondeables = [], onRegistrarAnticipo, hoy,
+}: Props) {
   const fecha = hoy ?? new Date().toISOString().slice(0, 10);
   const { user } = useAuth();
   const [filtros, setFiltros] = useState<FiltrosPorCobrar>(FILTROS_POR_COBRAR_VACIOS);
@@ -72,6 +94,8 @@ export default function PanelCuentasPorCobrar({ facturas, pagos, puedeCobrar, on
     setFiltros(f => ({ ...f, [k]: v }));
   const [abiertos, setAbiertos] = useState<Set<string>>(new Set());
   const [cobrando, setCobrando] = useState<FacturaEnCartera | null>(null);
+  /** Tarea 69 · P3 · El anticipo sin factura, que antes vivía en la ficha de la OC. */
+  const [anticipando, setAnticipando] = useState(false);
 
   /*
    * Tarea 61 · «Por cliente» sigue siendo el default: es la vista con la que
@@ -150,6 +174,29 @@ export default function PanelCuentasPorCobrar({ facturas, pagos, puedeCobrar, on
 
   return (
     <div className="space-y-5">
+      {/* ── Tarea 69 · P3 · bloque 1: la entrada de dinero vive AQUÍ ─────────
+          Hasta aquí había dos formas de capturarla y ninguna en cobranza: el
+          cobro contra una factura (en esta pantalla y en el embarque) y el
+          «depósito del cliente» DENTRO de la ficha de la orden de compra —la
+          cuenta por PAGAR. Gaby: «quien hace la solicitud de pago es
+          Operaciones, pero quien recibe el dinero del cliente es
+          Administración». El botón de arriba es el anticipo sin factura; el
+          cobro contra una factura sigue en su renglón, donde ya estaba. */}
+      {onRegistrarAnticipo && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[11px] text-gray-500">
+            El dinero que entra del cliente se registra aquí: contra su factura, desde el renglón;
+            o como anticipo, cuando todavía no hay factura.
+          </p>
+          <button
+            onClick={() => setAnticipando(true)}
+            className="inline-flex items-center gap-1.5 bg-primario hover:bg-primario-hover text-white text-[11px] font-bold uppercase tracking-wider px-4 py-2 rounded-lg transition-colors shadow-sm shrink-0"
+          >
+            <Banknote className="w-3.5 h-3.5" /> Registrar entrada de dinero
+          </button>
+        </div>
+      )}
+
       {/* KPIs por moneda */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Kpi icono={<Banknote className="w-4 h-4 text-gray-400" />} titulo="Por cobrar" total={resumen.porCobrar}
@@ -334,6 +381,15 @@ export default function PanelCuentasPorCobrar({ facturas, pagos, puedeCobrar, on
           onConfirmar={async (c) => { await onCobrar(c); setCobrando(null); }}
         />
       )}
+
+      {anticipando && onRegistrarAnticipo && (
+        <ModalAnticipo
+          embarques={embarquesFondeables}
+          hoy={fecha}
+          onCancelar={() => setAnticipando(false)}
+          onConfirmar={async (a) => { await onRegistrarAnticipo(a); setAnticipando(false); }}
+        />
+      )}
     </div>
   );
 }
@@ -439,6 +495,164 @@ function GrupoCliente({ grupo, abierto, onToggle, puedeCobrar, onCobrar }: {
   );
 }
 
+/**
+ * Tarea 69 · P3 · El anticipo del cliente: dinero que entra ANTES de que haya
+ * factura, y que es lo que libera el pago al proveedor (1.1).
+ *
+ * Es el formulario que vivía dentro de `FichaOC.tsx`, con tres diferencias
+ * que son el punto de la tarea:
+ *
+ *  1. **El embarque se ELIGE.** Antes era el de la orden que se estaba
+ *     mirando, así que había que entrar a una orden para poder capturar el
+ *     dinero: la pantalla del pago al proveedor decidía a dónde entraba el
+ *     cobro del cliente.
+ *  2. **La moneda se ELIGE.** Antes se heredaba de la orden (`moneda:
+ *     oc.moneda`), así que un depósito en pesos contra una orden en dólares
+ *     se guardaba como dólares y nadie lo veía (§10.1 del plan).
+ *  3. **La referencia es OPCIONAL.** «Aparece después del pago, no antes».
+ */
+function ModalAnticipo({ embarques, hoy, onCancelar, onConfirmar }: {
+  embarques: EmbarqueFondeable[];
+  hoy: string;
+  onCancelar: () => void;
+  onConfirmar: (a: {
+    embarqueId: string; embarqueFolio: string;
+    clienteId: string; clienteNombre: string;
+    monto: number; moneda: 'USD' | 'MXN';
+    fechaDeposito: string; referencia: string;
+  }) => Promise<void>;
+}) {
+  const [embarqueId, setEmbarqueId] = useState(embarques.length === 1 ? embarques[0].embarqueId : '');
+  const [monto, setMonto] = useState('');
+  /* Sin default: elegirla por el usuario es lo que esta pantalla viene a
+     arreglar. Un «MXN» precargado se aprieta por reflejo, igual que el botón
+     del tipo de cambio de la 56. */
+  const [moneda, setMoneda] = useState<'USD' | 'MXN' | ''>('');
+  const [fecha, setFecha] = useState(hoy);
+  const [referencia, setReferencia] = useState('');
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const elegido = embarques.find(e => e.embarqueId === embarqueId) ?? null;
+  const n = Number(monto);
+  const problema = problemaAnticipo({ embarqueId, monto: n, moneda, fecha });
+
+  const confirmar = async () => {
+    if (problema || guardando || !elegido || !moneda) return;
+    setGuardando(true); setError(null);
+    try {
+      await onConfirmar({
+        embarqueId: elegido.embarqueId,
+        embarqueFolio: elegido.embarqueFolio,
+        clienteId: elegido.clienteId,
+        clienteNombre: elegido.clienteNombre,
+        monto: Math.round(n * 100) / 100,
+        moneda,
+        fechaDeposito: fecha,
+        referencia: referencia.trim(),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setGuardando(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-150 flex items-center justify-between bg-gray-50/50">
+          <div>
+            <h3 className="text-[14px] font-bold text-[#18181B]">Registrar entrada de dinero</h3>
+            <p className="text-[11px] text-gray-500">Anticipo del cliente, sin factura todavía</p>
+          </div>
+          <button onClick={onCancelar} className="text-gray-400 hover:text-gray-600" aria-label="Cerrar"><X className="w-4 h-4" /></button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          {embarques.length === 0 ? (
+            /* No se ofrece un formulario que no puede guardar: sin una orden
+               esperando dinero, el anticipo no tiene a qué ligarse. */
+            <p className="text-[11px] text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2">
+              Ningún embarque tiene órdenes de pago esperando dinero. Un anticipo se liga al
+              embarque y a la orden que fondea, así que primero Operaciones solicita el pago.
+              Un cobro contra una factura sí se puede registrar desde su renglón.
+            </p>
+          ) : (
+            <>
+              <label className="block">
+                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">A qué embarque entra</span>
+                <select value={embarqueId} onChange={e => setEmbarqueId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario bg-white">
+                  <option value="">Elige el embarque…</option>
+                  {embarques.map(e => (
+                    <option key={e.embarqueId} value={e.embarqueId}>
+                      {e.embarqueFolio} — {e.clienteNombre || 'sin cliente'} ({e.ordenesAbiertas} orden{e.ordenesAbiertas !== 1 ? 'es' : ''})
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {elegido && (
+                <p className="text-[11px] text-gray-600">
+                  Sus órdenes abiertas piden <strong>{formatearPorMoneda(elegido.comprometido, { vacio: '—' })}</strong>.
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Monto</span>
+                  <input type="number" min={0} step="0.01" value={monto} onChange={e => setMonto(e.target.value)} placeholder="0.00"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario tabular-nums" />
+                </label>
+                <label className="block">
+                  <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Moneda</span>
+                  <select value={moneda} onChange={e => setMoneda(e.target.value as 'USD' | 'MXN' | '')}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario bg-white">
+                    <option value="">Elige…</option>
+                    <option value="MXN">MXN</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Fecha del depósito</span>
+                  <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario" />
+                </label>
+                <label className="block">
+                  <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Referencia (opcional)</span>
+                  <input value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="Puede llegar después"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario font-mono" />
+                </label>
+              </div>
+
+              {/* El modelo del depósito no tiene cuenta (§10.2 del plan): no se
+                  ofrece un selector cuyo valor se tiraría al guardar. */}
+              <p className="text-[10px] text-gray-400">
+                La cuenta de Vermur se pregunta en el cobro contra factura; el anticipo
+                todavía no la guarda. Entra al fondeo del embarque y libera sus pagos al proveedor.
+              </p>
+
+              {(problema || error) && <p className="text-[11px] text-red-600 font-semibold">{error ?? problema}</p>}
+            </>
+          )}
+        </div>
+
+        <div className="px-5 py-4 bg-gray-50/50 border-t border-gray-150 flex justify-end gap-2">
+          <button onClick={onCancelar} className="text-xs font-bold text-gray-500 hover:text-gray-700 uppercase tracking-wider px-4 py-2">
+            {embarques.length === 0 ? 'Cerrar' : 'Cancelar'}
+          </button>
+          {embarques.length > 0 && (
+            <button onClick={confirmar} disabled={!!problema || guardando}
+              className="bg-primario hover:bg-primario-hover text-white text-xs font-bold uppercase tracking-wider px-5 py-2 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed">
+              {guardando ? 'Guardando…' : 'Registrar entrada'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ModalCobro({ item, hoy, onCancelar, onConfirmar }: {
   item: FacturaEnCartera; hoy: string; onCancelar: () => void;
   onConfirmar: (c: Omit<CobroCliente, 'id' | 'registradoPor' | 'activo' | 'createdAt' | 'updatedAt'>) => Promise<void>;
@@ -452,7 +666,16 @@ function ModalCobro({ item, hoy, onCancelar, onConfirmar }: {
   const [error, setError] = useState<string | null>(null);
 
   const n = Number(monto);
-  const problema = montoCobrable(item, n, f.moneda) ?? (!referencia.trim() ? 'Captura la referencia bancaria.' : null);
+  /*
+   * Tarea 69 · P3, punto 2 · LA REFERENCIA YA NO ES OBLIGATORIA.
+   *
+   * Gaby: «la referencia bancaria aparece después del pago, no antes». Antes
+   * se exigía aquí y en el formulario de la ficha de la OC, así que no se
+   * podía capturar la entrada de dinero sin inventar una — y una referencia
+   * inventada se ve igual que una real, así que descuadra la conciliación de
+   * Julio sin que nadie se entere. Vacía es verdad; inventada es mentira.
+   */
+  const problema = montoCobrable(item, n, f.moneda);
   const parcial = n > 0 && n < item.saldo - 1;
 
   const confirmar = async () => {
@@ -506,8 +729,8 @@ function ModalCobro({ item, hoy, onCancelar, onConfirmar }: {
               </select>
             </label>
             <label className="block">
-              <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Referencia</span>
-              <input value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="Ref. bancaria"
+              <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Referencia (opcional)</span>
+              <input value={referencia} onChange={e => setReferencia(e.target.value)} placeholder="Puede llegar después"
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario font-mono" />
             </label>
           </div>
