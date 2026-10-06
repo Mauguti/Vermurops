@@ -46,7 +46,7 @@ interface Props {
   onRegistrar: (f: Omit<FacturaCliente, 'id' | 'registradaPor' | 'activo' | 'createdAt' | 'updatedAt'>, cargoIds: string[]) => void;
   onCancelar: (facturaId: string, motivo: string) => void;
   onCobrar: (c: Omit<CobroCliente, 'id' | 'registradoPor' | 'activo' | 'createdAt' | 'updatedAt'>) => void;
-  onAnularCobro: (cobroId: string) => void;
+  onAnularCobro: (cobroId: string, motivo: string) => void;
 }
 
 export default function PanelFacturasEmbarque({
@@ -306,7 +306,7 @@ function FilaFactura({
   puedeCobrar: boolean;
   onCancelar: (id: string, motivo: string) => void;
   onCobrar: Props['onCobrar'];
-  onAnularCobro: (id: string) => void;
+  onAnularCobro: (id: string, motivo: string) => void;
 }) {
   const [abierto, setAbierto] = useState(false);
   const [monto, setMonto] = useState('');
@@ -429,7 +429,13 @@ function FilaFactura({
                 {puedeCobrar && (
                   <button
                     type="button"
-                    onClick={() => { if (window.confirm('¿Anular este cobro?')) onAnularCobro(p.id); }}
+                    onClick={() => {
+                      /* Tarea 72 · P5 · El motivo es obligatorio. `prompt` es
+                         provisional, como el `confirm` que reemplaza; la ficha
+                         del pago (Finanzas → Pagos) lo pide con su campo. */
+                      const motivo = (window.prompt('Motivo para anular este cobro (obligatorio):') ?? '').trim();
+                      if (motivo) onAnularCobro(p.id, motivo);
+                    }}
                     className="text-[10px] font-bold text-gray-400 hover:text-red-600"
                   >
                     Anular

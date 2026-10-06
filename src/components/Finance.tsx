@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import { useDepositosCliente } from '../hooks/useDepositosCliente';
@@ -18,6 +18,7 @@ import { useAuth } from '../auth/AuthContext';
 import Toast, { TipoToast } from './ui/Toast';
 import ModuloEnDesarrollo from './ui/ModuloEnDesarrollo';
 import PanelCuentasPorCobrar from './facturas/PanelCuentasPorCobrar';
+import PanelListaPagos from './pagos/PanelListaPagos';
 import { cartera, resumenCartera } from '../lib/cuentasPorCobrar';
 import { monedasConMonto } from '../lib/sumarPorMoneda';
 import { useDestinoPendiente, useRegistrarAbierta, useNavegacion, type Destino } from '../navegacion/NavegacionContext';
@@ -72,8 +73,8 @@ export default function Finance() {
   // Tarea 67 · Por eso se leen como UNA lista de pagos: el depósito es un
   // pago sin aplicaciones, el cobro uno con una. Antes eran dos listas y cada
   // call site tenía que acordarse de pasar las dos.
-  const { depositos, registrarDeposito } = useDepositosCliente();
-  const { facturas, cobros, pagosNuevos, registrarPagoAplicado } = useFacturas();
+  const { depositos, registrarDeposito, anularDeposito } = useDepositosCliente();
+  const { facturas, cobros, pagosNuevos, registrarPagoAplicado, anularCobro, quitarAplicacion, aplicarSaldoAFavor } = useFacturas();
   /*
    * Tarea 68 · Las tres fuentes en una lista: lo que se escribe hoy
    * (`pagos/`) y los dos legados que ya no se escriben. `pagosNuevos` sale de
@@ -91,6 +92,18 @@ export default function Finance() {
    * esperando dinero no es un destino, es un renglón que no hace nada.
    */
   const embarquesDisponibles = useMemo(() => embarquesFondeables(ordenes), [ordenes]);
+
+  /*
+   * Tarea 72 · P5 · A qué embarque pertenece una factura. Aplicar el saldo a
+   * favor de un pago a una factura de OTRO embarque lo deja repartido entre
+   * dos, y `entradasDeFondeo` solo sabe cuánto toca a cada uno con esto. Sin
+   * resolvedor un pago así no cuenta en ninguno: falla cerrado, que es lo
+   * correcto —inflar el fondeo autoriza un pago descubierto.
+   */
+  const embarqueDeFactura = useCallback(
+    (facturaId: string) => facturas.find(f => f.id === facturaId)?.embarqueId,
+    [facturas],
+  );
 
   const carteraResumen = useMemo(() => {
     const hoy = new Date().toISOString().slice(0, 10);
@@ -134,7 +147,7 @@ export default function Finance() {
      */
     const fondeo = conCambios.embarqueId
       ? calcularFondeo(
-          entradasDeFondeo(pagosCliente, conCambios.embarqueId),
+          entradasDeFondeo(pagosCliente, conCambios.embarqueId, embarqueDeFactura),
           ordenes.filter(o => o.embarqueId === conCambios.embarqueId),
         )
       : undefined;
@@ -188,7 +201,7 @@ export default function Finance() {
    * pantalla que Julio abre cada mañana, y la bandeja es a dónde entra
    * cuando necesita el detalle de una orden.
    */
-  const tabs = ['Programación de pagos', 'Facturas (CFDI)', 'Cuentas por cobrar', 'Cuentas por pagar', 'Estados de cuenta'];
+  const tabs = ['Programación de pagos', 'Facturas (CFDI)', 'Cuentas por cobrar', 'Pagos', 'Cuentas por pagar', 'Estados de cuenta'];
 
   /*
    * Tarea 57 · Aquí vivían cuatro facturas de ejemplo (F-2023-085 a 087 y
@@ -233,7 +246,7 @@ export default function Finance() {
           } : undefined}
           fondeo={ocAbierta.embarqueId
             ? calcularFondeo(
-                entradasDeFondeo(pagosCliente, ocAbierta.embarqueId),
+                entradasDeFondeo(pagosCliente, ocAbierta.embarqueId, embarqueDeFactura),
                 ordenes.filter(o => o.embarqueId === ocAbierta.embarqueId),
               )
             : undefined}
@@ -364,6 +377,34 @@ export default function Finance() {
                        await registrarDeposito({ ...a, comprobante: null });
                        setToast({ mensaje: `Entrada de ${a.moneda} ${a.monto.toLocaleString('en-US', { minimumFractionDigits: 2 })} registrada en ${a.embarqueFolio}. Ya fondea sus órdenes de pago.`, tipo: 'exito' });
                      } : undefined}
+                   />
+                )}
+
+                {/* Tarea 72 · P5 · La ficha del pago: aplicar el saldo a favor,
+                    quitar una aplicación y anular, con motivo. Permiso: el de
+                    cobrar (`cobro.registrar`), porque corregir un cobro es
+                    cobranza, no facturación. */}
+                {activeTab === 'Pagos' && (
+                   <PanelListaPagos
+                     facturas={facturas}
+                     pagos={pagosCliente}
+                     puedeEditar={puede('cobro.registrar')}
+                     onQuitarAplicacion={async (pagoId, destinoId, motivo) => {
+                       await quitarAplicacion(pagoId, destinoId, motivo);
+                       setToast({ mensaje: 'Aplicación quitada: ese dinero volvió a quedar sin aplicar y la factura recuperó su saldo.', tipo: 'exito' });
+                     }}
+                     onAnularPago={async (pago, motivo) => {
+                       /* Un anticipo (sin aplicaciones) se anula con `anularDeposito`,
+                          que existía sin una sola pantalla que lo llamara. Las dos
+                          resuelven la colección con `coleccionDelPago`. */
+                       if ((pago.aplicaciones ?? []).length === 0) await anularDeposito(pago.id, motivo);
+                       else await anularCobro(pago.id, motivo);
+                       setToast({ mensaje: `${pago.folio} anulado. Lo que cubría recuperó su saldo.`, tipo: 'exito' });
+                     }}
+                     onAplicarSaldo={async (pagoId, aplicaciones, embarqueIds) => {
+                       const p = await aplicarSaldoAFavor(pagoId, aplicaciones, embarqueIds);
+                       setToast({ mensaje: `${p.folio}: saldo aplicado a ${aplicaciones.length} factura${aplicaciones.length !== 1 ? 's' : ''}.`, tipo: 'exito' });
+                     }}
                    />
                 )}
 

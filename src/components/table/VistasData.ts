@@ -20,7 +20,7 @@ import type { ColumnaVista } from './SpreadsheetTable';
  */
 export type ModuloVista =
   | 'cotizaciones' | 'clientes' | 'proveedores' | 'embarques'
-  | 'cuentasPorPagar' | 'cuentasPorCobrar';
+  | 'cuentasPorPagar' | 'cuentasPorCobrar' | 'pagos';
 
 // ─── Modelo Firestore ───────────────────────────────────────────────────────
 
