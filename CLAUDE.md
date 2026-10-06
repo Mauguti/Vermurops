@@ -1970,6 +1970,19 @@ los dos nombres.
   - Se agregaron positivos en recorrido, 56, 57, 59, 61 y 69; se rompió cada
     uno a propósito y falló. Las demás ya traían el par (ver reporte 77).
 
+## 4.43 Limpieza: huérfanos y rutas sin módulo (tarea 78, 6-oct-2026)
+
+Se borraron `Customs.tsx`, `Documents.tsx`, `ClientPortal.tsx`, `Warehouse.tsx`,
+`Pricing.tsx`, `pricing/PricingData.ts` y `pricing/FichaRFQ.tsx` (este último
+solo lo importaba `Pricing.tsx`, y sin él `PricingData` no se podía borrar).
+Nada los importaba; tsc y build lo confirman. Con ellos se fueron los datos de
+ejemplo que §4.23 dejó anotados; los seeds de `src/data.ts` siguen.
+  - **Reservas y Recolecciones: sin ruta ni permiso.** Se quitó `bookings` y
+    `pickups` de `App.tsx` (render y etiquetas) y del rol admin en
+    `auth/users.ts`. `Bookings.tsx` y `Pickups.tsx` se conservan, ya sin
+    importador, como punto de partida para cuando exista el módulo: entonces
+    vuelven con ruta, permiso y entrada de menú juntos.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

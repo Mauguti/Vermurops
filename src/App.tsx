@@ -18,8 +18,6 @@ import EmuladorBadge from './components/ui/EmuladorBadge';
 import { medirVistaDeSeccion } from './lib/analitica';
 import Dashboard from './components/Dashboard';
 import Quotes from './components/Quotes';
-import Bookings from './components/Bookings';
-import Pickups from './components/Pickups';
 import Shipments from './components/Shipments';
 import Finance from './components/Finance';
 import Clients from './components/Clients';
@@ -66,8 +64,6 @@ const ROLE_BADGE_STYLE: Record<string, { background: string; color: string }> = 
 const VIEW_LABELS: Record<string, string> = {
   dashboard: 'Vista general',
   quotes: 'CRM',
-  bookings: 'Reservas',
-  pickups: 'Recolecciones',
   shipments: 'Embarques',
   finance: 'Finanzas',
   exchange: 'Tipo de cambio',
@@ -323,8 +319,6 @@ function AppShell() {
     switch (currentView) {
       case 'dashboard':  return <Dashboard />;
       case 'quotes':     return <Quotes />;
-      case 'bookings':   return <Bookings />;
-      case 'pickups':    return <Pickups />;
       case 'shipments':  return <Shipments />;
       case 'finance':    return <Finance />;
       case 'exchange':   return <ExchangeRates />;
