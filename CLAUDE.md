@@ -1896,7 +1896,7 @@ copiada. `construirPagoDeGrupo`, `problemasDelGrupo`, `pagosDeProveedor` y
 
 Paso **P7** de `docs/sprint-post-junta/PLAN-PAGOS.md` (§5). «Las navieras
 cobran antes de facturar»: una orden de compra que Operaciones declara
-pagadera antes de tener la factura del proveedor. `lib/prefactura.ts` (22 tests).
+pagadera antes de tener la factura del proveedor. `lib/prefactura.ts` (17 tests).
 
   - **Lo único que se guarda** son `OrdenCompra.esPrefactura` y
     `motivoPrefactura`, opcionales. Pendiente, días y recibida se DERIVAN:
