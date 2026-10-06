@@ -2035,6 +2035,31 @@ existían en `pagos/` sin lista ni ficha.
   - Un pago a proveedor leído de las órdenes (`legacy_comprobante_oc`) se ve pero
     no se anula: no tiene documento propio.
 
+## 4.46 El formulario de «Registrar pago» a proveedor (tarea 81, 6-oct-2026)
+
+Cierra la pregunta 3 de §4.38 (PLAN-PAGOS §7.2). El `window.prompt` de
+Programación de pagos pasa a `ModalRegistrarPagoProveedor`: las órdenes del
+grupo con casilla (todas marcadas), **fecha del pago** (hoy por default,
+editable, no futura), cuenta de salida, referencia y comprobante opcional.
+Reglas puras en `lib/formularioPagoProveedor.ts`; el dinero sigue en
+`pagos.ts`.
+  - **Se paga un subconjunto:** desmarcar una orden la deja `autorizada` y
+    el total baja a lo que sí sale del banco (`montoATransferir`, §4.38).
+  - **La fecha es la del PAGO y la de cada aplicación**, no la de captura
+    (`DatosPagoDeGrupo.fecha`; `createdAt` sigue siendo el momento de captura).
+    El «hoy» es local (`hoyLocal`), no UTC: de noche en México el UTC ya es mañana.
+  - **El comprobante se sube UNA vez** a `ordenesCompra/{primera orden}/documentos/`
+    (PDF, JPG, PNG, HEIC, <20 MB; la regla ya existía) y queda en
+    `Pago.comprobante` y como `DocumentoOC` tipo `comprobante_pago` en CADA
+    orden pagada, apuntando al mismo `storagePath`. Si la subida falla no se
+    escribe nada.
+  - **Falla antes de escribir con excepción:** el modal muestra el motivo en
+    línea y se queda abierto. Lo posterior al pago (órdenes que no pasaron a
+    pagada) sigue siendo toast con el folio.
+  - La cuenta de salida elegida manda sobre la de las órdenes; «Sin indicar»
+    guarda null. Sin elegir nada el comportamiento es el de la 73.
+  - Sin cambio de modelo, de reglas ni de Functions.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

@@ -89,9 +89,6 @@ test('Administración paga un grupo: un solo pago con folio, cada orden lo muest
   await sembrar();
   const page = await entrar(browser, 'administracion@vermur.com');
 
-  let promptTexto = '';
-  page.on('dialog', d => { promptTexto = d.message(); void d.accept('TR-7301'); });
-
   await page.getByRole('button', { name: 'Finanzas', exact: true }).first().click();
   await page.getByRole('button', { name: 'Programación de pagos', exact: true }).first().click();
 
@@ -105,7 +102,10 @@ test('Administración paga un grupo: un solo pago con folio, cada orden lo muest
   await page.screenshot({ path: `${IMG}/73-programacion-antes.png`, fullPage: true });
 
   await tarjeta.getByRole('button', { name: 'Registrar pago' }).click();
-  expect(promptTexto).toContain('73,600.00');
+  const modal = page.getByTestId('modal-pago-proveedor');
+  await expect(modal.getByTestId('total-pago')).toContainText('73,600.00');
+  await modal.getByLabel('Referencia de la transferencia').fill('TR-7301');
+  await modal.getByRole('button', { name: 'Confirmar pago' }).click();
 
   // UN documento en pagos/, lado proveedor, tres aplicaciones.
   await expect(async () => {

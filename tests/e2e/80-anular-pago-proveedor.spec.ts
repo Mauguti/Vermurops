@@ -82,7 +82,6 @@ async function entrar(browser: any, email: string): Promise<Page> {
 }
 
 async function pagarGrupo(page: Page) {
-  page.on('dialog', d => { void d.accept('TR-8001'); });
   await page.getByRole('button', { name: 'Finanzas', exact: true }).first().click();
   await page.getByRole('button', { name: 'Programación de pagos', exact: true }).first().click();
   const cabecera = page.locator('div.bg-neutral-bg').filter({ hasText: 'IDAMEX 80' }).first();
@@ -90,6 +89,9 @@ async function pagarGrupo(page: Page) {
   const tarjeta = cabecera.locator('xpath=ancestor::div[.//button[contains(., "OC-2026-0801")]][1]');
   await expect(tarjeta).toContainText('68,400.00', { timeout: 15_000 });
   await tarjeta.getByRole('button', { name: 'Registrar pago' }).click();
+  const modal = page.getByTestId('modal-pago-proveedor');
+  await modal.getByLabel('Referencia de la transferencia').fill('TR-8001');
+  await modal.getByRole('button', { name: 'Confirmar pago' }).click();
   for (const id of ['OC-80-A', 'OC-80-B']) {
     await expect(async () => {
       expect((await leerDoc(`ordenesCompra/${id}`)).fields.estado.stringValue).toBe('pagada');

@@ -142,3 +142,38 @@ describe('anticipos cruzados', () => {
     expect(p.aplicaciones[0].monto).toBe(6000);
   });
 });
+
+describe('construirPagoDeGrupo · tarea 81 (fecha, cuenta y comprobante)', () => {
+  const dos = [orden({ id: 'oc-1' }), orden({ id: 'oc-2', folio: 'OC-2026-0002', monto: 5000 })];
+
+  it('la fecha elegida es la del pago y la de cada aplicación, no la de captura', () => {
+    const p = construirPagoDeGrupo(dos, { referencia: 'TR-1', fecha: '2026-10-05' }, ctx);
+    expect(p.fecha).toBe('2026-10-05');
+    expect(p.aplicaciones.every(a => a.aplicadaPor?.fecha === '2026-10-05')).toBe(true);
+    expect(p.createdAt).toBe(ctx.ahora);
+  });
+
+  it('el comprobante queda UNA vez en el pago, con su monto sin cambio', () => {
+    const comprobante = { url: 'https://x/c.jpg', nombre: 'c.jpg', subidoEn: ctx.ahora };
+    const p = construirPagoDeGrupo(dos, { ...datos, comprobante }, ctx);
+    expect(p.comprobante).toEqual(comprobante);
+    expect(p.monto).toBe(15000);
+  });
+
+  it('sin comprobante ni banco elegido: igual que antes', () => {
+    const p = construirPagoDeGrupo(dos, datos, ctx);
+    expect(p.comprobante).toBeNull();
+    expect(p.banco).toBe('santander_gastos');
+  });
+
+  it('la cuenta elegida manda sobre la de las órdenes; vacía = sin cuenta', () => {
+    expect(construirPagoDeGrupo(dos, { ...datos, banco: 'bbva' }, ctx).banco).toBe('bbva');
+    expect(construirPagoDeGrupo(dos, { ...datos, banco: '' }, ctx).banco).toBeNull();
+  });
+
+  it('un subconjunto del grupo paga solo lo suyo', () => {
+    const p = construirPagoDeGrupo([dos[1]], datos, ctx);
+    expect(p.monto).toBe(5000);
+    expect(p.destinoIds).toEqual(['oc-2']);
+  });
+});

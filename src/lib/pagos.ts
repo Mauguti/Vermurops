@@ -680,6 +680,10 @@ export interface DatosPagoDeGrupo {
   referencia: string;
   /** YYYY-MM-DD. El día en que el dinero salió. */
   fecha: string;
+  /** Cuenta de salida elegida (tarea 81). Sin ella se deriva de las órdenes, como antes. */
+  banco?: string | null;
+  /** Comprobante ya subido a Storage (tarea 81): un solo archivo para todo el grupo. */
+  comprobante?: ArchivoPago | null;
 }
 
 /**
@@ -727,7 +731,8 @@ export function construirPagoDeGrupo(
   const aTransferir = (o: OrdenCompra) => montoATransferir(o);
   const monto = exigirMonto(ordenes.reduce((acc, o) => acc + aTransferir(o), 0), 'el pago del grupo');
   const bancos = new Set(ordenes.map(o => o.bancoSalida ?? ''));
-  const banco = bancos.size === 1 ? ([...bancos][0] || null) : null;
+  const bancoDerivado = bancos.size === 1 ? ([...bancos][0] || null) : null;
+  const banco = datos.banco !== undefined ? (datos.banco || null) : bancoDerivado;
 
   const aplicaciones: AplicacionPago[] = ordenes.map(o => ({
     destinoTipo: 'orden',
@@ -750,7 +755,7 @@ export function construirPagoDeGrupo(
     fecha: datos.fecha,
     banco,
     referencia,
-    comprobante: null,
+    comprobante: datos.comprobante ?? null,
     aplicaciones,
     destinoIds: [...new Set(aplicaciones.map(a => a.destinoId))],
     embarqueIds: [...new Set(ordenes.map(o => o.embarqueId).filter((e): e is string => !!e))],

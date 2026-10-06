@@ -4,6 +4,9 @@ import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import { useDepositosCliente } from '../hooks/useDepositosCliente';
 import { useFacturas } from '../hooks/useFacturas';
 import { calcularFondeo } from '../lib/fondeoCliente';
+import { subirComprobante } from '../lib/subirComprobanteOC';
+import { hoyLocal, problemasDelFormulario } from '../lib/formularioPagoProveedor';
+import type { DatosFormularioPago } from './ordenesCompra/ModalRegistrarPagoProveedor';
 import { pagosDeCliente, entradasDeFondeo, problemasDelGrupo, construirPagoDeGrupo, pagoQueCubrio, pagosDeProveedor, planAnulacionProveedor, type Pago } from '../lib/pagos';
 import { puedeTransicionarOC } from '../lib/stateMachineOC';
 import { usePagos } from '../hooks/usePagos';
@@ -190,42 +193,71 @@ export default function Finance() {
    * referencia (la máquina de estados lo exige y los paneles lo leen), y cada
    * una muestra con qué pago se cubrió derivándolo de `pagos/`.
    */
-  const registrarPagoDelGrupo = async (ocIds: string[], referencia: string) => {
+  const registrarPagoDelGrupo = async (datos: DatosFormularioPago) => {
+    const { ocIds, referencia, fecha } = datos;
     const usuario = { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' };
     const grupo = ocIds
       .map(id => ordenes.find(o => o.id === id))
       .filter((o): o is OrdenCompra => !!o);
+    // Antes de escribir, TODO falla con una excepción: el modal la muestra
+    // en línea y se queda abierto para corregir (tarea 81).
     if (grupo.length !== ocIds.length) {
-      setToast({ mensaje: 'No se registró el pago: alguna orden del grupo ya no existe en la lista.', tipo: 'error' });
-      return;
+      throw new Error('No se registró el pago: alguna orden del grupo ya no existe en la lista.');
     }
-
-    const rechazos: string[] = problemasDelGrupo(grupo);
+    const problemasForm = problemasDelFormulario({
+      elegidas: grupo.length, referencia, fecha, hoy: hoyLocal(),
+      archivo: datos.comprobante ? { nombre: datos.comprobante.name, tamano: datos.comprobante.size } : null,
+    });
+    const rechazos: string[] = [...problemasForm, ...problemasDelGrupo(grupo)];
     for (const o of grupo) {
       const v = puedeTransicionarOC(o.estado, 'pagada', rolOC, { ...o, comprobantePago: referencia });
       if (!v.ok) rechazos.push(`${o.folio}: ${v.razon}`);
     }
     if (rechazos.length > 0) {
-      setToast({ mensaje: `No se registró el pago: ${rechazos.join(' · ')}`, tipo: 'error' });
-      return;
+      throw new Error(`No se registró el pago: ${rechazos.join(' · ')}`);
+    }
+
+    // El comprobante se sube UNA vez, a la carpeta de la primera orden, y las
+    // demás lo referencian. Si la subida falla no se escribe nada.
+    let archivo: { storagePath: string; url: string; nombre: string } | null = null;
+    if (datos.comprobante) {
+      try {
+        archivo = await subirComprobante(datos.comprobante, grupo[0].id);
+      } catch (err) {
+        throw new Error(`No se registró el pago: no se pudo subir el comprobante (${err instanceof Error ? err.message : err}).`);
+      }
     }
 
     let pago: Pago;
     try {
       const ctx = await contextoPago();
-      pago = construirPagoDeGrupo(grupo, { referencia, fecha: ctx.ahora.slice(0, 10) }, ctx);
+      pago = construirPagoDeGrupo(grupo, {
+        referencia, fecha, banco: datos.banco,
+        comprobante: archivo ? { url: archivo.url, nombre: archivo.nombre, subidoEn: ctx.ahora } : null,
+      }, ctx);
       await guardarPago(pago);
     } catch (err) {
-      setToast({ mensaje: `No se registró el pago: ${err instanceof Error ? err.message : err}`, tipo: 'error' });
-      return;
+      throw new Error(`No se registró el pago: ${err instanceof Error ? err.message : err}`);
     }
 
     const fallidas: string[] = [];
     for (const orden of grupo) {
       try {
-        await updateOrden(orden.id, { comprobantePago: referencia });
+        const cambios: Partial<OrdenCompra> = { comprobantePago: referencia };
+        if (archivo) {
+          cambios.documentos = [...(orden.documentos ?? []), {
+            id: `doc-${Date.now()}-${orden.id}`,
+            tipo: 'comprobante_pago',
+            nombre: archivo.nombre,
+            storagePath: archivo.storagePath,
+            url: archivo.url,
+            subidoPor: usuario.nombre,
+            fecha: pago.createdAt,
+          }];
+        }
+        await updateOrden(orden.id, cambios);
         const r = await transicionarEstado(
-          { ...orden, comprobantePago: referencia }, 'pagada', rolOC, usuario,
+          { ...orden, ...cambios }, 'pagada', rolOC, usuario,
         );
         if (!r.ok) fallidas.push(`${orden.folio}: ${r.razon}`);
       } catch (err) {
