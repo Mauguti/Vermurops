@@ -227,6 +227,31 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Pagos (PLAN-PAGOS §1.1 · tarea 68 / P2) ──────────────────────────
+    // Un documento por movimiento real de dinero —una transferencia que
+    // salió, una entrada que llegó— con sus aplicaciones dentro.
+    //
+    // Sustituye la ESCRITURA de `cobros/` y `depositosCliente/`, que quedan
+    // de solo lectura: lo que ya está ahí no se migra y se sigue leyendo.
+    //
+    // Eliminar está prohibido, por lo mismo que en las otras tres: un
+    // movimiento de dinero existió. Un pago mal aplicado se anula con
+    // activo=false y lo aplicado desaparece solo, porque se DERIVA de las
+    // aplicaciones vivas.
+    //
+    // ⚠️ Nace con esDelEquipo(), como todo lo demás: cualquiera del equipo
+    // puede escribir un pago desde la consola de Firebase. Con dinero de
+    // verdad en esta colección, la deuda de §6 —las reglas no distinguen
+    // roles— sube de prioridad. Lo correcto es exigir la capacidad
+    // `cobro.registrar` / `ordenCompra.autorizar`, y eso necesita el rol en
+    // el token (plan de la tarea 53).
+    match /pagos/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
     // ── Vistas de usuario (TV-4) ─────────────────────────────────────────
     // Lectura: autenticado (para ver vistas compartidas de otros).
     // Creación: autenticado, siempre que usuarioId == su UID.

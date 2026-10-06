@@ -9,13 +9,10 @@
  *   4. «qué pagos cubrieron esta factura», incluido un cobro viejo
  *   5. el guardado
  *
- * ⚠️ El paso del guardado documenta el BLOQUEO de la noche: `pagos/` no
- * tiene su bloque publicado en `firestore.rules` y el sprint no puede
- * editarlo (límite 4 del contrato). El aviso que sale es el que la tarea 68
- * dejó cableado, y este test lo fija: si alguien publica la regla y el aviso
- * sigue saliendo, el problema es otro. Cuando la regla esté, este test se
- * cambia por su versión en verde —está escrita abajo, comentada, con lo que
- * tiene que quedar en Firestore.
+ * El paso del guardado corre EN VERDE desde el 6-oct, con la regla de
+ * `pagos/` publicada: comprueba lo que quedó en Firestore, no el aviso del
+ * bloqueo. Hasta el 5-oct fijaba lo contrario, porque el sprint no podía
+ * editar `firestore.rules` (límite 4 del contrato).
  *
  * Requiere emuladores + app en :3100 arriba: `KEEP=1 ./scripts/e2e.sh`.
  * Se siembra con `Bearer owner` (el emulador trata ese token como Admin SDK).
@@ -27,6 +24,7 @@ test.describe.configure({ mode: 'serial' });
 test.setTimeout(120_000);
 
 const FS = 'http://127.0.0.1:8080/v1/projects/vermur-logistics-app/databases/(default)/documents';
+const AUTH = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1';
 const PW = '123456';
 const IMG = 'sprint/reportes/img';
 
@@ -67,7 +65,33 @@ const FACTURAS: Semilla[] = [
   { id: 'FAC-70-D', numero: 'A-7004', total: 3_000, moneda: 'USD', vence: '2026-10-20', embarqueId: EMB, embarqueFolio: 'VLIM-26-070' },
 ];
 
+/*
+ * Borra los pagos que dejó una corrida anterior DE ESTE CLIENTE.
+ *
+ * Hace falta desde que el caso 9 corre en verde: antes el guardado estaba
+ * bloqueado por la regla, nada mutaba y re-correr la suite era inofensivo.
+ * Ahora escribe, y `aplicado` se DERIVA de las aplicaciones vivas (§4.32),
+ * así que un pago sobreviviente deja las facturas cobradas y el paso 2 ve
+ * una lista vacía. Sembrar `estado: 'emitida'` no alcanza: el estado se
+ * recalcula desde los pagos.
+ *
+ * Solo toca a CLI-70 — lo del recorrido del jueves se queda donde está.
+ */
+async function limpiarPagosDe(clienteId: string) {
+  const r = await fetch(`${FS}/pagos?pageSize=300`, { headers: { Authorization: 'Bearer owner' } });
+  if (!r.ok) return;                       // la colección puede no existir aún
+  const d = await r.json() as { documents?: { name: string; fields: Record<string, any> }[] };
+  for (const doc of d.documents ?? []) {
+    if (doc.fields?.terceroId?.stringValue !== clienteId) continue;
+    await fetch(`${FS}/pagos/${doc.name.split('/').pop()}`, {
+      method: 'DELETE', headers: { Authorization: 'Bearer owner' },
+    });
+  }
+}
+
 async function sembrar() {
+  await limpiarPagosDe(CLIENTE_ID);
+
   await escribir(`clientes/${CLIENTE_ID}`, {
     id: S(CLIENTE_ID), nombre: S(CLIENTE), activo: B(true),
     rfc: S('APS260101AA7'), origenDatos: S('magaya'),
@@ -105,6 +129,44 @@ async function sembrar() {
     banco: S('BBVA'), referencia: S('SPEI-VIEJO-70'), activo: B(true),
     createdAt: S('2026-09-15T09:00:00.000Z'), updatedAt: S('2026-09-15T09:00:00.000Z'),
   });
+}
+
+/*
+ * Lectura por la REST del emulador CON la sesión de una persona, no con
+ * `Bearer owner`: la siembra usa owner porque simula al Admin SDK, pero
+ * comprobar lo que quedó tiene que pasar por las reglas. Si el bloque de
+ * `pagos/` desapareciera, esto falla — que es justo lo que se quiere saber.
+ * Mismo helper que `recorrido-jueves.spec.ts`.
+ */
+async function tokenDe(email: string): Promise<string> {
+  const r = await fetch(`${AUTH}/accounts:signInWithPassword?key=emulador`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: PW, returnSecureToken: true }),
+  });
+  return (await r.json() as { idToken: string }).idToken;
+}
+
+async function leerColeccion(email: string, col: string): Promise<Record<string, unknown>[]> {
+  const token = await tokenDe(email);
+  const r = await fetch(`${FS}/${col}?pageSize=300`, { headers: { Authorization: `Bearer ${token}` } });
+  const d = await r.json() as { documents?: { name: string; fields: Record<string, unknown> }[] };
+  return (d.documents ?? []).map(doc => ({ __id: doc.name.split('/').pop(), ...plano(doc.fields) }));
+}
+
+/** Aplana el JSON de la REST de Firestore a valores simples. */
+function plano(fields: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(fields)) {
+    const o = v as Record<string, unknown>;
+    if ('stringValue' in o) out[k] = o.stringValue;
+    else if ('integerValue' in o) out[k] = Number(o.integerValue);
+    else if ('doubleValue' in o) out[k] = o.doubleValue;
+    else if ('booleanValue' in o) out[k] = o.booleanValue;
+    else if ('nullValue' in o) out[k] = null;
+    else if ('mapValue' in o) out[k] = plano((o.mapValue as { fields?: Record<string, unknown> }).fields ?? {});
+    else if ('arrayValue' in o) out[k] = ((o.arrayValue as { values?: unknown[] }).values ?? []).map(x => plano({ x } as never).x);
+  }
+  return out;
 }
 
 async function entrar(browser: Browser, email: string): Promise<{ page: Page; ctx: BrowserContext }> {
@@ -275,17 +337,21 @@ test('desde la factura se ve qué pagos la cubrieron (punto 4)', async ({ browse
 });
 
 /**
- * El guardado. **Hoy falla, y el aviso es el artefacto que importa.**
+ * Caso 9 · el guardado, con la regla de `pagos/` ya publicada (6-oct-2026).
  *
- * `pagos/` no tiene su bloque en `firestore.rules`: el catch-all niega todo
- * lo que no esté nombrado, y el sprint no puede editar ese archivo (límite 4).
- * El bloque listo para pegar está en `docs/sprint-post-junta/REGLA-PAGOS.md`.
+ * Hasta el 5-oct este test fijaba el BLOQUEO: `pagos/` no tenía su bloque en
+ * `firestore.rules`, el catch-all negaba la escritura y el aviso de la
+ * pantalla era lo único comprobable. Publicada la regla, lo que se comprueba
+ * es el resultado: UN documento en `pagos/` con TRES aplicaciones, los dos
+ * embarques en `embarqueIds` —un pago que cruza embarques es justo lo que
+ * `CobroCliente.embarqueId` no podía representar— y las tres facturas con su
+ * estado nuevo.
  *
- * Cuando la regla esté publicada, este test se reemplaza por lo que está
- * comentado abajo: UN documento en `pagos/` con TRES aplicaciones, los dos
- * embarques en `embarqueIds`, y las tres facturas con su estado nuevo.
+ * La lectura va con la sesión de Administración: así la comprobación pasa por
+ * las reglas. Si alguien quita el bloque de `pagos/`, este test se cae aquí y
+ * no en un aviso de interfaz.
  */
-test('el guardado espera la regla de pagos/, y lo dice', async ({ browser }) => {
+test('el guardado reparte el pago entre las tres facturas y queda en pagos/', async ({ browser }) => {
   const { page, ctx } = await entrar(browser, 'administracion@vermur.com');
   await abrirPorCobrar(page);
   await abrirModal(page);
@@ -294,24 +360,71 @@ test('el guardado espera la regla de pagos/, y lo dice', async ({ browser }) => 
   await page.getByRole('button', { name: 'Aplicar lo más vencido primero' }).click();
   await page.getByRole('button', { name: 'Registrar pago' }).click();
 
-  /* Sale DOS veces y las dos están bien: el toast de arriba y el renglón de
-     error dentro del modal, que es el que deja el reparto capturado en vez de
-     tirarlo. */
-  await expect(page.getByText(/no tiene su regla publicada/).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(/no tiene su regla publicada/)).toHaveCount(2);
-  await foto(page, 'guardado-sin-regla');
-  await ctx.close();
+  // El modal cierra al guardar: mientras siga abierto, no guardó.
+  await expect(page.getByRole('button', { name: 'Registrar pago' })).toHaveCount(0, { timeout: 15_000 });
+  // Y el aviso del bloqueo no debe volver a aparecer.
+  await expect(page.getByText(/no tiene su regla publicada/)).toHaveCount(0);
+  await foto(page, 'guardado-con-regla');
 
-  /* Con la regla publicada, esto es lo que tiene que quedar:
-   *
-   *   const pagos = await leerColeccion('administracion@vermur.com', 'pagos');
-   *   const p = pagos.find(x => x.folio?.startsWith('PAG-'))!;
-   *   expect(p.monto).toBe(120000);
-   *   expect(p.aplicaciones).toHaveLength(3);
-   *   expect(p.destinoIds.sort()).toEqual(['FAC-70-A', 'FAC-70-B', 'FAC-70-C']);
-   *   expect(p.embarqueIds.sort()).toEqual([EMB, EMB_2]);   // cruza dos embarques
-   *   const facturas = await leerColeccion('administracion@vermur.com', 'facturas');
-   *   expect(facturas.find(f => f.__id === 'FAC-70-A')!.estado).toBe('cobrada');
-   *   expect(facturas.find(f => f.__id === 'FAC-70-C')!.estado).toBe('cobrada_parcial');
+  /*
+   * Filtrado por ESTE cliente, no por «el primer PAG-». El recorrido del
+   * jueves ya deja un pago en la colección —registrar un cobro escribe en
+   * `pagos/` desde la tarea 68— así que tomar el primero encontraba el
+   * ajeno. Y si el mismo cliente tuviera varios, el que importa es el único
+   * que reparte a tres facturas.
    */
+  const pagos = await leerColeccion('administracion@vermur.com', 'pagos');
+  const suyos = pagos.filter(x => x.terceroId === CLIENTE_ID
+                                  && String(x.folio ?? '').startsWith('PAG-'));
+  expect(suyos, `no quedó ningún pago de ${CLIENTE_ID} en pagos/`).toHaveLength(1);
+  const p = suyos[0] as Record<string, any>;
+  expect(p.monto).toBe(120000);
+  expect(p.aplicaciones).toHaveLength(3);
+  expect((p.destinoIds as string[]).sort()).toEqual(['FAC-70-A', 'FAC-70-B', 'FAC-70-C']);
+  expect((p.embarqueIds as string[]).sort()).toEqual([EMB, EMB_2].sort());
+
+  /*
+   * Cuánto le toca a cada factura. Es el contenido del reparto: A y B
+   * completas, C a la mitad de lo que le quedaba.
+   */
+  const porFactura = Object.fromEntries(
+    (p.aplicaciones as Record<string, any>[]).map(a => [a.destinoId, a.monto]),
+  );
+  // Los mismos números que el paso 3 fija en pantalla, ahora en Firestore:
+  // 45,000 + 60,000 completas y 15,000 a la tercera, que queda parcial.
+  expect(porFactura['FAC-70-A']).toBe(45_000);
+  expect(porFactura['FAC-70-B']).toBe(60_000);
+  expect(porFactura['FAC-70-C']).toBe(15_000);
+
+  /*
+   * El `estado` GUARDADO de las facturas NO se mueve, y está bien: §4.32 dice
+   * que `aplicado`, `sinAplicar` y `avanceDeDestino` se DERIVAN y ninguna se
+   * guarda. El bloque que la noche dejó comentado esperaba
+   * `estado === 'cobrada'` en Firestore; eso contradice la arquitectura de la
+   * propia tarea 67 y por eso no se usó. Lo que se comprueba es la
+   * derivación, donde la gente la ve: la factura liquidada deja de ofrecerse
+   * y la parcial sigue, con su saldo nuevo.
+   */
+  const facturas = await leerColeccion('administracion@vermur.com', 'facturas');
+  const f = (id: string) => facturas.find(x => x.__id === id) as Record<string, any>;
+  expect(f('FAC-70-A').estado).toBe('emitida');
+
+  /*
+   * En la cartera, con su filtro «Abiertas» de omisión: las dos liquidadas
+   * DESAPARECEN y la parcial se queda. No se reusa `abrirPorCobrar` aquí a
+   * propósito — ese helper espera ver A-7001, y que ya no esté es justo el
+   * resultado. Esto es la derivación donde Julio la ve.
+   */
+  const { page: p2, ctx: ctx2 } = await entrar(browser, 'administracion@vermur.com');
+  await p2.getByRole('button', { name: 'Finanzas', exact: true }).first().click();
+  await p2.getByRole('button', { name: 'Cuentas por cobrar', exact: true }).first().click();
+  await expect(p2.getByRole('button', { name: 'Por cliente' })).toBeVisible({ timeout: 15_000 });
+  await p2.locator('select').filter({ hasText: 'Cliente: todos' }).selectOption(CLIENTE_ID);
+  await expect(p2.getByText('A-7003').first()).toBeVisible({ timeout: 15_000 });
+  await expect(p2.getByText('A-7001')).toHaveCount(0);
+  await expect(p2.getByText('A-7002')).toHaveCount(0);
+  await foto(p2, 'tras-guardar-quedan-las-no-liquidadas');
+  await ctx2.close();
+
+  await ctx.close();
 });
