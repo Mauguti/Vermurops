@@ -1,3 +1,4 @@
+import { catalogoOperable } from '../../lib/estatusCatalogo';
 import React, { useRef, useState } from 'react';
 import {
   X, Upload, FileText, Sparkles, Loader2, ClipboardPaste, AlertTriangle,
@@ -125,7 +126,7 @@ export default function CargarTarifario({
       <RevisionTarifasExtraidas
         respuestaCruda={pendiente.respuesta}
         nombreArchivo={pendiente.documento.nombreArchivo}
-        conceptos={conceptos.filter(c => c.activo)}
+        conceptos={conceptos.filter(catalogoOperable)}
         puertos={puertos.map(p => ({ id: p.id, nombre: p.nombre, codigo: p.codigo }))}
         proveedores={proveedores}
         proveedorElegidoId={proveedorId}

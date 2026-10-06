@@ -2194,6 +2194,17 @@ compartida con `useTiendaCatalogo`; las escrituras no cambiaron.
     procesamiento por montaje, no en menos tráfico. La medición en navegador
     (conteo de `addTarget`) fue ruidosa y no es concluyente.
 
+## 4.56 Tipos y filtros de activo sueltos (tarea 94, 6-oct-2026)
+
+`ClienteVermur.statusOperativo` pasa a opcional, que es como ya se leía
+(`estatusDeCliente`); `tsc` no encontró ningún lugar que lo asumiera presente.
+`lib/estatusCatalogo.ts` (`catalogoOperable`, `activo !== false`) es el mismo
+criterio de clientes y proveedores para los catálogos con baja lógica:
+Puertos (lista, contador y badge), selector de conceptos, ficha y bandeja de
+cotización, formulario y carga masiva de tarifas. Sin migración ni campo
+escrito. Quedan sin tocar la consulta de `useTarifas` (`where activo == true`,
+índice) y `esTarifaVigente` (tarifas, no catálogo de selección).
+
 ---
 
 ## 5. Estado de los módulos

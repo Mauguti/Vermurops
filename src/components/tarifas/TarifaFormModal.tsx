@@ -1,3 +1,4 @@
+import { catalogoOperable } from '../../lib/estatusCatalogo';
 import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { TarifaVermur, TipoTarifa, UnidadTarifa, PreciosTarifa, hoyISO } from './TarifasData';
@@ -38,8 +39,8 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
   const { puertos } = usePuertos();
 
   const proveedoresActivos = proveedores.filter(proveedorOperable).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-  const conceptosActivos = conceptos.filter(c => c.activo).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-  const puertosActivos = puertos.filter(p => p.activo).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  const conceptosActivos = conceptos.filter(catalogoOperable).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  const puertosActivos = puertos.filter(catalogoOperable).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [tipo, setTipo] = useState<TipoTarifa>(tarifa?.tipo ?? 'tarifario');

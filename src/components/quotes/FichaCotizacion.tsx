@@ -1,3 +1,4 @@
+import { catalogoOperable } from '../../lib/estatusCatalogo';
 import React, { useState, useMemo, useCallback } from 'react';
 import { antesDeLaComa } from '../../lib/texto';
 import { textoBaseDelTotal } from '../../lib/serviciosDelTotal';
@@ -200,7 +201,7 @@ export default function FichaCotizacion({
   const { proveedores } = useProveedores();
   const { puertos } = usePuertos();
   const { conceptos: conceptosCatalogo } = useConceptos();
-  const conceptosActivos = useMemo(() => conceptosCatalogo.filter(c => c.activo), [conceptosCatalogo]);
+  const conceptosActivos = useMemo(() => conceptosCatalogo.filter(catalogoOperable), [conceptosCatalogo]);
 
   const [activeTab, setActiveTab] = useState<'info' | 'servicios' | 'actividades' | 'historial' | 'chat'>('info');
 

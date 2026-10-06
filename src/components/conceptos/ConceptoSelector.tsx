@@ -5,6 +5,7 @@
  * Agrupa por categoría, muestra badges impo/expo, y soporta alta rápida.
  */
 
+import { catalogoOperable } from '../../lib/estatusCatalogo';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { normalizarTexto } from '../../lib/texto';
 import { createPortal } from 'react-dom';
@@ -140,7 +141,7 @@ export default function ConceptoSelector({
 
   // Filtrar y agrupar
   const grouped = useMemo(() => {
-    const activos = conceptos.filter(c => c.activo);
+    const activos = conceptos.filter(catalogoOperable);
     const q = norm(search);
     const filtered = q
       ? activos.filter(c =>
