@@ -1856,6 +1856,42 @@ con su folio `PAG-…`, lo aplicado, lo que queda a favor y su estado, sobre
     `depositosCliente/` se lee y se anula, pero no se le aplica saldo ni se le
     quita una aplicación: esas colecciones ya no se escriben (§4.35).
 
+## 4.38 Un pago a proveedor cubre varias órdenes (tarea 73, 6-oct-2026)
+
+Paso **P6** de `docs/sprint-post-junta/PLAN-PAGOS.md` (§7.2). «Registrar pago»
+en Programación de pagos escribe **UN** `Pago` (`lado: 'proveedor'`) con una
+aplicación por orden, en vez del loop de N escrituras con la misma cadena
+copiada. `construirPagoDeGrupo`, `problemasDelGrupo`, `pagosDeProveedor` y
+`pagoQueCubrio` viven en `lib/pagos.ts`; el call site, en
+`Finance.registrarPagoDelGrupo`.
+
+  - **Se valida TODO el grupo antes de escribir.** Mezcla de proveedores o de
+    monedas (§4.3), una orden sin monto o una que la máquina de estados no deja
+    pasar a `pagada` detienen el pago completo: no se guarda ni el pago ni
+    ninguna orden. Antes, si fallaba a la mitad, unas quedaban pagadas y otras no.
+  - **El monto es lo que SALE del banco:** monto menos anticipos cruzados
+    (`montoATransferir`), el mismo total que enseña la tarjeta del grupo.
+  - **Las órdenes siguen pasando a `pagada` con `comprobantePago` = referencia**
+    (la máquina lo exige y los paneles lo leen). Lo que cambia es que además
+    existe el pago, con folio `PAG-…`, y la ficha de la orden dice «Cubierta por
+    el pago PAG-… · una sola transferencia que cubrió N órdenes»
+    (`pagoQueCubrio`, derivado: no se agregó campo a la orden).
+  - **Nada se migra, sin doble conteo.** `pagosDeProveedor` lee `pagos/` y le
+    quita a `pagosDesdeOrdenes` las órdenes que un pago vivo ya cubre; las
+    pagadas antes de P6 siguen leyéndose por el adaptador de la 67. Un pago
+    anulado deja de cubrir y sus órdenes vuelven a leerse por lo viejo.
+  - **Una orden sin factura del proveedor entra igual**: se paga lo autorizado
+    y la factura puede llegar después.
+  - ⚠️ Si falla el paso de las órdenes DESPUÉS de guardar el pago, el aviso lo
+    dice con el folio («PAG-… quedó registrado, pero no se pudieron marcar…»).
+    Sigue sin ser una transacción de Firestore; la validación previa es lo que
+    hace raro ese caso.
+  - Depende de la regla de `pagos/` publicada (§4.35), igual que P2.
+  - **Fuera de alcance, anotado:** el formulario de §7.2 con checkboxes por
+    factura, la fecha elegida por quien paga y el comprobante adjunto. Hoy la
+    fecha del pago es la del día de captura. La lista de la pestaña Pagos
+    sigue siendo solo del lado cliente.
+
 ## 5. Estado de los módulos
 
 ### Construido y validado

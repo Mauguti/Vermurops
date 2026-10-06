@@ -42,6 +42,7 @@
 import type { CobroCliente } from '../components/facturas/FacturasData';
 import type { DepositoCliente, OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
 import type { Moneda } from './sumarPorMoneda';
+import { montoATransferir } from './anticipos';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1 · El modelo (§1.1)
@@ -358,10 +359,8 @@ export function pagosDeCliente(
  * demás afirmaría que las cubrió una transferencia que nadie ha visto. Una
  * orden en otra moneda tampoco se junta: un pago tiene UNA moneda (§4.3).
  *
- * ⚠️ Su call site llega en **P6**, cuando `registrarPagoDelGrupo` pase a
- * crear un pago. Aquí está porque la tarea 67 pide los tres adaptadores de lo
- * viejo —`CobroCliente`, `depositosCliente` y `comprobantePago`— y porque el
- * lector del dato viejo tiene que existir antes de que la escritura cambie.
+ * Su call site es `pagosDeProveedor` (tarea 73 · P6), que le quita las órdenes
+ * que un pago nuevo ya cubre para no contarlas dos veces.
  */
 export function pagosDesdeOrdenes(ordenes: readonly OrdenCompra[]): Pago[] {
   const normalizar = (s: string) => s.replace(/[\s-_.\/]/g, '').toUpperCase();
@@ -648,6 +647,120 @@ export function construirPagoDeDeposito(
     createdAt: ctx.ahora,
     updatedAt: ctx.ahora,
   };
+}
+
+/** Lo que se captura al pagar un grupo de órdenes de UN proveedor (tarea 73 · P6). */
+export interface DatosPagoDeGrupo {
+  /** Lo que identifica la transferencia: obligatoria aquí, la máquina de la OC la exige. */
+  referencia: string;
+  /** YYYY-MM-DD. El día en que el dinero salió. */
+  fecha: string;
+}
+
+/**
+ * Las razones por las que un grupo de órdenes NO puede ser un solo pago.
+ * Vacío = se puede. Se evalúa ANTES de escribir nada: la tarea 73 existe
+ * porque el loop de N escrituras dejaba unas órdenes pagadas y otras no.
+ */
+export function problemasDelGrupo(ordenes: readonly OrdenCompra[]): string[] {
+  const out: string[] = [];
+  if (ordenes.length === 0) return ['no hay órdenes que pagar.'];
+  const proveedores = new Set(ordenes.map(o => o.proveedorId ?? o.proveedorNombre ?? ''));
+  if (proveedores.size > 1) out.push('las órdenes son de proveedores distintos: un pago cubre a un solo proveedor.');
+  const monedas = new Set(ordenes.map(o => o.moneda));
+  if (monedas.size > 1) out.push('las órdenes están en monedas distintas: un pago tiene una sola moneda (§4.3).');
+  for (const o of ordenes) {
+    if (!Number.isFinite(o.monto) || o.monto <= 0 || montoATransferir(o) <= 0) out.push(`${o.folio}: no tiene monto por transferir.`);
+  }
+  return out;
+}
+
+/**
+ * Una transferencia a un proveedor, escrita como UN pago con una aplicación
+ * por orden (§7.2 · paso P6). Es el espejo de `construirPagoAplicado`.
+ *
+ * El monto es la suma de las órdenes, en su moneda única. Una orden SIN
+ * factura del proveedor entra igual: se paga lo que está autorizado, y la
+ * factura puede llegar después.
+ *
+ * Lanza antes de escribir si el grupo mezcla proveedores o monedas.
+ */
+export function construirPagoDeGrupo(
+  ordenes: readonly OrdenCompra[],
+  datos: DatosPagoDeGrupo,
+  ctx: ContextoPago,
+): Pago {
+  const problemas = problemasDelGrupo(ordenes);
+  if (problemas.length > 0) throw new Error(`el pago del grupo: ${problemas.join(' ')}`);
+  const referencia = (datos.referencia ?? '').trim();
+  if (!referencia) throw new Error('el pago del grupo: falta la referencia de la transferencia.');
+
+  const primera = ordenes[0];
+  // Lo que SALE del banco: el monto menos los anticipos ya cruzados, que es
+  // el total que Programación de pagos muestra en la tarjeta del grupo. Una
+  // sola moneda por construcción: `problemasDelGrupo` rechaza la mezcla (§4.3).
+  const aTransferir = (o: OrdenCompra) => montoATransferir(o);
+  const monto = exigirMonto(ordenes.reduce((acc, o) => acc + aTransferir(o), 0), 'el pago del grupo');
+  const bancos = new Set(ordenes.map(o => o.bancoSalida ?? ''));
+  const banco = bancos.size === 1 ? ([...bancos][0] || null) : null;
+
+  const aplicaciones: AplicacionPago[] = ordenes.map(o => ({
+    destinoTipo: 'orden',
+    destinoId: o.id,
+    destinoNumero: o.folio,
+    monto: redondear(aTransferir(o)),
+    moneda: o.moneda,
+    aplicadaPor: { uid: ctx.por.uid, nombre: ctx.por.nombre, fecha: datos.fecha },
+  }));
+
+  return {
+    id: ctx.id,
+    folio: ctx.folio,
+    lado: 'proveedor',
+    terceroTipo: 'proveedor',
+    terceroId: primera.proveedorId ?? null,
+    terceroNombre: primera.proveedorNombre ?? '',
+    monto,
+    moneda: primera.moneda,
+    fecha: datos.fecha,
+    banco,
+    referencia,
+    comprobante: null,
+    aplicaciones,
+    destinoIds: [...new Set(aplicaciones.map(a => a.destinoId))],
+    embarqueIds: [...new Set(ordenes.map(o => o.embarqueId).filter((e): e is string => !!e))],
+    origen: 'app',
+    registradoPor: ctx.por,
+    activo: true,
+    createdAt: ctx.ahora,
+    updatedAt: ctx.ahora,
+  };
+}
+
+/**
+ * Todos los pagos del lado proveedor: los de `pagos/` y los que solo existen
+ * como órdenes pagadas con el mismo `comprobantePago`.
+ *
+ * Una orden pagada desde P6 vive en las DOS partes —el pago y su propio
+ * estado `pagada`—, así que `pagosDesdeOrdenes` la leería otra vez como un
+ * pago legacy. Se descartan de la lectura legacy las órdenes que un pago
+ * vivo ya cubre: un movimiento vive en `pagos` **o** en lo viejo.
+ */
+export function pagosDeProveedor(
+  pagos: readonly Pago[],
+  ordenes: readonly OrdenCompra[],
+): Pago[] {
+  const nuevos = pagos.filter(p => p.lado === 'proveedor');
+  const cubiertas = new Set(nuevos.filter(vivo).flatMap(p => p.destinoIds ?? []));
+  return [
+    ...nuevos,
+    ...pagosDesdeOrdenes(ordenes.filter(o => !cubiertas.has(o.id))),
+  ];
+}
+
+/** El pago vivo que cubrió una orden, o null (pagada antes de P6, o sin pagar). */
+export function pagoQueCubrio(ordenId: string, pagos: readonly Pago[]): Pago | null {
+  return pagos.find(p => p.lado === 'proveedor' && vivo(p) && (p.destinoIds ?? []).includes(ordenId)) ?? null;
 }
 
 /**

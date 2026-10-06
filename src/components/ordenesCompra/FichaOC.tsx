@@ -26,6 +26,7 @@ import type { ReglaIVA } from '../conceptos/ConceptosData';
 import { compararIVAFactura, type ResultadoComparacionIVA } from '../../lib/ivaOrdenCompra';
 import CargarFacturaOC from './CargarFacturaOC';
 import DocumentosOC from './DocumentosOC';
+import type { Pago } from '../../lib/pagos';
 import {
   AVISO_COBRO_EN_COBRANZA, type EntradaDeEmbarque,
 } from '../../lib/entradaDinero';
@@ -113,6 +114,11 @@ interface Props {
   onIrACobranza?: () => void;
   /** Etiqueta del botón regresar cuando se llegó desde otra ficha. */
   regresarLabel?: string;
+  /**
+   * Tarea 73 · P6 · El pago a proveedor que cubrió esta orden, si fue uno
+   * registrado desde P6. Las pagadas antes no lo tienen y no se migran.
+   */
+  pagoProveedor?: Pago | null;
 }
 
 const money = (n: number) =>
@@ -120,7 +126,7 @@ const money = (n: number) =>
 
 export default function FichaOC({
   oc, rol, onBack, onTransicionar, onActualizar, fondeo, proveedor, categoriaConcepto,
-  reglaIVA, todasLasOrdenes = [], entradas = [], onIrACobranza, regresarLabel,
+  reglaIVA, todasLasOrdenes = [], entradas = [], onIrACobranza, regresarLabel, pagoProveedor,
 }: Props) {
   const [motivo, setMotivo] = useState(oc.motivoRechazo ?? '');
   const [comprobante, setComprobante] = useState(oc.comprobantePago ?? '');
@@ -685,6 +691,16 @@ export default function FichaOC({
               onGuardar={() => onActualizar({ comprobantePago: comprobante.trim() || null })}
               soloLectura={terminada}
             />
+
+            {pagoProveedor && (
+              <p data-testid="pago-que-cubrio" className="text-[12px] text-gray-600">
+                Cubierta por el pago <span className="font-mono font-bold">{pagoProveedor.folio}</span>
+                {' · '}{pagoProveedor.moneda} {money(pagoProveedor.monto)}
+                {pagoProveedor.aplicaciones.length > 1
+                  ? ` · una sola transferencia que cubrió ${pagoProveedor.aplicaciones.length} órdenes`
+                  : ''}
+              </p>
+            )}
           </div>
 
           {/* ── Tarea 63 · Documentos de la orden, con un solo botón ───── */}

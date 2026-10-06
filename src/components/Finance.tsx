@@ -4,7 +4,9 @@ import { useOrdenesCompra } from '../hooks/useOrdenesCompra';
 import { useDepositosCliente } from '../hooks/useDepositosCliente';
 import { useFacturas } from '../hooks/useFacturas';
 import { calcularFondeo } from '../lib/fondeoCliente';
-import { pagosDeCliente, entradasDeFondeo } from '../lib/pagos';
+import { pagosDeCliente, entradasDeFondeo, problemasDelGrupo, construirPagoDeGrupo, pagoQueCubrio, type Pago } from '../lib/pagos';
+import { puedeTransicionarOC } from '../lib/stateMachineOC';
+import { usePagos } from '../hooks/usePagos';
 import { embarquesFondeables, entradasDelEmbarque } from '../lib/entradaDinero';
 import PanelPagos from './ordenesCompra/PanelPagos';
 import BandejaOC from './ordenesCompra/BandejaOC';
@@ -74,6 +76,7 @@ export default function Finance() {
   // pago sin aplicaciones, el cobro uno con una. Antes eran dos listas y cada
   // call site tenía que acordarse de pasar las dos.
   const { depositos, registrarDeposito, anularDeposito } = useDepositosCliente();
+  const { pagos: pagosEscritos, contextoNuevo: contextoPago, guardarPago } = usePagos();
   const { facturas, cobros, pagosNuevos, registrarPagoAplicado, anularCobro, quitarAplicacion, aplicarSaldoAFavor } = useFacturas();
   /*
    * Tarea 68 · Las tres fuentes en una lista: lo que se escribe hoy
@@ -165,20 +168,54 @@ export default function Finance() {
 
   /**
    * 1.5 · Registra el pago de un GRUPO: una transferencia cubre varias
-   * órdenes del mismo proveedor, así que todas pasan a pagada con la misma
-   * referencia. Se hace en secuencia y se reporta lo que falló: marcar la
-   * mitad y no decirlo dejaría a Julio creyendo que pagó lo que no pagó.
+   * órdenes del mismo proveedor.
+   *
+   * Tarea 73 · P6 · Es UN `Pago` con una aplicación por orden, una sola
+   * escritura. Antes eran N escrituras independientes con la misma cadena
+   * copiada y, si fallaba a la mitad, unas órdenes quedaban pagadas y otras
+   * no. Ahora se valida TODO el grupo antes de escribir: si una orden no
+   * puede pasar a pagada, no se guarda ni el pago ni ninguna.
+   *
+   * Las órdenes siguen pasando a `pagada` con `comprobantePago` = la
+   * referencia (la máquina de estados lo exige y los paneles lo leen), y cada
+   * una muestra con qué pago se cubrió derivándolo de `pagos/`.
    */
   const registrarPagoDelGrupo = async (ocIds: string[], referencia: string) => {
+    const usuario = { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' };
+    const grupo = ocIds
+      .map(id => ordenes.find(o => o.id === id))
+      .filter((o): o is OrdenCompra => !!o);
+    if (grupo.length !== ocIds.length) {
+      setToast({ mensaje: 'No se registró el pago: alguna orden del grupo ya no existe en la lista.', tipo: 'error' });
+      return;
+    }
+
+    const rechazos: string[] = problemasDelGrupo(grupo);
+    for (const o of grupo) {
+      const v = puedeTransicionarOC(o.estado, 'pagada', rolOC, { ...o, comprobantePago: referencia });
+      if (!v.ok) rechazos.push(`${o.folio}: ${v.razon}`);
+    }
+    if (rechazos.length > 0) {
+      setToast({ mensaje: `No se registró el pago: ${rechazos.join(' · ')}`, tipo: 'error' });
+      return;
+    }
+
+    let pago: Pago;
+    try {
+      const ctx = await contextoPago();
+      pago = construirPagoDeGrupo(grupo, { referencia, fecha: ctx.ahora.slice(0, 10) }, ctx);
+      await guardarPago(pago);
+    } catch (err) {
+      setToast({ mensaje: `No se registró el pago: ${err instanceof Error ? err.message : err}`, tipo: 'error' });
+      return;
+    }
+
     const fallidas: string[] = [];
-    for (const id of ocIds) {
-      const orden = ordenes.find(o => o.id === id);
-      if (!orden) continue;
+    for (const orden of grupo) {
       try {
-        await updateOrden(id, { comprobantePago: referencia });
+        await updateOrden(orden.id, { comprobantePago: referencia });
         const r = await transicionarEstado(
-          { ...orden, comprobantePago: referencia }, 'pagada', rolOC,
-          { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' },
+          { ...orden, comprobantePago: referencia }, 'pagada', rolOC, usuario,
         );
         if (!r.ok) fallidas.push(`${orden.folio}: ${r.razon}`);
       } catch (err) {
@@ -186,8 +223,8 @@ export default function Finance() {
       }
     }
     setToast(fallidas.length === 0
-      ? { mensaje: `${ocIds.length} orden(es) marcadas como pagadas.`, tipo: 'exito' }
-      : { mensaje: `No se pudieron pagar: ${fallidas.join(' · ')}`, tipo: 'error' });
+      ? { mensaje: `${pago.folio}: ${grupo.length} orden(es) marcadas como pagadas.`, tipo: 'exito' }
+      : { mensaje: `${pago.folio} quedó registrado, pero no se pudieron marcar: ${fallidas.join(' · ')}`, tipo: 'error' });
   };
 
   const handleActualizarOC = (cambios: Partial<OrdenCompra>) => {
@@ -233,6 +270,7 @@ export default function Finance() {
           onTransicionar={handleTransicionar}
           onActualizar={handleActualizarOC}
           todasLasOrdenes={ordenes}
+          pagoProveedor={pagoQueCubrio(ocAbierta.id, pagosEscritos)}
           proveedor={proveedores.find(p => p.id === ocAbierta.proveedorId) ?? null}
           categoriaConcepto={conceptos.find(c => c.id === ocAbierta.conceptoId)?.categoria}
           reglaIVA={conceptos.find(c => c.id === ocAbierta.conceptoId)?.reglaIVA}
