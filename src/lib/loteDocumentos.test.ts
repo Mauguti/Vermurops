@@ -5,6 +5,8 @@ import {
   conflictosDeTipo,
   textoCorreccionTipo,
   observacionesConCorreccion,
+  clasificacionDeLinea,
+  etiquetaConfianza,
   etiquetaDocOC,
   DOCUMENTOS_OC,
   type LineaLote,
@@ -266,6 +268,90 @@ describe('observacionesConCorreccion', () => {
   it('con solo una, no mete el separador', () => {
     expect(observacionesConCorreccion(undefined, 'Tipo corregido…')).toBe('Tipo corregido…');
     expect(observacionesConCorreccion('Ilegible', null)).toBe('Ilegible');
+  });
+});
+
+// ── D-bis · El registro empacado para el expediente (tarea 71) ───────────────
+
+/** Las etiquetas del expediente del proveedor, que se indexa por clave de DocsAlta. */
+const etiquetaProveedor = (tipo: string) =>
+  DOCS_PROVEEDOR_NACIONAL.find(d => d.campo === tipo)?.etiqueta ?? tipo.replace(/_/g, ' ');
+
+const AUTOR = {
+  por: 'administracion@vermur.com',
+  fecha: '2026-10-05T18:30:00.000Z',
+  etiqueta: etiquetaProveedor,
+};
+
+describe('clasificacionDeLinea', () => {
+  it('escribe el registro cuando la persona corrigió el tipo', () => {
+    const c = clasificacionDeLinea(
+      linea({ tipoCrudo: 'acta_constitutiva', tipoPropuesto: 'acta', tipoElegido: 'csf', corregidoAMano: true }),
+      AUTOR,
+    );
+    expect(c?.tipoCrudo).toBe('acta_constitutiva');
+    expect(c?.observaciones).toContain('administracion@vermur.com');
+    expect(c?.observaciones).toContain('2026-10-05');
+    // Las dos cosas: qué leyó el agente y qué decidió la persona.
+    expect(c?.observaciones).toContain('el clasificador lo leyó como');
+    expect(c?.observaciones).toContain(etiquetaProveedor('csf'));
+  });
+
+  it('conserva la observación del agente junto a la corrección', () => {
+    const c = clasificacionDeLinea(
+      linea({ tipoElegido: 'csf', corregidoAMano: true, observaciones: 'Escaneo ilegible en la parte baja' }),
+      AUTOR,
+    );
+    expect(c?.observaciones).toContain('Escaneo ilegible en la parte baja');
+    expect(c?.observaciones).toContain('Tipo corregido a mano');
+  });
+
+  it('sin corrección guarda lo que dijo el agente y nada más', () => {
+    const c = clasificacionDeLinea(linea({ confianza: 'alta' }), AUTOR);
+    expect(c).toEqual({ tipoCrudo: 'constancia_situacion_fiscal', confianza: 'alta' });
+    expect(c?.observaciones).toBeUndefined();
+  });
+
+  it('cuando el agente no contestó nada, devuelve undefined en vez de un objeto vacío', () => {
+    // Firestore rechaza undefined dentro del documento y tumba la escritura
+    // entera: aquí la clave no se escribe.
+    const c = clasificacionDeLinea(
+      linea({ tipoCrudo: '', tipoPropuesto: null, confianza: undefined, observaciones: undefined }),
+      AUTOR,
+    );
+    expect(c).toBeUndefined();
+  });
+
+  it('ninguna clave queda en undefined', () => {
+    const c = clasificacionDeLinea(linea({ tipoCrudo: 'csf' }), AUTOR);
+    expect(Object.values(c ?? {}).every(v => v !== undefined)).toBe(true);
+  });
+
+  it('un tipo que el agente no determinó se registra como corrección sin lectura', () => {
+    const c = clasificacionDeLinea(
+      linea({ tipoCrudo: '', tipoPropuesto: null, tipoElegido: 'csf', corregidoAMano: true }),
+      AUTOR,
+    );
+    expect(c?.tipoCrudo).toBeUndefined();
+    expect(c?.observaciones).toContain('el clasificador no pudo determinar el tipo');
+  });
+});
+
+describe('etiquetaConfianza', () => {
+  it('la escala de texto se lee tal cual', () => {
+    expect(etiquetaConfianza('alta')).toBe('alta');
+  });
+
+  it('un número no se convierte a porcentaje: no se sabe su escala', () => {
+    expect(etiquetaConfianza(0.8)).toBe('0.8');
+    expect(etiquetaConfianza(80)).toBe('80');
+  });
+
+  it('sin valor no hay etiqueta', () => {
+    expect(etiquetaConfianza(undefined)).toBeNull();
+    expect(etiquetaConfianza(null)).toBeNull();
+    // Un documento viejo con el campo en blanco no pinta «confianza » a secas.
+    expect(etiquetaConfianza('  ' as unknown as 'alta')).toBeNull();
   });
 });
 
