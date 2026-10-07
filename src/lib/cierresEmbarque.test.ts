@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { evaluarCierres, avisoDeOrden } from './cierresEmbarque';
+import { evaluarCierres, avisoDeOrden, alternarCierre, crearColaEmbarque } from './cierresEmbarque';
 import type { EmbarqueCompleto, CargoDetalle } from '../components/shipments/EmbarquesData';
 import type { OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
 import type { FacturaCliente, CobroCliente } from '../components/facturas/FacturasData';
@@ -185,5 +185,141 @@ describe('lo marcado contra lo que dicen los datos', () => {
       .toContain('sin que el cliente haya pagado');
     expect(avisoDeOrden('operativo', { operativo: false, pago: false, administrativo: false }))
       .toBeNull();
+  });
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Dos clics seguidos no pierden ninguno
+// ═══════════════════════════════════════════════════════════════════════════
+
+/*
+ * El bug: `handleToggleCierre` armaba el documento extendiendo el `embarque`
+ * del render, y el guardado escribe el documento COMPLETO. Dos clics
+ * —operativo y pago— partían los dos del mismo estado, así que el segundo
+ * escribía el primero en false otra vez. Con el `confirmar()` de §4.7 de por
+ * medio, la ventana son segundos.
+ */
+interface EmbSimple { cierres: { operativo: boolean; pago: boolean; administrativo: boolean } }
+
+const SIN_CERRAR: EmbSimple = { cierres: { operativo: false, pago: false, administrativo: false } };
+
+describe('alternarCierre', () => {
+  it('invierte solo el tipo pedido', () => {
+    expect(alternarCierre(SIN_CERRAR.cierres, 'pago'))
+      .toEqual({ operativo: false, pago: true, administrativo: false });
+  });
+
+  it('no muta la entrada', () => {
+    const antes = { ...SIN_CERRAR.cierres };
+    alternarCierre(antes, 'operativo');
+    expect(antes.operativo).toBe(false);
+  });
+});
+
+describe('crearColaEmbarque · dos clics sin esperar', () => {
+  /** Guardado lento, como una escritura real: sin él la carrera no aparece. */
+  const guardadoLento = () => {
+    const escritos: EmbSimple[] = [];
+    return {
+      escritos,
+      guardar: async (e: EmbSimple) => {
+        await new Promise(r => setTimeout(r, 5));
+        escritos.push(structuredClone(e));
+      },
+    };
+  };
+
+  it('dos clics SIN esperar guardan los DOS cierres', async () => {
+    const { escritos, guardar } = guardadoLento();
+    const cola = crearColaEmbarque<EmbSimple>(SIN_CERRAR, guardar);
+
+    // Nadie espera al primero: es el doble clic real.
+    const a = cola.encolar(e => ({ ...e, cierres: alternarCierre(e.cierres, 'operativo') }));
+    const b = cola.encolar(e => ({ ...e, cierres: alternarCierre(e.cierres, 'pago') }));
+    await Promise.all([a, b]);
+
+    expect(escritos).toHaveLength(2);
+    // Lo ÚLTIMO que quedó escrito tiene los dos: es lo que ve Firestore.
+    expect(escritos[1].cierres).toEqual({ operativo: true, pago: true, administrativo: false });
+  });
+
+  it('los tres cierres seguidos acaban los tres en true', async () => {
+    const { escritos, guardar } = guardadoLento();
+    const cola = crearColaEmbarque<EmbSimple>(SIN_CERRAR, guardar);
+    const tipos = ['operativo', 'pago', 'administrativo'] as const;
+    await Promise.all(tipos.map(t =>
+      cola.encolar(e => ({ ...e, cierres: alternarCierre(e.cierres, t) }))));
+    expect(escritos[2].cierres).toEqual({ operativo: true, pago: true, administrativo: true });
+  });
+
+  it('dos clics al MISMO cierre se cancelan, no se duplican', async () => {
+    const { escritos, guardar } = guardadoLento();
+    const cola = crearColaEmbarque<EmbSimple>(SIN_CERRAR, guardar);
+    const uno = cola.encolar(e => ({ ...e, cierres: alternarCierre(e.cierres, 'pago') }));
+    const dos = cola.encolar(e => ({ ...e, cierres: alternarCierre(e.cierres, 'pago') }));
+    await Promise.all([uno, dos]);
+    expect(escritos[1].cierres.pago).toBe(false);
+  });
+
+  /*
+   * El snapshot viejo tiene que llegar MIENTRAS se guarda, no antes de que la
+   * cola arranque: si llega antes, el cambio se calcula encima de él y el test
+   * pasa sin ejercitar el guard de `pendientes`. Se sincroniza DENTRO del
+   * guardado, que es el único momento en que hay algo en vuelo.
+   */
+  it('un dato del servidor NO pisa lo que la cola tiene en vuelo', async () => {
+    let cola: ReturnType<typeof crearColaEmbarque<EmbSimple>>;
+    const guardar = async () => {
+      cola.sincronizar(SIN_CERRAR);        // snapshot viejo a media escritura
+      await new Promise(r => setTimeout(r, 5));
+    };
+    cola = crearColaEmbarque<EmbSimple>(SIN_CERRAR, guardar);
+    await cola.encolar(e => ({ ...e, cierres: alternarCierre(e.cierres, 'operativo') }));
+    expect(cola.actual().cierres.operativo).toBe(true);
+  });
+
+  it('con la cola quieta, el dato del servidor sí entra', async () => {
+    const { guardar } = guardadoLento();
+    const cola = crearColaEmbarque<EmbSimple>(SIN_CERRAR, guardar);
+    cola.sincronizar({ cierres: { operativo: true, pago: true, administrativo: false } });
+    expect(cola.actual().cierres.pago).toBe(true);
+  });
+
+  /*
+   * Lo que sostiene la CADENA, aparte de acumular: el ORDEN de las
+   * escrituras. Si corrieran en paralelo, la primera —más lenta— podría
+   * aterrizar al final y dejar en Firestore un documento con un cierre menos.
+   * Acumular no basta: lo último que se escribe tiene que ser lo más completo.
+   */
+  it('la escritura lenta no aterriza DESPUÉS de la rápida', async () => {
+    const escritos: EmbSimple[] = [];
+    let primera = true;
+    const cola = crearColaEmbarque<EmbSimple>(SIN_CERRAR, async e => {
+      const espera = primera ? 30 : 1;     // la primera, mucho más lenta
+      primera = false;
+      await new Promise(r => setTimeout(r, espera));
+      escritos.push(structuredClone(e));
+    });
+    const a = cola.encolar(x => ({ ...x, cierres: alternarCierre(x.cierres, 'operativo') }));
+    const b = cola.encolar(x => ({ ...x, cierres: alternarCierre(x.cierres, 'pago') }));
+    await Promise.all([a, b]);
+
+    expect(escritos).toHaveLength(2);
+    expect(escritos[0].cierres).toEqual({ operativo: true, pago: false, administrativo: false });
+    expect(escritos[1].cierres).toEqual({ operativo: true, pago: true, administrativo: false });
+  });
+
+  it('si un guardado falla, el siguiente clic se sigue aplicando', async () => {
+    const escritos: EmbSimple[] = [];
+    let primera = true;
+    const cola = crearColaEmbarque<EmbSimple>(SIN_CERRAR, async e => {
+      if (primera) { primera = false; throw new Error('sin red'); }
+      escritos.push(structuredClone(e));
+    });
+    const a = cola.encolar(e => ({ ...e, cierres: alternarCierre(e.cierres, 'operativo') }));
+    const b = cola.encolar(e => ({ ...e, cierres: alternarCierre(e.cierres, 'pago') }));
+    await Promise.all([a, b]);
+    expect(escritos[0].cierres).toEqual({ operativo: true, pago: true, administrativo: false });
   });
 });

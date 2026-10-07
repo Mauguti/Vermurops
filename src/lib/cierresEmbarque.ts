@@ -200,3 +200,67 @@ export function avisoDeOrden(
   }
   return null;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Alternar un cierre, sin perder clics
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** El cierre contrario del tipo pedido, sobre los cierres que se le pasen. */
+export function alternarCierre<C extends object, K extends keyof C>(
+  cierres: C,
+  tipo: K,
+): C {
+  return { ...cierres, [tipo]: !cierres[tipo] } as C;
+}
+
+/**
+ * Cola de guardados de UN embarque: cada cambio parte del resultado del
+ * anterior, no del que había al pintar.
+ *
+ * El bug que cierra: `handleToggleCierre` armaba el documento nuevo
+ * extendiendo el `embarque` del render, y `guardarEmbarque` escribe el
+ * documento COMPLETO. Dos clics seguidos —operativo y pago— partían los dos
+ * del mismo estado, así que el segundo escribía el primero en false otra vez.
+ * Entre clic y clic puede haber un `confirmar()` de por medio (§4.7 avisa si
+ * se cierra fuera de orden), lo que ensancha la ventana a segundos.
+ *
+ * Por qué una cola y no `updateDoc` del campo puntual: el guardado pasa por
+ * `conBitacora`, que COMPARA el antes contra el después para anotar solo. Un
+ * `update` de `cierres.operativo` se saltaría esa comparación y el cierre no
+ * quedaría en la bitácora, que es justo lo que §4.14 pide registrar.
+ *
+ * `sincronizar` la pone al día cuando el dato llega del servidor; lo que la
+ * cola tenga pendiente manda sobre eso, porque es más nuevo.
+ */
+export function crearColaEmbarque<E>(
+  inicial: E,
+  guardar: (e: E) => Promise<void> | void,
+) {
+  let ultimo = inicial;
+  let pendientes = 0;
+  let cola: Promise<void> = Promise.resolve();
+
+  return {
+    /** El estado desde el que partiría el próximo cambio. */
+    actual: () => ultimo,
+
+    /** Dato nuevo del servidor. Se ignora si la cola tiene algo en vuelo. */
+    sincronizar(e: E) {
+      if (pendientes === 0) ultimo = e;
+    },
+
+    /** Encola un cambio calculado sobre el estado más reciente. */
+    encolar(cambio: (e: E) => E): Promise<void> {
+      pendientes += 1;
+      cola = cola.then(async () => {
+        const siguiente = cambio(ultimo);
+        ultimo = siguiente;
+        await guardar(siguiente);
+      }).catch(() => {
+        // El error lo reporta quien guarda (toast); la cola no se rompe, o un
+        // fallo dejaría los clics siguientes sin aplicar y en silencio.
+      }).finally(() => { pendientes -= 1; });
+      return cola;
+    },
+  };
+}

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { expedientePendiente, textoSalto } from '../../lib/frenoExpediente';
 import { ChevronRight, Save, X, Calendar, Plus, Check, FileText, Landmark, ShieldCheck, DollarSign, Activity, GitCommit, Ship, Plane, Truck, ArrowRight, Trash2, Package, Layers, Eye } from 'lucide-react';
 import { EmbarqueCompleto, TIPOS_DOCUMENTO, EVENT_TYPES, CargoDetalle, EmbarqueEvento, EmbarqueDocumento, recalcularCargos, EmbarqueProducto, totalesDe, monedasConMovimiento } from './EmbarquesData';
@@ -13,7 +13,7 @@ import { useFacturas } from '../../hooks/useFacturas';
 import PanelFacturasEmbarque from '../facturas/PanelFacturasEmbarque';
 import { traficoDeFolio } from '../../lib/facturacionEmbarque';
 import { aplicaSoloExportacion } from '../../lib/pedimentosEmbarque';
-import { evaluarCierres, avisoDeOrden } from '../../lib/cierresEmbarque';
+import { evaluarCierres, avisoDeOrden, alternarCierre, crearColaEmbarque } from '../../lib/cierresEmbarque';
 import { useProveedores } from '../../hooks/useProveedores';
 import { useAuth, usuariosPorRol } from '../../auth/AuthContext';
 import TablaCargosEmbarque from './TablaCargosEmbarque';
@@ -94,6 +94,30 @@ export default function FichaEmbarque({
   const autorBitacora = { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' };
   const guardar = (updated: EmbarqueCompleto) =>
     onUpdateEmbarque(conBitacora(embarque, updated, autorBitacora, new Date().toISOString()));
+
+  /*
+   * Los cierres se guardan por una COLA: cada clic parte del resultado del
+   * anterior, no del `embarque` del render. Antes, dos clics seguidos
+   * —operativo y pago— armaban los dos el documento completo desde el mismo
+   * estado y el segundo escribía el primero en false otra vez; con el
+   * `confirmar()` de §4.7 de por medio la ventana son segundos.
+   *
+   * La cola guarda con `conBitacora(anterior, siguiente)` para que el cierre
+   * quede anotado (§4.14): un `updateDoc` del campo puntual se saltaría esa
+   * comparación. El `anterior` es el que la cola traía, no el del render.
+   */
+  const colaAnterior = useRef(embarque);
+  const colaCierres = useRef(crearColaEmbarque<EmbarqueCompleto>(embarque, siguiente => {
+    const anterior = colaAnterior.current;
+    colaAnterior.current = siguiente;
+    return onUpdateEmbarque(
+      conBitacora(anterior, siguiente, autorBitacora, new Date().toISOString()));
+  }));
+  // El dato del servidor pone la cola al día; lo que tenga en vuelo manda.
+  useEffect(() => {
+    colaCierres.current.sincronizar(embarque);
+    colaAnterior.current = embarque;
+  }, [embarque]);
   const { prefs, guardar: guardarPreferencia } = usePreferenciasUsuario();
   const vistaCargos = prefs.vistaCargos ?? 'proveedor';
   const consolidadoProveedores = useMemo(
@@ -246,15 +270,11 @@ export default function FichaEmbarque({
       const aviso = avisoDeOrden(cierreType, embarque.cierres);
       if (aviso && !await confirmar({ mensaje: `${aviso}\n\n¿Marcarlo de todos modos?`, confirmar: 'Marcar' })) return;
     }
-    const updated: EmbarqueCompleto = {
-      ...embarque,
-      cierres: {
-        ...embarque.cierres,
-        [cierreType]: !embarque.cierres[cierreType]
-      },
-      updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ')
-    };
-    guardar(updated);
+    await colaCierres.current.encolar(actual => ({
+      ...actual,
+      cierres: alternarCierre(actual.cierres, cierreType),
+      updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+    }));
   };
 
   // Cargos Handlers
