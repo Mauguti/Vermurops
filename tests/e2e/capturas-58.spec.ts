@@ -117,6 +117,15 @@ async function abrirCuentasPorPagar(page: Page) {
   await page.getByRole('button', { name: 'Por proveedor' }).click();
 }
 
+/**
+ * La tarjeta de IDAMEX en «Por proveedor» (tarea 96). Con todos los specs en la
+ * misma base hay otros proveedores con «N facturas · 3 órdenes» o con «Fechas
+ * distintas», y el texto suelto choca. De los ancestros que contienen el nombre
+ * y la factura, el último en el DOM es el más interno: la tarjeta del proveedor.
+ */
+const tarjetaIdamex = (page: Page) =>
+  page.locator('div', { has: page.locator('p', { hasText: /^IDAMEX$/ }) }).filter({ hasText: 'F-IDA-1310' }).last();
+
 // ─── 1 · IDAMEX una vez, con sus dos facturas ──────────────────────────────
 
 test('IDAMEX aparece una vez: tres órdenes, dos facturas', async ({ browser }) => {
@@ -126,16 +135,17 @@ test('IDAMEX aparece una vez: tres órdenes, dos facturas', async ({ browser }) 
 
   // El proveedor, UNA vez. Antes eran tres renglones.
   await expect(page.locator('p', { hasText: /^IDAMEX$/ })).toHaveCount(1);
-  await expect(page.getByText('2 facturas · 3 órdenes')).toBeVisible();
+  const tarjeta = tarjetaIdamex(page);
+  await expect(tarjeta.getByText('2 facturas · 3 órdenes')).toBeVisible();
 
   // Un renglón por factura, con el total por moneda sin revolver (§4.3).
-  await expect(page.getByText('F-IDA-1201')).toBeVisible();
-  await expect(page.getByText('F-IDA-1310')).toBeVisible();
-  await expect(page.getByText('MXN 18,500.00').first()).toBeVisible();
-  await expect(page.getByText('USD 900.00').first()).toBeVisible();
+  await expect(tarjeta.getByText('F-IDA-1201')).toBeVisible();
+  await expect(tarjeta.getByText('F-IDA-1310')).toBeVisible();
+  await expect(tarjeta.getByText('MXN 18,500.00').first()).toBeVisible();
+  await expect(tarjeta.getByText('USD 900.00').first()).toBeVisible();
 
   // Las dos órdenes de la misma factura traen fechas de pago distintas: se dice.
-  await expect(page.getByText('Fechas distintas')).toBeVisible();
+  await expect(tarjeta.getByText('Fechas distintas')).toBeVisible();
 
   await page.getByText('F-IDA-1310').scrollIntoViewIfNeeded();
   await page.waitForTimeout(400);
@@ -180,7 +190,7 @@ test('la factura se abre y el folio de la orden lleva a su ficha', async ({ brow
 
   // …y «Regresar» deja la vista donde estaba.
   await page.getByRole('button', { name: /Cuentas por pagar/ }).first().click();
-  await expect(page.getByText('2 facturas · 3 órdenes')).toBeVisible({ timeout: 15_000 });
+  await expect(tarjetaIdamex(page).getByText('2 facturas · 3 órdenes')).toBeVisible({ timeout: 15_000 });
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(500);
@@ -209,7 +219,7 @@ test('«Por orden» conserva la tabla de siempre y la preferencia se queda', asy
   await expect(page.getByRole('columnheader', { name: 'Folio' })).toBeVisible({ timeout: 15_000 });
 
   await page.getByRole('button', { name: 'Por proveedor' }).click();
-  await expect(page.getByText('2 facturas · 3 órdenes')).toBeVisible();
+  await expect(tarjetaIdamex(page).getByText('2 facturas · 3 órdenes')).toBeVisible();
 
   await ctx.close();
 });

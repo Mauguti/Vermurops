@@ -437,6 +437,16 @@ test('Administración · depósito, autoriza y paga la OC, factura y cobra al cl
   await page.getByRole('button', { name: /^Información/ }).click();
   for (const c of ['Cierre Operativo', 'Cierre de Pagos / Finanzas', 'Cierre Administrativo']) {
     await page.locator('div', { hasText: c }).filter({ has: page.locator('button') }).last().locator('button').last().click();
+    // Cada clic parte de lo que la ficha tenía EN PANTALLA: `handleToggleCierre`
+    // lee `embarque.cierres` del render, así que un segundo clic antes de que
+    // llegue el guardado del primero escribe sobre un estado viejo (y el aviso de
+    // orden del administrativo sale al ver el pago aún sin cerrar). Se espera a
+    // que el cierre esté en Firestore antes de pasar al siguiente (tarea 96).
+    const clave = c === 'Cierre Operativo' ? 'operativo' : c === 'Cierre Administrativo' ? 'administrativo' : 'pago';
+    await expect.poll(async () => {
+      const emb = (await leerColeccion('administracion@vermur.com', 'embarques')).find(x => x.__id === S.embarqueId);
+      return (emb?.cierres as Record<string, boolean> | undefined)?.[clave];
+    }, { timeout: 15_000, message: `el ${c} no quedó guardado` }).toBe(true);
   }
   await expect(page.getByText('Entregado').first()).toBeVisible({ timeout: 15_000 });
 
