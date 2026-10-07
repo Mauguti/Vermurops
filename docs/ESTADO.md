@@ -1,36 +1,31 @@
-# Estado de VermurOps — 6 de octubre de 2026 (corte del sprint nocturno, noche)
+# Estado de VermurOps — 7 de octubre de 2026 (corte del sprint nocturno)
 
-**Corte del sprint «Pruebas repetibles y últimos cabos»: la cadena 92 → 94 está
-lista y SIN PUBLICAR.** Tres tareas `[x]`; 91 y 95 `[!]` (fuera de la cadena);
-un bloqueo de la guardia (95).
+**Corte del sprint «Las dos de pruebas que se cayeron»: la cadena 96 → 97 está
+lista y SIN PUBLICAR.** Dos tareas `[x]`, ninguna `[!]`; dos bloqueos de la
+guardia (97, falsos positivos sobre el secreto de n8n).
 
-Sale de `sprint/base` = `main` = `4572a46`, que ya trae 85 → 90. Punta:
-`sprint/94-activo-suelto` — **mergearla trae las tres**.
+Sale de `sprint/base` = `main` = `4c3143d`, que **ya trae 92 → 94** (merge
+`verif/92-94`). Punta: `sprint/97-suite-functions` — mergearla trae las dos.
 
-En la punta: **2,692 tests en verde** · `tsc --noEmit` 0 errores · build limpio ·
-`./scripts/e2e.sh` 6/6. **La cadena es solo hosting**: sin reglas, índices,
-Functions, n8n ni campos de modelo.
+En la punta: **2,693 tests en verde** · `tsc --noEmit` 0 errores ·
+`./scripts/e2e-completo.sh` 239 verdes (10 min 47 s, ya con `gestion-usuarios` y
+`capturas-21` y el emulador de Functions) · `REPETIR=2` verde (21 min).
+**La cadena es solo scripts y specs de prueba**: sin hosting, reglas,
+Functions, n8n ni modelo.
 
 Resumen con preguntas: `sprint/reportes/RESUMEN.md` (no versionado).
 
 ---
 
-## 1. La cadena de la noche: 92 → 94, sin publicar
+## 1. La cadena de la noche: 96 → 97, sin publicar
 
-| # | Tarea | Rama | CLAUDE.md |
-|---|---|---|---|
-| 92 | Fecha real también al pagar una orden desde su ficha | `sprint/92-fecha-pago-individual` | §4.54 |
-| 93 | Un listener por colección en clientes, proveedores, embarques, cotizaciones | `sprint/93-listeners` | §4.55 |
-| 94 | Un criterio de «activo» en catálogos; `statusOperativo` opcional | `sprint/94-activo-suelto` | §4.56 |
+| # | Tarea | Rama |
+|---|---|---|
+| 96 | El recorrido se puede correr dos veces seguidas (cierres esperados en Firestore; capturas-58 acotado a la tarjeta de IDAMEX) | `sprint/96-e2e-repetible` |
+| 97 | La suite completa levanta Functions con secreto falso del emulador (`VERMUR_N8N_TOKEN=EMULADOR_NO_REAL`) | `sprint/97-suite-functions` |
 
-### Antes del hosting
-
-1. Hosting con `--only hosting` desde el checkout principal
-   (`cd /Users/mauriciogutierrezmunoz/antigravity/Vermur-Logistics`), leyendo
-   `uploading` y no `skipping upload` (§3); luego merge `--no-ff` y push.
-2. Validar con las tablas de `sprint/reportes/92–94.md`.
-
-**Punto de regreso:** `git revert` del merge. Nada que deshacer en datos.
+Para publicar: merge `--no-ff` de la 97 a `main` y push. No hay deploy.
+**Punto de regreso:** `git revert` del merge.
 
 ---
 
@@ -38,9 +33,7 @@ Resumen con preguntas: `sprint/reportes/RESUMEN.md` (no versionado).
 
 | Qué | Tipo | Bloquea |
 |---|---|---|
-| **Publicar la cadena 92 → 94** (hosting) | Despliegue | — |
-| **91** `[!]` · recorrido repetible (`REPETIR=3`): la sesión cerró sin diagnóstico, dejando la suite en segundo plano | Pruebas | Rehacer esperando en primer plano |
-| **95** `[!]` · `e2e-completo.sh` con emulador de Functions (rama `sprint/95-suite-functions`, solo un `wip`): la guardia bloqueó listar los secretos locales; usar un secreto falso solo para el emulador | Pruebas | Igual que 91 |
+| **Publicar la cadena 96 → 97** (solo merge, sin deploy) | Merge | — |
 | Otros hooks con `onSnapshot` por montaje (`useConceptos`, `usePuertos`, `useTarifas`, `useProspectos`, `useOrdenesCompra`…) | Código | — |
 | `useTarifas` filtra `activo == true` en la query; una tarifa sin campo no se ve (cambiarlo implica índices) | Código + índices | — |
 | Validar 56–66 y 35–55 en navegador (arrastrado) | Validación | Cerrar sprints anteriores |
@@ -59,10 +52,12 @@ Resumen con preguntas: `sprint/reportes/RESUMEN.md` (no versionado).
 ## 3. Decisiones de Mau y pendientes
 
 Tomadas (6-oct): el seed de clientes NO escribe ACTIVO cuando falta `activo`;
-la suite completa SÍ levanta Functions (tarea 95); anular un pago a proveedor
+la suite completa SÍ levanta Functions (hecho en la 97); anular un pago a proveedor
 regresa las órdenes a «autorizada» (por confirmar con Julio).
 
 Pendientes:
+- ¿`handleToggleCierre` usa el estado más reciente para no perder clics rápidos? (96; recomendación: solo si se ve).
+- Posible intermitencia en capturas-60 (spinner en Altas, 1 de 4 corridas), sin reproducir.
 - ¿Medición más fina de listeners? (no hace falta)
 - Para Julio: ¿los días de una prefactura cuentan desde la fecha del pago o de la captura?
 - Para Julio: confirmar que anular regresa a «autorizada» y qué pasa con el anticipo cruzado.
