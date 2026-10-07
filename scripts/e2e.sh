@@ -31,6 +31,11 @@ EMULADORES="auth,firestore,storage"
 if [[ "${CON_FUNCTIONS:-0}" == "1" ]]; then
   PUERTOS_EMU="$PUERTOS_EMU,5001"
   EMULADORES="$EMULADORES,functions"
+  # Secretos FALSOS, solo para este proceso: las Functions declaran
+  # VERMUR_N8N_TOKEN y el emulador los pide al arrancar. Los dos specs que
+  # usan Functions (gestion-usuarios, capturas-21) no llaman a n8n; si algún
+  # día lo hicieran, un token falso falla en vez de pegarle al n8n real.
+  export VERMUR_N8N_TOKEN="${VERMUR_N8N_TOKEN:-EMULADOR_NO_REAL}"
 fi
 FS="http://127.0.0.1:8080/v1/projects/vermur-logistics-app/databases/(default)/documents"
 
