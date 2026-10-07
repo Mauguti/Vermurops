@@ -3,13 +3,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const abiertas: string[] = [];
 const cerradas: string[] = [];
 const escritas: string[] = [];
+/*
+ * Lo que el SERVIDOR contesta en la segunda barrera. Era una constante
+ * `{ empty: true }`, así que la rama «el servidor ya tiene documentos» no se
+ * ejercitaba nunca: quitarla no tumbaba ningún test. Es la última cosa entre
+ * un snapshot vacío de caché y escribir los datos de ejemplo encima del
+ * catálogo de producción (§6).
+ */
+let enServidor: { empty: boolean; size: number } = { empty: true, size: 0 };
 let oyentes: Record<string, { ok: (s: unknown) => void; err: (e: Error) => void }> = {};
 vi.mock('../firebase', () => ({ db: {} }));
 vi.mock('firebase/firestore', () => ({
   collection: (_db: unknown, nombre: string) => nombre,
   doc: (_db: unknown, col: string, id: string) => `${col}/${id}`,
   setDoc: (ref: string) => { escritas.push(ref); return Promise.resolve(); },
-  getDocsFromServer: () => Promise.resolve({ empty: true, size: 0 }),
+  getDocsFromServer: () => Promise.resolve(enServidor),
   onSnapshot: (c: string, ok: (s: unknown) => void, err: (e: Error) => void) => {
     abiertas.push(c);
     oyentes[c] = { ok, err };
@@ -93,7 +101,10 @@ describe('tiendas de catálogo (tarea 93) · orden y datos', () => {
 });
 
 describe('tiendas de catálogo (tarea 93) · seed', () => {
-  beforeEach(() => { abiertas.length = 0; cerradas.length = 0; escritas.length = 0; oyentes = {}; });
+  beforeEach(() => {
+    abiertas.length = 0; cerradas.length = 0; escritas.length = 0; oyentes = {};
+    enServidor = { empty: true, size: 0 };
+  });
 
   it('con el servidor vacío siembra UNA vez aunque haya varios suscriptores', async () => {
     const bajas = [tiendaProveedores.suscribir(() => {}), tiendaProveedores.suscribir(() => {})];
@@ -113,6 +124,37 @@ describe('tiendas de catálogo (tarea 93) · seed', () => {
     oyentes.cotizaciones.ok(snapDe([], false));
     await new Promise(r => setTimeout(r, 0));
     expect(escritas).toEqual([]);
+    baja();
+  });
+
+  /*
+   * La SEGUNDA barrera. `evaluarSeed` ya descartó los snapshots de caché,
+   * pero puede dejar pasar uno del servidor que llegó vacío por una lectura
+   * a medias. Antes de escribir se vuelve a preguntar AL SERVIDOR, y si ahí
+   * hay algo no se siembra.
+   *
+   * Es lo último entre un snapshot vacío y los datos de ejemplo escritos
+   * encima del catálogo vivo (§6: localhost escribe en producción). Quitarla
+   * no tumbaba ningún test porque el mock contestaba siempre «vacío».
+   */
+  it('si el SERVIDOR ya tiene documentos no se siembra, aunque el snapshot venga vacío', async () => {
+    enServidor = { empty: false, size: 544 };
+    const avisos: unknown[] = [];
+    const warn = vi.spyOn(console, 'warn').mockImplementation((...a) => { avisos.push(a); });
+
+    /*
+     * `clientes` y no `proveedores`: el candado por módulo es de módulo, y
+     * el test de arriba ya lo cerró para proveedores. Con esa tienda el
+     * `escritas: []` saldría por el candado, no por la barrera — pasaría
+     * por la razón equivocada. El aviso es lo que lo distingue.
+     */
+    const baja = tiendaClientes.suscribir(() => {});
+    oyentes.clientes.ok(snapDe([], true));
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(escritas).toEqual([]);
+    expect(String(avisos[0])).toContain('544');
+    warn.mockRestore();
     baja();
   });
 
