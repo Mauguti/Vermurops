@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   hoyLocal, problemaFechaPago, problemaComprobante, totalElegido, bancoInicial,
-  problemasDelFormulario, diaAutorizacion, problemasFechaContraAutorizacion,
+  problemasDelFormulario, diaAutorizacion, problemasFechaContraAutorizacion, problemaFechaPagoIndividual,
 } from './formularioPagoProveedor';
 import type { OrdenCompra } from '../components/ordenesCompra/OrdenesCompraData';
 
@@ -88,5 +88,24 @@ describe('fecha del pago contra la autorización (tarea 86)', () => {
     const o = [aut('OC-1', '2026-10-05T12:00:00')];
     expect(problemasDelFormulario({ elegidas: 1, referencia: 'x', fecha: '2026-10-04', hoy: '2026-10-06', ordenes: o })[0]).toMatch(/OC-1/);
     expect(problemasDelFormulario({ elegidas: 1, referencia: 'x', fecha: '2026-10-07', hoy: '2026-10-06', ordenes: o })).toHaveLength(1);
+  });
+});
+
+describe('fecha del pago de UNA orden (tarea 92)', () => {
+  const o = oc('OC-1', 1, { autorizadaPor: { uid: 'u', nombre: 'A', fecha: '2026-10-05T12:00:00' } });
+  it('sirve entre la autorización y hoy, ambos inclusive', () => {
+    expect(problemaFechaPagoIndividual('2026-10-05', '2026-10-06', o)).toBeNull();
+    expect(problemaFechaPagoIndividual('2026-10-06', '2026-10-06', o)).toBeNull();
+  });
+  it('rechaza anterior a la autorización, y dice cuál orden', () => {
+    expect(problemaFechaPagoIndividual('2026-10-04', '2026-10-06', o)).toMatch(/OC-1.*2026-10-05/);
+  });
+  it('rechaza futura, vacía o inexistente', () => {
+    expect(problemaFechaPagoIndividual('2026-10-07', '2026-10-06', o)).toMatch(/futura/);
+    expect(problemaFechaPagoIndividual('', '2026-10-06', o)).toMatch(/Falta/);
+    expect(problemaFechaPagoIndividual('2026-02-31', '2026-10-06', o)).toMatch(/no existe/);
+  });
+  it('una orden sin autorización registrada no bloquea', () => {
+    expect(problemaFechaPagoIndividual('2026-10-01', '2026-10-06', oc('OC-2', 1, { autorizadaPor: null }))).toBeNull();
   });
 });

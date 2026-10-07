@@ -1,3 +1,4 @@
+import { catalogoOperable } from '../lib/estatusCatalogo';
 import React, { useState, useMemo } from 'react';
 import { contiene } from '../lib/texto';
 import { Plus, Search, Pencil, Anchor } from 'lucide-react';
@@ -28,7 +29,7 @@ export default function Puertos() {
 
   const filtered = useMemo(() => {
     let list = puertos;
-    if (!showInactivos) list = list.filter(p => p.activo);
+    if (!showInactivos) list = list.filter(catalogoOperable);
     if (filterTipo) list = list.filter(p => tipoDePunto(p) === filterTipo);
     if (filterPais) list = list.filter(p => p.pais === filterPais);
     if (search.trim()) {
@@ -61,7 +62,7 @@ export default function Puertos() {
         <div>
           <h2 className="text-[20px] font-bold text-text-primary">Puertos y aeropuertos</h2>
           <p className="text-[13px] text-text-muted mt-1">
-            {filtered.length} punto{filtered.length !== 1 ? 's' : ''} de origen/destino · {puertos.filter(p => p.activo).length} activos
+            {filtered.length} punto{filtered.length !== 1 ? 's' : ''} de origen/destino · {puertos.filter(catalogoOperable).length} activos
           </p>
         </div>
         {puedeAltaPuerto && (
@@ -169,11 +170,11 @@ export default function Puertos() {
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold ${
-                        p.activo
+                        catalogoOperable(p)
                           ? 'bg-success-bg text-success-text'
                           : 'bg-neutral-bg text-text-muted'
                       }`}>
-                        {p.activo ? 'Activo' : 'Inactivo'}
+                        {catalogoOperable(p) ? 'Activo' : 'Inactivo'}
                       </span>
                     </td>
                     <td className="px-4 py-3">

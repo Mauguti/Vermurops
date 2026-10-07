@@ -5,6 +5,7 @@
  * Agrupa cotizaciones por acción requerida, no por etapa del pipeline.
  */
 
+import { catalogoOperable } from '../../lib/estatusCatalogo';
 import React, { useState, useEffect, useMemo } from 'react';
 import { antesDeLaComa } from '../../lib/texto';
 import { alDiaConVersion } from '../../lib/versionesCotizacion';
@@ -282,7 +283,7 @@ export default function BandejaPricing({
   }, [!!selectedQuote, onFichaVisible]);
 
   // ── Maps memoizados para matching O(1) ──────────────────────────────────
-  const conceptosActivos = useMemo(() => conceptosCatalogo.filter(c => c.activo), [conceptosCatalogo]);
+  const conceptosActivos = useMemo(() => conceptosCatalogo.filter(catalogoOperable), [conceptosCatalogo]);
   const conceptoMap = useMemo(() => buildConceptoMap(conceptosActivos), [conceptosActivos]);
   const tarifaCountMap = useMemo(() => buildTarifaCountMap(catalogoTarifas), [catalogoTarifas]);
 

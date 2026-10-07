@@ -117,7 +117,7 @@ export interface ClienteVermur {
   interesMoratorio?: number;
 
   // ── Estado operativo ───────────────────────────────────────────────────────
-  statusOperativo: 'ACTIVO' | 'INACTIVO';
+  statusOperativo?: 'ACTIVO' | 'INACTIVO';
   /**
    * Estado del seguro de crédito Atradius.
    * '✔' = aprobado | 'X' = rechazado | 'NA' | 'SOLICITADO' | 'RECHAZADO' | 'RETIRADO' | ''

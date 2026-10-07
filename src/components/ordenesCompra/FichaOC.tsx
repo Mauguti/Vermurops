@@ -24,6 +24,7 @@ import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import LineaTiempo from '../ui/ficha/LineaTiempo';
 import type { ReglaIVA } from '../conceptos/ConceptosData';
 import { compararIVAFactura, type ResultadoComparacionIVA } from '../../lib/ivaOrdenCompra';
+import { problemaFechaPagoIndividual, hoyLocal } from '../../lib/formularioPagoProveedor';
 import CargarFacturaOC from './CargarFacturaOC';
 import DocumentosOC from './DocumentosOC';
 import type { Pago } from '../../lib/pagos';
@@ -90,7 +91,7 @@ interface Props {
    * que el usuario acaba de escribir; van con ella para que se guarden y se
    * validen en el mismo acto.
    */
-  onTransicionar: (nuevoEstado: EstadoOC, cambios?: Partial<OrdenCompra>) => void;
+  onTransicionar: (nuevoEstado: EstadoOC, cambios?: Partial<OrdenCompra>, fechaPago?: string) => void;
   /** Guarda campos sueltos: comprobante, factura, motivo de rechazo. */
   onActualizar: (cambios: Partial<OrdenCompra>) => void;
   /** 1.1 · Fondeo del embarque. Ausente en gastos de oficina. */
@@ -135,6 +136,8 @@ export default function FichaOC({
   const [motivo, setMotivo] = useState(oc.motivoRechazo ?? '');
   const [comprobante, setComprobante] = useState(oc.comprobantePago ?? '');
   const [factura, setFactura] = useState(oc.facturaAsociada ?? '');
+  // Tarea 92: el día en que salió el dinero; hoy por default, editable.
+  const [fechaPago, setFechaPago] = useState(() => hoyLocal());
 
   /*
    * La orden TAL COMO ESTÁ EN PANTALLA, con lo que el usuario acaba de
@@ -152,6 +155,7 @@ export default function FichaOC({
   };
 
   const disponibles = transicionesDisponiblesOC(oc.estado, rol, ocLocal, fondeo);
+  const problemaFecha = problemaFechaPagoIndividual(fechaPago, hoyLocal(), oc);
 
   /**
    * Los estados que la máquina rechaza HOY pero podría permitir si el usuario
@@ -258,11 +262,13 @@ export default function FichaOC({
               {primarios.map(estado => (
                 <button
                   key={estado}
+                  disabled={estado === 'pagada' && !!problemaFecha}
+                  title={estado === 'pagada' && problemaFecha ? problemaFecha : undefined}
                   onClick={() => onTransicionar(estado, {
                     comprobantePago: comprobante.trim() || null,
                     facturaAsociada: factura.trim() || null,
-                  })}
-                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-xs"
+                  }, estado === 'pagada' ? fechaPago : undefined)}
+                  className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-xs"
                 >
                   <CheckCircle2 className="w-3.5 h-3.5" /> {ACCION[estado]}
                 </button>
@@ -710,6 +716,19 @@ export default function FichaOC({
               onGuardar={() => onActualizar({ comprobantePago: comprobante.trim() || null })}
               soloLectura={terminada}
             />
+
+            {disponibles.includes('pagada') && (
+              <label className="block" data-testid="fecha-pago-individual">
+                <span className="block text-[9px] font-bold text-gray-400 uppercase mb-1">Fecha del pago</span>
+                <input
+                  type="date" value={fechaPago} max={hoyLocal()}
+                  onChange={e => setFechaPago(e.target.value)}
+                  aria-label="Fecha del pago"
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-xs outline-none focus:border-primario"
+                />
+                {problemaFecha && <span className="block text-[11px] text-peligro mt-1">{problemaFecha}</span>}
+              </label>
+            )}
 
             {pagoProveedor && (
               <p data-testid="pago-que-cubrio" className="text-[12px] text-gray-600">

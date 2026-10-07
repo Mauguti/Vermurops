@@ -22,9 +22,9 @@
  * FichaEmbarque, ni EmbarquesList, ni ProductosEmbarque necesitan cambios.
  */
 
-import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
+import { useTiendaCatalogo, tiendaEmbarques } from './tiendasCatalogos';
 import { EmbarqueCompleto } from '../components/shipments/EmbarquesData';
 import { useAuth } from '../auth/AuthContext';
 import { PermisoDenegadoError, capacidadParaGuardarEmbarque, puedeGuardarEmbarque } from '../auth/permisos';
@@ -35,38 +35,7 @@ import { conAviso } from '../lib/erroresEscritura';
 export function useEmbarques() {
   const { user } = useAuth();
 
-  const [embarques, setEmbarques] = useState<EmbarqueCompleto[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = onSnapshot(
-      collection(db, 'embarques'),
-      (snapshot) => {
-        const data: EmbarqueCompleto[] = [];
-        snapshot.forEach(docSnap => {
-          data.push({ id: docSnap.id, ...docSnap.data() } as EmbarqueCompleto);
-        });
-
-        // Más recientes primero.
-        data.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
-
-        setEmbarques(data);
-        setLoading(false);
-      },
-      (err) => {
-        setError(err.message);
-        setLoading(false);
-      },
-    );
-
-    return () => unsubscribe();
-  }, [user]);
+  const { datos: embarques, loading, error } = useTiendaCatalogo(tiendaEmbarques, !!user);
 
   /**
    * Upsert de un embarque — misma semántica que el viejo handleUpdateEmbarque.

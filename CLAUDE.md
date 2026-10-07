@@ -2161,6 +2161,50 @@ de la lectura deja la lista vacía y `loading` en false, como antes.
   - **Pendiente:** el recorrido NO se puede repetir sobre los mismos emuladores
     (la 2ª vuelta falla en pasos que dependen de datos de la 1ª).
 
+## 4.54 La fecha real también al pagar UNA orden (tarea 92, 6-oct-2026)
+
+Cierra lo que la 86 dejó fuera: `transicionarEstado` (pagar desde la ficha de
+la orden) seguía guardando la fecha de captura en `pagadaPor.fecha`. Ahora la
+ficha trae «Fecha del pago» (hoy por default, editable) cuando el pago está
+disponible, y viaja como tercer argumento de `onTransicionar` y quinto de
+`transicionarEstado`. Misma regla que el pago de grupo
+(`problemaFechaPagoIndividual`, en `formularioPagoProveedor.ts`): válida, no
+futura, no anterior a la autorización; el botón se deshabilita y dice por qué.
+El hook la vuelve a validar (la pantalla se puede esquivar). Sin fecha
+(llamadas viejas) rige la de captura; la hora sigue en `historialEstados`.
+
+## 4.55 Un listener por colección en el resto de la app (tarea 93, 6-oct-2026)
+
+Lo mismo que la 82 y la 89, para `clientes/`, `proveedores/`, `embarques/` y
+`cotizaciones/` (`hooks/tiendasCatalogos.ts`). `useClientes`, `useProveedores`,
+`useEmbarques` y `useCotizaciones` ya no abren `onSnapshot`: leen la tienda
+compartida con `useTiendaCatalogo`; las escrituras no cambiaron.
+  - **El seed vive en la apertura de la tienda**, con su candado de módulo y
+    `evaluarSeed` + `getDocsFromServer`: un solo listener, un solo sembrador.
+    Embarques sigue SIN seed (§3).
+  - **El orden es puro y exportado** (`ordenarPorNombre`, `ordenarPorCreacion`)
+    y no muta la entrada. Un documento sin `nombre` / `createdAt` no tira la lista.
+  - `crearTiendaCompartida` ahora puede llevar el mensaje de error (`error?`)
+    para que los hooks conserven su `error: string | null`; sin mensaje el
+    estado queda como antes.
+  - Los tests cubren compartir, orden/datos y seed, y cada uno se comprobó por
+    mutación (orden, candado, compartir, evaluarSeed).
+  - **Ojo:** el SDK de Firestore ya fusiona queries idénticas en un solo target
+    del lado de la red; la ganancia es sobre todo en estado de React y
+    procesamiento por montaje, no en menos tráfico. La medición en navegador
+    (conteo de `addTarget`) fue ruidosa y no es concluyente.
+
+## 4.56 Tipos y filtros de activo sueltos (tarea 94, 6-oct-2026)
+
+`ClienteVermur.statusOperativo` pasa a opcional, que es como ya se leía
+(`estatusDeCliente`); `tsc` no encontró ningún lugar que lo asumiera presente.
+`lib/estatusCatalogo.ts` (`catalogoOperable`, `activo !== false`) es el mismo
+criterio de clientes y proveedores para los catálogos con baja lógica:
+Puertos (lista, contador y badge), selector de conceptos, ficha y bandeja de
+cotización, formulario y carga masiva de tarifas. Sin migración ni campo
+escrito. Quedan sin tocar la consulta de `useTarifas` (`where activo == true`,
+índice) y `esTarifaVigente` (tarifas, no catálogo de selección).
+
 ---
 
 ## 5. Estado de los módulos

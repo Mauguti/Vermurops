@@ -23,7 +23,7 @@ function tiendaDe<T extends { id: string }>(coleccion: string, campoOrden: strin
         snap.forEach(d => data.push({ id: d.id, ...d.data() } as T));
         alDato(data);
       },
-      alError,
+      () => alError(),
     ));
 }
 

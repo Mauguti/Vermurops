@@ -47,7 +47,7 @@ const tiendaPagos = crearTiendaCompartida<Pago>((alDato, alError) =>
       snap.forEach(d => data.push({ id: d.id, ...d.data() } as Pago));
       alDato(data);
     },
-    alError,
+    () => alError(),
   ));
 
 export function usePagos(embarqueId?: string) {

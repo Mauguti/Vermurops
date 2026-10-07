@@ -11,12 +11,11 @@
  *     analizarImportacionClientes, importarClientesDesdeJSON }.
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { compararTexto } from '../lib/texto';
+import { useCallback } from 'react';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, setDoc, updateDoc, getDocsFromServer } from 'firebase/firestore';
-import { evaluarSeed } from '../lib/seedGuard';
-import { ClienteVermur, initialClientes } from '../components/clientes/ClientesData';
+import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { useTiendaCatalogo, tiendaClientes } from './tiendasCatalogos';
+import { ClienteVermur } from '../components/clientes/ClientesData';
 import type { DiasCredito } from '../components/proveedores/ProveedoresData';
 import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
@@ -25,95 +24,12 @@ import { conAviso, reportarErrorEscritura } from '../lib/erroresEscritura';
 import { sanitizarParaFirestore } from '../lib/sanitizarFirestore';
 import { statusOperativoDesdeActivo } from '../lib/estatusCliente';
 
-/**
- * El candado del seed vive a nivel de MÓDULO, no del hook (1d).
- *
- * Era un `useRef`, o sea uno por INSTANCIA: montar el hook en dos lugares
- * creaba dos sembradores compitiendo. Ya pasó con useConceptos al montarlo
- * también en Embarques —el recorrido e2e falló dos veces seguidas con el
- * catálogo a medio sembrar— y se arregló así.
- *
- * `evaluarSeed` descarta los snapshots de caché y `getDocsFromServer`
- * confirma contra el servidor antes de escribir, pero las dos barreras son
- * POR INSTANCIA: dos hooks pueden pasarlas a la vez. El candado compartido
- * cierra la ventana en el cliente, que es donde nace.
- *
- * Aquí el riesgo no se había materializado porque este hook se monta en un
- * solo lugar. Se cierra antes de que alguien lo monte en dos.
- */
-let seedIntentado = false;
+/* El seed y su candado viven en tiendasCatalogos.ts (tarea 93). */
 
 export function useClientes() {
   const { user } = useAuth();
 
-  const [clientes, setClientes] = useState<ClienteVermur[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Guarda de autenticación: no abrir el listener hasta tener usuario.
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-
-    const unsubscribe = onSnapshot(
-      collection(db, 'clientes'),
-      async (snapshot) => {
-        // ── ¿Se puede sembrar? ────────────────────────────────────────────
-        // evaluarSeed descarta los snapshots de caché: uno vacío NO prueba que
-        // la colección esté vacía en el servidor, solo que este cliente aún no
-        // la bajó. Ver src/lib/seedGuard.ts.
-        if (evaluarSeed(snapshot, seedIntentado).sembrar) {
-          seedIntentado = true;
-          try {
-            // Segunda barrera, ya con el servidor de por medio: confirma que
-            // 'clientes' sigue vacía justo antes de escribir. Cubre la carrera
-            // con otra pestaña sembrando al mismo tiempo, y falla si no hay red
-            // en vez de sembrar a ciegas.
-            const enServidor = await getDocsFromServer(collection(db, 'clientes'));
-            if (!enServidor.empty) {
-              console.warn('[seed] clientes: el servidor ya tiene ' + enServidor.size + ' documentos. No se siembra.');
-              return;
-            }
-
-            await conAviso('los clientes iniciales', () => Promise.all(
-              initialClientes.map(c =>
-                setDoc(doc(db, 'clientes', c.id), sanitizarParaFirestore(c))
-              )
-            ));
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : 'Error al sembrar clientes iniciales';
-            setError(msg);
-            setLoading(false);
-          }
-          return;
-        }
-
-        // Snapshot que no autoriza sembrar: se pinta tal cual. Si venía de
-        // caché, el snapshot del servidor llegará después y volverá a evaluar.
-
-        // ── Snapshot con datos (normal o post-seed) ───────────────────────
-        const data: ClienteVermur[] = [];
-        snapshot.forEach(docSnap => {
-          data.push({ id: docSnap.id, ...docSnap.data() } as ClienteVermur);
-        });
-
-        // Alfabético por razón social.
-        // Bloque 4: un documento sin `nombre` tiraba la app entera al cargar.
-        data.sort((a, b) => compararTexto(a.nombre, b.nombre));
-
-        setClientes(data);
-        setLoading(false);
-      },
-      (err) => {
-        setError(err.message);
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [user]);
+  const { datos: clientes, loading, error } = useTiendaCatalogo(tiendaClientes, !!user);
 
   // ── Writes ───────────────────────────────────────────────────────────────
 

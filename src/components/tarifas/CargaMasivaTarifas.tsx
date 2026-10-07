@@ -12,6 +12,7 @@
  *  - Si algo falla a media escritura, muestra qué se guardó y qué no.
  */
 
+import { catalogoOperable } from '../../lib/estatusCatalogo';
 import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   ArrowLeft, Plus, Trash2, Loader2, CheckCircle2, XCircle, AlertCircle,
@@ -79,11 +80,11 @@ export default function CargaMasivaTarifas({ onClose, onCreate }: Props) {
     [proveedores],
   );
   const concActivos = useMemo(
-    () => conceptos.filter(c => c.activo).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
+    () => conceptos.filter(catalogoOperable).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
     [conceptos],
   );
   const ptosActivos = useMemo(
-    () => puertos.filter(p => p.activo).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
+    () => puertos.filter(catalogoOperable).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
     [puertos],
   );
 
