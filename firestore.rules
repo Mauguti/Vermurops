@@ -259,11 +259,30 @@ service cloud.firestore {
         return request.resource.data[campo] == valor;
       }
 
+      function veniaEn(campo, valor) {
+        return resource.data[campo] == valor;
+      }
+
       allow read:   if esDelEquipo();
       allow create: if esDelEquipo();
       allow update: if esDelEquipo()
-                    // Marcar pagada es registrar un pago.
+                    // Marcar pagada es registrar un pago: la ENTRADA.
                     && (!(toca('estado') && quedaEn('estado', 'pagada')) || autorizaDinero())
+                    /*
+                     * Y la SALIDA. Sacar una orden de «pagada» —lo que hace
+                     * anular el pago (§4.45)— es deshacer un movimiento de
+                     * dinero, así que pide lo mismo que hacerlo. Sin esto,
+                     * Operaciones podía mover una orden pagada a cualquier
+                     * otro estado: la guarda de entrada no mira de dónde viene.
+                     */
+                    && (!(veniaEn('estado', 'pagada') && toca('estado')) || autorizaDinero())
+                    /*
+                     * El comprobante ES la prueba de que salió el dinero, y
+                     * `pagadaPor` dice quién y cuándo. Tocarlos es registrar o
+                     * borrar esa prueba.
+                     */
+                    && (!toca('comprobantePago') || autorizaDinero())
+                    && (!toca('pagadaPor') || autorizaDinero())
                     // Quitar «No pagar» libera el dinero; ponerlo solo avisa.
                     && (!(toca('noPagar') && quedaEn('noPagar', false)) || autorizaDinero())
                     && (!(toca('noPagar') && quedaEn('noPagar', true))
