@@ -1,0 +1,316 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /*
+     * ── Quién es del equipo (Bloque 9, 25-sep-2026) ──────────────────────
+     * Parche mientras el rol no viaja en el token. Hasta hoy bastaba con
+     * estar autenticado, y el registro público estuvo ABIERTO: cualquiera
+     * que leyera la API key del bundle podía crearse una cuenta y leer y
+     * escribir toda la base. El registro ya se cerró; esto asegura que, si
+     * volviera a abrirse o alguien creara una cuenta por otra vía, no
+     * alcance ni un documento.
+     *
+     * Es una LISTA DE CORREOS a propósito: el rol no está en el token
+     * todavía. Cuando Usuarios y roles ponga los claims, esta función se
+     * sustituye por permisos por rol (paso 3) y la lista desaparece.
+     *
+     * ⚠️ Una cuenta recién invitada que no esté aquí NO puede entrar: la
+     * pantalla de Usuarios avisa, y el correo se agrega en el mismo cambio.
+     *
+     * Las cuentas de prueba del emulador NO van aquí: se inyectan al
+     * generar las reglas del emulador (scripts/reglasEmulador.sh), para no
+     * dejar en producción correos que alguien pueda crear después.
+     */
+    function esDelEquipo() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() in [
+          // EQUIPO:INICIO — generado también para el emulador; no reordenar a mano
+          'itzel.laurean@vermur.com',
+          'nohema.sosa@vermur.com',
+          'julio.gutierrez@vermur.com',
+          'angel.luna@vermur.com',
+          'gabriela.huerta@vermur.com',
+          'luis.renteria@vermur.com',
+          'info@digsol.com.mx'
+          // EQUIPO:FIN
+        ];
+    }
+
+
+    // ── Denegar todo lo que no esté explícitamente permitido ──────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ── Cotizaciones ──────────────────────────────────────────────────────
+    // Cualquier usuario autenticado puede leer y crear/actualizar.
+    // Eliminar está prohibido: una cotización perdida se marca como 'perdida',
+    // nunca se borra del historial.
+    match /cotizaciones/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Versiones de la cotización (V-2) ──────────────────────────────────
+    // Fotos INMUTABLES: se crean al hacer «Nueva versión» y nunca se editan
+    // ni se borran. Restaurar una vieja crea otra nueva; no la reescribe.
+    match /cotizaciones/{id}/versiones/{numero} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update, delete: if false;
+    }
+
+    // ── Prospectos / leads ────────────────────────────────────────────────
+    // Antes vivían solo en memoria: se perdían al recargar. Mismo patrón que
+    // cotizaciones — un lead perdido se marca, no se borra del historial.
+    match /prospectos/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Contadores (usado por folioService.generateFolio) ─────────────────
+    // generateFolio() hace runTransaction: necesita leer Y escribir.
+    // Solo usuarios autenticados pueden tocar el contador.
+    match /contadores/{id} {
+      allow read:   if esDelEquipo();
+      allow write:  if esDelEquipo();
+    }
+    // NOTA: la siembra de consecutivos (contadores/embarques_VLIM, etc.) se
+    // restringe a Admin en la capa de datos (useContadoresSerie exige
+    // 'catalogo.importarMasivo'). Aquí no se puede distinguir el rol — ver la
+    // deuda crítica de §6 sobre reglas que no distinguen roles.
+
+    // ── Clientes ──────────────────────────────────────────────────────────
+    // Cualquier usuario autenticado puede leer y crear/actualizar.
+    // Eliminar está prohibido: un cliente inactivo se marca statusOperativo='INACTIVO'.
+    match /clientes/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Proveedores ─────────────────────────────────────────────────────
+    // Cualquier usuario autenticado puede leer y crear/actualizar.
+    // Eliminar está prohibido: un proveedor inactivo se marca activo=false.
+    match /proveedores/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Conceptos ────────────────────────────────────────────────────────
+    // Catálogo de conceptos/servicios (105 registros de Magaya).
+    // Baja lógica: un concepto inactivo se marca activo=false.
+    match /conceptos/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Términos de pago ────────────────────────────────────────────────
+    // Catálogo de términos/condiciones de pago (25 registros).
+    // Baja lógica: un término inactivo se marca activo=false.
+    match /terminosPago/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Puertos (E10.0) ─────────────────────────────────────────────────
+    // Catálogo de puertos marítimos. Mismo patrón que proveedores.
+    // Baja lógica: un puerto inactivo se marca activo=false.
+    match /puertos/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Tarifas (TA-1) ──────────────────────────────────────────────────
+    // Catálogo de tarifas (precios por concepto + proveedor + ruta).
+    // Baja lógica: una tarifa inactiva se marca activo=false.
+    // Queries del listener acotado usan: activo + fechaFin.
+    match /tarifas/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Documentos de tarifario / evidencias (TA-3, MC-6) ────────────────
+    // El documento del que se extrajo una tarifa ES la evidencia: no hay dos
+    // sistemas de adjuntos. Eliminar está prohibido — borrar la evidencia de
+    // dónde salió un costo deja la tarifa sin respaldo.
+    match /documentosTarifario/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo()
+                    && request.resource.data.subidoPor == request.auth.uid;
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Importaciones de tarifarios (TA-2) ───────────────────────────────
+    // Borradores de la carga de tarifarios con IA.
+    // Eliminar está prohibido: una importación descartada se MARCA, no se
+    // borra. Si mañana aparece una tarifa rara en el catálogo, el rastro de
+    // qué se subió y qué se decidió es lo que permite reconstruir qué pasó.
+    //
+    // La capacidad 'tarifario.cargar' (Pricing) se exige en la capa de datos,
+    // no aquí: las reglas todavía no distinguen roles — ver §6 del CLAUDE.md.
+    match /importacionesTarifas/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo()
+                    && request.resource.data.creadoPor == request.auth.uid;
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Embarques (E-1) ──────────────────────────────────────────────────
+    // Antes vivían en memoria y se perdían al recargar.
+    // Eliminar está prohibido: un embarque cancelado se marca en sus cierres,
+    // nunca se borra — es el respaldo de lo que se cobró y se pagó.
+    match /embarques/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Órdenes de Compra (OC-1) ─────────────────────────────────────────
+    // Cualquier usuario autenticado puede leer y crear/actualizar.
+    // Eliminar está prohibido: una OC cancelada se marca activo=false.
+    match /ordenesCompra/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Depósitos del cliente (1.1) ──────────────────────────────────────
+    // El dinero con el que el cliente fondea las OCs de su embarque.
+    // Eliminar está prohibido: un depósito mal capturado se anula con
+    // activo=false, nunca se borra — es evidencia de que entró dinero,
+    // igual que un comprobante de pago.
+    match /depositosCliente/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Facturas al cliente y sus cobros (2.1 / 2.3) ─────────────────────
+    // ⚠️ NO son CFDI: Vermur timbra por fuera. Aquí se registra lo emitido.
+    // Eliminar está prohibido: una factura emitida existió, y borrarla
+    // dejaría las líneas del embarque apuntando a un documento fantasma.
+    // Una factura mal capturada se cancela; un cobro se anula.
+    match /facturas/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    match /cobros/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Pagos (PLAN-PAGOS §1.1 · tarea 68 / P2) ──────────────────────────
+    // Un documento por movimiento real de dinero —una transferencia que
+    // salió, una entrada que llegó— con sus aplicaciones dentro.
+    //
+    // Sustituye la ESCRITURA de `cobros/` y `depositosCliente/`, que quedan
+    // de solo lectura: lo que ya está ahí no se migra y se sigue leyendo.
+    //
+    // Eliminar está prohibido, por lo mismo que en las otras tres: un
+    // movimiento de dinero existió. Un pago mal aplicado se anula con
+    // activo=false y lo aplicado desaparece solo, porque se DERIVA de las
+    // aplicaciones vivas.
+    //
+    // ⚠️ Nace con esDelEquipo(), como todo lo demás: cualquiera del equipo
+    // puede escribir un pago desde la consola de Firebase. Con dinero de
+    // verdad en esta colección, la deuda de §6 —las reglas no distinguen
+    // roles— sube de prioridad. Lo correcto es exigir la capacidad
+    // `cobro.registrar` / `ordenCompra.autorizar`, y eso necesita el rol en
+    // el token (plan de la tarea 53).
+    match /pagos/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
+      allow delete: if false;
+    }
+
+    // ── Vistas de usuario (TV-4) ─────────────────────────────────────────
+    // Lectura: autenticado (para ver vistas compartidas de otros).
+    // Creación: autenticado, siempre que usuarioId == su UID.
+    // Actualización/Borrado: solo el creador (usuarioId == UID).
+    // ── Preferencias de pantalla por usuario (3.3) ────────────────────────
+    // Un documento por uid: cómo ver los cargos, y lo que venga. Solo el
+    // dueño lee y escribe el suyo.
+    match /preferenciasUsuario/{uid} {
+      allow read, write: if esDelEquipo() && request.auth.uid == uid;
+    }
+
+    match /vistasUsuario/{id} {
+      allow read:   if esDelEquipo();
+      allow create: if esDelEquipo()
+                    && request.resource.data.usuarioId == request.auth.uid;
+      allow update: if esDelEquipo()
+                    && resource.data.usuarioId == request.auth.uid;
+      allow delete: if esDelEquipo()
+                    && resource.data.usuarioId == request.auth.uid;
+    }
+
+    // ── Configuración de la empresa (tarea 40) ───────────────────────
+    // Los datos que encabezan los documentos operativos: razón social,
+    // RFC, domicilio, logo. Los edita Administración desde «Mi empresa».
+    match /configuracion/empresa {
+      allow read, write: if esDelEquipo();
+    }
+
+    // ── Tipo de cambio: se LEE, no se escribe desde el navegador ──────
+    //
+    // Lo escribe `actualizarTipoCambio` con el Admin SDK, que no pasa por
+    // estas reglas. Dejarlo abierto al cliente permitiría que cualquiera
+    // del equipo moviera la tasa con la que se cotiza y se factura, desde
+    // la consola del navegador y sin dejar rastro.
+    match /configuracion/tipoCambio {
+      allow read:  if esDelEquipo();
+      allow write: if false;
+    }
+
+    match /tiposCambio/{fecha} {
+      allow read:  if esDelEquipo();
+      allow write: if false;
+    }
+
+    // ── Notificaciones ────────────────────────────────────────────────────
+    // Lectura: solo el destinatario nombrado en el documento.
+    //   Alinea con la query de NotificationsContext:
+    //   where('destinatarioId', '==', user.uid)
+    // Creación: cualquier usuario autenticado puede crear (p.ej. mensaje de chat
+    //   que genera notificación para otro usuario).
+    // Actualización: solo el propio destinatario puede marcarla leída.
+    match /notificaciones/{id} {
+      allow read:   if esDelEquipo()
+                    && resource.data.destinatarioId == request.auth.uid;
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo()
+                    && resource.data.destinatarioId == request.auth.uid;
+      allow delete: if false;
+    }
+
+  }
+}
