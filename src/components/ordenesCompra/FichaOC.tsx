@@ -35,6 +35,7 @@ import {
   puedeMarcarNoPagar as rolPuedeMarcarNoPagar,
   puedeLiberarNoPagar as rolPuedeLiberarNoPagar,
   puedeMarcarPrefactura as rolPuedeMarcarPrefactura,
+  puedeRegistrarComprobante as rolPuedeRegistrarComprobante,
 } from '../../auth/permisos';
 import BadgePrefactura from './BadgePrefactura';
 import { PanelPrefactura } from './PanelPrefactura';
@@ -191,6 +192,16 @@ export default function FichaOC({
    * decidir cuánto sale de la cuenta, no avisar de un riesgo.
    */
   const puedeCruzarAnticipos = rolPuedeLiberarNoPagar(rol);
+
+  /*
+   * El comprobante ES la prueba de que salió el dinero, y lo escribe quien
+   * paga. Para los demás el campo queda de SOLO LECTURA, no escondido: ver
+   * la referencia del pago es parte de entender la orden; capturarla, no.
+   *
+   * Sin esto la pantalla ofrecería un campo que las reglas de Firestore
+   * rechazan, y el aviso rojo llegaría después de teclear.
+   */
+  const puedeTocarComprobante = rolPuedeRegistrarComprobante(rol);
   // Tarea 55 · admin, administracion y operaciones pueden cargar la factura.
   const puedeCargarFactura = rol === 'admin' || rol === 'administracion' || rol === 'operaciones';
 
@@ -710,11 +721,13 @@ export default function FichaOC({
 
             <Campo
               rotulo="Comprobante de pago"
-              ayuda="Sin él no se puede marcar como pagada: el comprobante ES la prueba de que salió el dinero."
+              ayuda={puedeTocarComprobante
+                ? 'Sin él no se puede marcar como pagada: el comprobante ES la prueba de que salió el dinero.'
+                : 'Lo captura Administración al registrar el pago.'}
               valor={comprobante}
               onChange={setComprobante}
               onGuardar={() => onActualizar({ comprobantePago: comprobante.trim() || null })}
-              soloLectura={terminada}
+              soloLectura={terminada || !puedeTocarComprobante}
             />
 
             {disponibles.includes('pagada') && (
@@ -866,6 +879,10 @@ function Campo({
         onChange={e => onChange(e.target.value)}
         onBlur={onGuardar}
         readOnly={soloLectura}
+        /* El <label> de arriba es hermano y no trae htmlFor, así que no está
+           asociado a este input: ni un lector de pantalla ni un test lo
+           ligan. El aria-label cierra las dos cosas. */
+        aria-label={rotulo}
         placeholder="Referencia o liga del documento"
         className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-[12px] outline-none focus:border-primario read-only:text-gray-500"
       />

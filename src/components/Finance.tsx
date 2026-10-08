@@ -22,6 +22,7 @@ import { useConceptos } from '../hooks/useConceptos';
 import type { OrdenCompra, EstadoOC } from './ordenesCompra/OrdenesCompraData';
 import type { RolOC } from '../lib/stateMachineOC';
 import { useAuth } from '../auth/AuthContext';
+import { puedeRegistrarComprobante } from '../auth/permisos';
 import Toast, { TipoToast } from './ui/Toast';
 import ModuloEnDesarrollo from './ui/ModuloEnDesarrollo';
 import PanelCuentasPorCobrar from './facturas/PanelCuentasPorCobrar';
@@ -427,7 +428,14 @@ export default function Finance() {
                      <PanelPagos
                        ordenes={ordenes}
                        onAbrirOC={setOcAbiertaId}
-                       onRegistrarPago={registrarPagoDelGrupo}
+                       /*
+                        * Solo a quien autoriza. El botón se ofrecía a todo el
+                        * que ve Finanzas —Operaciones incluida— y la escritura
+                        * la detenía la máquina de estados aguas abajo: un
+                        * botón que no cumple su promesa. `onRegistrarPago` ya
+                        * era opcional, así que la puerta es no pasarlo.
+                        */
+                       onRegistrarPago={puedeRegistrarComprobante(rolOC) ? registrarPagoDelGrupo : undefined}
                        conteosPorEstado={conteosPorEstado}
                      />
                    </div>
