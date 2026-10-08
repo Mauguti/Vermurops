@@ -240,6 +240,22 @@ export function puedeMarcarPrefactura(rol: UserRole | undefined | null): boolean
   return puede(rol, 'ordenCompra.gestionar');
 }
 
+/**
+ * ¿Este rol puede escribir el COMPROBANTE del pago y `pagadaPor`?
+ *
+ * El comprobante es la prueba de que el dinero salió del banco, y quien la
+ * tiene es quien pagó: `ordenCompra.autorizar` (Administración y admin).
+ * Operaciones prepara la orden —factura del proveedor, «No pagar»,
+ * prefactura— pero no registra el movimiento.
+ *
+ * Es el espejo en la app de la guarda de `firestore.rules`: tocar
+ * `comprobantePago` o `pagadaPor` pide `autorizaDinero()`. Sin esto, la
+ * pantalla ofrecería un campo que la base rechaza.
+ */
+export function puedeRegistrarComprobante(rol: UserRole | undefined | null): boolean {
+  return puede(rol, 'ordenCompra.autorizar');
+}
+
 /** ¿Este rol puede QUITAR la marca y dejar que el pago salga? */
 export function puedeLiberarNoPagar(rol: UserRole | undefined | null): boolean {
   return puede(rol, 'ordenCompra.autorizar');
