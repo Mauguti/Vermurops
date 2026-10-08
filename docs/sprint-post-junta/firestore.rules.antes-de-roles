@@ -38,54 +38,6 @@ service cloud.firestore {
         ];
     }
 
-    /*
-     * ── El rol, con convivencia ───────────────────────────────────────────
-     *
-     * `gestionarUsuarios` pone `{ rol }` en los custom claims. Mientras no
-     * TODO el equipo lo tenga, una cuenta SIN claim se comporta exactamente
-     * como hasta hoy: `esDelEquipo()` y nada más. Así nadie se queda fuera el
-     * día del deploy, y el cerco se va cerrando solo conforme se asignan los
-     * roles — sin un segundo deploy de reglas.
-     *
-     * El precio, dicho: una cuenta del equipo sin rol asignado conserva los
-     * permisos de hoy, o sea todos. La lista de correos sigue siendo el piso.
-     */
-    /*
-     * Se pregunta por la CLAVE (`'rol' in …`), no por el valor: en un token
-     * sin el claim, leer `request.auth.token.rol` no da null, falla la
-     * evaluación — y una regla que falla deniega. Preguntar por el valor
-     * dejaba fuera justo a las cuentas sin rol, que es lo contrario de lo que
-     * la convivencia promete.
-     */
-    function tieneRolAsignado() {
-      return request.auth != null
-        && 'rol' in request.auth.token
-        && request.auth.token.rol is string;
-    }
-
-    /** Del equipo Y (sin rol todavía, o con uno de los roles que se piden). */
-    function rolEntre(roles) {
-      return esDelEquipo()
-        && (!tieneRolAsignado() || request.auth.token.rol in roles);
-    }
-
-    /*
-     * Quien decide que el dinero se mueve: registrar, aplicar y anular cobros
-     * y pagos. Es `ordenCompra.autorizar` + `cobro.registrar` de permisos.ts.
-     */
-    function autorizaDinero() {
-      return rolEntre(['admin', 'administracion']);
-    }
-
-    /*
-     * Quien habla con el proveedor y conoce la operación: marcar «No pagar» y
-     * marcar prefactura. Es `ordenCompra.gestionar` de permisos.ts, que NO la
-     * tiene Administración — ahí la app y estas reglas dicen lo mismo.
-     */
-    function gestionaOrdenes() {
-      return rolEntre(['admin', 'operaciones']);
-    }
-
 
     // ── Denegar todo lo que no esté explícitamente permitido ──────────────
     match /{document=**} {
@@ -238,38 +190,9 @@ service cloud.firestore {
     // Cualquier usuario autenticado puede leer y crear/actualizar.
     // Eliminar está prohibido: una OC cancelada se marca activo=false.
     match /ordenesCompra/{id} {
-      /*
-       * La base NO cambia —Operaciones solicita y gestiona, Administración
-       * autoriza y paga, y las dos escriben la misma orden— y encima van tres
-       * guardas por CAMPO, que es donde el rol importa:
-       *
-       *   estado → 'pagada'   el dinero salió      solo quien autoriza
-       *   noPagar true→false  liberar el pago      solo quien autoriza
-       *   noPagar → true      avisar del riesgo    también Operaciones
-       *   esPrefactura        la naviera cobra antes   Operaciones (y admin)
-       *
-       * Se escriben como NEGACIONES sobre la base: si el patch no toca el
-       * campo, la guarda no opina. Un `update` que mezcla varios campos tiene
-       * que cumplir todas las que toque.
-       */
-      function toca(campo) {
-        return request.resource.data.diff(resource.data).affectedKeys().hasAny([campo]);
-      }
-      function quedaEn(campo, valor) {
-        return request.resource.data[campo] == valor;
-      }
-
       allow read:   if esDelEquipo();
       allow create: if esDelEquipo();
-      allow update: if esDelEquipo()
-                    // Marcar pagada es registrar un pago.
-                    && (!(toca('estado') && quedaEn('estado', 'pagada')) || autorizaDinero())
-                    // Quitar «No pagar» libera el dinero; ponerlo solo avisa.
-                    && (!(toca('noPagar') && quedaEn('noPagar', false)) || autorizaDinero())
-                    && (!(toca('noPagar') && quedaEn('noPagar', true))
-                        || autorizaDinero() || gestionaOrdenes())
-                    // La prefactura la declara quien habla con el proveedor.
-                    && (!toca('esPrefactura') || gestionaOrdenes());
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -279,11 +202,9 @@ service cloud.firestore {
     // activo=false, nunca se borra — es evidencia de que entró dinero,
     // igual que un comprobante de pago.
     match /depositosCliente/{id} {
-      // Legado de solo lectura desde la 68; misma razón.
-      // LEER no cambia: la cartera y los tableros la ven todos.
       allow read:   if esDelEquipo();
-      allow create: if autorizaDinero();
-      allow update: if autorizaDinero();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -300,11 +221,9 @@ service cloud.firestore {
     }
 
     match /cobros/{id} {
-      // Legado de solo lectura desde la 68, pero la regla no se relaja.
-      // LEER no cambia: la cartera y los tableros la ven todos.
       allow read:   if esDelEquipo();
-      allow create: if autorizaDinero();
-      allow update: if autorizaDinero();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
@@ -327,11 +246,9 @@ service cloud.firestore {
     // `cobro.registrar` / `ordenCompra.autorizar`, y eso necesita el rol en
     // el token (plan de la tarea 53).
     match /pagos/{id} {
-      // Un movimiento de dinero: lo registra, aplica y anula quien autoriza.
-      // LEER no cambia: la cartera y los tableros la ven todos.
       allow read:   if esDelEquipo();
-      allow create: if autorizaDinero();
-      allow update: if autorizaDinero();
+      allow create: if esDelEquipo();
+      allow update: if esDelEquipo();
       allow delete: if false;
     }
 
