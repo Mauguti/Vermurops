@@ -162,6 +162,91 @@ describe('ordenesCompra · marcar PAGADA es registrar un pago', () => {
   });
 });
 
+describe('ordenesCompra · salir de «pagada» pide lo mismo que entrar', () => {
+  /*
+   * La guarda de entrada no mira de DÓNDE viene: sin la de salida,
+   * Operaciones podía mover una orden ya pagada a cualquier otro estado y
+   * deshacer un movimiento de dinero que no autorizó.
+   */
+  beforeEach(async () => {
+    await sembrar('ordenesCompra/OC-PAGADA', {
+      ...ORDEN, id: 'OC-PAGADA', estado: 'pagada',
+      comprobantePago: 'SPEI-999',
+      pagadaPor: { uid: 'u', nombre: 'Julio', fecha: '2026-10-07' },
+    });
+  });
+
+  it.each(['operaciones', 'pricing', 'ventas'] as const)('%s NO la saca de pagada', async (rol) => {
+    await assertFails(updateDoc(doc(como(rol), 'ordenesCompra', 'OC-PAGADA'),
+      { estado: 'autorizada' }));
+  });
+
+  it.each(['admin', 'administracion'] as const)('%s sí la saca de pagada', async (rol) => {
+    await assertSucceeds(updateDoc(doc(como(rol), 'ordenesCompra', 'OC-PAGADA'),
+      { estado: 'autorizada' }));
+  });
+
+  /** Lo que NO toca el estado sigue pasando: la orden pagada no se congela. */
+  it('operaciones sí edita otro campo de una orden pagada', async () => {
+    await assertSucceeds(updateDoc(doc(como('operaciones'), 'ordenesCompra', 'OC-PAGADA'),
+      { concepto: 'Flete marítimo' }));
+  });
+
+  /*
+   * El caso que importa que NO se rompa: la transacción de la tarea 85
+   * (§4.48) anulando un pago a proveedor. Administración saca la orden de
+   * «pagada» Y limpia las dos pruebas del pago, todo en el mismo patch.
+   */
+  it('la anulación de la 85 pasa completa con Administración', async () => {
+    await assertSucceeds(updateDoc(doc(como('administracion'), 'ordenesCompra', 'OC-PAGADA'), {
+      estado: 'autorizada',
+      comprobantePago: null,
+      pagadaPor: null,
+      historialEstados: [{ estado: 'autorizada', motivo: 'Anulado el pago PAG-1' }],
+    }));
+  });
+
+  it('y Operaciones NO puede hacer esa misma anulación', async () => {
+    await assertFails(updateDoc(doc(como('operaciones'), 'ordenesCompra', 'OC-PAGADA'), {
+      estado: 'autorizada', comprobantePago: null, pagadaPor: null,
+    }));
+  });
+});
+
+describe('ordenesCompra · el comprobante y pagadaPor son la prueba del pago', () => {
+  it.each(['admin', 'administracion'] as const)('%s escribe el comprobante', async (rol) => {
+    await assertSucceeds(updateDoc(doc(como(rol), 'ordenesCompra', 'OC-1'),
+      { comprobantePago: 'SPEI-123' }));
+  });
+
+  /*
+   * ⚠️ Esto QUITA algo que hoy funciona: el campo «Comprobante de pago» de
+   * la ficha (FichaOC.tsx) no comprueba rol, solo que la orden no esté
+   * terminada, y su ayuda dice que se captura ANTES de pagar. Con esta regla
+   * Operaciones deja de poder capturarlo. Está anotado para Mau, sin
+   * cambiar la regla para que pase.
+   */
+  it.each(['operaciones', 'pricing', 'ventas'] as const)('%s NO lo escribe', async (rol) => {
+    await assertFails(updateDoc(doc(como(rol), 'ordenesCompra', 'OC-1'),
+      { comprobantePago: 'SPEI-123' }));
+  });
+
+  it.each(['admin', 'administracion'] as const)('%s escribe pagadaPor', async (rol) => {
+    await assertSucceeds(updateDoc(doc(como(rol), 'ordenesCompra', 'OC-1'),
+      { pagadaPor: { uid: 'u', nombre: 'Julio', fecha: '2026-10-07' } }));
+  });
+
+  it('operaciones NO escribe pagadaPor', async () => {
+    await assertFails(updateDoc(doc(como('operaciones'), 'ordenesCompra', 'OC-1'),
+      { pagadaPor: { uid: 'u', nombre: 'Ángel', fecha: '2026-10-07' } }));
+  });
+
+  it('borrar el comprobante tampoco es de Operaciones', async () => {
+    await assertFails(updateDoc(doc(como('operaciones'), 'ordenesCompra', 'OC-1'),
+      { comprobantePago: null }));
+  });
+});
+
 describe('ordenesCompra · «No pagar»: marcarlo y quitarlo no son lo mismo', () => {
   it.each(['admin', 'administracion', 'operaciones'] as const)('%s lo MARCA', async (rol) => {
     await assertSucceeds(updateDoc(doc(como(rol), 'ordenesCompra', 'OC-1'),

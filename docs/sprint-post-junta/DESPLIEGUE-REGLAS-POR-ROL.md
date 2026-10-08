@@ -5,11 +5,58 @@ y `ordenesCompra/`. Todo lo demás sigue con `esDelEquipo()`.
 
 ---
 
-## 0 · Antes de desplegar (2 minutos)
+## 0 · Los claims, ANTES del deploy — sin esto el deploy no protege nada
 
-**Confirmar que los claims están puestos.** Configuración → Usuarios: cada
-persona debe mostrar su rol. Quien no lo tenga **no se queda fuera** —la
-convivencia lo cubre— pero tampoco queda protegido.
+La convivencia deja pasar a toda cuenta **sin** claim con los permisos de hoy.
+Así nadie se queda fuera… y así tampoco nadie queda protegido. **Una cuenta
+sin rol es una cuenta sin cerco**, aunque las reglas estén publicadas.
+
+### 0.1 Ver qué falta
+
+```bash
+cd /Users/mauriciogutierrezmunoz/antigravity/Vermur-Logistics && npx tsx scripts/auditarClaims.ts
+```
+
+Solo lectura. Lista las cuentas de Auth con su rol y marca con ❌ las que no
+tienen. Al final dice **«N de 7 con rol asignado»** y si se puede desplegar.
+
+### 0.2 Asignar el rol que falte
+
+**Configuración → Usuarios**, con la cuenta de admin. Va por
+`gestionarUsuarios`, que pone el claim y además revoca los tokens — por eso no
+se hace a mano con la consola.
+
+### 0.3 Que cada quien cierre sesión y vuelva a entrar
+
+**Este paso es el que se olvida.** El claim viaja **en el token**, y el que la
+persona ya tiene en su navegador no lo trae. Hasta que no renueve sesión, su
+token sigue sin rol y su cuenta sigue en la vía de convivencia, aunque la
+pantalla de Usuarios ya muestre el rol.
+
+Mensaje para el grupo:
+
+> Ya quedaron los roles. **Cierren sesión y vuelvan a entrar** antes del
+> martes; si no, la plataforma los sigue tratando como antes.
+
+### 0.4 Volver a correr la auditoría
+
+```bash
+cd /Users/mauriciogutierrezmunoz/antigravity/Vermur-Logistics && npx tsx scripts/auditarClaims.ts
+```
+
+**Repetir 0.2 → 0.4 hasta que diga «7 de 7» y «✅ Los claims están listos».**
+Con un solo ❌, el deploy se puede hacer —no rompe nada— pero esa persona
+conserva todos los permisos de hoy. No es un deploy a medias: es un deploy que
+a esa cuenta no le aplica.
+
+> ⚠️ **Un rol inválido es peor que ninguno.** Si una cuenta trae un claim que
+> las reglas no reconocen (un dedazo, un rol que ya no existe), NO cae en la
+> convivencia: queda sin permisos de dinero. La auditoría lo marca con ⚠️
+> aparte de los ❌.
+
+---
+
+## 1 · El deploy
 
 ```bash
 cd /Users/mauriciogutierrezmunoz/antigravity/Vermur-Logistics && npx firebase deploy --only firestore:rules
@@ -24,7 +71,7 @@ existe.
 
 ---
 
-## 1 · Qué probar en producción, en 10 minutos
+## 2 · Qué probar en producción, en 10 minutos
 
 Con **una orden de prueba** («PRUEBA ROLES»), no con una real: este bloque
 mueve estados de órdenes de compra.
@@ -47,7 +94,7 @@ cerró es **quién escribe** dinero.
 
 ---
 
-## 2 · Cómo regresar
+## 3 · Cómo regresar
 
 El `firestore.rules` de hoy está guardado tal cual, verificado byte a byte
 contra lo que corre en producción:
@@ -75,7 +122,7 @@ copia de arriba.
 
 ---
 
-## 3 · La decisión que lleva dentro, para que la tomes a sabiendas
+## 4 · La decisión que lleva dentro, para que la tomes a sabiendas
 
 **Una cuenta del equipo SIN claim de rol conserva los permisos de hoy, o sea
 todos.** Es lo que hace publicable el martes sin esperar a que los seis roles
@@ -93,7 +140,45 @@ regresión.
 
 ---
 
-## 4 · Lo que este paso NO hace
+## 5 · El martes 20: quitar la convivencia
+
+Con los 7 roles puestos y una semana de operación encima, la vía de escape
+deja de hacer falta y pasa a ser el agujero: cualquier cuenta a la que se le
+caiga el claim —una invitación nueva sin rol, un `revokeRefreshTokens` a medias—
+recupera todos los permisos sin que nadie se entere.
+
+**Propuesta: martes 20-oct.** Una semana de margen para que cualquier
+problema del 13 aparezca con la red puesta.
+
+Qué se hace, en `firestore.rules`:
+
+```
+function rolEntre(roles) {
+  return esDelEquipo()
+    && (!tieneRolAsignado() || request.auth.token.rol in roles);   ← quitar esta mitad
+}
+```
+
+queda:
+
+```
+function rolEntre(roles) {
+  return esDelEquipo() && request.auth.token.rol in roles;
+}
+```
+
+**Al hacerlo, el bloque «convivencia» de `tests/reglas/porRol.test.ts` DEBE
+caer** — son 9 tests y son el contrato de la vía de escape. Su caída es la
+señal de que ya no existe, no una regresión: se reescriben al revés (una
+cuenta sin rol ya no escribe) en el mismo cambio.
+
+Antes de ese deploy, correr `auditarClaims.ts` otra vez: después del 20, una
+cuenta sin rol **se queda sin poder registrar dinero**, y eso sí se nota en
+media hora.
+
+---
+
+## 6 · Lo que este paso NO hace
 
 - **No restringe lecturas.** El plan (§2.1) propone que Ventas y Pricing no
   vean `ordenesCompra`, `cobros` ni `depositosCliente`. No entró: cerrar
@@ -110,7 +195,7 @@ regresión.
 
 ---
 
-## 5 · Evidencia
+## 7 · Evidencia
 
 - **119 tests de reglas** (`npm run test:reglas`), de los cuales 50 son los
   nuevos por rol.
