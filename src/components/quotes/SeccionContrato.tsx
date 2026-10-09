@@ -27,9 +27,9 @@ export function AvisoSinContrato({ quote }: { quote: Pick<KanbanQuote, 'etapa' |
   );
 }
 
-export default function SeccionContrato({ quote }: { quote: KanbanQuote }) {
+export default function SeccionContrato({ quote, onUpdateQuote }: { quote: KanbanQuote; onUpdateQuote: (q: KanbanQuote) => void }) {
   const { user } = useAuth();
-  const { trabajando, subir, marcarFirmado } = useContratoCotizacion();
+  const { trabajando, subir, marcarFirmado } = useContratoCotizacion(onUpdateQuote);
   const [firmadoAlSubir, setFirmadoAlSubir] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [url, setUrl] = useState<string | null>(null);

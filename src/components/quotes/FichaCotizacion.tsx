@@ -2418,7 +2418,7 @@ export default function FichaCotizacion({
             </div>{/* fin rejilla de dos columnas */}
 
           {/* ── Contrato (tarea 102): solo cuando la cotización está ganada. */}
-          {quote.etapa === 'ganada' && !viendoVersion && <SeccionContrato quote={quote} />}
+          {quote.etapa === 'ganada' && !viendoVersion && <SeccionContrato quote={quote} onUpdateQuote={onUpdateQuote} />}
 
           {/* ── Operación (Fase A, 24-sep-2026) ───────────────────────────
               Lo que antes vivía en el modal «Datos del embarque», editable
