@@ -556,6 +556,20 @@ export interface KanbanQuote {
    */
   pdfs?: PdfCotizacion[];
 
+  /**
+   * Contrato de la cotización ganada (tarea 102). Opcional y aditivo: lo
+   * ausente es «sin contrato». `subidoEn` es ISO 8601 como el resto de las
+   * fechas del modelo. Un reemplazo deja la versión anterior en
+   * `actividades` (y el archivo en Storage); nunca se borra.
+   */
+  contrato?: {
+    storagePath: string;
+    nombreArchivo: string;
+    subidoPor: string;
+    subidoEn: string;
+    firmado: boolean;
+  } | null;
+
   // Timestamps y auditoría
   createdAt: string;
   updatedAt: string;

@@ -1,3 +1,4 @@
+import { AvisoSinContrato } from '../quotes/SeccionContrato';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { expedientePendiente, textoSalto } from '../../lib/frenoExpediente';
 import { ChevronRight, Save, X, Calendar, Plus, Check, FileText, Landmark, ShieldCheck, DollarSign, Activity, GitCommit, Ship, Plane, Truck, ArrowRight, Trash2, Package, Layers, Eye } from 'lucide-react';
@@ -877,6 +878,7 @@ export default function FichaEmbarque({
                   Hitos Temporales (Fechas)
                 </h3>
 
+                {cotizacionOrigen && <AvisoSinContrato quote={cotizacionOrigen} />}
                 {cotizacionOrigen && (
                   <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
                     <LecturaFechasDeseadas fuente={cotizacionOrigen} titulo="Solicitadas por el cliente (no son ETD/ETA)" />

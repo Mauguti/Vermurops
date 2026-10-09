@@ -96,6 +96,7 @@ import { calcTotales } from '../../lib/cotizacionCalculator';
 import { cargaDesdeLegacy, resumenCarga, ETIQUETA_MODALIDAD, ModalidadSolicitud } from '../../lib/cargaSolicitud';
 import DetalleCargaSolicitud from './DetalleCargaSolicitud';
 import { EditorFechasDeseadas, LecturaFechasDeseadas } from './FechasDeseadas';
+import SeccionContrato, { AvisoSinContrato } from './SeccionContrato';
 import { useVersionesCotizacion } from '../../hooks/useVersionesCotizacion';
 import {
   opcionesSelector, vistaDeVersion, puedeVersionar, numeroVersionActual,
@@ -1677,6 +1678,10 @@ export default function FichaCotizacion({
           ))}
         </div>
       )}
+      {/* Tarea 102 · una ganada sin contrato firmado avisa; no frena nada. */}
+      {!viendoVersion && quote.etapa === 'ganada' && (
+        <div className="px-6 pt-2"><AvisoSinContrato quote={quote} /></div>
+      )}
       {errorVersiones && (
         <p className="mx-6 mt-2 text-[11px] text-red-600 font-semibold">{errorVersiones}</p>
       )}
@@ -2411,6 +2416,9 @@ export default function FichaCotizacion({
 
             </div>{/* fin columna derecha */}
             </div>{/* fin rejilla de dos columnas */}
+
+          {/* ── Contrato (tarea 102): solo cuando la cotización está ganada. */}
+          {quote.etapa === 'ganada' && !viendoVersion && <SeccionContrato quote={quote} />}
 
           {/* ── Operación (Fase A, 24-sep-2026) ───────────────────────────
               Lo que antes vivía en el modal «Datos del embarque», editable

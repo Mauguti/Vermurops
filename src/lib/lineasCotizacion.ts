@@ -714,6 +714,8 @@ export const CAMPOS_EDITABLES_CONGELADA = [
   'updatedAt',
   // El PDF de una ganada se genera después de congelarla: es evidencia, no edición.
   'pdfs',
+  // El contrato se sube DESPUÉS de ganar (tarea 102): es evidencia, no edición.
+  'contrato',
 ] as const;
 
 /**
