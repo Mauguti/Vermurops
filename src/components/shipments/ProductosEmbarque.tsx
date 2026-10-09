@@ -3,6 +3,8 @@ import { Package, Plus, Trash2, Weight, Box, ChevronDown, ChevronRight, Edit2, S
 import { EmbarqueProducto, Pallet, DatosContenedor, TIPOS_CONTENEDOR, palletPiezas, palletPeso, palletVolumen, palletDescripcion } from './EmbarquesData';
 import { ClienteVermur } from '../clientes/ClientesData';
 import { SERVICIOS_AEREO, ETIQUETA_SERVICIO_AEREO, serviciosDeProductos, etiquetaServicioAereo, type ServicioAereo } from '../../lib/servicioAereo';
+import CampoEstiba from '../ui/CampoEstiba';
+import { textoCortoEstiba, modalidadEstibaDeTexto } from '../../lib/estiba';
 import { clienteOperable, estatusDeCliente, ETIQUETA_ESTATUS } from '../../lib/estatusCliente';
 
 const TIPOS_EMBALAJE = ['Pallet', 'Caja', 'Tambor', 'Bulto', 'Bobina', 'Contenedor', 'Otro'] as const;
@@ -53,6 +55,9 @@ export default function ProductosEmbarque({
   const [piezas, setPiezas] = useState<number | ''>('');
   const [peso, setPeso] = useState<number | ''>('');
   const [volumen, setVolumen] = useState<number | ''>('');
+  // Tarea 99: estiba del producto (undefined = sin indicar).
+  const [estibable, setEstibable] = useState<boolean | undefined>(undefined);
+  const [nivelesEstiba, setNivelesEstiba] = useState<number | null>(null);
 
   // Estado condicional de Contenedor
   const [numeroContenedor, setNumeroContenedor] = useState('');
@@ -109,6 +114,7 @@ export default function ProductosEmbarque({
       tipoConsolidacion: consolType,
       pallets: palletList,
       ...(esAereo && servicioAereo ? { servicioAereo } : {}),
+      ...(estibable === undefined ? {} : { estibable, ...(estibable && nivelesEstiba ? { nivelesEstiba } : {}) }),
     });
 
     // Reset fields
@@ -116,6 +122,8 @@ export default function ProductosEmbarque({
     setPiezas('');
     setPeso('');
     setVolumen('');
+    setEstibable(undefined);
+    setNivelesEstiba(null);
     setNumeroContenedor('');
     setTipoContenedor(TIPOS_CONTENEDOR[0]);
     setNumeroSello('');
@@ -222,6 +230,11 @@ export default function ProductosEmbarque({
                         <td className="px-5 py-3.5 font-bold text-text-primary">
                           <div className="flex flex-col">
                             <span>{p.descripcion}</span>
+                            {textoCortoEstiba(p) && (
+                              <span className="text-[10px] text-text-muted font-semibold uppercase mt-0.5" data-testid="estiba-producto">
+                                {textoCortoEstiba(p)}
+                              </span>
+                            )}
                             {isContainer && p.datosContenedor && (
                               <span className="text-[10px] text-text-muted font-medium uppercase mt-0.5">
                                 {p.datosContenedor.numeroContenedor} • {p.datosContenedor.tipoContenedor}
@@ -439,6 +452,12 @@ export default function ProductosEmbarque({
                 className="w-full px-3 py-2 border border-card-border rounded-lg text-xs font-semibold text-text-primary outline-none focus:border-brand shadow-sm transition-colors"
               />
             </div>
+          </div>
+
+          {/* Tarea 99 — estiba del producto */}
+          <div className="mt-4">
+            <CampoEstiba modalidad={modalidadEstibaDeTexto(modalidad)} estibable={estibable} niveles={nivelesEstiba}
+              onCambio={(est, n) => { setEstibable(est); setNivelesEstiba(est ? n : null); }} />
           </div>
 
           {/* Bloque Condicional Contenedor */}

@@ -14,6 +14,7 @@
 
 import type { KanbanQuote, ServicioSolicitado, CargaSolicitada } from '../components/quotes/QuotesData';
 import { aplanarCotizacion, type LineaPlana } from './lineasCotizacion';
+import { textoCortoEstiba } from './estiba';
 import { cargaDesdeLegacy, modalidadDeCarga, ETIQUETA_MODALIDAD, ETIQUETA_CONTENEDOR, ETIQUETA_UNIDAD_TERRESTRE } from './cargaSolicitud';
 import { numeroVersionActual } from './versionesCotizacion';
 import { ETIQUETA_SERVICIO_AEREO } from './servicioAereo';
@@ -58,6 +59,14 @@ export function cargaParaPdf(servicio: ServicioSolicitado | undefined): PayloadP
   if (!carga) {
     return { tipo: '', contenedores: '', piezas: 0, peso: servicio?.peso ?? 0, volumen: servicio?.volumen ?? 0 };
   }
+  const base = cargaParaPdfSinEstiba(carga);
+  // Tarea 99: la estiba va en el tipo («LCL · estibable ×3»); la plantilla de n8n
+  // ya imprime ese campo, así que no hace falta cambiar el flujo.
+  const estiba = carga.tipo === 'despacho' ? null : textoCortoEstiba(carga);
+  return estiba ? { ...base, tipo: `${base.tipo} · ${estiba}` } : base;
+}
+
+function cargaParaPdfSinEstiba(carga: CargaSolicitada): PayloadPdf['carga'] {
   switch (carga.tipo) {
     case 'fcl':
       return {

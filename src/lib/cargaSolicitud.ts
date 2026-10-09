@@ -20,6 +20,7 @@ import type { MercanciaLine } from '../components/shipments/EmbarquesData';
 import { calcLinea } from './cotizacionCalculator';
 import { idUnico } from './idUnico';
 import { ETIQUETA_SERVICIO_AEREO, leerServicioAereo } from './servicioAereo';
+import { problemaNivelesEstiba, textoCortoEstiba, leerEstiba, leerNivelesEstiba, type ModalidadEstiba } from './estiba';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1 · Modalidad: derivada de la carga, nunca guardada aparte
@@ -84,12 +85,20 @@ export function validarCarga(carga: CargaSolicitada): string[] {
     }
   };
 
+  const estibaValida = (modalidad: ModalidadEstiba) => {
+    if ('estibable' in carga && carga.estibable === true) {
+      const p = problemaNivelesEstiba(modalidad, carga.nivelesEstiba);
+      if (p) faltantes.push(`Estiba: ${p}`);
+    }
+  };
+
   switch (carga.tipo) {
     case 'fcl': {
       const validos = carga.contenedores.filter(c => c.cantidad > 0);
       if (validos.length === 0) faltantes.push('Indica al menos un contenedor con cantidad.');
       pesoPositivo(carga.pesoBrutoKg);
       peligrosaCompleta(carga.peligrosa);
+      estibaValida('maritimo');
       if (carga.refrigeracion.requiere && typeof carga.refrigeracion.temperaturaC !== 'number') {
         faltantes.push('Requiere refrigeración: falta la temperatura.');
       }
@@ -100,16 +109,19 @@ export function validarCarga(carga: CargaSolicitada): string[] {
       if (!(carga.volumenM3 > 0)) faltantes.push('El volumen en m³ es obligatorio.');
       if (!(carga.piezas > 0)) faltantes.push('El número de piezas o bultos es obligatorio.');
       peligrosaCompleta(carga.peligrosa);
+      estibaValida('maritimo');
       break;
     }
     case 'aereo': {
       pesoPositivo(carga.pesoBrutoKg);
       if (!(carga.piezas > 0)) faltantes.push('El número de piezas es obligatorio.');
       peligrosaCompleta(carga.peligrosa);
+      estibaValida('aereo');
       break;
     }
     case 'terrestre': {
       pesoPositivo(carga.pesoBrutoKg, 'El peso');
+      estibaValida('terrestre');
       break;
     }
     case 'despacho': {
@@ -152,7 +164,6 @@ export function resumenCarga(carga: CargaSolicitada): string {
       if (carga.piezas > 0) partes.push(`${carga.piezas} bultos`);
       if (carga.pesoBrutoKg > 0) partes.push(fmtKg(carga.pesoBrutoKg));
       if (carga.volumenM3 > 0) partes.push(`${carga.volumenM3} m³`);
-      if (!carga.estibable) partes.push('no estibable');
       break;
     case 'aereo':
       partes.push(carga.servicioAereo ? `Aéreo ${ETIQUETA_SERVICIO_AEREO[carga.servicioAereo]}` : 'Aéreo');
@@ -171,6 +182,10 @@ export function resumenCarga(carga: CargaSolicitada): string {
       if (carga.requierePrevio) partes.push('previo');
       if (carga.requiereNOM) partes.push('NOM');
       break;
+  }
+  if (carga.tipo !== 'despacho') {
+    const estiba = textoCortoEstiba(carga);
+    if (estiba) partes.push(estiba);
   }
   const peligrosa = 'peligrosa' in carga && carga.peligrosa.esPeligrosa
     ? `IMO ${carga.peligrosa.claseIMO ?? '?'}`
@@ -262,6 +277,7 @@ export function cargaDesdeLegacy(servicio: ServicioSolicitado): CargaSolicitada 
       pesoBrutoKg: (servicio.ter_peso ?? servicio.peso ?? 0) * factor,
       piezas: servicio.ter_num_pallets ?? 0,
       requiereManiobras: false,
+      ...(typeof servicio.ter_estibable === 'boolean' ? { estibable: servicio.ter_estibable } : {}),
     };
   }
 
@@ -367,6 +383,8 @@ export function productosDesdeCarga(
     ? servicio.mercancia
     : 'Mercancía por describir';
   const pallets = palletInicial(carga.mercancias, clienteNombre, cotizacionId);
+  // Tarea 99: la estiba pasa tal cual (sin valor no se escribe la clave).
+  const estiba = carga.tipo === 'despacho' ? {} : estibaDeProducto(carga);
 
   switch (carga.tipo) {
     case 'fcl': {
@@ -381,6 +399,7 @@ export function productosDesdeCarga(
         // El número lo pone Operaciones cuando la naviera lo asigna.
         datosContenedor: { numeroContenedor: '', tipoContenedor: ETIQUETA_CONTENEDOR[tipoContenedor], numeroSello: '', folioSello: '' },
         tipoConsolidacion: 'FCL' as const,
+        ...estiba,
         piezas: 0,
         peso: unico ? carga.pesoBrutoKg : 0,
         ...(unico || i === 0 ? { pallets } : { pallets: [] }),
@@ -392,6 +411,7 @@ export function productosDesdeCarga(
         descripcion,
         tipoEmbalaje: 'Bulto',
         tipoConsolidacion: 'LCL' as const,
+        ...estiba,
         piezas: carga.piezas,
         peso: carga.pesoBrutoKg,
         volumen: carga.volumenM3,
@@ -407,6 +427,7 @@ export function productosDesdeCarga(
         // Tarea 98: lo que Ventas pidió llega así al embarque. Sin valor no
         // se escribe la clave (Firestore rechaza undefined).
         ...(leerServicioAereo(carga.servicioAereo) ? { servicioAereo: carga.servicioAereo } : {}),
+        ...estiba,
         pallets,
       }];
     case 'terrestre':
@@ -416,12 +437,20 @@ export function productosDesdeCarga(
         tipoEmbalaje: 'Bulto',
         piezas: carga.piezas,
         peso: carga.pesoBrutoKg,
+        ...estiba,
         pallets,
       }];
     case 'despacho':
       // El despacho no mueve carga propia: no hereda productos.
       return [];
   }
+}
+
+/** Las claves de estiba que se heredan al producto: solo las que tienen valor. */
+function estibaDeProducto(carga: { estibable?: boolean; nivelesEstiba?: number | null }) {
+  const { estibable, niveles } = leerEstiba(carga);
+  if (estibable === undefined) return {};
+  return { estibable, ...(niveles ? { nivelesEstiba: niveles } : {}) };
 }
 
 /** Productos de un GRUPO de servicios (un embarque puede juntar varios). */
@@ -461,6 +490,7 @@ export function borradorTieneDatos(b: BorradorConDatos): boolean {
   if ((c.mercancias ?? []).some(m => m.descripcion.trim())) return true;
   if ('pesoBrutoKg' in c && c.pesoBrutoKg > 0) return true;
   if ('peligrosa' in c && c.peligrosa.esPeligrosa) return true;
+  if (c.tipo !== 'lcl' && c.tipo !== 'despacho' && c.estibable !== undefined) return true;
 
   switch (c.tipo) {
     case 'fcl':
@@ -469,7 +499,7 @@ export function borradorTieneDatos(b: BorradorConDatos): boolean {
         || c.contenedores.some(x => x.tipoContenedor !== '40' || x.cantidad !== 1)
         || c.refrigeracion.requiere;
     case 'lcl':
-      return c.volumenM3 > 0 || c.piezas > 0 || c.bultos.length > 0 || !c.estibable;
+      return c.volumenM3 > 0 || c.piezas > 0 || c.bultos.length > 0 || !c.estibable || !!leerNivelesEstiba(c.nivelesEstiba);
     case 'aereo':
       return c.pesoVolumetricoKg > 0 || c.piezas > 0 || c.bultos.length > 0 || !!c.servicioAereo;
     case 'terrestre':

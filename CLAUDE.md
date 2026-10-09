@@ -2232,6 +2232,29 @@ editar, porque `updateDoc` no quita una clave que no se manda). **Sin valor =
   - e2e: `tests/e2e/98-servicio-aereo.spec.ts` (solicitud → embarque, y filtro
     de tarifas).
 
+## 4.58 Estibable y niveles de estiba (tarea 99, 9-oct-2026)
+
+`estibable?: boolean` y `nivelesEstiba?: number | null` en las cinco cargas
+(FCL, LCL, aérea, terrestre; el LCL ya traía `estibable`) y en
+`EmbarqueProducto`. Opcionales y aditivos; sin valor = «Sin indicar», que no
+es «no estibable». Reglas puras y tests en `lib/estiba.ts`.
+  - **El tope vive en UNA constante** (`TOPE_NIVELES_ESTIBA`): terrestre 5,
+    aéreo 3, marítimo sin tope (solo mínimo 1; pendiente de confirmar con Mau).
+  - **Un número fuera del tope no se guarda:** `CampoEstiba` lo deja en el
+    campo con su aviso y la carga conserva el último valor válido, así el
+    autoguardado de la ficha nunca escribe un 6 en terrestre. `validarCarga`
+    lo vuelve a exigir (la pantalla se puede esquivar).
+  - No estibable ⇒ `nivelesEstiba` se borra (nunca `undefined`) y el campo se oculta.
+  - **Dónde se ve:** formulario de la solicitud y sección Operación de la ficha
+    (mismo `FormCargaServicio`), `DetalleCargaSolicitud` («Estibable ×3»,
+    «No estibable», «Estibable (niveles sin indicar)»), `resumenCarga`
+    («estibable ×3» / «no estibable»; el LCL viejo sin niveles no ensucia),
+    productos del embarque (formulario y etiqueta; heredan de la carga) y PDF
+    (va en `carga.tipo`: «LCL · estibable ×3», sin tocar el flujo de n8n).
+  - **Legacy:** `lcl_estibable` y `ter_estibable` se siguen leyendo
+    (`cargaDesdeLegacy`); los checkboxes del modal viejo no se tocaron.
+  - e2e: `tests/e2e/99-estiba.spec.ts`.
+
 ---
 
 ## 5. Estado de los módulos

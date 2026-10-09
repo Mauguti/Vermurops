@@ -11,6 +11,7 @@
  * que el propio cliente pidió.
  */
 
+import { etiquetaEstiba } from '../../lib/estiba';
 import { etiquetaServicioAereo } from '../../lib/servicioAereo';
 import React from 'react';
 import type { ServicioSolicitado, CargaSolicitada } from './QuotesData';
@@ -40,6 +41,7 @@ function DatosPorTipo({ carga }: { carga: CargaSolicitada }) {
               .map(c => `${c.cantidad}×${ETIQUETA_CONTENEDOR[c.tipoContenedor]}`).join(' + ') || '—'}
           </Dato>
           <Dato etiqueta="Peso bruto total">{carga.pesoBrutoKg > 0 ? kg(carga.pesoBrutoKg) : '—'}</Dato>
+          <Dato etiqueta="¿Estibable?">{etiquetaEstiba(carga)}</Dato>
           <Dato etiqueta="Refrigeración">
             {carga.refrigeracion.requiere
               ? `Sí${typeof carga.refrigeracion.temperaturaC === 'number' ? ` · ${carga.refrigeracion.temperaturaC}°C` : ''}`
@@ -54,7 +56,7 @@ function DatosPorTipo({ carga }: { carga: CargaSolicitada }) {
           <Dato etiqueta="Peso bruto">{carga.pesoBrutoKg > 0 ? kg(carga.pesoBrutoKg) : '—'}</Dato>
           <Dato etiqueta="Volumen">{carga.volumenM3 > 0 ? `${carga.volumenM3} m³` : '—'}</Dato>
           <Dato etiqueta="Piezas / bultos">{carga.piezas || '—'}</Dato>
-          <Dato etiqueta="¿Estibable?">{carga.estibable ? 'Sí' : 'No'}</Dato>
+          <Dato etiqueta="¿Estibable?">{etiquetaEstiba(carga)}</Dato>
           {carga.bultos.length > 0 && (
             <Dato etiqueta="Dimensiones (cm)">
               {carga.bultos.map(b => `${b.largoCm}×${b.anchoCm}×${b.altoCm}`).join(' · ')}
@@ -69,6 +71,7 @@ function DatosPorTipo({ carga }: { carga: CargaSolicitada }) {
           <Dato etiqueta="Peso bruto">{carga.pesoBrutoKg > 0 ? kg(carga.pesoBrutoKg) : '—'}</Dato>
           <Dato etiqueta="Peso volumétrico">{carga.pesoVolumetricoKg > 0 ? kg(carga.pesoVolumetricoKg) : '—'}</Dato>
           <Dato etiqueta="Piezas">{carga.piezas || '—'}</Dato>
+          <Dato etiqueta="¿Estibable?">{etiquetaEstiba(carga)}</Dato>
           {carga.bultos.length > 0 && (
             <Dato etiqueta="Dimensiones (cm)">
               {carga.bultos.map(b => `${b.largoCm}×${b.anchoCm}×${b.altoCm}`).join(' · ')}
@@ -82,6 +85,7 @@ function DatosPorTipo({ carga }: { carga: CargaSolicitada }) {
           <Dato etiqueta="Tipo de unidad">{ETIQUETA_UNIDAD_TERRESTRE[carga.tipoUnidad]}</Dato>
           <Dato etiqueta="Peso">{carga.pesoBrutoKg > 0 ? kg(carga.pesoBrutoKg) : '—'}</Dato>
           <Dato etiqueta="Piezas">{carga.piezas || '—'}</Dato>
+          <Dato etiqueta="¿Estibable?">{etiquetaEstiba(carga)}</Dato>
           <Dato etiqueta="Maniobras de carga/descarga">{carga.requiereManiobras ? 'Sí' : 'No'}</Dato>
         </>
       );

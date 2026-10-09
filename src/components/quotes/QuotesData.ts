@@ -149,6 +149,9 @@ export interface CargaFCL extends CargaBase {
   pesoBrutoKg: number;
   peligrosa: MercanciaPeligrosa;
   refrigeracion: Refrigeracion;
+  /** Tarea 99: ¿se puede estibar y cuántos niveles? Opcional; sin valor = sin indicar. */
+  estibable?: boolean;
+  nivelesEstiba?: number | null;
 }
 
 export interface CargaLCL extends CargaBase {
@@ -159,6 +162,8 @@ export interface CargaLCL extends CargaBase {
   bultos: Bulto[];
   /** Lo pidió Ventas explícitamente: cambia cómo se estiba y cotiza. */
   estibable: boolean;
+  /** Tarea 99: cuántos se pueden estibar uno encima de otro. Solo con estibable. */
+  nivelesEstiba?: number | null;
   peligrosa: MercanciaPeligrosa;
 }
 
@@ -174,6 +179,9 @@ export interface CargaAerea extends CargaBase {
    * sin valor es «Sin indicar», no se asume ninguno.
    */
   servicioAereo?: ServicioAereo;
+  /** Tarea 99: ¿se puede estibar y cuántos niveles? Opcional; sin valor = sin indicar. */
+  estibable?: boolean;
+  nivelesEstiba?: number | null;
 }
 
 export type TipoUnidadTerrestre =
@@ -185,6 +193,9 @@ export interface CargaTerrestre extends CargaBase {
   pesoBrutoKg: number;
   piezas: number;
   requiereManiobras: boolean;
+  /** Tarea 99: ¿se puede estibar y cuántos niveles? Opcional; sin valor = sin indicar. */
+  estibable?: boolean;
+  nivelesEstiba?: number | null;
 }
 
 export interface CargaDespacho extends CargaBase {

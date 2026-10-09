@@ -25,6 +25,8 @@ import {
   ETIQUETA_UNIDAD_TERRESTRE, modalidadDeCarga,
 } from '../../lib/cargaSolicitud';
 import { idUnico } from '../../lib/idUnico';
+import CampoEstiba from '../ui/CampoEstiba';
+import { conEstiba, leerEstiba } from '../../lib/estiba';
 import { SERVICIOS_AEREO, ETIQUETA_SERVICIO_AEREO, conServicioAereo, etiquetaServicioAereo } from '../../lib/servicioAereo';
 
 // ─── El borrador de un servicio en el formulario ─────────────────────────────
@@ -301,6 +303,12 @@ export default function FormCargaServicio({
   const modalidad = modalidadDeCarga(carga);
   const esMaritimo = modalidad === 'maritimo';
   const setCarga = (c: CargaSolicitada) => onCambio({ ...draft, carga: c });
+  // Tarea 99: la estiba en cualquier carga que mueva mercancía.
+  const bloqueEstiba = (c: Exclude<CargaSolicitada, { tipo: 'despacho' }>) => (
+    <CampoEstiba modalidad={modalidad === 'despacho_aduanal' ? 'maritimo' : modalidad}
+      estibable={leerEstiba(c).estibable} niveles={leerEstiba(c).niveles}
+      onCambio={(est, n) => setCarga(est ? conEstiba(c, true, n) : conEstiba(c, false, null))} />
+  );
 
   const handlePuerto = (extremo: 'origen' | 'destino') => (texto: string, puertoId: string | null) => {
     const next = extremo === 'origen'
@@ -477,6 +485,7 @@ export default function FormCargaServicio({
               </div>
             )}
           </div>
+          {bloqueEstiba(carga)}
           <BloquePeligrosa carga={carga} onCambio={setCarga} />
         </>
       )}
@@ -499,8 +508,7 @@ export default function FormCargaServicio({
               </select>
             </Campo>
           </div>
-          <SiNo valor={carga.estibable} etiqueta="¿Es estibable?"
-            onCambio={v => setCarga({ ...carga, estibable: v })} />
+          {bloqueEstiba(carga)}
           <BloqueBultos carga={carga} onCambio={setCarga} />
           <BloquePeligrosa carga={carga} onCambio={setCarga} />
         </>
@@ -524,6 +532,7 @@ export default function FormCargaServicio({
               </select>
             </Campo>
           </div>
+          {bloqueEstiba(carga)}
           <BloqueBultos carga={carga} onCambio={setCarga} />
           <BloquePeligrosa carga={carga} onCambio={setCarga} />
         </>
@@ -549,6 +558,7 @@ export default function FormCargaServicio({
           </div>
           <SiNo valor={carga.requiereManiobras} etiqueta="¿Requiere maniobras de carga o descarga?"
             onCambio={v => setCarga({ ...carga, requiereManiobras: v })} />
+          {bloqueEstiba(carga)}
         </>
       )}
 

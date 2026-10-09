@@ -362,6 +362,9 @@ export interface EmbarqueProducto {
   tipoConsolidacion?: 'FCL' | 'LCL';
   /** Tarea 98: aéreo expeditado o regular. Sin valor = «Sin indicar». */
   servicioAereo?: ServicioAereo;
+  /** Tarea 99: heredado de la carga. Sin valor = sin indicar. */
+  estibable?: boolean;
+  nivelesEstiba?: number | null;
   pallets?: Pallet[];
   /** Override manual: el usuario pisó el peso auto-calculado de pallets. */
   pesoOverride?: boolean;
