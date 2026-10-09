@@ -1,29 +1,37 @@
 # Estado de VermurOps — 9 de octubre de 2026 (corte del sprint nocturno)
 
-**Cadena 98 → 99, lista y SIN PUBLICAR.** Dos tareas `[x]`, ninguna `[!]`.
-Sale de `sprint/base` = `main` = `09c6dcc`; punta: `sprint/99-estibable`
-(mergearla trae las dos). Solo hosting: sin reglas, índices, Functions, n8n ni
-modelo obligatorio (campos opcionales).
+**Cadena 98 → 102, lista y SIN PUBLICAR.** Cinco tareas `[x]`, ninguna `[!]`.
+Sale de `main` = `09c6dcc`; punta: `sprint/102-contrato-ganada` (lineal: mergearla
+trae las cinco). Hosting, más **reglas de Storage para la 102**. Sin Functions,
+índices, n8n ni modelo obligatorio (campos opcionales).
 
-- **98** `servicioAereo` expeditado/regular en solicitud, embarque, tarifas (filtro,
-  sugerencias del mismo tipo) y PDF. §4.57.
-- **99** `estibable` + `nivelesEstiba` con tope por modalidad (terrestre 5, aéreo 3,
-  marítimo sin tope) en `lib/estiba.ts`. §4.58.
-- En la punta: 2,736 tests verdes · tsc 0 · build limpio · recorrido e2e 6/6.
-  Antes de publicar, correr 45-filtros y 47-barrido (la 98 no los corrió).
+| # | Qué | Rama | Sección |
+|---|---|---|---|
+| 98 | `servicioAereo` expeditado/regular: solicitud, embarque, tarifas, PDF | `sprint/98-aereo-servicio` | §4.57 |
+| 99 | `estibable` + `nivelesEstiba` con tope (terrestre 5, aéreo 3, marítimo sin tope) | `sprint/99-estibable` | §4.58 |
+| 100 | Tarifas por kg cobrable: factor, mínimo, escalas; desglose en la cotización | `sprint/100-peso-cobrable` | §4.59 |
+| 101 | Fechas deseadas de recolección y entrega (se leen de la cotización en el embarque) | `sprint/101-fechas-deseadas` | §4.60 |
+| 102 | Contrato de la ganada: subir, firmar, reemplazar, aviso y filtro | `sprint/102-contrato-ganada` | §4.61 |
 
-- **100** (rama `sprint/100-peso-cobrable`, sale de `sprint/base`): tarifas por kg
-  cobrable con factor, mínimo y escalas; desglose en la cotización. §4.59. Solo hosting.
+En la punta: 2,801 tests verdes · tsc 0 · build limpio · recorrido e2e 6/6, más un
+spec e2e por tarea.
 
-**Cola restante:** 100 peso cobrable, 101 fechas deseadas, 102 contrato de la
-ganada (la 102 necesita regla de Storage para `cotizaciones/{id}/contrato/`, que
-el sprint solo puede dejar escrita en el reporte). No corrieron: el script dijo
-«Cola vacía» con tres líneas `[ ]`; revisar.
+**Para publicar la 102:** pegar en `storage.rules` el bloque de
+`cotizaciones/{id}/contrato/` (está en `sprint/reportes/RESUMEN.md` §2), publicar
+reglas con `--only storage` (debe decir «uploading rules»), después hosting.
+Antes, correr 45-filtros y 47-barrido (la 98 no los corrió).
 
-**Decisiones pendientes:** servicio aéreo obligatorio al solicitar; tope de estiba
-marítimo; si la estiba merece campo propio en el PDF (toca n8n). Detalle en
-`sprint/reportes/RESUMEN.md`. Lo que sigue de este documento (corte del 7-oct)
-vale salvo donde la cadena 96 → 97 ya se haya publicado.
+**Cola restante:** vacía. Siguientes candidatas (de los reportes): volumen m³ en
+`CargaTerrestre` (para kg cobrable terrestre), campo «modalidad» en la tarifa,
+unidad nueva en `CargaMasivaTarifas`, edición de estiba en productos ya creados,
+plantilla de contrato (espera el modelo de Vermur).
+
+**Decisiones pendientes:** contrato firmado como freno o aviso (rec.: aviso);
+tope de estiba marítimo; estiba o fechas con campo propio en el PDF (toca n8n);
+servicio aéreo obligatorio al solicitar; copiar o leer las fechas deseadas.
+Detalle y preguntas para Vermur en `sprint/reportes/RESUMEN.md` (no versionado).
+Lo que sigue de este documento (corte del 7-oct) vale salvo donde la cadena
+96 → 97 ya se haya publicado.
 
 ---
 
