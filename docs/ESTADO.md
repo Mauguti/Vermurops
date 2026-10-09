@@ -12,6 +12,9 @@ modelo obligatorio (campos opcionales).
 - En la punta: 2,736 tests verdes · tsc 0 · build limpio · recorrido e2e 6/6.
   Antes de publicar, correr 45-filtros y 47-barrido (la 98 no los corrió).
 
+- **100** (rama `sprint/100-peso-cobrable`, sale de `sprint/base`): tarifas por kg
+  cobrable con factor, mínimo y escalas; desglose en la cotización. §4.59. Solo hosting.
+
 **Cola restante:** 100 peso cobrable, 101 fechas deseadas, 102 contrato de la
 ganada (la 102 necesita regla de Storage para `cotizaciones/{id}/contrato/`, que
 el sprint solo puede dejar escrita en el reporte). No corrieron: el script dijo

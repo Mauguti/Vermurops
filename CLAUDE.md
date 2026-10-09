@@ -2255,6 +2255,34 @@ es «no estibable». Reglas puras y tests en `lib/estiba.ts`.
     (`cargaDesdeLegacy`); los checkboxes del modal viejo no se tocaron.
   - e2e: `tests/e2e/99-estiba.spec.ts`.
 
+## 4.59 Tarifas por peso cobrable (tarea 100, 9-oct-2026)
+
+Unidad nueva `KG_COBRABLE` en `UnidadTarifa` y, en `PreciosTarifa`, opcionales
+`factorVolumetricoKgM3`, `minimo` y `escalas[{desdeKg, monto}]`. El cálculo es
+una función pura, `lib/pesoCobrable.ts` (38 tests, verificados por mutación):
+volumétrico = m³ × factor; cobrable = el mayor entre bruto y volumétrico;
+precio/kg = el de la escala con mayor `desdeKg` que no pase el cobrable (sin
+escala, el `monto`); total = el mayor entre `minimo` y cobrable × precio/kg.
+  - **Aéreo:** factor 167 kg/m³ si la tarifa no trae uno; el cobrable sube al
+    medio kilo (101.2 → 101.5) y la escala se decide con el cobrable YA
+    redondeado. El `pesoVolumetricoKg` que capturó Ventas se respeta; si no
+    viene, se calcula de los bultos, solo cuando sus medidas cubren todas las
+    piezas.
+  - **Terrestre:** sin default. El wizard no guarda una tarifa por kg cobrable
+    sin factor, salvo que declare servicio aéreo. Ojo: la carga terrestre no
+    captura volumen, así que hoy esas tarifas dicen «Sin cálculo» en la
+    cotización hasta que exista el dato.
+  - **No inventa:** sin peso, sin volumen o sin factor, la función devuelve el
+    motivo y no un total. `montoDeTarifa` (tarifaMatching) devuelve `null` y
+    «Usar» avisa en vez de meter el precio por kg como si fuera el monto.
+  - **En la cotización:** `DesgloseCobrable` muestra bruto, volumétrico, cuál
+    se cobró y la fórmula en el panel y en las sugerencias; al usarla, el
+    renglón lleva el TOTAL como costo y la fórmula en `condiciones`.
+  - **`minimo` vs `montoMinimo`:** el modelo aprobado nombra `minimo`; ya
+    existía `montoMinimo` (CBM/TON/WM). Lo nuevo escribe `minimo` y se lee con
+    respaldo del otro. TON, WM y CBM no cambian.
+  - e2e: `tests/e2e/100-peso-cobrable.spec.ts`.
+
 ---
 
 ## 5. Estado de los módulos
