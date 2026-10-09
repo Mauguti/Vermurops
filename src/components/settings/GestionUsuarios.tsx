@@ -33,6 +33,25 @@ const BADGE_ROL: Record<UserRole, { bg: string; color: string }> = {
   admin:          { bg: 'var(--color-primario-10, #EDE9F3)', color: 'var(--color-primario, #4B2A8C)' },
 };
 
+/*
+ * Una cuenta de Auth anterior a este módulo no tiene claim de rol, y ahora
+ * la lista SÍ la enseña —antes era invisible y por eso no se le podía
+ * asignar nada—. Sin este caso, `BADGE_ROL[rol]` daba `undefined` y el
+ * `badge.color` de abajo tumbaba la pantalla entera.
+ *
+ * Ámbar, como «Sin estatus» en Altas (§4.41): es un hueco que hay que
+ * llenar, no un estado válido.
+ */
+const BADGE_SIN_ROL = { bg: '#FFFBEB', color: '#B45309' };
+
+function badgeDe(rol: UserRole | '' | undefined) {
+  return (rol && BADGE_ROL[rol as UserRole]) || BADGE_SIN_ROL;
+}
+
+function etiquetaDe(rol: UserRole | '' | undefined) {
+  return (rol && ETIQUETA_ROL[rol as UserRole]) || 'Sin rol';
+}
+
 // ── Componente principal ─────────────────────────────────────────────────────
 
 export default function GestionUsuarios() {
@@ -221,7 +240,7 @@ function FilaUsuario({
 }) {
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [cambiando, setCambiando] = useState(false);
-  const badge = BADGE_ROL[usuario.rol];
+  const badge = badgeDe(usuario.rol);
 
   const avatar = usuario.nombre
     .split(' ')
@@ -258,7 +277,7 @@ function FilaUsuario({
             }`}
             style={{ background: badge.bg, color: badge.color }}
           >
-            {ETIQUETA_ROL[usuario.rol]}
+            {etiquetaDe(usuario.rol)}
             {!esMismoUsuario && usuario.activo && <ChevronDown className="w-3 h-3" />}
           </button>
           {menuAbierto && (

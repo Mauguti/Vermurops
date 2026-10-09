@@ -20,6 +20,12 @@ export interface UsuarioRegistrado {
   creadoEn: string;
   actualizadoEn: string;
   historial?: CambioUsuario[];
+  /**
+   * La cuenta existe en Auth y NO tiene documento en `usuarios/`: es anterior
+   * a este módulo. Se enseña igual —antes era invisible— y al cambiarle el rol
+   * el documento se crea.
+   */
+  sinDocumento?: boolean;
 }
 
 export interface CambioUsuario {
