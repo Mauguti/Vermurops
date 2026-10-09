@@ -25,6 +25,8 @@ import {
 export { normalize, resolverMonto } from './tarifaMatching';
 
 import { tarifasPorServicioAereo, type ServicioAereo } from '../../lib/servicioAereo';
+import type { CargaSolicitada } from '../quotes/QuotesData';
+import DesgloseCobrable from './DesgloseCobrable';
 
 // ─── Props ─────────────────────────────────────────────────────────────────
 
@@ -42,13 +44,15 @@ interface Props {
   contenedorTipo?: string;
   /** Tarea 98: servicio de la cotización aérea. */
   servicioAereo?: ServicioAereo | null;
+  /** Tarea 100: carga del servicio, para el desglose de las tarifas por kg cobrable. */
+  carga?: CargaSolicitada | null;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export default function TarifaSuggestions({
   conceptoNombre, conceptoId, rutaTexto, catalogoTarifas,
-  onUsarTarifa, tarifasYaUsadas = [], contenedorTipo, servicioAereo,
+  onUsarTarifa, tarifasYaUsadas = [], contenedorTipo, servicioAereo, carga,
 }: Props) {
   const { conceptos } = useConceptos();
   const { proveedores } = useProveedores();
@@ -212,6 +216,7 @@ export default function TarifaSuggestions({
                     {t.tiempoTransitoDias != null && <span>TT: {t.tiempoTransitoDias}d</span>}
                     {t.freeTimeDias != null && <span>FT: {t.freeTimeDias}d</span>}
                   </div>
+                  <DesgloseCobrable tarifa={t} carga={carga} />
                 </div>
 
                 {/* Right: price + action */}

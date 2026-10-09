@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, BarChart2, ChevronRight } from 'lucide-react';
 import {
-  ConceptoCotizacion, CotizacionProveedor,
+  ConceptoCotizacion, CotizacionProveedor, CargaSolicitada,
   getCostoOficial, getTarifasOficiales,
 } from './QuotesData';
 import { calcLinea } from '../../lib/cotizacionCalculator';
@@ -9,7 +9,9 @@ import ComparativaPricing from './ComparativaPricing';
 import type { ProveedorComparativa } from './ComparativaPricing';
 import type { TarifaVermur } from '../tarifas/TarifasData';
 import type { ServicioAereo } from '../../lib/servicioAereo';
-import TarifaSuggestions, { resolverMonto } from '../tarifas/TarifaSuggestions';
+import TarifaSuggestions from '../tarifas/TarifaSuggestions';
+import { montoDeTarifa, formulaCobrable } from '../tarifas/tarifaMatching';
+import { avisar } from '../ui/Dialogos';
 import CapturaManualConcepto from '../tarifas/CapturaManualConcepto';
 import ConceptoSelector from '../conceptos/ConceptoSelector';
 import type { ConceptoVermur } from '../conceptos/ConceptosData';
@@ -30,6 +32,8 @@ export interface ConceptoSectionProps {
   contenedorTipo?: string;
   /** Tarea 98: servicio aéreo de la cotización. */
   servicioAereo?: ServicioAereo | null;
+  /** Tarea 100: carga del servicio (peso cobrable). */
+  carga?: CargaSolicitada | null;
   onCrearTarifaSpot?: (t: TarifaVermur) => Promise<void>;
   /** FC-2: ¿este concepto es el activo en el panel de tarifas? */
   isActive?: boolean;
@@ -47,7 +51,7 @@ export interface ConceptoSectionProps {
   onCrearConcepto?: () => void;
 }
 
-export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moneda = 'USD', ruta = '', clientePreferidos, clienteVetados, diasCredito = 30, catalogoTarifas, contenedorTipo, servicioAereo, onCrearTarifaSpot, isActive, onActivate, panelVisible, onComparativaToggle, servicioId, conceptosActivos, onCrearConcepto }: ConceptoSectionProps) {
+export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moneda = 'USD', ruta = '', clientePreferidos, clienteVetados, diasCredito = 30, catalogoTarifas, contenedorTipo, servicioAereo, carga, onCrearTarifaSpot, isActive, onActivate, panelVisible, onComparativaToggle, servicioId, conceptosActivos, onCrearConcepto }: ConceptoSectionProps) {
   const [newSubNombre, setNewSubNombre] = useState('');
   const [newSubCosto, setNewSubCosto] = useState('');
   const [comparativaOpen, setComparativaOpen] = useState(false);
@@ -225,21 +229,27 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moned
             catalogoTarifas={catalogoTarifas}
             contenedorTipo={contenedorTipo}
             servicioAereo={servicioAereo}
+            carga={carga}
             tarifasYaUsadas={(concepto.tarifas || []).map(t => t.tarifaOrigenId).filter((id): id is string => !!id)}
             onUsarTarifa={(tarifa, provNombre, contactoNombre) => {
               // Duplicate check
               if ((concepto.tarifas || []).some(t => t.tarifaOrigenId === tarifa.id)) return;
+              const montoTarifa = montoDeTarifa(tarifa, contenedorTipo, carga);
+              if (montoTarifa === null) {
+                void avisar('Esta tarifa es por kg cobrable y la carga del servicio no alcanza para calcularla (falta peso, volumen o factor). Complétalo en Información → Operación.');
+                return;
+              }
               const esPrimera = !(concepto.tarifas?.length);
               const cpId = `cp-${Date.now()}`;
               const cp: CotizacionProveedor = {
                 id: cpId,
                 proveedor: provNombre,
                 contacto: contactoNombre,
-                monto: resolverMonto(tarifa, contenedorTipo),
+                monto: montoTarifa,
                 moneda: tarifa.moneda,
                 tiempoTransito: tarifa.tiempoTransitoDias ? `${tarifa.tiempoTransitoDias} días` : undefined,
                 vigencia: tarifa.fechaFin ?? undefined,
-                condiciones: tarifa.condiciones || undefined,
+                condiciones: [tarifa.condiciones, formulaCobrable(tarifa, carga)].filter(Boolean).join(' · ') || undefined,
                 adjuntoUrl: null,
                 archivoNombre: null,
                 seleccionada: esPrimera,

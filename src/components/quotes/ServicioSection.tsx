@@ -537,6 +537,7 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
                     catalogoTarifas={catalogoTarifas}
                     contenedorTipo={servicio.fcl_contenedor}
                     servicioAereo={servicio.carga?.tipo === 'aereo' ? servicio.carga.servicioAereo ?? null : null}
+                    carga={servicio.carga}
                     onCrearTarifaSpot={onCrearTarifaSpot}
                     isActive={activeConceptoId === concepto.id}
                     onActivate={() => onConceptoActivate?.(concepto.id)}

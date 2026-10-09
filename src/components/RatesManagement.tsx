@@ -25,6 +25,7 @@ const UNIDAD_LABEL: Record<UnidadTarifa, string> = {
   BL: 'B/L',
   FIJO: 'fijo',
   DIA: 'día',
+  KG_COBRABLE: 'kg cobrable',
 };
 
 function formatPrecio(t: TarifaVermur): string {

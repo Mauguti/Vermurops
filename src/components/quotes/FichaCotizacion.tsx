@@ -31,7 +31,7 @@ import {
 } from '../../lib/operacionServicio';
 import { ALMACENAJE_SUGERIDO } from '../../lib/diasLibres';
 import TarifaPanel from '../tarifas/TarifaPanel';
-import { resolverMonto, fmtPrecio } from '../tarifas/tarifaMatching';
+import { montoDeTarifa, formulaCobrable, fmtPrecio } from '../tarifas/tarifaMatching';
 import { useProveedores } from '../../hooks/useProveedores';
 import { contactoPrincipal } from '../proveedores/ProveedoresData';
 import type { TarifaVermur } from '../tarifas/TarifasData';
@@ -500,17 +500,22 @@ export default function FichaCotizacion({
     if (!conc) return;
     // Duplicate check
     if ((conc.tarifas || []).some(t => t.tarifaOrigenId === tarifa.id)) return;
+    const montoTarifa = montoDeTarifa(tarifa, srv.fcl_contenedor, srv.carga);
+    if (montoTarifa === null) {
+      void avisar('Esta tarifa es por kg cobrable y la carga del servicio no alcanza para calcularla (falta peso, volumen o factor). Complétalo en Información → Operación.');
+      return;
+    }
     const esPrimera = !(conc.tarifas?.length);
     const cpId = idUnico('cp');
     const cp: CotizacionProveedor = {
       id: cpId,
       proveedor: provNombre,
       contacto: contactoNombre,
-      monto: resolverMonto(tarifa, srv.fcl_contenedor),
+      monto: montoTarifa,
       moneda: tarifa.moneda,
       tiempoTransito: tarifa.tiempoTransitoDias ? `${tarifa.tiempoTransitoDias} días` : undefined,
       vigencia: tarifa.fechaFin ?? undefined,
-      condiciones: tarifa.condiciones || undefined,
+      condiciones: [tarifa.condiciones, formulaCobrable(tarifa, srv.carga)].filter(Boolean).join(' · ') || undefined,
       adjuntoUrl: null,
       archivoNombre: null,
       seleccionada: esPrimera,
@@ -550,10 +555,13 @@ export default function FichaCotizacion({
     const esPrimeraYUnica = existingTarifas.length === 0 && tarifas.length === 1;
 
     const newCps: CotizacionProveedor[] = [];
+    let sinCalculo = 0;
     for (const tarifa of tarifas) {
       // Duplicate check
       if (existingTarifas.some(t => t.tarifaOrigenId === tarifa.id)) continue;
       if (newCps.some(t => t.tarifaOrigenId === tarifa.id)) continue;
+      const montoTarifa = montoDeTarifa(tarifa, srv.fcl_contenedor, srv.carga);
+      if (montoTarifa === null) { sinCalculo += 1; continue; }
       const prov = proveedores.find(p => p.id === tarifa.proveedorId);
       const contacto = prov ? contactoPrincipal(prov) : undefined;
       const cpId = idUnico('cp');
@@ -561,11 +569,11 @@ export default function FichaCotizacion({
         id: cpId,
         proveedor: prov?.nombre ?? tarifa.proveedorId,
         contacto: contacto?.nombre ?? '',
-        monto: resolverMonto(tarifa, srv.fcl_contenedor),
+        monto: montoTarifa,
         moneda: tarifa.moneda,
         tiempoTransito: tarifa.tiempoTransitoDias ? `${tarifa.tiempoTransitoDias} días` : undefined,
         vigencia: tarifa.fechaFin ?? undefined,
-        condiciones: tarifa.condiciones || undefined,
+        condiciones: [tarifa.condiciones, formulaCobrable(tarifa, srv.carga)].filter(Boolean).join(' · ') || undefined,
         adjuntoUrl: null,
         archivoNombre: null,
         seleccionada: esPrimeraYUnica,
@@ -575,6 +583,9 @@ export default function FichaCotizacion({
         conceptoId: tarifa.conceptoId,
         tarifaOrigenId: tarifa.id,
       });
+    }
+    if (sinCalculo > 0) {
+      void avisar(`${sinCalculo} tarifa(s) por kg cobrable no se aplicaron: la carga del servicio no alcanza para calcularlas (falta peso, volumen o factor).`);
     }
     if (newCps.length === 0) return;
 
@@ -2038,6 +2049,7 @@ export default function FichaCotizacion({
                     conceptoId={activeConceptoData?.concepto.conceptoId}
                     contenedorTipo={activeConceptoData?.servicio.fcl_contenedor}
                     servicioAereo={activeConceptoData?.servicio.carga?.tipo === 'aereo' ? activeConceptoData.servicio.carga.servicioAereo ?? null : null}
+                    carga={activeConceptoData?.servicio.carga}
                     catalogoTarifas={catalogoTarifas}
                     tarifasYaUsadas={
                       activeConceptoData

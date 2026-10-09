@@ -8,6 +8,7 @@ import { usePuertos } from '../../hooks/usePuertos';
 import { useAuth } from '../../auth/AuthContext';
 import { SERVICIOS_AEREO, ETIQUETA_SERVICIO_AEREO, ETIQUETA_SIN_INDICAR, leerServicioAereo, type ServicioAereo } from '../../lib/servicioAereo';
 import { proveedorOperable } from '../../lib/estatusProveedor';
+import { problemasTarifaCobrable, FACTOR_VOLUMETRICO_AEREO } from '../../lib/pesoCobrable';
 
 interface Props {
   mode: 'crear' | 'editar';
@@ -30,6 +31,7 @@ const UNIDADES: { key: UnidadTarifa; label: string }[] = [
   { key: 'BL', label: 'Por B/L' },
   { key: 'FIJO', label: 'Monto fijo' },
   { key: 'DIA', label: 'Por día' },
+  { key: 'KG_COBRABLE', label: 'Por kg cobrable' },
 ];
 
 export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpdate }: Props) {
@@ -55,7 +57,11 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
   const [monto, setMonto] = useState(tarifa?.precios.monto?.toString() ?? '');
   const [montoPor40, setMontoPor40] = useState(tarifa?.precios.montoPor40?.toString() ?? '');
   const [montoPor40HC, setMontoPor40HC] = useState(tarifa?.precios.montoPor40HC?.toString() ?? '');
-  const [montoMinimo, setMontoMinimo] = useState(tarifa?.precios.montoMinimo?.toString() ?? '');
+  const [montoMinimo, setMontoMinimo] = useState((tarifa?.precios.minimo ?? tarifa?.precios.montoMinimo)?.toString() ?? '');
+  const [factorVol, setFactorVol] = useState(tarifa?.precios.factorVolumetricoKgM3?.toString() ?? '');
+  const [escalas, setEscalas] = useState<{ desdeKg: string; monto: string }[]>(
+    (tarifa?.precios.escalas ?? []).map(e => ({ desdeKg: String(e.desdeKg), monto: String(e.monto) })),
+  );
   const [moneda, setMoneda] = useState<'USD' | 'MXN'>(tarifa?.moneda ?? 'USD');
   const [vigenciaTexto, setVigenciaTexto] = useState(tarifa?.vigenciaTexto ?? '');
   const [fechaInicio, setFechaInicio] = useState(tarifa?.fechaInicio ?? hoyISO());
@@ -78,7 +84,8 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
   const terminalesDisponibles = puertoConTerminales?.terminales ?? [];
 
   const showContainerFields = unidad === 'CONTENEDOR';
-  const showMinimoField = unidad === 'CBM' || unidad === 'TON' || unidad === 'WM';
+  const esCobrable = unidad === 'KG_COBRABLE';
+  const showMinimoField = unidad === 'CBM' || unidad === 'TON' || unidad === 'WM' || esCobrable;
 
   // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
@@ -87,6 +94,16 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
     if (!monto || Number(monto) <= 0) { setError('El precio es obligatorio.'); return; }
     if (!vigenciaTexto.trim()) { setError('La descripción de vigencia es obligatoria.'); return; }
     if (!fechaInicio) { setError('La fecha de inicio es obligatoria.'); return; }
+
+    if (esCobrable) {
+      const problemas = problemasTarifaCobrable({
+        monto: Number(monto),
+        factorVolumetricoKgM3: factorVol ? Number(factorVol) : undefined,
+        minimo: montoMinimo ? Number(montoMinimo) : undefined,
+        escalas: escalas.map(e => ({ desdeKg: Number(e.desdeKg), monto: Number(e.monto) })),
+      }, { aereo: !!servicioAereo });
+      if (problemas.length > 0) { setError(problemas[0]); return; }
+    }
 
     setError('');
     setSaving(true);
@@ -98,7 +115,11 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
         unidad,
         ...(showContainerFields && montoPor40 ? { montoPor40: Number(montoPor40) } : {}),
         ...(showContainerFields && montoPor40HC ? { montoPor40HC: Number(montoPor40HC) } : {}),
-        ...(showMinimoField && montoMinimo ? { montoMinimo: Number(montoMinimo) } : {}),
+        ...(showMinimoField && montoMinimo ? (esCobrable ? { minimo: Number(montoMinimo) } : { montoMinimo: Number(montoMinimo) }) : {}),
+        ...(esCobrable && factorVol ? { factorVolumetricoKgM3: Number(factorVol) } : {}),
+        ...(esCobrable && escalas.length > 0
+          ? { escalas: escalas.map(e => ({ desdeKg: Number(e.desdeKg), monto: Number(e.monto) })).sort((a, b) => a.desdeKg - b.desdeKg) }
+          : {}),
       };
 
       if (isEdit && onUpdate) {
@@ -275,7 +296,7 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
                 </select>
               </div>
               <div>
-                <label className={LABEL}>{showContainerFields ? "Precio 20'" : 'Monto'} *</label>
+                <label className={LABEL}>{showContainerFields ? "Precio 20'" : esCobrable ? 'Precio por kg *' : 'Monto'} {esCobrable ? '' : '*'}</label>
                 <input type="number" step="0.01" className={INPUT} value={monto} onChange={e => setMonto(e.target.value)} placeholder="0.00" />
               </div>
               <div>
@@ -295,6 +316,45 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
                 <div>
                   <label className={LABEL}>Precio 40&apos; HC</label>
                   <input type="number" step="0.01" className={INPUT} value={montoPor40HC} onChange={e => setMontoPor40HC(e.target.value)} placeholder="0.00" />
+                </div>
+              </div>
+            )}
+            {esCobrable && (
+              <div className="mt-3 space-y-3 border border-card-border rounded-[8px] p-3 bg-canvas" data-testid="tarifa-cobrable">
+                <p className="text-[11px] text-text-muted">
+                  Se cobra el mayor entre el peso bruto y el volumétrico (volumen m³ × factor).
+                  En aéreo el cobrable se redondea al medio kilo.
+                </p>
+                <div className="max-w-[260px]">
+                  <label className={LABEL}>Factor volumétrico (kg por m³){servicioAereo ? '' : ' *'}</label>
+                  <input type="number" step="1" className={INPUT} value={factorVol} data-testid="tarifa-factor-vol"
+                    onChange={e => setFactorVol(e.target.value)}
+                    placeholder={servicioAereo ? `${FACTOR_VOLUMETRICO_AEREO} (aéreo)` : 'Ej. 250'} />
+                  {!servicioAereo && <p className="text-[10px] text-text-muted mt-1">Obligatorio: solo el aéreo tiene uno por default (167).</p>}
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className={LABEL + ' mb-0'}>Escalas por peso (opcional)</span>
+                    <button type="button" data-testid="tarifa-escala-agregar" className="text-[12px] text-brand font-medium hover:underline"
+                      onClick={() => setEscalas([...escalas, { desdeKg: '', monto: '' }])}>+ Agregar escala</button>
+                  </div>
+                  {escalas.length === 0 && <p className="text-[11px] text-text-muted">Sin escalas: rige el precio por kg de arriba.</p>}
+                  {escalas.map((e, i) => (
+                    <div key={i} className="grid grid-cols-[1fr_1fr_auto] gap-2 mb-2 items-end">
+                      <div>
+                        {i === 0 && <label className={LABEL}>Desde (kg)</label>}
+                        <input type="number" className={INPUT} value={e.desdeKg} placeholder="45" data-testid={`tarifa-escala-desde-${i}`}
+                          onChange={ev => setEscalas(escalas.map((x, j) => j === i ? { ...x, desdeKg: ev.target.value } : x))} />
+                      </div>
+                      <div>
+                        {i === 0 && <label className={LABEL}>Precio por kg</label>}
+                        <input type="number" step="0.01" className={INPUT} value={e.monto} placeholder="0.00" data-testid={`tarifa-escala-monto-${i}`}
+                          onChange={ev => setEscalas(escalas.map((x, j) => j === i ? { ...x, monto: ev.target.value } : x))} />
+                      </div>
+                      <button type="button" aria-label="Quitar escala" className="p-2 text-text-muted hover:text-danger-text"
+                        onClick={() => setEscalas(escalas.filter((_, j) => j !== i))}><X className="w-4 h-4" /></button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

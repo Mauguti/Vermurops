@@ -6,6 +6,8 @@
  */
 
 import type { TarifaVermur, UnidadTarifa } from './TarifasData';
+import type { CargaSolicitada } from '../quotes/QuotesData';
+import { calcularPesoCobrable, entradaDesdeCarga, type ResultadoCobrable } from '../../lib/pesoCobrable';
 
 // ─── Normalización de texto ───────────────────────────────────────────────────
 
@@ -16,7 +18,7 @@ export const normalize = (s: string) =>
 
 const UNIDAD_SHORT: Record<UnidadTarifa, string> = {
   CONTENEDOR: 'cntr', CBM: 'm³', TON: 'ton', WM: 'W/M',
-  PEDIMENTO: 'ped.', VIAJE: 'viaje', BL: 'B/L', FIJO: 'fijo', DIA: 'día',
+  PEDIMENTO: 'ped.', VIAJE: 'viaje', BL: 'B/L', FIJO: 'fijo', DIA: 'día', KG_COBRABLE: 'kg cobrable',
 };
 
 export function fmtPrecio(t: TarifaVermur): string {
@@ -28,6 +30,10 @@ export function fmtPrecio(t: TarifaVermur): string {
     if (montoPor40) s += ` · $${f(montoPor40)}/40'`;
     if (montoPor40HC) s += ` · $${f(montoPor40HC)}/40'HC`;
     return `${s} ${sym}`;
+  }
+  if (unidad === 'KG_COBRABLE') {
+    const esc = t.precios.escalas?.length ?? 0;
+    return `$${f(monto)}/kg cobrable ${sym}${esc > 0 ? ` · ${esc} escalas` : ''}`;
   }
   return `$${f(monto)}/${UNIDAD_SHORT[unidad]} ${sym}`;
 }
@@ -56,6 +62,34 @@ export function resolverMonto(tarifa: TarifaVermur, contenedorTipo?: string): nu
     return tarifa.precios.montoPor40 ?? tarifa.precios.monto;
   }
   return tarifa.precios.monto;
+}
+
+/**
+ * Tarea 100: el cálculo de una tarifa por kg cobrable contra la carga.
+ * null si la tarifa no es de esa unidad.
+ */
+export function calcularTarifaCobrable(tarifa: TarifaVermur, carga: CargaSolicitada | null | undefined): ResultadoCobrable | null {
+  if (tarifa.precios.unidad !== 'KG_COBRABLE') return null;
+  return calcularPesoCobrable(entradaDesdeCarga(carga), tarifa.precios);
+}
+
+/**
+ * Monto de la tarifa para la cotización. Igual que `resolverMonto`, pero para
+ * KG_COBRABLE devuelve el TOTAL calculado con la carga, o null si la carga no
+ * alcanza (sin peso, sin volumen, sin factor): un precio por kg suelto metido
+ * como monto sería inventar el cobro. Quien lo llama debe tratar null como
+ * «no se puede usar todavía», no como cero.
+ */
+export function montoDeTarifa(tarifa: TarifaVermur, contenedorTipo?: string, carga?: CargaSolicitada | null): number | null {
+  const c = calcularTarifaCobrable(tarifa, carga);
+  if (c === null) return resolverMonto(tarifa, contenedorTipo);
+  return c.ok ? c.total : null;
+}
+
+/** La fórmula para dejar en las condiciones del renglón, o undefined. */
+export function formulaCobrable(tarifa: TarifaVermur, carga: CargaSolicitada | null | undefined): string | undefined {
+  const c = calcularTarifaCobrable(tarifa, carga);
+  return c && c.ok ? c.formula : undefined;
 }
 
 /** Etiqueta corta del tamaño usado. */

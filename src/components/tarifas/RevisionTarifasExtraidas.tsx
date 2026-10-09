@@ -43,7 +43,7 @@ const COLOR_CONFIANZA: Record<NivelConfianza, string> = {
 };
 
 const UNIDADES: UnidadTarifa[] = [
-  'CONTENEDOR', 'CBM', 'TON', 'WM', 'PEDIMENTO', 'VIAJE', 'BL', 'FIJO', 'DIA',
+  'CONTENEDOR', 'CBM', 'TON', 'WM', 'PEDIMENTO', 'VIAJE', 'BL', 'FIJO', 'DIA', 'KG_COBRABLE',
 ];
 
 interface Props {
