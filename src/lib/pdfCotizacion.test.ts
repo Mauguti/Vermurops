@@ -104,4 +104,16 @@ describe('carga, vigencia y nombre', () => {
   it('una línea sin concepto no sale al cliente', () => {
     expect(lineasParaPdf([{ concepto: '  ', venta: 10, moneda: 'USD', orden: 0 } as never])).toEqual([]);
   });
+
+  it('tarea 101: las fechas deseadas salen en las notas y como campos; sin ellas, nada cambia', () => {
+    const sin = armarPayloadPdf(quote, opts);
+    expect(sin.notas).toBe('Sujeto a disponibilidad');
+    expect('fechaEntregaDeseada' in sin).toBe(false);
+    const con = armarPayloadPdf({ ...quote, fechaRecoleccionDeseada: '2026-10-12', fechaEntregaDeseada: '2026-10-20' }, opts);
+    expect(con.notas).toBe('Recolección deseada: 12 oct 2026 · Entrega deseada: 20 oct 2026\nSujeto a disponibilidad');
+    expect(con.fechaRecoleccionDeseada).toBe('2026-10-12');
+    expect(con.fechaEntregaDeseada).toBe('2026-10-20');
+    const en = armarPayloadPdf({ ...quote, fechaEntregaDeseada: '2026-10-20' }, { ...opts, idioma: 'en' });
+    expect(en.notas).toContain('Requested delivery: 2026-10-20');
+  });
 });

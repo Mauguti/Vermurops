@@ -32,6 +32,8 @@ import { PROSPECTO_COLUMNS, VISTA_DEFAULT_PROSPECTOS } from './quotes/prospectoC
 import FichaProspecto from './quotes/FichaProspecto';
 import { useVistasUsuario } from '../hooks/useVistasUsuario';
 import VistaSelector from './table/VistaSelector';
+import { CapturaFechasDeseadas } from './quotes/FechasDeseadas';
+import { problemasFechasDeseadas } from '../lib/fechasDeseadas';
 import FormCargaServicio, { DraftServicio, nuevoDraft } from './quotes/FormCargaServicio';
 import { usePuertos } from '../hooks/usePuertos';
 import { useConceptos } from '../hooks/useConceptos';
@@ -553,6 +555,8 @@ export default function Quotes() {
     }
     setFormCargas([nuevoDraft(m)]);
     setFormTrafico('');
+    setFormFechaRecoleccion(null);
+    setFormFechaEntrega(null);
   };
 
   /**
@@ -600,6 +604,8 @@ export default function Quotes() {
    * aquí y no se deja a la derivación por ruta, que es el respaldo para las
    * cotizaciones viejas. De este dato depende el folio del embarque.
    */
+  const [formFechaRecoleccion, setFormFechaRecoleccion] = useState<string | null>(null);
+  const [formFechaEntrega, setFormFechaEntrega] = useState<string | null>(null);
   const [formTrafico, setFormTrafico] = useState<'importacion' | 'exportacion' | ''>('');
 
   // Formulario Nuevo Prospecto
@@ -677,6 +683,13 @@ export default function Quotes() {
     if (!formEmpresa.trim() || formCargas.length === 0) {
       void avisar('Por favor introduce la empresa y agrega al menos una modalidad.');
       medirFlujoAbandonado(FLUJO_SOLICITUD, 'sin_empresa', 'validacion');
+      return;
+    }
+
+    // Tarea 101: la entrega antes de la recolección bloquea; una fecha pasada solo avisa en el formulario.
+    const pf = problemasFechasDeseadas(formFechaRecoleccion, formFechaEntrega);
+    if (pf.error) {
+      void avisar(pf.error);
       return;
     }
 
@@ -758,6 +771,9 @@ export default function Quotes() {
       }),
       valorTotalConsolidado: 0,
       moneda: 'USD',
+      // Tarea 101: se omiten cuando no hay (Firestore rechaza undefined).
+      ...(formFechaRecoleccion ? { fechaRecoleccionDeseada: formFechaRecoleccion } : {}),
+      ...(formFechaEntrega ? { fechaEntregaDeseada: formFechaEntrega } : {}),
       estadoFinal: null,
       motivoPerdida: null,
       createdAt: fechaActual,
@@ -1304,6 +1320,14 @@ export default function Quotes() {
                     );
                   })}
                 </div>
+              </div>
+
+              <div className="mb-4">
+                <CapturaFechasDeseadas
+                  recoleccion={formFechaRecoleccion}
+                  entrega={formFechaEntrega}
+                  onCambio={(r, e) => { setFormFechaRecoleccion(r); setFormFechaEntrega(e); }}
+                />
               </div>
 
               {formCargas[0] && (

@@ -95,6 +95,7 @@ import ResumenFinancieroInline from './ResumenFinancieroInline';
 import { calcTotales } from '../../lib/cotizacionCalculator';
 import { cargaDesdeLegacy, resumenCarga, ETIQUETA_MODALIDAD, ModalidadSolicitud } from '../../lib/cargaSolicitud';
 import DetalleCargaSolicitud from './DetalleCargaSolicitud';
+import { EditorFechasDeseadas, LecturaFechasDeseadas } from './FechasDeseadas';
 import { useVersionesCotizacion } from '../../hooks/useVersionesCotizacion';
 import {
   opcionesSelector, vistaDeVersion, puedeVersionar, numeroVersionActual,
@@ -1758,6 +1759,20 @@ export default function FichaCotizacion({
                 leen la matriz y la generación de embarques — pero deja de ser
                 el criterio de agrupación visual. */}
             {franjaSolicitud}
+
+            {/* Tarea 101 · lo que desea el cliente: Pricing decide ruta y servicio con esto. */}
+            {puedeEditarOperacion(rolActivo, quote.etapa, bloqueada) ? (
+              <div className="border border-gray-200 bg-gray-50/60 rounded-xl px-4 py-2.5">
+                <EditorFechasDeseadas
+                  fuente={quote}
+                  onGuardar={(r, e) => onUpdateQuote({ ...quote, fechaRecoleccionDeseada: r, fechaEntregaDeseada: e })}
+                />
+              </div>
+            ) : (
+              <div className="border border-gray-200 bg-gray-50/60 rounded-xl px-4 py-2.5">
+                <LecturaFechasDeseadas fuente={quote} titulo="Fechas que desea el cliente" siempre />
+              </div>
+            )}
 
             {/* 1b · Por proveedor (default) o por concepto. Editar concepto,
                 comparar y arrastrar tarifas viven en la vista por concepto;

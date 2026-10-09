@@ -18,6 +18,7 @@ import { textoCortoEstiba } from './estiba';
 import { cargaDesdeLegacy, modalidadDeCarga, ETIQUETA_MODALIDAD, ETIQUETA_CONTENEDOR, ETIQUETA_UNIDAD_TERRESTRE } from './cargaSolicitud';
 import { numeroVersionActual } from './versionesCotizacion';
 import { ETIQUETA_SERVICIO_AEREO } from './servicioAereo';
+import { fechasDeseadasDe, textoFechasDeseadas } from './fechasDeseadas';
 import { contactoParaAvisos, type ContactoEditable } from './contactos';
 
 export type IdiomaPdf = 'es' | 'en';
@@ -37,6 +38,9 @@ export interface PayloadPdf {
   lineas: { concepto: string; detalle?: string; venta: number; moneda: string }[];
   notas: string;
   contacto: string;
+  /** Tarea 101, YYYY-MM-DD. Solo viajan si hay; el texto también va en `notas`. */
+  fechaRecoleccionDeseada?: string;
+  fechaEntregaDeseada?: string;
 }
 
 export interface OpcionesPdf {
@@ -110,6 +114,7 @@ export function armarPayloadPdf(quote: KanbanQuote, o: OpcionesPdf): PayloadPdf 
   // Tarea 60: nunca un contacto desactivado. Mandarle la cotización a quien
   // ya no trabaja ahí se ve perfectamente bien y no llega a nadie.
   const contactoPrincipal = contactoParaAvisos(o.cliente?.contactos);
+  const fd = fechasDeseadasDe(quote);
 
   return {
     folio: `${quote.id} v${numeroVersionActual(quote)}`,
@@ -127,8 +132,13 @@ export function armarPayloadPdf(quote: KanbanQuote, o: OpcionesPdf): PayloadPdf 
     mercancia: servicio?.mercancia ?? '',
     carga: cargaParaPdf(servicio),
     lineas: lineasParaPdf(aplanarCotizacion(quote)),
-    notas: o.notas,
+    // Tarea 101: las fechas deseadas salen en las notas (la plantilla de n8n
+    // actual las imprime) y como campos propios para cuando la plantilla las
+    // quiera en su propio renglón.
+    notas: [textoFechasDeseadas(quote, o.idioma), o.notas].filter(Boolean).join('\n'),
     contacto: o.contacto,
+    ...(fd.recoleccion ? { fechaRecoleccionDeseada: fd.recoleccion } : {}),
+    ...(fd.entrega ? { fechaEntregaDeseada: fd.entrega } : {}),
   };
 }
 

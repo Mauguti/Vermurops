@@ -491,6 +491,13 @@ export interface KanbanQuote {
    */
   diasLibresDemora?: number | null;
   /**
+   * Fechas que el cliente desea (tarea 101), YYYY-MM-DD. Opcionales. Pricing
+   * las lee para decidir ruta y servicio; el embarque las muestra como
+   * «solicitadas» y no pisa ETD/ETA. Ver lib/fechasDeseadas.ts.
+   */
+  fechaRecoleccionDeseada?: string | null;
+  fechaEntregaDeseada?: string | null;
+  /**
    * Días libres de almacenaje (tarea 08, 28-sep-2026).
    *
    * Sugeridos 7 para todos. La fecha límite = ETA + estos días.

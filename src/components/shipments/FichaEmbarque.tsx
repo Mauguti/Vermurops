@@ -8,6 +8,8 @@ import DocumentosEmbarque from './DocumentosEmbarque';
 import DocumentosGeneradosPanel from './DocumentosGeneradosPanel';
 import ProductosEmbarque from './ProductosEmbarque';
 import { useClientes } from '../../hooks/useClientes';
+import { useCotizaciones } from '../../hooks/useCotizaciones';
+import { LecturaFechasDeseadas } from '../quotes/FechasDeseadas';
 import { useConceptos } from '../../hooks/useConceptos';
 import { useFacturas } from '../../hooks/useFacturas';
 import PanelFacturasEmbarque from '../facturas/PanelFacturasEmbarque';
@@ -77,6 +79,9 @@ export default function FichaEmbarque({
   regresarLabel,
 }: FichaEmbarqueProps) {
   const { clientes } = useClientes();
+  const { quotes: cotizacionesTodas } = useCotizaciones();
+  /** Tarea 101: las fechas del cliente se LEEN de la cotización; no hay copia que se desincronice. */
+  const cotizacionOrigen = cotizacionesTodas.find(c => c.id === embarque.cotizacionId) ?? null;
   const { proveedores } = useProveedores();
   const { ordenes, createOrden, updateOrden } = useOrdenesCompra();
 
@@ -871,6 +876,12 @@ export default function FichaEmbarque({
                 <h3 className="text-xs font-bold text-[#18181B] uppercase tracking-wider border-b border-gray-100 pb-3">
                   Hitos Temporales (Fechas)
                 </h3>
+
+                {cotizacionOrigen && (
+                  <div className="rounded-lg bg-gray-50 border border-gray-100 px-3 py-2">
+                    <LecturaFechasDeseadas fuente={cotizacionOrigen} titulo="Solicitadas por el cliente (no son ETD/ETA)" />
+                  </div>
+                )}
 
                 <div className="space-y-3 text-xs">
                   <div className="grid grid-cols-2 gap-2">
