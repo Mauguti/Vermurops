@@ -1760,19 +1760,10 @@ export default function FichaCotizacion({
                 el criterio de agrupación visual. */}
             {franjaSolicitud}
 
-            {/* Tarea 101 · lo que desea el cliente: Pricing decide ruta y servicio con esto. */}
-            {puedeEditarOperacion(rolActivo, quote.etapa, bloqueada) ? (
-              <div className="border border-gray-200 bg-gray-50/60 rounded-xl px-4 py-2.5">
-                <EditorFechasDeseadas
-                  fuente={quote}
-                  onGuardar={(r, e) => onUpdateQuote({ ...quote, fechaRecoleccionDeseada: r, fechaEntregaDeseada: e })}
-                />
-              </div>
-            ) : (
-              <div className="border border-gray-200 bg-gray-50/60 rounded-xl px-4 py-2.5">
-                <LecturaFechasDeseadas fuente={quote} titulo="Fechas que desea el cliente" siempre />
-              </div>
-            )}
+            {/* Tarea 101 · lo que desea el cliente (se captura en Información → Operación). */}
+            <div className="border border-gray-200 bg-gray-50/60 rounded-xl px-4 py-2.5">
+              <LecturaFechasDeseadas fuente={quote} titulo="Fechas que desea el cliente" siempre />
+            </div>
 
             {/* 1b · Por proveedor (default) o por concepto. Editar concepto,
                 comparar y arrastrar tarifas viven en la vista por concepto;
@@ -2431,6 +2422,17 @@ export default function FichaCotizacion({
                 <span className="ml-auto normal-case tracking-normal font-semibold text-gray-400">solo lectura</span>
               )}
             </h3>
+            {/* Tarea 101 · fechas que desea el cliente. Pricing decide ruta y servicio con ellas. */}
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+              {puedeEditarOperacion(rolActivo, quote.etapa, bloqueada) ? (
+                <EditorFechasDeseadas
+                  fuente={quote}
+                  onGuardar={(r, e) => onUpdateQuote({ ...quote, fechaRecoleccionDeseada: r, fechaEntregaDeseada: e })}
+                />
+              ) : (
+                <LecturaFechasDeseadas fuente={quote} titulo="Fechas que desea el cliente" siempre />
+              )}
+            </div>
             {quote.servicios.length === 0 && (
               <p className="text-[11px] text-gray-400">Esta cotización no tiene servicios.</p>
             )}
