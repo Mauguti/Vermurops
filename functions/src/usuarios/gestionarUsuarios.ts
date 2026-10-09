@@ -82,9 +82,48 @@ function validarRol(rol: unknown): UserRole {
 
 // ── Acciones ─────────────────────────────────────────────────────────────────
 
+/*
+ * La lista sale de Firestore MÁS Auth.
+ *
+ * Solo con la colección, una cuenta que existe en Auth y no tiene documento
+ * es invisible aquí — y eso es exactamente lo que pasaba con las seis del
+ * equipo, anteriores a este módulo: la pantalla no las enseñaba, así que no
+ * había a quién asignarle rol. El síntoma era «asigné el rol y no se puso»,
+ * y la causa era que nunca apareció la fila.
+ *
+ * Las de Auth sin documento se marcan con `sinDocumento` y traen el rol que
+ * diga su claim —o ninguno—; cambiarles el rol crea el documento (`set` con
+ * merge en `cambiarRol`).
+ */
 async function listar(): Promise<UsuarioRegistrado[]> {
-  const snap = await db().collection('usuarios').orderBy('nombre').get();
-  return snap.docs.map(d => ({ uid: d.id, ...d.data() }) as UsuarioRegistrado);
+  const snap = await db().collection('usuarios').get();
+  const porUid = new Map<string, UsuarioRegistrado>();
+  snap.docs.forEach(d => porUid.set(d.id, { uid: d.id, ...d.data() } as UsuarioRegistrado));
+
+  let token: string | undefined;
+  do {
+    const pagina = await authAdmin().listUsers(1000, token);
+    for (const u of pagina.users) {
+      if (porUid.has(u.uid)) continue;
+      const claims = (u.customClaims ?? {}) as { rol?: string };
+      porUid.set(u.uid, {
+        uid: u.uid,
+        email: u.email ?? '',
+        nombre: u.displayName ?? u.email ?? '(sin nombre)',
+        rol: (claims.rol ?? '') as UsuarioRegistrado['rol'],
+        activo: !u.disabled,
+        invitadoPor: '(anterior a Gestión de Usuarios)',
+        creadoEn: u.metadata.creationTime
+          ? new Date(u.metadata.creationTime).toISOString()
+          : '',
+        actualizadoEn: '',
+        sinDocumento: true,
+      } as UsuarioRegistrado);
+    }
+    token = pagina.pageToken;
+  } while (token);
+
+  return [...porUid.values()].sort((a, b) => (a.nombre ?? '').localeCompare(b.nombre ?? ''));
 }
 
 async function invitar(
@@ -169,15 +208,35 @@ async function cambiarRol(
     throw new ErrorAuth(404, `No se encontró el usuario con uid «${uid}».`);
   }
 
-  // Actualizar claims
-  await authAdmin().setCustomUserClaims(uid, { rol });
+  /*
+   * Los claims que ya existan se conservan: `setCustomUserClaims` REEMPLAZA
+   * el objeto completo, así que mandar `{ rol }` a secas borraría cualquier
+   * otro. Hoy no hay más claims, pero el día que haya este código los tiraría
+   * sin avisar.
+   */
+  const claimsPrevios = (userRecord.customClaims ?? {}) as Record<string, unknown>;
+  await authAdmin().setCustomUserClaims(uid, { ...claimsPrevios, rol });
 
   // Revocar refresh tokens para forzar re-autenticación con los nuevos claims
   await authAdmin().revokeRefreshTokens(uid);
 
-  // Actualizar documento
+  /*
+   * `set` con merge y no `update`: un `update` a un documento que NO existe
+   * LANZA, y las seis cuentas del equipo son anteriores a este módulo, así
+   * que no tienen documento en `usuarios/`. Con `update`, cambiarle el rol a
+   * una de ellas ponía el claim (arriba), revocaba sus tokens y DESPUÉS
+   * fallaba: la pantalla decía que no se pudo y el claim ya estaba puesto.
+   * Un guardado a medias (§3).
+   */
   const ahora = new Date().toISOString();
-  await db().collection('usuarios').doc(uid).update({
+  await db().collection('usuarios').doc(uid).set({
+    email: userRecord.email ?? '',
+    nombre: userRecord.displayName ?? userRecord.email ?? '',
+    activo: !userRecord.disabled,
+    creadoEn: userRecord.metadata.creationTime
+      ? new Date(userRecord.metadata.creationTime).toISOString()
+      : ahora,
+    invitadoPor: modificadoPorEmail,
     rol,
     actualizadoEn: ahora,
     historial: FieldValue.arrayUnion({
@@ -187,7 +246,7 @@ async function cambiarRol(
       por: modificadoPorEmail,
       fecha: ahora,
     }),
-  });
+  }, { merge: true });
 
   const snap = await db().collection('usuarios').doc(uid).get();
   return { uid, ...snap.data() } as UsuarioRegistrado;
