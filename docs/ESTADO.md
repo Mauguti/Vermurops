@@ -1,3 +1,29 @@
+# Estado de VermurOps — 9 de octubre de 2026 (corte del sprint nocturno)
+
+**Cadena 98 → 99, lista y SIN PUBLICAR.** Dos tareas `[x]`, ninguna `[!]`.
+Sale de `sprint/base` = `main` = `09c6dcc`; punta: `sprint/99-estibable`
+(mergearla trae las dos). Solo hosting: sin reglas, índices, Functions, n8n ni
+modelo obligatorio (campos opcionales).
+
+- **98** `servicioAereo` expeditado/regular en solicitud, embarque, tarifas (filtro,
+  sugerencias del mismo tipo) y PDF. §4.57.
+- **99** `estibable` + `nivelesEstiba` con tope por modalidad (terrestre 5, aéreo 3,
+  marítimo sin tope) en `lib/estiba.ts`. §4.58.
+- En la punta: 2,736 tests verdes · tsc 0 · build limpio · recorrido e2e 6/6.
+  Antes de publicar, correr 45-filtros y 47-barrido (la 98 no los corrió).
+
+**Cola restante:** 100 peso cobrable, 101 fechas deseadas, 102 contrato de la
+ganada (la 102 necesita regla de Storage para `cotizaciones/{id}/contrato/`, que
+el sprint solo puede dejar escrita en el reporte). No corrieron: el script dijo
+«Cola vacía» con tres líneas `[ ]`; revisar.
+
+**Decisiones pendientes:** servicio aéreo obligatorio al solicitar; tope de estiba
+marítimo; si la estiba merece campo propio en el PDF (toca n8n). Detalle en
+`sprint/reportes/RESUMEN.md`. Lo que sigue de este documento (corte del 7-oct)
+vale salvo donde la cadena 96 → 97 ya se haya publicado.
+
+---
+
 # Estado de VermurOps — 7 de octubre de 2026 (corte del sprint nocturno)
 
 **Corte del sprint «Las dos de pruebas que se cayeron»: la cadena 96 → 97 está
