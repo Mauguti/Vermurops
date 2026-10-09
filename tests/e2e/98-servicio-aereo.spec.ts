@@ -168,8 +168,10 @@ test('Ventas · solicita un aéreo EXPEDITADO', async ({ browser }) => {
   await irA(pr.page, 'CRM');
   await pr.page.getByRole('button', { name: 'Bandeja Pricing' }).click();
   await pr.page.getByText(S.folio, { exact: true }).first().click();
-  await expect(pr.page.getByText('Servicio aéreo').first()).toBeVisible({ timeout: 15_000 });
-  await expect(pr.page.getByText('Expeditado').first()).toBeVisible();
+  await pr.page.getByRole('button', { name: 'Información' }).click();
+  // La sección Operación de la ficha trae el mismo selector, ya con lo que pidió Ventas.
+  await expect(pr.page.getByTestId('servicio-aereo').getByRole('button', { name: 'Expeditado' }))
+    .toHaveAttribute('aria-pressed', 'true', { timeout: 15_000 });
   await pr.ctx.close();
 });
 
@@ -196,7 +198,10 @@ test('Pricing · arma el paquete del aéreo expeditado', async ({ browser }) => 
 
   await page.getByRole('button', { name: 'Cotizaciones recibidas' }).click();
   await page.getByRole('button', { name: 'Armar cotización' }).click();
-  await expect(page.getByText(/Consolidada|consolidada/).first()).toBeVisible({ timeout: 15_000 });
+  await expect.poll(async () => {
+    const cots = await leerColeccion('pricing@vermur.com', 'cotizaciones');
+    return cots.find(c => c.__id === S.folio)?.etapa;
+  }, { timeout: 15_000, message: 'La cotización no quedó consolidada' }).toBe('consolidada');
   await ctx.close();
 });
 
@@ -267,7 +272,8 @@ test('Operaciones · el embarque nace expeditado: ficha, productos y lista', asy
   }, { timeout: 15_000 }).toMatch(/expeditado/);
 
   // En la lista: la columna dice Expeditado para este embarque.
-  await irA(page, 'Embarques');
+  await page.getByRole('button', { name: 'Embarques', exact: true }).last().click();
+  await page.getByRole('button', { name: 'Todos los embarques' }).click();
   const filaLista = page.locator('tr', { hasText: S.embarqueFolio });
   await expect(filaLista).toBeVisible({ timeout: 15_000 });
   await expect(filaLista.getByText('Expeditado')).toBeVisible();
