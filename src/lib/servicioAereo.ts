@@ -95,7 +95,7 @@ export interface TarifasPorServicio<T> {
  * concepto distingue servicio (un despacho, un seguro), no hay nada que
  * filtrar y no se avisa: un aviso en todo concepto dejaría de leerse.
  */
-export function tarifasPorServicioAereo<T extends { servicioAereo?: ServicioAereo }>(
+export function tarifasPorServicioAereo<T extends { servicioAereo?: ServicioAereo | null }>(
   tarifas: readonly T[],
   pedido: ServicioAereo | null | undefined,
 ): TarifasPorServicio<T> {

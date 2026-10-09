@@ -65,9 +65,10 @@ describe('etiqueta del embarque', () => {
 });
 
 describe('tarifas: primero las del mismo tipo', () => {
-  const exp = { id: 'a', servicioAereo: 'expeditado' as const };
-  const reg = { id: 'b', servicioAereo: 'regular' as const };
-  const sin = { id: 'c' };
+  type T = { id: string; servicioAereo?: 'expeditado' | 'regular' };
+  const exp: T = { id: 'a', servicioAereo: 'expeditado' };
+  const reg: T = { id: 'b', servicioAereo: 'regular' };
+  const sin: T = { id: 'c' };
   it('con las del mismo tipo, solo esas y sin aviso', () => {
     const r = tarifasPorServicioAereo([exp, reg, sin], 'expeditado');
     expect(r.tarifas.map(t => t.id)).toEqual(['a']);
@@ -85,7 +86,7 @@ describe('tarifas: primero las del mismo tipo', () => {
   });
   it('cotización sin servicio o concepto sin distinción: no se filtra ni se avisa', () => {
     expect(tarifasPorServicioAereo([exp, reg, sin], null)).toEqual({ tarifas: [exp, reg, sin], aviso: null });
-    expect(tarifasPorServicioAereo([sin, { id: 'd' }], 'regular')).toEqual({ tarifas: [sin, { id: 'd' }], aviso: null });
+    expect(tarifasPorServicioAereo([sin, { id: 'd' } as T], 'regular')).toEqual({ tarifas: [sin, { id: 'd' }], aviso: null });
   });
   it('un valor basura en la tarifa cuenta como sin indicar', () => {
     const basura = { id: 'x', servicioAereo: 'express' as never };

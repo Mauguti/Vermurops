@@ -2205,6 +2205,33 @@ cotización, formulario y carga masiva de tarifas. Sin migración ni campo
 escrito. Quedan sin tocar la consulta de `useTarifas` (`where activo == true`,
 índice) y `esTarifaVigente` (tarifas, no catálogo de selección).
 
+## 4.57 Aéreo expeditado o regular (tarea 98, 9-oct-2026)
+
+El FCL/LCL del aéreo. `servicioAereo?: 'expeditado' | 'regular'` en tres
+lugares, siempre opcional: `CargaAerea` (la solicitud), `EmbarqueProducto`
+(junto a `tipoConsolidacion`) y `TarifaVermur` (que además admite `null` al
+editar, porque `updateDoc` no quita una clave que no se manda). **Sin valor =
+«Sin indicar»; nunca se asume** ni se reescribe. Reglas puras y 13 tests en
+`lib/servicioAereo.ts`.
+  - **Solicitud:** dos botones «Expeditado / Regular» en `FormCargaServicio`
+    (solo aéreo; volver a pulsar el elegido lo quita, borrando la clave). Pricing
+    lo ve en `DetalleCargaSolicitud`; `resumenCarga` y el PDF
+    (`carga.tipo` = «Aéreo Expeditado») lo dicen.
+  - **Al embarque:** `productosDesdeCarga` lo hereda al producto aéreo.
+    `ProductosEmbarque` (solo `modalidad === 'aereo'`) tiene el selector; el
+    servicio es del EMBARQUE, así que cambiarlo lo pone en todos sus productos.
+    Si los productos no coinciden se dice y no se escoge uno.
+  - **Listas:** columna «Servicio aéreo» en Embarques (en la vista por
+    defecto y en el CSV) y badge en la ficha; columna y filtro en Tarifas.
+  - **Tarifas desde la cotización** (`tarifasPorServicioAereo`, en
+    `TarifaPanel` y `TarifaSuggestions`): las del MISMO tipo; si no hay, las
+    «sin indicar» con aviso ámbar; las del otro tipo nunca. Si la cotización no
+    indica servicio, o ninguna tarifa del concepto distingue servicio (un
+    despacho, un seguro), no se filtra ni se avisa. ⚠️ Decisión: con tarifas
+    del mismo tipo disponibles, las «sin indicar» NO se muestran.
+  - e2e: `tests/e2e/98-servicio-aereo.spec.ts` (solicitud → embarque, y filtro
+    de tarifas).
+
 ---
 
 ## 5. Estado de los módulos
