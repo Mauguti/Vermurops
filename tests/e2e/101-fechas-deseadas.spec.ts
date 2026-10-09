@@ -145,6 +145,10 @@ test('Ventas · captura las fechas: la inversión bloquea, la pasada avisa', asy
   await ent.fill('2030-03-10');
   await expect(page.getByTestId('fechas-deseadas').getByRole('alert')).toContainText('antes de la recolección');
   await page.getByRole('button', { name: 'Enviar a Pricing' }).click();
+  // El aviso lo dice y la solicitud no se envió.
+  await expect(page.getByTestId('dialogo')).toContainText('antes de la recolección');
+  await page.getByTestId('dialogo').getByRole('button').click();
+  await expect(page.getByTestId('dialogo')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Enviar a Pricing' })).toBeVisible();
   await page.screenshot({ path: 'sprint/reportes/img/101-solicitud-error-desktop.png', fullPage: true });
 
@@ -176,6 +180,9 @@ test('Ventas · captura las fechas: la inversión bloquea, la pasada avisa', asy
   await pr.page.getByRole('button', { name: 'Información' }).click();
   await expect(pr.page.locator('#fecha-recoleccion-deseada')).toHaveValue('2030-03-05', { timeout: 15_000 });
   await expect(pr.page.locator('#fecha-entrega-deseada')).toHaveValue('2030-03-10');
+  await pr.page.screenshot({ path: 'sprint/reportes/img/101-ficha-pricing-desktop.png', fullPage: true });
+  await pr.page.setViewportSize({ width: 390, height: 844 });
+  await pr.page.screenshot({ path: 'sprint/reportes/img/101-ficha-pricing-angosto.png', fullPage: true });
   await pr.ctx.close();
 });
 

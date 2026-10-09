@@ -2283,6 +2283,25 @@ escala, el `monto`); total = el mayor entre `minimo` y cobrable × precio/kg.
     respaldo del otro. TON, WM y CBM no cambian.
   - e2e: `tests/e2e/100-peso-cobrable.spec.ts`.
 
+## 4.60 Fechas de recolección y entrega deseadas (tarea 101, 9-oct-2026)
+
+`fechaRecoleccionDeseada?` y `fechaEntregaDeseada?` (YYYY-MM-DD, opcionales,
+`null` al borrar) en la cotización. Reglas puras y tests en
+`lib/fechasDeseadas.ts`; UI en `components/quotes/FechasDeseadas.tsx`.
+  - **Entrega antes de recolección bloquea** (solicitud y ficha); **una fecha
+    pasada solo avisa** («Se guarda igual»), porque hay cotizaciones que se
+    capturan tarde. En la ficha el valor inválido queda en pantalla y no se guarda.
+  - **Captura:** formulario de la solicitud y Información → Operación (quien
+    puede editar la operación, `puedeEditarOperacion`). Pricing las lee ahí y
+    en la franja del tab Servicios.
+  - **PDF:** salen como primera línea de `notas` (la plantilla de n8n actual las
+    imprime) y como campos propios del payload, que solo viajan si hay.
+  - **Embarque: se LEEN de la cotización de origen** (`cotizacionId`), no se
+    copian: así no hay modelo nuevo ni copia que se desincronice. Se muestran
+    como «Solicitadas por el cliente (no son ETD/ETA)» en Hitos Temporales y no
+    tocan `fechas.salida` ni `fechas.arribo`.
+  - e2e: `tests/e2e/101-fechas-deseadas.spec.ts`.
+
 ---
 
 ## 5. Estado de los módulos
