@@ -8,6 +8,7 @@ import { calcLinea } from '../../lib/cotizacionCalculator';
 import ComparativaPricing from './ComparativaPricing';
 import type { ProveedorComparativa } from './ComparativaPricing';
 import type { TarifaVermur } from '../tarifas/TarifasData';
+import type { ServicioAereo } from '../../lib/servicioAereo';
 import TarifaSuggestions, { resolverMonto } from '../tarifas/TarifaSuggestions';
 import CapturaManualConcepto from '../tarifas/CapturaManualConcepto';
 import ConceptoSelector from '../conceptos/ConceptoSelector';
@@ -27,6 +28,8 @@ export interface ConceptoSectionProps {
   diasCredito?: number;
   catalogoTarifas?: TarifaVermur[];
   contenedorTipo?: string;
+  /** Tarea 98: servicio aéreo de la cotización. */
+  servicioAereo?: ServicioAereo | null;
   onCrearTarifaSpot?: (t: TarifaVermur) => Promise<void>;
   /** FC-2: ¿este concepto es el activo en el panel de tarifas? */
   isActive?: boolean;
@@ -44,7 +47,7 @@ export interface ConceptoSectionProps {
   onCrearConcepto?: () => void;
 }
 
-export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moneda = 'USD', ruta = '', clientePreferidos, clienteVetados, diasCredito = 30, catalogoTarifas, contenedorTipo, onCrearTarifaSpot, isActive, onActivate, panelVisible, onComparativaToggle, servicioId, conceptosActivos, onCrearConcepto }: ConceptoSectionProps) {
+export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moneda = 'USD', ruta = '', clientePreferidos, clienteVetados, diasCredito = 30, catalogoTarifas, contenedorTipo, servicioAereo, onCrearTarifaSpot, isActive, onActivate, panelVisible, onComparativaToggle, servicioId, conceptosActivos, onCrearConcepto }: ConceptoSectionProps) {
   const [newSubNombre, setNewSubNombre] = useState('');
   const [newSubCosto, setNewSubCosto] = useState('');
   const [comparativaOpen, setComparativaOpen] = useState(false);
@@ -221,6 +224,7 @@ export function ConceptoSection({ concepto, rolActivo, onUpdate, onDelete, moned
             rutaTexto={ruta}
             catalogoTarifas={catalogoTarifas}
             contenedorTipo={contenedorTipo}
+            servicioAereo={servicioAereo}
             tarifasYaUsadas={(concepto.tarifas || []).map(t => t.tarifaOrigenId).filter((id): id is string => !!id)}
             onUsarTarifa={(tarifa, provNombre, contactoNombre) => {
               // Duplicate check

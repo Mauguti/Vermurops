@@ -12,6 +12,7 @@ import type { EmbarqueCompleto, ModalidadEmbarque } from './EmbarquesData';
 import type { VistaConfig } from '../table/SpreadsheetTable';
 import { estadoDe, ETAPAS_EMBARQUE } from '../../lib/estadoEmbarque';
 import { nombreDeUsuario } from '../../auth/AuthContext';
+import { etiquetaServicioDeEmbarque } from '../../lib/servicioAereo';
 import { ETIQUETA_TRAFICO, traficoDeEmbarque } from '../../lib/traficoEmbarque';
 
 const col = createColumnHelper<EmbarqueCompleto>();
@@ -99,6 +100,12 @@ export const EMBARQUE_COLUMNS = [
     id: 'modalidad', header: 'Modalidad', size: 110,
     cell: info => <BadgeModalidad modalidad={info.getValue()} />,
   }),
+  col.accessor(e => etiquetaServicioDeEmbarque(e) ?? '', {
+    id: 'servicioAereo', header: 'Servicio aéreo', size: 130,
+    cell: info => info.getValue()
+      ? <span className="text-gray-700">{info.getValue()}</span>
+      : <span className="text-gray-300">—</span>,
+  }),
   col.accessor(e => traficoDeEmbarque(e).trafico ?? '', {
     id: 'trafico', header: 'Tráfico', size: 120,
     cell: info => <BadgeTrafico embarque={info.row.original} />,
@@ -159,7 +166,7 @@ export const EMBARQUE_COLUMNS = [
 export const VISTA_DEFAULT_EMBARQUES: VistaConfig = {
   columnas: [
     { id: 'folio' }, { id: 'cliente' }, { id: 'responsable' }, { id: 'estado' },
-    { id: 'modalidad' }, { id: 'trafico' }, { id: 'ruta' }, { id: 'guia' },
+    { id: 'modalidad' }, { id: 'servicioAereo' }, { id: 'trafico' }, { id: 'ruta' }, { id: 'guia' },
     { id: 'eta' }, { id: 'cierres' },
   ],
   ordenamiento: { columnaId: 'eta', direccion: 'asc' },

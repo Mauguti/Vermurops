@@ -24,6 +24,8 @@ import {
 // ─── Re-exports for backward compat ─────────────────────────────────────────
 export { normalize, resolverMonto } from './tarifaMatching';
 
+import { tarifasPorServicioAereo, type ServicioAereo } from '../../lib/servicioAereo';
+
 // ─── Props ─────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -38,13 +40,15 @@ interface Props {
   tarifasYaUsadas?: string[];
   /** Tipo de contenedor del servicio (para resolución de monto). */
   contenedorTipo?: string;
+  /** Tarea 98: servicio de la cotización aérea. */
+  servicioAereo?: ServicioAereo | null;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export default function TarifaSuggestions({
   conceptoNombre, conceptoId, rutaTexto, catalogoTarifas,
-  onUsarTarifa, tarifasYaUsadas = [], contenedorTipo,
+  onUsarTarifa, tarifasYaUsadas = [], contenedorTipo, servicioAereo,
 }: Props) {
   const { conceptos } = useConceptos();
   const { proveedores } = useProveedores();
@@ -63,10 +67,12 @@ export default function TarifaSuggestions({
   );
 
   // 2. Find vigente tariffs
-  const vigentes = useMemo(() => {
-    if (!matchedConcept) return [];
-    return buscarTarifasVigentes(catalogoTarifas, { conceptoId: matchedConcept.id });
-  }, [matchedConcept, catalogoTarifas]);
+  const { vigentes, avisoServicio } = useMemo(() => {
+    if (!matchedConcept) return { vigentes: [] as TarifaVermur[], avisoServicio: null as string | null };
+    const todas = buscarTarifasVigentes(catalogoTarifas, { conceptoId: matchedConcept.id });
+    const { tarifas, aviso } = tarifasPorServicioAereo(todas, servicioAereo);
+    return { vigentes: tarifas, avisoServicio: aviso };
+  }, [matchedConcept, catalogoTarifas, servicioAereo]);
 
   // 3. Lookup maps
   const provMap = useMemo(() => {
@@ -118,7 +124,7 @@ export default function TarifaSuggestions({
     return (
       <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-gray-50 border border-gray-150 text-[10px] text-gray-400">
         <BookOpen className="w-3 h-3" />
-        <span>Sin tarifario para &quot;{matchedConcept.nombre}&quot; — captura manual</span>
+        <span>{avisoServicio ?? <>Sin tarifario para &quot;{matchedConcept.nombre}&quot; — captura manual</>}</span>
       </div>
     );
   }
@@ -150,6 +156,12 @@ export default function TarifaSuggestions({
       {/* Expanded content */}
       {expanded && (
         <div className="px-2.5 pb-2.5 space-y-1.5">
+          {avisoServicio && (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-50 border border-amber-200/60 text-[9px] font-semibold text-amber-700">
+              <AlertTriangle className="w-3 h-3 shrink-0" />
+              {avisoServicio}
+            </div>
+          )}
           {/* Maniobras warning */}
           {esManiobra && terminalInfo && (
             <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-50 border border-amber-200/60 text-[9px] font-semibold text-amber-700">

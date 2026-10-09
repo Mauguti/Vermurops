@@ -2037,6 +2037,7 @@ export default function FichaCotizacion({
                     conceptoNombre={activeConceptoData?.concepto.nombre ?? null}
                     conceptoId={activeConceptoData?.concepto.conceptoId}
                     contenedorTipo={activeConceptoData?.servicio.fcl_contenedor}
+                    servicioAereo={activeConceptoData?.servicio.carga?.tipo === 'aereo' ? activeConceptoData.servicio.carga.servicioAereo ?? null : null}
                     catalogoTarifas={catalogoTarifas}
                     tarifasYaUsadas={
                       activeConceptoData

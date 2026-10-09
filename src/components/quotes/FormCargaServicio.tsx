@@ -25,6 +25,7 @@ import {
   ETIQUETA_UNIDAD_TERRESTRE, modalidadDeCarga,
 } from '../../lib/cargaSolicitud';
 import { idUnico } from '../../lib/idUnico';
+import { SERVICIOS_AEREO, ETIQUETA_SERVICIO_AEREO, conServicioAereo, etiquetaServicioAereo } from '../../lib/servicioAereo';
 
 // ─── El borrador de un servicio en el formulario ─────────────────────────────
 
@@ -348,6 +349,28 @@ export default function FormCargaServicio({
           )}
         </div>
       </div>
+
+      {/* Tarea 98 — solo aéreo: expeditado o regular. Volver a pulsar el elegido
+          lo quita: lo viejo es «Sin indicar» y también se puede dejar así. */}
+      {carga.tipo === 'aereo' && (
+        <div className="flex items-center gap-3" data-testid="servicio-aereo">
+          <span className={LBL + ' mb-0'}>Servicio</span>
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+            {SERVICIOS_AEREO.map(s => (
+              <button key={s} type="button" aria-pressed={carga.servicioAereo === s}
+                onClick={() => setCarga(conServicioAereo(carga, carga.servicioAereo === s ? null : s))}
+                className={`px-3 py-1 text-[10px] font-bold uppercase transition-colors ${
+                  carga.servicioAereo === s ? 'bg-primario text-white' : 'bg-white text-gray-500 hover:bg-gray-50'
+                }`}>
+                {ETIQUETA_SERVICIO_AEREO[s]}
+              </button>
+            ))}
+          </div>
+          {!carga.servicioAereo && (
+            <span className="text-[10px] text-gray-400 italic">{etiquetaServicioAereo(undefined)}</span>
+          )}
+        </div>
+      )}
 
       {/* ── Ruta ── */}
       {esMaritimo && (

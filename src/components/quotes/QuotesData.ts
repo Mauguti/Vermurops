@@ -4,6 +4,7 @@
 // ============================================================
 import { calcLinea } from '../../lib/cotizacionCalculator';
 import type { TipoCambioCotizacion } from '../../lib/monedaComparativa';
+import type { ServicioAereo } from '../../lib/servicioAereo';
 import type { OrigenVersion, ResumenVersion } from '../../lib/versionesCotizacion';
 
 // ------------------------------------------------------------
@@ -168,6 +169,11 @@ export interface CargaAerea extends CargaBase {
   piezas: number;
   bultos: Bulto[];
   peligrosa: MercanciaPeligrosa;
+  /**
+   * Tarea 98: expeditado o regular, el FCL/LCL del aéreo. Opcional: lo viejo
+   * sin valor es «Sin indicar», no se asume ninguno.
+   */
+  servicioAereo?: ServicioAereo;
 }
 
 export type TipoUnidadTerrestre =

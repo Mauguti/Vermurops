@@ -236,6 +236,8 @@ function SimuladorFooter({
   );
 }
 
+import { tarifasPorServicioAereo, type ServicioAereo } from '../../lib/servicioAereo';
+
 interface TarifaPanelProps {
   /** Nombre del concepto activo. null = ningún concepto seleccionado. */
   conceptoNombre: string | null;
@@ -250,6 +252,8 @@ interface TarifaPanelProps {
   conceptoId?: string;
   /** Tipo de contenedor del servicio (para resolución de monto). */
   contenedorTipo?: string;
+  /** Tarea 98: servicio de la cotización aérea; propone primero las tarifas del mismo tipo. */
+  servicioAereo?: ServicioAereo | null;
   /** Tarifas del catálogo completo (de useTarifas). */
   catalogoTarifas: TarifaVermur[];
   /** IDs de tarifas ya aplicadas al concepto activo. */
@@ -273,6 +277,7 @@ export default function TarifaPanel({
   horizontal = false,
   conceptoId,
   contenedorTipo,
+  servicioAereo,
   catalogoTarifas,
   tarifasYaUsadas,
   onUsarTarifa,
@@ -309,10 +314,12 @@ export default function TarifaPanel({
   }, [conceptoId, conceptoNombre, conceptos, conceptoMap]);
 
   // ── Tarifas vigentes ──────────────────────────────────────────────────────
-  const vigentes = useMemo(() => {
-    if (!matchedConcept) return [];
-    return buscarTarifasVigentes(catalogoTarifas, { conceptoId: matchedConcept.id });
-  }, [matchedConcept, catalogoTarifas]);
+  const { vigentes, avisoServicio } = useMemo(() => {
+    if (!matchedConcept) return { vigentes: [] as TarifaVermur[], avisoServicio: null as string | null };
+    const todas = buscarTarifasVigentes(catalogoTarifas, { conceptoId: matchedConcept.id });
+    const { tarifas, aviso } = tarifasPorServicioAereo(todas, servicioAereo);
+    return { vigentes: tarifas, avisoServicio: aviso };
+  }, [matchedConcept, catalogoTarifas, servicioAereo]);
 
   // ── Lookup maps ───────────────────────────────────────────────────────────
   const provMap = useMemo(() => {
@@ -448,6 +455,13 @@ export default function TarifaPanel({
               <strong>&quot;{conceptoNombre}&quot;</strong> no está en el catálogo de conceptos.
               Selecciona uno del catálogo para ver tarifas, o usa captura manual.
             </span>
+          </div>
+        )}
+
+        {avisoServicio && (
+          <div className="col-span-full flex items-start gap-2 px-2.5 py-2 rounded-md bg-amber-50 border border-amber-200/60 text-[10px] font-semibold text-amber-700" data-testid="aviso-servicio-aereo">
+            <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+            <span>{avisoServicio}</span>
           </div>
         )}
 

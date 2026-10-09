@@ -11,6 +11,7 @@
  * que el propio cliente pidió.
  */
 
+import { etiquetaServicioAereo } from '../../lib/servicioAereo';
 import React from 'react';
 import type { ServicioSolicitado, CargaSolicitada } from './QuotesData';
 import {
@@ -64,6 +65,7 @@ function DatosPorTipo({ carga }: { carga: CargaSolicitada }) {
     case 'aereo':
       return (
         <>
+          <Dato etiqueta="Servicio aéreo">{etiquetaServicioAereo(carga.servicioAereo)}</Dato>
           <Dato etiqueta="Peso bruto">{carga.pesoBrutoKg > 0 ? kg(carga.pesoBrutoKg) : '—'}</Dato>
           <Dato etiqueta="Peso volumétrico">{carga.pesoVolumetricoKg > 0 ? kg(carga.pesoVolumetricoKg) : '—'}</Dato>
           <Dato etiqueta="Piezas">{carga.piezas || '—'}</Dato>

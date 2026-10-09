@@ -41,6 +41,7 @@ import Toast, { TipoToast } from '../ui/Toast';
 import { sumarPorMoneda, formatearPorMoneda } from '../../lib/sumarPorMoneda';
 import { ETIQUETA_FUENTE } from '../../lib/monedaComparativa';
 import { avisar, confirmar } from '../ui/Dialogos';
+import { etiquetaServicioDeEmbarque, type ServicioAereo } from '../../lib/servicioAereo';
 
 /**
  * Las pestañas, en el orden en que se trabaja (decisión de Mau, 10-sep-2026):
@@ -469,6 +470,19 @@ export default function FichaEmbarque({
     });
   };
 
+  // Tarea 98: el servicio aéreo es del embarque, así que se pone en todos sus productos.
+  const handleSetServicioAereo = (valor: ServicioAereo | null) => {
+    guardar({
+      ...embarque,
+      productos: (embarque.productos || []).map(p => {
+        if (valor) return { ...p, servicioAereo: valor };
+        const { servicioAereo: _quitado, ...resto } = p;
+        return resto;
+      }),
+      updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+    });
+  };
+
   const handleDeleteProducto = (prodId: string) => {
     guardar({
       ...embarque,
@@ -586,6 +600,9 @@ export default function FichaEmbarque({
         badges={
           <>
             <BadgeEstado tono="neutro">{embarque.modalidad}</BadgeEstado>
+              {etiquetaServicioDeEmbarque(embarque) && (
+                <span data-testid="badge-servicio-aereo"><BadgeEstado tono="neutro">{etiquetaServicioDeEmbarque(embarque)}</BadgeEstado></span>
+              )}
             {embarque.requiereCaptura && (
               <BadgeEstado
                 tono="espera"
@@ -1763,6 +1780,8 @@ export default function FichaEmbarque({
             clientes={clientes}
             onAddProducto={handleAddProducto}
             onDeleteProducto={handleDeleteProducto}
+            modalidad={embarque.modalidad}
+            onSetServicioAereo={handleSetServicioAereo}
           />
         )}
 

@@ -15,6 +15,8 @@
  *  - Spot inverso: captura manual en cotización puede guardarse como tarifa spot.
  */
 
+import type { ServicioAereo } from '../../lib/servicioAereo';
+
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
 export type TipoTarifa = 'tarifario' | 'spot';
@@ -89,6 +91,8 @@ export interface TarifaVermur {
   freeTimeDias: number | null;
   /** Notas, condiciones especiales. */
   condiciones: string;
+  /** Tarea 98: servicio de la tarifa aérea. Sin valor = «Sin indicar». */
+  servicioAereo?: ServicioAereo | null;
 
   // ── Estado ───────────────────────────────────────────────────────────────
   activo: boolean;

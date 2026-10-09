@@ -6,6 +6,7 @@ import { useProveedores } from '../../hooks/useProveedores';
 import { useConceptos } from '../../hooks/useConceptos';
 import { usePuertos } from '../../hooks/usePuertos';
 import { useAuth } from '../../auth/AuthContext';
+import { SERVICIOS_AEREO, ETIQUETA_SERVICIO_AEREO, ETIQUETA_SIN_INDICAR, leerServicioAereo, type ServicioAereo } from '../../lib/servicioAereo';
 import { proveedorOperable } from '../../lib/estatusProveedor';
 
 interface Props {
@@ -63,6 +64,7 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
   const [freeTimeDias, setFreeTimeDias] = useState(tarifa?.freeTimeDias?.toString() ?? '');
   const [condiciones, setCondiciones] = useState(tarifa?.condiciones ?? '');
   const [activo, setActivo] = useState(tarifa?.activo ?? true);
+  const [servicioAereo, setServicioAereo] = useState<ServicioAereo | ''>(leerServicioAereo(tarifa?.servicioAereo) ?? '');
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -116,6 +118,8 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
           tiempoTransitoDias: tiempoTransitoDias ? Number(tiempoTransitoDias) : null,
           freeTimeDias: freeTimeDias ? Number(freeTimeDias) : null,
           condiciones: condiciones.trim(),
+          // null y no ausente: updateDoc no quita una clave que no se manda.
+          servicioAereo: servicioAereo || null,
           activo,
           updatedAt: now,
         });
@@ -137,6 +141,7 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
           tiempoTransitoDias: tiempoTransitoDias ? Number(tiempoTransitoDias) : null,
           freeTimeDias: freeTimeDias ? Number(freeTimeDias) : null,
           condiciones: condiciones.trim(),
+          ...(servicioAereo ? { servicioAereo } : {}),
           activo: true,
           origenDatos: 'manual',
           creadoPor: user?.uid ?? '',
@@ -205,6 +210,16 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
                 ))}
               </select>
             </div>
+          </div>
+
+          {/* ── Tarea 98: servicio de la tarifa aérea ─────────────────── */}
+          <div className="max-w-[260px]">
+            <label className={LABEL}>Servicio aéreo (solo tarifas aéreas)</label>
+            <select className={INPUT} value={servicioAereo} data-testid="tarifa-servicio-aereo"
+              onChange={e => setServicioAereo(e.target.value as ServicioAereo | '')}>
+              <option value="">{ETIQUETA_SIN_INDICAR}</option>
+              {SERVICIOS_AEREO.map(s => <option key={s} value={s}>{ETIQUETA_SERVICIO_AEREO[s]}</option>)}
+            </select>
           </div>
 
           {/* ── Ruta (puertos) ────────────────────────────────────────── */}

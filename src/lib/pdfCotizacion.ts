@@ -16,6 +16,7 @@ import type { KanbanQuote, ServicioSolicitado, CargaSolicitada } from '../compon
 import { aplanarCotizacion, type LineaPlana } from './lineasCotizacion';
 import { cargaDesdeLegacy, modalidadDeCarga, ETIQUETA_MODALIDAD, ETIQUETA_CONTENEDOR, ETIQUETA_UNIDAD_TERRESTRE } from './cargaSolicitud';
 import { numeroVersionActual } from './versionesCotizacion';
+import { ETIQUETA_SERVICIO_AEREO } from './servicioAereo';
 import { contactoParaAvisos, type ContactoEditable } from './contactos';
 
 export type IdiomaPdf = 'es' | 'en';
@@ -68,7 +69,7 @@ export function cargaParaPdf(servicio: ServicioSolicitado | undefined): PayloadP
     case 'lcl':
       return { tipo: 'LCL', contenedores: '', piezas: carga.piezas, peso: carga.pesoBrutoKg, volumen: carga.volumenM3 };
     case 'aereo':
-      return { tipo: 'Aéreo', contenedores: '', piezas: carga.piezas, peso: carga.pesoBrutoKg, volumen: carga.pesoVolumetricoKg };
+      return { tipo: carga.servicioAereo ? `Aéreo ${ETIQUETA_SERVICIO_AEREO[carga.servicioAereo]}` : 'Aéreo', contenedores: '', piezas: carga.piezas, peso: carga.pesoBrutoKg, volumen: carga.pesoVolumetricoKg };
     case 'terrestre':
       return { tipo: ETIQUETA_UNIDAD_TERRESTRE[carga.tipoUnidad], contenedores: '', piezas: carga.piezas, peso: carga.pesoBrutoKg, volumen: 0 };
     case 'despacho':

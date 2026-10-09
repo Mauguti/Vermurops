@@ -19,6 +19,7 @@ import type {
 import type { MercanciaLine } from '../components/shipments/EmbarquesData';
 import { calcLinea } from './cotizacionCalculator';
 import { idUnico } from './idUnico';
+import { ETIQUETA_SERVICIO_AEREO, leerServicioAereo } from './servicioAereo';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1 · Modalidad: derivada de la carga, nunca guardada aparte
@@ -154,7 +155,7 @@ export function resumenCarga(carga: CargaSolicitada): string {
       if (!carga.estibable) partes.push('no estibable');
       break;
     case 'aereo':
-      partes.push('Aéreo');
+      partes.push(carga.servicioAereo ? `Aéreo ${ETIQUETA_SERVICIO_AEREO[carga.servicioAereo]}` : 'Aéreo');
       if (carga.piezas > 0) partes.push(`${carga.piezas} pzas`);
       if (carga.pesoBrutoKg > 0) partes.push(fmtKg(carga.pesoBrutoKg));
       if (carga.pesoVolumetricoKg > 0) partes.push(`vol. ${fmtKg(carga.pesoVolumetricoKg)}`);
@@ -403,6 +404,9 @@ export function productosDesdeCarga(
         tipoEmbalaje: 'Bulto',
         piezas: carga.piezas,
         peso: carga.pesoBrutoKg,
+        // Tarea 98: lo que Ventas pidió llega así al embarque. Sin valor no
+        // se escribe la clave (Firestore rechaza undefined).
+        ...(leerServicioAereo(carga.servicioAereo) ? { servicioAereo: carga.servicioAereo } : {}),
         pallets,
       }];
     case 'terrestre':
@@ -467,7 +471,7 @@ export function borradorTieneDatos(b: BorradorConDatos): boolean {
     case 'lcl':
       return c.volumenM3 > 0 || c.piezas > 0 || c.bultos.length > 0 || !c.estibable;
     case 'aereo':
-      return c.pesoVolumetricoKg > 0 || c.piezas > 0 || c.bultos.length > 0;
+      return c.pesoVolumetricoKg > 0 || c.piezas > 0 || c.bultos.length > 0 || !!c.servicioAereo;
     case 'terrestre':
       return c.tipoUnidad !== 'caja_seca_53' || c.piezas > 0 || c.requiereManiobras;
     case 'despacho':

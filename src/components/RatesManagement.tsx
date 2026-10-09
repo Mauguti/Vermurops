@@ -11,6 +11,7 @@ import {
 import TarifaFormModal from './tarifas/TarifaFormModal';
 import CargarTarifario from './tarifas/CargarTarifario';
 import Toast, { TipoToast } from './ui/Toast';
+import { leerServicioAereo, ETIQUETA_SERVICIO_AEREO } from '../lib/servicioAereo';
 
 // ─── Helpers de display ──────────────────────────────────────────────────────
 
@@ -60,6 +61,7 @@ export default function RatesManagement() {
   const [search, setSearch] = useState('');
   const [filterConcepto, setFilterConcepto] = useState('');
   const [filterProveedor, setFilterProveedor] = useState('');
+  const [filterServicio, setFilterServicio] = useState<'' | 'expeditado' | 'regular' | 'sin_indicar'>('');
   const [filterTipo, setFilterTipo] = useState<'' | TipoTarifa>('');
   const [filterVigencia, setFilterVigencia] = useState<FiltroVigencia>('todas');
   const [modal, setModal] = useState<{ mode: 'crear' | 'editar'; tarifa?: TarifaVermur } | null>(null);
@@ -104,6 +106,9 @@ export default function RatesManagement() {
     if (filterConcepto) list = list.filter(t => t.conceptoId === filterConcepto);
     if (filterProveedor) list = list.filter(t => t.proveedorId === filterProveedor);
     if (filterTipo) list = list.filter(t => t.tipo === filterTipo);
+    if (filterServicio) {
+      list = list.filter(t => (leerServicioAereo(t.servicioAereo) ?? 'sin_indicar') === filterServicio);
+    }
     if (filterVigencia !== 'todas') list = list.filter(t => estadoVigencia(t) === filterVigencia);
 
     if (search.trim()) {
@@ -120,7 +125,7 @@ export default function RatesManagement() {
     }
 
     return list;
-  }, [tarifas, search, filterConcepto, filterProveedor, filterTipo, filterVigencia, concMap, provMap]);
+  }, [tarifas, search, filterConcepto, filterProveedor, filterTipo, filterServicio, filterVigencia, concMap, provMap]);
 
   // ── Contadores ──────────────────────────────────────────────────────────
   const conteos = useMemo(() => {
@@ -257,6 +262,16 @@ export default function RatesManagement() {
           </select>
           <select
             className="px-3 py-2 text-[13px] bg-white border border-card-border rounded-[8px] focus:outline-none focus:border-brand text-text-primary"
+            value={filterServicio} data-testid="filtro-servicio-aereo"
+            onChange={e => setFilterServicio(e.target.value as typeof filterServicio)}
+          >
+            <option value="">Servicio aéreo: todos</option>
+            <option value="expeditado">Expeditado</option>
+            <option value="regular">Regular</option>
+            <option value="sin_indicar">Sin indicar</option>
+          </select>
+          <select
+            className="px-3 py-2 text-[13px] bg-white border border-card-border rounded-[8px] focus:outline-none focus:border-brand text-text-primary"
             value={filterVigencia}
             onChange={e => setFilterVigencia(e.target.value as FiltroVigencia)}
           >
@@ -279,6 +294,7 @@ export default function RatesManagement() {
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Proveedor</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Ruta</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Tipo</th>
+                <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Servicio aéreo</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Precio</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Vigencia</th>
                 <th className="px-4 py-3 text-[11px] font-semibold text-text-muted uppercase tracking-wider">Estado</th>
@@ -288,7 +304,7 @@ export default function RatesManagement() {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center">
+                  <td colSpan={9} className="px-4 py-12 text-center">
                     {conteos.total === 0 ? (
                       <EmptyState onCreateClick={() => setModal({ mode: 'crear' })} onBulkClick={() => setCargando(true)} />
                     ) : (
@@ -322,6 +338,9 @@ export default function RatesManagement() {
                         }`}>
                           {t.tipo === 'tarifario' ? 'Tarifario' : 'Spot'}
                         </span>
+                      </td>
+                      <td className="px-4 py-3 text-[12px] text-text-secondary" title={leerServicioAereo(t.servicioAereo) ? undefined : 'Sin indicar'}>
+                        {leerServicioAereo(t.servicioAereo) ? ETIQUETA_SERVICIO_AEREO[leerServicioAereo(t.servicioAereo)!] : '—'}
                       </td>
                       <td className="px-4 py-3 text-[12px] text-text-primary tabular-nums font-mono whitespace-nowrap">
                         {formatPrecio(t)}
