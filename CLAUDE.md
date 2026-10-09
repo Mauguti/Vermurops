@@ -2302,6 +2302,31 @@ escala, el `monto`); total = el mayor entre `minimo` y cobrable × precio/kg.
     tocan `fechas.salida` ni `fechas.arribo`.
   - e2e: `tests/e2e/101-fechas-deseadas.spec.ts`.
 
+## 4.61 Contrato de la cotización ganada (tarea 102, 9-oct-2026)
+
+`KanbanQuote.contrato?: { storagePath, nombreArchivo, subidoPor, subidoEn, firmado } | null`,
+opcional y aditivo; `subidoEn` es ISO 8601 como el resto del modelo. Reglas
+puras y tests en `lib/contratoCotizacion.ts`; sección en
+`components/quotes/SeccionContrato.tsx`, solo con la cotización en `ganada`.
+  - **No genera texto de contrato**: «Generar contrato» está deshabilitado con
+    «Falta la plantilla de Vermur». Cuando llegue, va como `generar-documento`.
+  - **No bloquea nada.** Ganada sin contrato firmado (ausente, o subido sin
+    marcar «Firmado por el cliente») muestra el aviso ámbar «Sin contrato
+    firmado» en la ficha de la cotización y en la del embarque (Hitos).
+  - **Se escribe por `onUpdateQuote`, no por `updateDoc`**: la ficha trabaja con
+    una copia local y solo adopta la del listener al cambiar de versión; un
+    `updateDoc` directo no se veía y el autoguardado lo pisaba.
+  - Reemplazar deja una entrada en Historial / Notas con el archivo anterior;
+    el archivo se conserva en Storage. Quién maneja el contrato:
+    `cotizacion.solicitar` o `cotizacion.crear` (Ventas, Pricing, admin).
+  - Lista de cotizaciones: filtro «Ganadas sin contrato» (en «Filtros»).
+  - 🔴 **Storage necesita su regla publicada**: `cotizaciones/{id}/contrato/`
+    no existe en `storage.rules`; sin ella la subida falla en producción. El
+    bloque está en el reporte 102. Mientras tanto `scripts/reglasEmulador.sh`
+    la inyecta SOLO en el derivado del emulador (se quita sola del paso cuando
+    `storage.rules` ya la trae).
+  - e2e: `tests/e2e/102-contrato-ganada.spec.ts`.
+
 ---
 
 ## 5. Estado de los módulos
