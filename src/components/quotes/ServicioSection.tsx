@@ -358,12 +358,15 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
                     <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Cubicaje Total (CBM)</label>
                     <input type="number" value={servicio.lcl_cubicaje_total || ''} onChange={e => handleFieldChange('lcl_cubicaje_total', Number(e.target.value))} className={inputCls} placeholder="0.00" />
                   </div>
-                  <div className="col-span-2">
-                    <label className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer select-none">
-                      <input type="checkbox" checked={!!servicio.lcl_estibable} onChange={e => handleFieldChange('lcl_estibable', e.target.checked)} className="accent-blue-600" />
-                      Estibable
-                    </label>
-                  </div>
+                  {/* Tarea 105: con `carga` la estiba se edita en Información → Operación; la casilla vieja solo para cotizaciones sin carga. */}
+                  {!servicio.carga && (
+                    <div className="col-span-2">
+                      <label className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer select-none">
+                        <input type="checkbox" checked={!!servicio.lcl_estibable} onChange={e => handleFieldChange('lcl_estibable', e.target.checked)} className="accent-blue-600" />
+                        Estibable
+                      </label>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -414,12 +417,14 @@ export function ServicioSection({ servicio, rolActivo, onUpdateServicio, servici
                   <label className="block text-[9px] text-gray-400 font-bold uppercase mb-1">Volumen terrestre (m³)</label>
                   <input type="number" value={servicio.ter_volumen || ''} onChange={e => handleFieldChange('ter_volumen', Number(e.target.value))} className={inputCls} placeholder="0.00" />
                 </div>
-                <div className="flex items-end pb-1">
-                  <label className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer select-none">
-                    <input type="checkbox" checked={!!servicio.ter_estibable} onChange={e => handleFieldChange('ter_estibable', e.target.checked)} className="accent-emerald-600" />
-                    Estibable
-                  </label>
-                </div>
+                {!servicio.carga && (
+                  <div className="flex items-end pb-1">
+                    <label className="flex items-center gap-1.5 text-[10px] text-gray-600 cursor-pointer select-none">
+                      <input type="checkbox" checked={!!servicio.ter_estibable} onChange={e => handleFieldChange('ter_estibable', e.target.checked)} className="accent-emerald-600" />
+                      Estibable
+                    </label>
+                  </div>
+                )}
               </div>
             </div>
           )}

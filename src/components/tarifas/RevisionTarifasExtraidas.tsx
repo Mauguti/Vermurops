@@ -4,7 +4,7 @@ import {
   Plus, Calendar, Ship, Clock,
 } from 'lucide-react';
 import {
-  validarRespuestaN8N, construirLineasEnRevision, motivosNoGuardable,
+  validarRespuestaN8N, construirLineasEnRevision, problemasCobrableDeLinea, motivosNoGuardable,
   esGuardable, resumenRevision, ordenarParaRevision, textoDeAviso, TEXTO_MOTIVO,
   resolverProveedor, estadoGuardable, esVigenciaVencida, estadoVigenciaGuardable,
   confirmarLinea, confirmarTodas, pendientesDeConfirmar, tieneQueConfirmar,
@@ -14,6 +14,7 @@ import {
 import type { ConceptoMatch } from './tarifaMatching';
 import type { PuertoMatch } from '../../lib/importacionTarifas';
 import type { UnidadTarifa } from './TarifasData';
+import EditorCobrable from './EditorCobrable';
 import ConceptoSelector from '../conceptos/ConceptoSelector';
 import type { ConceptoVermur } from '../conceptos/ConceptosData';
 import SelectorProveedor from '../proveedores/SelectorProveedor';
@@ -429,6 +430,30 @@ export default function RevisionTarifasExtraidas({
                         </span>
                       )}
                     </div>
+                  )}
+
+                  {l.unidadAmbigua && !l.unidad && !l.descartada && (
+                    <p className="text-[10px] text-amber-800" data-testid="unidad-ambigua">
+                      El documento dice «{l.extraida.unidad}» y no queda claro si es precio por kg cobrable (aéreo)
+                      o por tonelada. Elige la unidad.
+                    </p>
+                  )}
+
+                  {l.unidad === 'KG_COBRABLE' && !l.descartada && (
+                    <EditorCobrable
+                      valor={{
+                        factor: l.factorVolumetricoKgM3?.toString() ?? '',
+                        minimo: l.montoMinimo?.toString() ?? '',
+                        escalas: (l.escalas ?? []).map(e => ({ desdeKg: e.desdeKg ? String(e.desdeKg) : '', monto: e.monto ? String(e.monto) : '' })),
+                      }}
+                      avisos={problemasCobrableDeLinea(l)}
+                      onChange={v => actualizar(l.lineaId, {
+                        factorVolumetricoKgM3: v.factor.trim() === '' ? undefined : Number(v.factor),
+                        montoMinimo: v.minimo.trim() === '' ? undefined : Number(v.minimo),
+                        // Filas a medio capturar se conservan (NaN) para que el motivo las marque.
+                        escalas: v.escalas.map(e => ({ desdeKg: e.desdeKg === '' ? 0 : Number(e.desdeKg), monto: e.monto === '' ? 0 : Number(e.monto) })),
+                      })}
+                    />
                   )}
 
                   {l.agregadaManual && (

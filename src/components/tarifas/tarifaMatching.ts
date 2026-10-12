@@ -70,7 +70,7 @@ export function resolverMonto(tarifa: TarifaVermur, contenedorTipo?: string): nu
  */
 export function calcularTarifaCobrable(tarifa: TarifaVermur, carga: CargaSolicitada | null | undefined): ResultadoCobrable | null {
   if (tarifa.precios.unidad !== 'KG_COBRABLE') return null;
-  return calcularPesoCobrable(entradaDesdeCarga(carga), tarifa.precios);
+  return calcularPesoCobrable(entradaDesdeCarga(carga), tarifa.precios, tarifa.modalidad);
 }
 
 /**

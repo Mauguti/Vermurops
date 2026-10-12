@@ -17,6 +17,8 @@ import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import {
   ArrowLeft, Plus, Trash2, Loader2, CheckCircle2, XCircle, AlertCircle,
 } from 'lucide-react';
+import EditorCobrable, { ValorCobrable, cobrableANumeros } from './EditorCobrable';
+import { problemasTarifaCobrable } from '../../lib/pesoCobrable';
 import { TarifaVermur, UnidadTarifa, PreciosTarifa, hoyISO } from './TarifasData';
 import { useProveedores } from '../../hooks/useProveedores';
 import { useConceptos } from '../../hooks/useConceptos';
@@ -40,6 +42,8 @@ interface Linea {
   monto: string;
   montoPor40: string;
   montoPor40HC: string;
+  /** Tarea 104: solo con unidad KG_COBRABLE. */
+  cobrable: ValorCobrable;
   puertoOrigenId: string;
   puertoDestinoId: string;
   error?: string;
@@ -55,6 +59,7 @@ const mkLine = (): Linea => ({
   monto: '',
   montoPor40: '',
   montoPor40HC: '',
+  cobrable: { factor: '', minimo: '', escalas: [] },
   puertoOrigenId: '',
   puertoDestinoId: '',
   status: 'idle',
@@ -168,7 +173,13 @@ export default function CargaMasivaTarifas({ onClose, onCreate }: Props) {
       const miss: string[] = [];
       if (!l.conceptoId) miss.push('concepto');
       if (!l.monto || Number(l.monto) <= 0) miss.push('precio');
-      if (miss.length) { hasErr = true; return { ...l, error: `Falta: ${miss.join(', ')}` }; }
+      if (l.unidad === 'KG_COBRABLE') {
+        const n = cobrableANumeros(l.cobrable);
+        if (!l.cobrable.modalidad) miss.push('modalidad (aéreo o terrestre)');
+        else miss.push(...problemasTarifaCobrable({ monto: Number(l.monto), ...n }, { aereo: l.cobrable.modalidad === 'aereo', modalidad: l.cobrable.modalidad })
+          .filter(p => !p.startsWith('El precio por kg')));
+      }
+      if (miss.length) { hasErr = true; return { ...l, error: `${l.unidad === 'KG_COBRABLE' && miss.length && !miss[0].match(/^(concepto|precio)$/) ? 'Revisa: ' : 'Falta: '}${miss.join(' · ')}` }; }
       return { ...l, error: undefined };
     });
     if (hasErr) { setLineas(checked); return; }
@@ -197,6 +208,14 @@ export default function CargaMasivaTarifas({ onClose, onCreate }: Props) {
           unidad: l.unidad,
           ...(l.unidad === 'CONTENEDOR' && l.montoPor40 ? { montoPor40: Number(l.montoPor40) } : {}),
           ...(l.unidad === 'CONTENEDOR' && l.montoPor40HC ? { montoPor40HC: Number(l.montoPor40HC) } : {}),
+          ...(l.unidad === 'KG_COBRABLE' ? (() => {
+            const n = cobrableANumeros(l.cobrable);
+            return {
+              ...(n.factorVolumetricoKgM3 ? { factorVolumetricoKgM3: n.factorVolumetricoKgM3 } : {}),
+              ...(n.minimo ? { minimo: n.minimo } : {}),
+              ...(n.escalas.length > 0 ? { escalas: [...n.escalas].sort((a, b) => a.desdeKg - b.desdeKg) } : {}),
+            };
+          })() : {}),
         };
 
         const tarifa: TarifaVermur = {
@@ -218,6 +237,7 @@ export default function CargaMasivaTarifas({ onClose, onCreate }: Props) {
           condiciones: condiciones.trim(),
           activo: true,
           origenDatos: 'manual',
+          ...(l.unidad === 'KG_COBRABLE' && l.cobrable.modalidad ? { modalidad: l.cobrable.modalidad } : {}),
           creadoPor: user?.uid ?? '',
           fechaAlta: now.split('T')[0],
           updatedAt: now,
@@ -374,8 +394,8 @@ export default function CargaMasivaTarifas({ onClose, onCreate }: Props) {
                   '';
 
                 return (
+                  <React.Fragment key={l.key}>
                   <tr
-                    key={l.key}
                     data-rk={l.key}
                     className={`border-b border-divider last:border-b-0 ${rowBorder}`}
                   >
@@ -426,6 +446,7 @@ export default function CargaMasivaTarifas({ onClose, onCreate }: Props) {
                         <option value="VIAJE">Viaje</option>
                         <option value="BL">B/L</option>
                         <option value="DIA">Día</option>
+                        <option value="KG_COBRABLE">kg cobrable</option>
                       </select>
                     </td>
 
@@ -515,6 +536,20 @@ export default function CargaMasivaTarifas({ onClose, onCreate }: Props) {
                       ) : null}
                     </td>
                   </tr>
+                  {l.unidad === 'KG_COBRABLE' && (
+                    <tr className={`border-b border-divider ${rowBorder}`} data-testid="fila-cobrable">
+                      <td />
+                      <td colSpan={7} className="px-1 pb-2">
+                        <EditorCobrable
+                          valor={l.cobrable}
+                          conModalidad
+                          disabled={locked}
+                          onChange={v => patch(l.key, { cobrable: v })}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 );
               })}
             </tbody>

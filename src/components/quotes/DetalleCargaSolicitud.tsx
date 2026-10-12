@@ -85,6 +85,7 @@ function DatosPorTipo({ carga }: { carga: CargaSolicitada }) {
           <Dato etiqueta="Tipo de unidad">{ETIQUETA_UNIDAD_TERRESTRE[carga.tipoUnidad]}</Dato>
           <Dato etiqueta="Peso">{carga.pesoBrutoKg > 0 ? kg(carga.pesoBrutoKg) : '—'}</Dato>
           <Dato etiqueta="Piezas">{carga.piezas || '—'}</Dato>
+          <Dato etiqueta="Volumen">{(carga.volumenM3 ?? 0) > 0 ? `${carga.volumenM3} m³` : '—'}</Dato>
           <Dato etiqueta="¿Estibable?">{etiquetaEstiba(carga)}</Dato>
           <Dato etiqueta="Maniobras de carga/descarga">{carga.requiereManiobras ? 'Sí' : 'No'}</Dato>
         </>

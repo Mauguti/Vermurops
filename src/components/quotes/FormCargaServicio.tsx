@@ -555,6 +555,9 @@ export default function FormCargaServicio({
             <Campo label="Piezas">
               <Num valor={carga.piezas} onCambio={v => setCarga({ ...carga, piezas: v })} placeholder="26" />
             </Campo>
+            <Campo label="Volumen (m³, opcional)">
+              <Num valor={carga.volumenM3 ?? 0} onCambio={v => setCarga({ ...carga, volumenM3: v > 0 ? v : null })} placeholder="12.5" />
+            </Campo>
           </div>
           <SiNo valor={carga.requiereManiobras} etiqueta="¿Requiere maniobras de carga o descarga?"
             onCambio={v => setCarga({ ...carga, requiereManiobras: v })} />

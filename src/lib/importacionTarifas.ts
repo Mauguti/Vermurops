@@ -21,6 +21,7 @@
  */
 
 import { TarifaVermur, UnidadTarifa } from '../components/tarifas/TarifasData';
+import { problemasTarifaCobrable } from './pesoCobrable';
 import { matchConceptByName, type ConceptoMatch } from '../components/tarifas/tarifaMatching';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,6 +59,9 @@ export interface LineaExtraida {
   montoPor40?: number;
   montoPor40HC?: number;
   montoMinimo?: number;
+  /** Tarea 104: por si el extractor ya separa las escalas por kg (+45, +100…). */
+  escalas?: Array<{ desdeKg: number; monto: number }>;
+  factorVolumetricoKgM3?: number;
   moneda?: string;
   tiempoTransito?: number;
   freeTime?: number;
@@ -156,6 +160,9 @@ export function validarRespuestaN8N(bruto: unknown): ResultadoValidacion {
       montoPor40: typeof cruda.montoPor40 === 'number' ? cruda.montoPor40 : undefined,
       montoPor40HC: typeof cruda.montoPor40HC === 'number' ? cruda.montoPor40HC : undefined,
       montoMinimo: typeof cruda.montoMinimo === 'number' ? cruda.montoMinimo : undefined,
+      escalas: escalasValidas(cruda.escalas),
+      factorVolumetricoKgM3: typeof cruda.factorVolumetricoKgM3 === 'number' && cruda.factorVolumetricoKgM3 > 0
+        ? cruda.factorVolumetricoKgM3 : undefined,
       moneda: MONEDAS_VALIDAS.includes(moneda) ? moneda : undefined,
       tiempoTransito: typeof cruda.tiempoTransito === 'number' ? cruda.tiempoTransito : undefined,
       freeTime: typeof cruda.freeTime === 'number' ? cruda.freeTime : undefined,
@@ -338,6 +345,17 @@ export interface LineaEnRevision {
   unidad: UnidadTarifa | null;
 
   /**
+   * Tarea 104 (solo KG_COBRABLE): factor volumétrico y escalas por kg. El
+   * mínimo viaja en `montoMinimo` y se guarda como `minimo`.
+   */
+  factorVolumetricoKgM3?: number;
+  escalas?: Array<{ desdeKg: number; monto: number }>;
+  /** El documento parece de carga aérea: el factor 167 de respaldo aplica. */
+  aereoDetectado?: boolean;
+  /** «kg»/«peso» sin contexto para decidir: la unidad queda vacía y se elige a mano. */
+  unidadAmbigua?: boolean;
+
+  /**
    * Moneda y unidad confirmadas a mano.
    *
    * No basta con que sean editables: un 1,200 que era MXN cargado como USD se
@@ -401,7 +419,8 @@ export type MotivoNoGuardable =
   | 'moneda_sin_confirmar'
   | 'sin_unidad'
   | 'unidad_sin_confirmar'
-  | 'monto_invalido';
+  | 'monto_invalido'
+  | 'cobrable_incompleto';
 
 export const TEXTO_MOTIVO: Record<MotivoNoGuardable, string> = {
   sin_concepto:          'Falta elegir el concepto del catálogo',
@@ -411,6 +430,7 @@ export const TEXTO_MOTIVO: Record<MotivoNoGuardable, string> = {
   sin_unidad:            'Falta la unidad',
   unidad_sin_confirmar:  'Confirma la unidad',
   monto_invalido:        'El monto debe ser mayor a cero',
+  cobrable_incompleto:   'La tarifa por kg cobrable está incompleta',
 };
 
 /**
@@ -433,6 +453,10 @@ export function motivosNoGuardable(l: LineaEnRevision): MotivoNoGuardable[] {
   else if (!l.unidadConfirmada) motivos.push('unidad_sin_confirmar');
 
   if (!Number.isFinite(l.monto) || l.monto <= 0) motivos.push('monto_invalido');
+
+  if (l.unidad === 'KG_COBRABLE' && problemasCobrableDeLinea(l).length > 0) {
+    motivos.push('cobrable_incompleto');
+  }
 
   return motivos;
 }
@@ -636,21 +660,56 @@ export function detectarColisiones(
 // 6 · De la respuesta validada a la pantalla de revisión
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Contexto para decidir qué es «kg»: el mismo texto significa cosas distintas. */
+export interface ContextoUnidad {
+  /** El tarifario es aéreo (flete aéreo, AWB…). */
+  aereo?: boolean;
+  /** La línea trae escalas por kg (+45, +100…). */
+  escalas?: boolean;
+}
+
+export interface UnidadClasificada {
+  unidad: UnidadTarifa | null;
+  /** Dijo «kg»/«peso» y no hay contexto para elegir entre KG_COBRABLE y TON. */
+  ambigua: boolean;
+}
+
+// Textos que son, sin duda, el precio por peso cobrable.
+const UNIDADES_COBRABLE_CLARAS = new Set([
+  'peso cobrable', 'kg cobrable', 'kilos cobrables', 'chargeable', 'chargeable weight',
+  'chargeable kg', 'cw', 'kg cw', 'peso facturable',
+]);
+// «kg» a secas: puede ser tarifa aérea por kg o una marítima por tonelada mal escrita.
+const UNIDADES_KG_AMBIGUAS = new Set([
+  'kg', 'kgs', 'kilo', 'kilos', 'kilogramo', 'kilogramos', 'por kg', 'por kilo',
+  'per kg', 'per kilo', '/kg', 'x kg', 'peso',
+]);
+
 /**
- * Traduce la unidad que escribió la IA a la del catálogo.
+ * Clasifica la unidad que escribió la IA, con el contexto del tarifario.
  *
- * Devuelve null si no la reconoce, en vez de adivinar: la unidad decide cómo
- * se multiplica el precio, así que equivocarla cambia el monto de la
- * cotización entera.
+ * Nunca adivina: «kg» o «peso» solo pasan a KG_COBRABLE si el tarifario es
+ * aéreo o la línea trae escalas por kg. Sin ese contexto la unidad queda
+ * vacía y `ambigua`, para que alguien la elija: la unidad decide cómo se
+ * multiplica el precio, y confundir kg con tonelada lo mueve por mil.
  */
-export function normalizarUnidad(texto: string | undefined): UnidadTarifa | null {
-  if (!texto?.trim()) return null;
+export function clasificarUnidad(
+  texto: string | undefined,
+  contexto: ContextoUnidad = {},
+): UnidadClasificada {
+  if (!texto?.trim()) return { unidad: null, ambigua: false };
   const t = norm(texto);
+
+  if (UNIDADES_COBRABLE_CLARAS.has(t)) return { unidad: 'KG_COBRABLE', ambigua: false };
+  if (UNIDADES_KG_AMBIGUAS.has(t)) {
+    if (contexto.aereo || contexto.escalas) return { unidad: 'KG_COBRABLE', ambigua: false };
+    return { unidad: null, ambigua: true };
+  }
 
   const MAPA: Record<string, UnidadTarifa> = {
     contenedor: 'CONTENEDOR', container: 'CONTENEDOR', ctr: 'CONTENEDOR', teu: 'CONTENEDOR',
     cbm: 'CBM', m3: 'CBM', 'metro cubico': 'CBM', 'metros cubicos': 'CBM', volumen: 'CBM',
-    ton: 'TON', tonelada: 'TON', toneladas: 'TON', kg: 'TON', peso: 'TON',
+    ton: 'TON', tonelada: 'TON', toneladas: 'TON', tm: 'TON', mt: 'TON',
     wm: 'WM', 'w/m': 'WM',
     pedimento: 'PEDIMENTO', despacho: 'PEDIMENTO',
     viaje: 'VIAJE', flete: 'VIAJE', camion: 'VIAJE',
@@ -659,7 +718,52 @@ export function normalizarUnidad(texto: string | undefined): UnidadTarifa | null
     dia: 'DIA', dias: 'DIA', diario: 'DIA',
   };
 
-  return MAPA[t] ?? null;
+  return { unidad: MAPA[t] ?? null, ambigua: false };
+}
+
+/** Compatibilidad: solo la unidad. */
+export function normalizarUnidad(
+  texto: string | undefined,
+  contexto: ContextoUnidad = {},
+): UnidadTarifa | null {
+  return clasificarUnidad(texto, contexto).unidad;
+}
+
+const RE_AEREO = /\b(a[eé]re[oa]s?|air\s?freight|air\s?cargo|awb|airline|aerol[ií]nea)\b/i;
+// «+45», «+100 kg», «45+», «100kg+»: el escalonado típico de una tarifa aérea.
+const RE_ESCALA = /(^|[\s(,;])\+\s*\d{2,4}\s*(kgs?|k)?(?![\w])|\b\d{2,4}\s*(kgs?|k)?\s*\+(?![\w])/i;
+
+/** ¿El texto parece de carga aérea? */
+export function pareceAereo(...textos: Array<string | undefined | null>): boolean {
+  return textos.some(t => !!t && RE_AEREO.test(norm(t)));
+}
+
+/** ¿El texto menciona escalas por kg (+45, +100…)? */
+export function mencionaEscalasKg(...textos: Array<string | undefined | null>): boolean {
+  return textos.some(t => !!t && RE_ESCALA.test(t));
+}
+
+function escalasValidas(v: unknown): Array<{ desdeKg: number; monto: number }> | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out = v
+    .filter(esObjeto)
+    .map(e => ({ desdeKg: e.desdeKg, monto: e.monto }))
+    .filter((e): e is { desdeKg: number; monto: number } =>
+      typeof e.desdeKg === 'number' && typeof e.monto === 'number' && e.desdeKg > 0 && e.monto > 0);
+  return out.length > 0 ? out.sort((a, b) => a.desdeKg - b.desdeKg) : undefined;
+}
+
+/** Lo que le falta a una línea KG_COBRABLE para poder guardarse (vacío = completa). */
+export function problemasCobrableDeLinea(l: LineaEnRevision): string[] {
+  return problemasTarifaCobrable(
+    {
+      monto: l.monto,
+      factorVolumetricoKgM3: l.factorVolumetricoKgM3,
+      minimo: l.montoMinimo,
+      escalas: l.escalas,
+    },
+    { aereo: !!l.aereoDetectado },
+  );
 }
 
 export interface CatalogosResolucion {
@@ -691,6 +795,10 @@ export function construirLineasEnRevision(
       destino.match ? null : ex.puertoDestino,
     ].filter(Boolean);
 
+    const aereo = pareceAereo(ex.concepto, ex.condiciones, ex.unidad, datos.proveedor, datos.observaciones, datos.vigenciaTexto);
+    const escalas = (ex.escalas?.length ?? 0) > 0 || mencionaEscalasKg(ex.unidad, ex.condiciones, ex.concepto);
+    const { unidad, ambigua } = clasificarUnidad(ex.unidad, { aereo, escalas });
+
     return {
       lineaId: ex.lineaId,
       extraida: ex,
@@ -705,7 +813,13 @@ export function construirLineasEnRevision(
       montoPor40HC: ex.montoPor40HC,
       montoMinimo: ex.montoMinimo,
       moneda: (ex.moneda === 'USD' || ex.moneda === 'MXN') ? ex.moneda : null,
-      unidad: normalizarUnidad(ex.unidad),
+      unidad,
+      ...(ambigua ? { unidadAmbigua: true } : {}),
+      ...(unidad === 'KG_COBRABLE' ? {
+        ...(ex.escalas ? { escalas: ex.escalas } : {}),
+        ...(ex.factorVolumetricoKgM3 ? { factorVolumetricoKgM3: ex.factorVolumetricoKgM3 } : {}),
+      } : {}),
+      ...(aereo ? { aereoDetectado: true } : {}),
       monedaConfirmada: false,
       unidadConfirmada: false,
       descartada: false,

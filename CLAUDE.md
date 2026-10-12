@@ -2327,6 +2327,67 @@ puras y tests en `lib/contratoCotizacion.ts`; sección en
     `storage.rules` ya la trae).
   - e2e: `tests/e2e/102-contrato-ganada.spec.ts`.
 
+## 4.62 Volumen terrestre y modalidad en la tarifa (tarea 103, 12-oct-2026)
+
+Cierra las preguntas 3 y 4 del resumen del 9-oct sobre §4.59. Dos campos
+opcionales y aditivos: `CargaTerrestre.volumenM3?: number | null` y
+`TarifaVermur.modalidad?: 'maritimo' | 'aereo' | 'terrestre' | null`.
+  - **Volumen:** campo «Volumen (m³, opcional)» en el formulario de la carga
+    terrestre (solicitud e Información → Operación). Vacío se guarda `null`,
+    nunca 0 ni `undefined`; negativo se rechaza. Se ve en el detalle y en el
+    resumen. Con él `entradaDesdeCarga` alimenta el cálculo terrestre; sin él
+    sigue «Sin cálculo» con la razón (y ahora dice dónde capturarlo).
+  - **Modalidad en la tarifa** (`lib/pesoCobrable.ts`, tercer parámetro de
+    `calcularPesoCobrable` y `opciones.modalidad` de `problemasTarifaCobrable`):
+    aéreo = 167 por default y medio kilo; terrestre = factor OBLIGATORIO, sin
+    default y sin redondeo; marítimo = no aplica, la tarifa por kg cobrable no
+    se guarda y el cálculo devuelve el motivo. **Con modalidad manda ella**, aun
+    si la carga es de otro tipo.
+  - **Legacy:** sin modalidad rige la lógica de la 100 (la carga decide el
+    aéreo; el wizard mira el servicio aéreo). Nada se migra ni se reescribe.
+  - e2e: `tests/e2e/103-volumen-terrestre.spec.ts`.
+
+## 4.63 La importación con IA entiende «por kg cobrable» (tarea 104, 12-oct-2026)
+
+`normalizarUnidad` convertía «kg» y «peso» en TON: un precio aéreo por kg se
+guardaba por tonelada, mil veces mal. Ahora `clasificarUnidad(texto, contexto)`
+(`lib/importacionTarifas.ts`, tests en `importacionTarifas.cobrable.test.ts`):
+  - **Sin duda → KG_COBRABLE:** «peso cobrable», «kg cobrable», «chargeable»,
+    «CW». **Sin duda → TON:** «ton», «tonelada», «TM».
+  - **«kg», «kilo», «por kg», «peso» dependen del contexto:** KG_COBRABLE solo
+    si el documento parece aéreo (`pareceAereo`: concepto, condiciones,
+    proveedor, observaciones) o la línea trae escalas (`mencionaEscalasKg`:
+    «+45», «100 kg+», o `escalas[]` estructuradas del extractor). Sin contexto
+    la unidad queda VACÍA y `unidadAmbigua`: la pantalla lo dice y bloquea con
+    «Falta la unidad». Nunca se adivina.
+  - **La revisión** pinta `EditorCobrable` (factor, mínimo, escalas) en cada
+    línea KG_COBRABLE. El guardado se bloquea con `cobrable_incompleto` según
+    `problemasTarifaCobrable`: aéreo detectado no necesita factor (167); lo
+    demás, sí. Se guarda `minimo`, no `montoMinimo`.
+  - **No se escribe `modalidad` desde la importación:** inferirla escribiría un
+    dato que la persona no eligió y que manda sobre la carga (§4.62).
+  - ⚠️ **`CargaMasivaTarifas` NO está montada en ninguna pantalla** (cero
+    importadores; la 78 no la vio). Se le agregó la unidad, el editor y la
+    modalidad elegida a mano, pero no se puede ver ni probar hasta que alguien
+    la monte: otra regla sin call site.
+  - e2e: `tests/e2e/104-importacion-cobrable.spec.ts` (extractor simulado).
+
+## 4.64 Estiba editable en el producto del embarque (tarea 105, 12-oct-2026)
+
+Cierra lo que la 99 dejó anotado: la estiba solo se capturaba al CREAR un
+producto. Ahora cada renglón de Productos trae un lápiz («Editar estiba») que
+abre el mismo `CampoEstiba` con los mismos topes (`lib/estiba.ts`) y guarda por
+`conEstiba` (no estibable borra los niveles; nunca `undefined`).
+`ProductosEmbarque` recibe `onUpdateProducto` (opcional) y `FichaEmbarque` lo
+cablea con `handleUpdateProducto`. Sin modelo nuevo.
+  - **Casillas viejas:** en `ServicioSection`, `lcl_estibable` y `ter_estibable`
+    solo se pintan si el servicio NO tiene `carga`; con `carga` la estiba se edita
+    en Información → Operación. Se siguen LEYENDO (`cargaDesdeLegacy`,
+    `estibaLegacy`); no se borran ni migran.
+  - e2e: `tests/e2e/105-estiba-producto.spec.ts` (alta ×3 → editar ×7 → no
+    estibable, verificado en Firestore). Un `uncheck()` de Playwright falla aquí
+    porque la casilla es controlada y se actualiza al volver el listener: usar `click()`.
+
 ---
 
 ## 5. Estado de los módulos

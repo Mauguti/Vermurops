@@ -100,6 +100,12 @@ export interface TarifaVermur {
   condiciones: string;
   /** Tarea 98: servicio de la tarifa aérea. Sin valor = «Sin indicar». */
   servicioAereo?: ServicioAereo | null;
+  /**
+   * Tarea 103: modalidad de la tarifa. Decide si la tarifa por kg cobrable
+   * exige factor volumétrico (aéreo: 167 por default; terrestre: obligatorio;
+   * marítimo: no aplica). Sin valor rige la lógica anterior.
+   */
+  modalidad?: 'maritimo' | 'aereo' | 'terrestre' | null;
 
   // ── Estado ───────────────────────────────────────────────────────────────
   activo: boolean;

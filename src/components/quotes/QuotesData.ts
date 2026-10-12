@@ -193,6 +193,11 @@ export interface CargaTerrestre extends CargaBase {
   pesoBrutoKg: number;
   piezas: number;
   requiereManiobras: boolean;
+  /**
+   * Tarea 103: volumen en m³. Con él las tarifas terrestres por kg cobrable
+   * calculan; sin él se muestra «Sin cálculo». Opcional: null/ausente = no se sabe (no es cero).
+   */
+  volumenM3?: number | null;
   /** Tarea 99: ¿se puede estibar y cuántos niveles? Opcional; sin valor = sin indicar. */
   estibable?: boolean;
   nivelesEstiba?: number | null;
