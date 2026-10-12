@@ -2388,6 +2388,15 @@ cablea con `handleUpdateProducto`. Sin modelo nuevo.
     estibable, verificado en Firestore). Un `uncheck()` de Playwright falla aquí
     porque la casilla es controlada y se actualiza al volver el listener: usar `click()`.
 
+## 4.65 Diff y fusión por id de la cotización (tarea 110, 12-oct-2026)
+
+P1 de `docs/sprint-post-junta/PLAN-FICHA-COTIZACION.md`. `lib/diffCotizacion.ts`
+(17 tests, verificados por mutación): `tocados(anterior, nuevo)` por clave de
+primer nivel (`updatedAt` solo no cuenta), `fusionarListaPorId(servidor,
+anterior, nuevo)` para `actividades`, `chat` y `pdfs`, y `parcheFusionado`.
+**Nadie los llama todavía**: es la pieza que P2 usará en la transacción de
+`updateCotizacion`. Cero cambio de comportamiento.
+
 ---
 
 ## 5. Estado de los módulos
