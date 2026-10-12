@@ -2448,6 +2448,21 @@ una ganada sin contrato firmado (o con archivo sin marcar firmado) pinta el
 y trae el aviso de cada una. No bloquea nada; sin modelo nuevo.
 e2e: `tests/e2e/114-aviso-contrato-prospecto.spec.ts`.
 
+## 4.70 Specs aislados: lo creado se identifica por diferencia, lo sembrado se devuelve (tarea 109, 12-oct-2026)
+
+`tests/e2e/aislamiento.ts`. Los specs comparten UNA base y `createdAt` de una
+cotización tiene resolución de MINUTO: «la más reciente en `solicitado_pricing`»
+empata con lo que otro spec dejó hace segundos (causa de `capturas-03`
+intermitente). Ahora `idsDe` toma la foto antes de «Enviar a Pricing» y
+`soloNuevos` descarta lo previo (9 specs). Lo que un spec siembra por REST
+(`TAR-98-*`, `TAR-100-AER`, `TAR-103-TER` y las tarifas «Prueba 100/103»
+creadas por pantalla) lo borra en `afterAll` (`borrarSembrados`,
+`borrarTarifasPorVigencia`): sin eso la 100 aplicaba la tarifa de la 98 en la
+2ª vuelta. `gestion-usuarios` usa un correo único por corrida; la nota externa
+de 111 lleva `createdAt` y `responsableId` como una nota real (sin ellos la
+ficha truena al reabrirse: `FichaCotizacion` ordena Historial por `createdAt`).
+`REPETIR=2 ./scripts/e2e-completo.sh --retries=0`: 274 + 274 verdes, 24 min 40 s.
+
 ---
 
 ## 5. Estado de los módulos
