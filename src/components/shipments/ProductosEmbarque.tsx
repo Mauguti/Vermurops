@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Package, Plus, Trash2, Weight, Box, ChevronDown, ChevronRight, Edit2, ShieldCheck, X } from 'lucide-react';
 import { EmbarqueProducto, Pallet, DatosContenedor, TIPOS_CONTENEDOR, palletPiezas, palletPeso, palletVolumen, palletDescripcion } from './EmbarquesData';
 import { ClienteVermur } from '../clientes/ClientesData';
+import { SERVICIOS_AEREO, ETIQUETA_SERVICIO_AEREO, serviciosDeProductos, etiquetaServicioAereo, type ServicioAereo } from '../../lib/servicioAereo';
+import CampoEstiba from '../ui/CampoEstiba';
+import { textoCortoEstiba, modalidadEstibaDeTexto } from '../../lib/estiba';
 import { clienteOperable, estatusDeCliente, ETIQUETA_ESTATUS } from '../../lib/estatusCliente';
 
 const TIPOS_EMBALAJE = ['Pallet', 'Caja', 'Tambor', 'Bulto', 'Bobina', 'Contenedor', 'Otro'] as const;
@@ -20,6 +23,10 @@ interface ProductosEmbarqueProps {
   clientes: ClienteVermur[];
   onAddProducto: (prod: Omit<EmbarqueProducto, 'id'>) => void;
   onDeleteProducto: (id: string) => void;
+  /** Tarea 98: solo un embarque aéreo pregunta expeditado o regular. */
+  modalidad?: string;
+  /** Pone (o quita, con null) el servicio en TODOS los productos del embarque. */
+  onSetServicioAereo?: (valor: ServicioAereo | null) => void;
 }
 
 export default function ProductosEmbarque({
@@ -27,13 +34,30 @@ export default function ProductosEmbarque({
   clientes,
   onAddProducto,
   onDeleteProducto,
+  modalidad,
+  onSetServicioAereo,
 }: ProductosEmbarqueProps) {
+  const esAereo = modalidad === 'aereo';
+  // El servicio es del embarque: lo que ya tienen los productos manda; mientras
+  // no hay productos, lo elegido vive aquí y lo heredan los que se agreguen.
+  const delosProductos = serviciosDeProductos(productos);
+  const [servicioLocal, setServicioLocal] = useState<ServicioAereo | null>(null);
+  const servicioAereo: ServicioAereo | null =
+    delosProductos.length === 1 ? delosProductos[0] : delosProductos.length === 0 ? servicioLocal : null;
+  const elegirServicio = (s: ServicioAereo) => {
+    const nuevo = servicioAereo === s ? null : s;
+    setServicioLocal(nuevo);
+    onSetServicioAereo?.(nuevo);
+  };
   // Estado base del producto
   const [desc, setDesc] = useState('');
   const [embalaje, setEmbalaje] = useState<string>('Pallet');
   const [piezas, setPiezas] = useState<number | ''>('');
   const [peso, setPeso] = useState<number | ''>('');
   const [volumen, setVolumen] = useState<number | ''>('');
+  // Tarea 99: estiba del producto (undefined = sin indicar).
+  const [estibable, setEstibable] = useState<boolean | undefined>(undefined);
+  const [nivelesEstiba, setNivelesEstiba] = useState<number | null>(null);
 
   // Estado condicional de Contenedor
   const [numeroContenedor, setNumeroContenedor] = useState('');
@@ -88,7 +112,9 @@ export default function ProductosEmbarque({
       volumen: volumen !== '' ? Number(volumen) : undefined,
       datosContenedor,
       tipoConsolidacion: consolType,
-      pallets: palletList
+      pallets: palletList,
+      ...(esAereo && servicioAereo ? { servicioAereo } : {}),
+      ...(estibable === undefined ? {} : { estibable, ...(estibable && nivelesEstiba ? { nivelesEstiba } : {}) }),
     });
 
     // Reset fields
@@ -96,6 +122,8 @@ export default function ProductosEmbarque({
     setPiezas('');
     setPeso('');
     setVolumen('');
+    setEstibable(undefined);
+    setNivelesEstiba(null);
     setNumeroContenedor('');
     setTipoContenedor(TIPOS_CONTENEDOR[0]);
     setNumeroSello('');
@@ -134,6 +162,25 @@ export default function ProductosEmbarque({
 
   return (
     <div className="space-y-6">
+
+      {esAereo && (
+        <div className="bg-white rounded-xl border border-gray-150 shadow-2xs px-5 py-3 flex items-center gap-3" data-testid="servicio-aereo-embarque">
+          <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Servicio aéreo</span>
+          <div className="flex bg-neutral-bg p-1 rounded-lg border border-card-border">
+            {SERVICIOS_AEREO.map(s => (
+              <button key={s} type="button" aria-pressed={servicioAereo === s} onClick={() => elegirServicio(s)}
+                className={`px-4 py-1.5 rounded-md text-xs font-bold uppercase transition-all ${servicioAereo === s ? 'bg-white text-brand shadow-sm' : 'text-text-muted hover:text-text-primary'}`}>
+                {ETIQUETA_SERVICIO_AEREO[s]}
+              </button>
+            ))}
+          </div>
+          {servicioAereo === null && (
+            <span className="text-[10px] text-text-muted italic">
+              {delosProductos.length > 1 ? 'Los productos no coinciden: elige uno para igualarlos.' : etiquetaServicioAereo(undefined)}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Tabla de productos */}
       <div className="bg-white rounded-xl border border-gray-150 shadow-2xs overflow-hidden">
@@ -183,6 +230,11 @@ export default function ProductosEmbarque({
                         <td className="px-5 py-3.5 font-bold text-text-primary">
                           <div className="flex flex-col">
                             <span>{p.descripcion}</span>
+                            {textoCortoEstiba(p) && (
+                              <span className="text-[10px] text-text-muted font-semibold uppercase mt-0.5" data-testid="estiba-producto">
+                                {textoCortoEstiba(p)}
+                              </span>
+                            )}
                             {isContainer && p.datosContenedor && (
                               <span className="text-[10px] text-text-muted font-medium uppercase mt-0.5">
                                 {p.datosContenedor.numeroContenedor} • {p.datosContenedor.tipoContenedor}
@@ -400,6 +452,12 @@ export default function ProductosEmbarque({
                 className="w-full px-3 py-2 border border-card-border rounded-lg text-xs font-semibold text-text-primary outline-none focus:border-brand shadow-sm transition-colors"
               />
             </div>
+          </div>
+
+          {/* Tarea 99 — estiba del producto */}
+          <div className="mt-4">
+            <CampoEstiba modalidad={modalidadEstibaDeTexto(modalidad)} estibable={estibable} niveles={nivelesEstiba}
+              onCambio={(est, n) => { setEstibable(est); setNivelesEstiba(est ? n : null); }} />
           </div>
 
           {/* Bloque Condicional Contenedor */}

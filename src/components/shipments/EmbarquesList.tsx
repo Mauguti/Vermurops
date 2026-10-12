@@ -10,6 +10,7 @@
  * que nadie los repita cada mañana.
  */
 
+import { etiquetaServicioDeEmbarque } from '../../lib/servicioAereo';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Plus, Ship, X, Download, UserCheck, SlidersHorizontal } from 'lucide-react';
 import type { EmbarqueCompleto } from './EmbarquesData';
@@ -113,11 +114,12 @@ export default function EmbarquesList({ embarques, onSelectEmbarque, onCrearEmba
   }, [embarques, filtros, clientes]);
 
   const exportarCSV = () => {
-    const headers = ['Folio', 'Cliente', 'Responsable', 'Modalidad', 'Tráfico', 'BL/AWB', 'ETD', 'ETA', 'Mes de cierre'];
+    const headers = ['Folio', 'Cliente', 'Responsable', 'Modalidad', 'Servicio aéreo', 'Tráfico', 'BL/AWB', 'ETD', 'ETA', 'Mes de cierre'];
     const rows = filtrados.map(e => {
       const { trafico } = traficoDeEmbarque(e);
       return [
         e.folio, e.entidades?.clienteCobrar ?? '', e.responsableOperativo ?? '', e.modalidad,
+        etiquetaServicioDeEmbarque(e) ?? '',
         trafico ? ETIQUETA_TRAFICO[trafico] : '',
         e.numeroGuia, e.fechas?.salida ?? '', e.fechas?.arribo ?? '',
         cierreDelEmbarque(e).mes,

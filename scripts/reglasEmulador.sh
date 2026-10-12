@@ -32,4 +32,29 @@ for archivo in firestore storage; do
   ' "$origen" > "$destino"
   grep -q "ventas@vermur.com" "$destino" || { echo "✗ no se inyectaron las cuentas en $destino"; exit 1; }
 done
+
+# ── Tarea 102 (9-oct-2026): contrato de la cotización ganada ─────────────────
+# `storage.rules` de producción todavía no tiene `cotizaciones/{id}/contrato/`
+# (el sprint no edita reglas; el bloque exacto está en el reporte 102). Para
+# que el recorrido corra el flujo completo, SOLO el derivado del emulador lo
+# lleva. Cuando el bloque entre en storage.rules este paso se quita: si no, el
+# `match` duplicado haría que el derivado conserve la regla de producción.
+if ! grep -q "cotizaciones/{cotizacionId}/contrato/" storage.rules; then
+  awk '
+    /match \/ordenesCompra\/\{ordenId\}\/factura\/\{archivo\}/ && !hecho {
+      print "    // ── solo emulador (tarea 102): contrato de la cotización ganada ──"
+      print "    match /cotizaciones/{cotizacionId}/contrato/{archivo} {"
+      print "      allow read: if esDelEquipo();"
+      print "      allow create: if esDelEquipo()"
+      print "                    && request.resource.size < 20 * 1024 * 1024"
+      print "                    && request.resource.contentType.matches(\"application/pdf|image/jpeg|image/png|image/heic|image/heif\");"
+      print "      allow update, delete: if false;"
+      print "    }"
+      print ""
+      hecho = 1
+    }
+    { print }
+  ' storage.emulador.rules > storage.emulador.rules.tmp && mv storage.emulador.rules.tmp storage.emulador.rules
+  grep -q "cotizaciones/{cotizacionId}/contrato/" storage.emulador.rules || { echo "✗ no se inyectó la regla del contrato"; exit 1; }
+fi
 echo "✓ reglas del emulador generadas desde las de producción"

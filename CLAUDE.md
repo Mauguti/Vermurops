@@ -2205,6 +2205,128 @@ cotización, formulario y carga masiva de tarifas. Sin migración ni campo
 escrito. Quedan sin tocar la consulta de `useTarifas` (`where activo == true`,
 índice) y `esTarifaVigente` (tarifas, no catálogo de selección).
 
+## 4.57 Aéreo expeditado o regular (tarea 98, 9-oct-2026)
+
+El FCL/LCL del aéreo. `servicioAereo?: 'expeditado' | 'regular'` en tres
+lugares, siempre opcional: `CargaAerea` (la solicitud), `EmbarqueProducto`
+(junto a `tipoConsolidacion`) y `TarifaVermur` (que además admite `null` al
+editar, porque `updateDoc` no quita una clave que no se manda). **Sin valor =
+«Sin indicar»; nunca se asume** ni se reescribe. Reglas puras y 13 tests en
+`lib/servicioAereo.ts`.
+  - **Solicitud:** dos botones «Expeditado / Regular» en `FormCargaServicio`
+    (solo aéreo; volver a pulsar el elegido lo quita, borrando la clave). Pricing
+    lo ve en `DetalleCargaSolicitud`; `resumenCarga` y el PDF
+    (`carga.tipo` = «Aéreo Expeditado») lo dicen.
+  - **Al embarque:** `productosDesdeCarga` lo hereda al producto aéreo.
+    `ProductosEmbarque` (solo `modalidad === 'aereo'`) tiene el selector; el
+    servicio es del EMBARQUE, así que cambiarlo lo pone en todos sus productos.
+    Si los productos no coinciden se dice y no se escoge uno.
+  - **Listas:** columna «Servicio aéreo» en Embarques (en la vista por
+    defecto y en el CSV) y badge en la ficha; columna y filtro en Tarifas.
+  - **Tarifas desde la cotización** (`tarifasPorServicioAereo`, en
+    `TarifaPanel` y `TarifaSuggestions`): las del MISMO tipo; si no hay, las
+    «sin indicar» con aviso ámbar; las del otro tipo nunca. Si la cotización no
+    indica servicio, o ninguna tarifa del concepto distingue servicio (un
+    despacho, un seguro), no se filtra ni se avisa. ⚠️ Decisión: con tarifas
+    del mismo tipo disponibles, las «sin indicar» NO se muestran.
+  - e2e: `tests/e2e/98-servicio-aereo.spec.ts` (solicitud → embarque, y filtro
+    de tarifas).
+
+## 4.58 Estibable y niveles de estiba (tarea 99, 9-oct-2026)
+
+`estibable?: boolean` y `nivelesEstiba?: number | null` en las cinco cargas
+(FCL, LCL, aérea, terrestre; el LCL ya traía `estibable`) y en
+`EmbarqueProducto`. Opcionales y aditivos; sin valor = «Sin indicar», que no
+es «no estibable». Reglas puras y tests en `lib/estiba.ts`.
+  - **El tope vive en UNA constante** (`TOPE_NIVELES_ESTIBA`): terrestre 5,
+    aéreo 3, marítimo sin tope (solo mínimo 1; pendiente de confirmar con Mau).
+  - **Un número fuera del tope no se guarda:** `CampoEstiba` lo deja en el
+    campo con su aviso y la carga conserva el último valor válido, así el
+    autoguardado de la ficha nunca escribe un 6 en terrestre. `validarCarga`
+    lo vuelve a exigir (la pantalla se puede esquivar).
+  - No estibable ⇒ `nivelesEstiba` se borra (nunca `undefined`) y el campo se oculta.
+  - **Dónde se ve:** formulario de la solicitud y sección Operación de la ficha
+    (mismo `FormCargaServicio`), `DetalleCargaSolicitud` («Estibable ×3»,
+    «No estibable», «Estibable (niveles sin indicar)»), `resumenCarga`
+    («estibable ×3» / «no estibable»; el LCL viejo sin niveles no ensucia),
+    productos del embarque (formulario y etiqueta; heredan de la carga) y PDF
+    (va en `carga.tipo`: «LCL · estibable ×3», sin tocar el flujo de n8n).
+  - **Legacy:** `lcl_estibable` y `ter_estibable` se siguen leyendo
+    (`cargaDesdeLegacy`); los checkboxes del modal viejo no se tocaron.
+  - e2e: `tests/e2e/99-estiba.spec.ts`.
+
+## 4.59 Tarifas por peso cobrable (tarea 100, 9-oct-2026)
+
+Unidad nueva `KG_COBRABLE` en `UnidadTarifa` y, en `PreciosTarifa`, opcionales
+`factorVolumetricoKgM3`, `minimo` y `escalas[{desdeKg, monto}]`. El cálculo es
+una función pura, `lib/pesoCobrable.ts` (38 tests, verificados por mutación):
+volumétrico = m³ × factor; cobrable = el mayor entre bruto y volumétrico;
+precio/kg = el de la escala con mayor `desdeKg` que no pase el cobrable (sin
+escala, el `monto`); total = el mayor entre `minimo` y cobrable × precio/kg.
+  - **Aéreo:** factor 167 kg/m³ si la tarifa no trae uno; el cobrable sube al
+    medio kilo (101.2 → 101.5) y la escala se decide con el cobrable YA
+    redondeado. El `pesoVolumetricoKg` que capturó Ventas se respeta; si no
+    viene, se calcula de los bultos, solo cuando sus medidas cubren todas las
+    piezas.
+  - **Terrestre:** sin default. El wizard no guarda una tarifa por kg cobrable
+    sin factor, salvo que declare servicio aéreo. Ojo: la carga terrestre no
+    captura volumen, así que hoy esas tarifas dicen «Sin cálculo» en la
+    cotización hasta que exista el dato.
+  - **No inventa:** sin peso, sin volumen o sin factor, la función devuelve el
+    motivo y no un total. `montoDeTarifa` (tarifaMatching) devuelve `null` y
+    «Usar» avisa en vez de meter el precio por kg como si fuera el monto.
+  - **En la cotización:** `DesgloseCobrable` muestra bruto, volumétrico, cuál
+    se cobró y la fórmula en el panel y en las sugerencias; al usarla, el
+    renglón lleva el TOTAL como costo y la fórmula en `condiciones`.
+  - **`minimo` vs `montoMinimo`:** el modelo aprobado nombra `minimo`; ya
+    existía `montoMinimo` (CBM/TON/WM). Lo nuevo escribe `minimo` y se lee con
+    respaldo del otro. TON, WM y CBM no cambian.
+  - e2e: `tests/e2e/100-peso-cobrable.spec.ts`.
+
+## 4.60 Fechas de recolección y entrega deseadas (tarea 101, 9-oct-2026)
+
+`fechaRecoleccionDeseada?` y `fechaEntregaDeseada?` (YYYY-MM-DD, opcionales,
+`null` al borrar) en la cotización. Reglas puras y tests en
+`lib/fechasDeseadas.ts`; UI en `components/quotes/FechasDeseadas.tsx`.
+  - **Entrega antes de recolección bloquea** (solicitud y ficha); **una fecha
+    pasada solo avisa** («Se guarda igual»), porque hay cotizaciones que se
+    capturan tarde. En la ficha el valor inválido queda en pantalla y no se guarda.
+  - **Captura:** formulario de la solicitud y Información → Operación (quien
+    puede editar la operación, `puedeEditarOperacion`). Pricing las lee ahí y
+    en la franja del tab Servicios.
+  - **PDF:** salen como primera línea de `notas` (la plantilla de n8n actual las
+    imprime) y como campos propios del payload, que solo viajan si hay.
+  - **Embarque: se LEEN de la cotización de origen** (`cotizacionId`), no se
+    copian: así no hay modelo nuevo ni copia que se desincronice. Se muestran
+    como «Solicitadas por el cliente (no son ETD/ETA)» en Hitos Temporales y no
+    tocan `fechas.salida` ni `fechas.arribo`.
+  - e2e: `tests/e2e/101-fechas-deseadas.spec.ts`.
+
+## 4.61 Contrato de la cotización ganada (tarea 102, 9-oct-2026)
+
+`KanbanQuote.contrato?: { storagePath, nombreArchivo, subidoPor, subidoEn, firmado } | null`,
+opcional y aditivo; `subidoEn` es ISO 8601 como el resto del modelo. Reglas
+puras y tests en `lib/contratoCotizacion.ts`; sección en
+`components/quotes/SeccionContrato.tsx`, solo con la cotización en `ganada`.
+  - **No genera texto de contrato**: «Generar contrato» está deshabilitado con
+    «Falta la plantilla de Vermur». Cuando llegue, va como `generar-documento`.
+  - **No bloquea nada.** Ganada sin contrato firmado (ausente, o subido sin
+    marcar «Firmado por el cliente») muestra el aviso ámbar «Sin contrato
+    firmado» en la ficha de la cotización y en la del embarque (Hitos).
+  - **Se escribe por `onUpdateQuote`, no por `updateDoc`**: la ficha trabaja con
+    una copia local y solo adopta la del listener al cambiar de versión; un
+    `updateDoc` directo no se veía y el autoguardado lo pisaba.
+  - Reemplazar deja una entrada en Historial / Notas con el archivo anterior;
+    el archivo se conserva en Storage. Quién maneja el contrato:
+    `cotizacion.solicitar` o `cotizacion.crear` (Ventas, Pricing, admin).
+  - Lista de cotizaciones: filtro «Ganadas sin contrato» (en «Filtros»).
+  - 🔴 **Storage necesita su regla publicada**: `cotizaciones/{id}/contrato/`
+    no existe en `storage.rules`; sin ella la subida falla en producción. El
+    bloque está en el reporte 102. Mientras tanto `scripts/reglasEmulador.sh`
+    la inyecta SOLO en el derivado del emulador (se quita sola del paso cuando
+    `storage.rules` ya la trae).
+  - e2e: `tests/e2e/102-contrato-ganada.spec.ts`.
+
 ---
 
 ## 5. Estado de los módulos

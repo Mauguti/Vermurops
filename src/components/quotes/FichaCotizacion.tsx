@@ -31,7 +31,7 @@ import {
 } from '../../lib/operacionServicio';
 import { ALMACENAJE_SUGERIDO } from '../../lib/diasLibres';
 import TarifaPanel from '../tarifas/TarifaPanel';
-import { resolverMonto, fmtPrecio } from '../tarifas/tarifaMatching';
+import { montoDeTarifa, formulaCobrable, fmtPrecio } from '../tarifas/tarifaMatching';
 import { useProveedores } from '../../hooks/useProveedores';
 import { contactoPrincipal } from '../proveedores/ProveedoresData';
 import type { TarifaVermur } from '../tarifas/TarifasData';
@@ -95,6 +95,8 @@ import ResumenFinancieroInline from './ResumenFinancieroInline';
 import { calcTotales } from '../../lib/cotizacionCalculator';
 import { cargaDesdeLegacy, resumenCarga, ETIQUETA_MODALIDAD, ModalidadSolicitud } from '../../lib/cargaSolicitud';
 import DetalleCargaSolicitud from './DetalleCargaSolicitud';
+import { EditorFechasDeseadas, LecturaFechasDeseadas } from './FechasDeseadas';
+import SeccionContrato, { AvisoSinContrato } from './SeccionContrato';
 import { useVersionesCotizacion } from '../../hooks/useVersionesCotizacion';
 import {
   opcionesSelector, vistaDeVersion, puedeVersionar, numeroVersionActual,
@@ -500,17 +502,22 @@ export default function FichaCotizacion({
     if (!conc) return;
     // Duplicate check
     if ((conc.tarifas || []).some(t => t.tarifaOrigenId === tarifa.id)) return;
+    const montoTarifa = montoDeTarifa(tarifa, srv.fcl_contenedor, srv.carga);
+    if (montoTarifa === null) {
+      void avisar('Esta tarifa es por kg cobrable y la carga del servicio no alcanza para calcularla (falta peso, volumen o factor). Complétalo en Información → Operación.');
+      return;
+    }
     const esPrimera = !(conc.tarifas?.length);
     const cpId = idUnico('cp');
     const cp: CotizacionProveedor = {
       id: cpId,
       proveedor: provNombre,
       contacto: contactoNombre,
-      monto: resolverMonto(tarifa, srv.fcl_contenedor),
+      monto: montoTarifa,
       moneda: tarifa.moneda,
       tiempoTransito: tarifa.tiempoTransitoDias ? `${tarifa.tiempoTransitoDias} días` : undefined,
       vigencia: tarifa.fechaFin ?? undefined,
-      condiciones: tarifa.condiciones || undefined,
+      condiciones: [tarifa.condiciones, formulaCobrable(tarifa, srv.carga)].filter(Boolean).join(' · ') || undefined,
       adjuntoUrl: null,
       archivoNombre: null,
       seleccionada: esPrimera,
@@ -550,10 +557,13 @@ export default function FichaCotizacion({
     const esPrimeraYUnica = existingTarifas.length === 0 && tarifas.length === 1;
 
     const newCps: CotizacionProveedor[] = [];
+    let sinCalculo = 0;
     for (const tarifa of tarifas) {
       // Duplicate check
       if (existingTarifas.some(t => t.tarifaOrigenId === tarifa.id)) continue;
       if (newCps.some(t => t.tarifaOrigenId === tarifa.id)) continue;
+      const montoTarifa = montoDeTarifa(tarifa, srv.fcl_contenedor, srv.carga);
+      if (montoTarifa === null) { sinCalculo += 1; continue; }
       const prov = proveedores.find(p => p.id === tarifa.proveedorId);
       const contacto = prov ? contactoPrincipal(prov) : undefined;
       const cpId = idUnico('cp');
@@ -561,11 +571,11 @@ export default function FichaCotizacion({
         id: cpId,
         proveedor: prov?.nombre ?? tarifa.proveedorId,
         contacto: contacto?.nombre ?? '',
-        monto: resolverMonto(tarifa, srv.fcl_contenedor),
+        monto: montoTarifa,
         moneda: tarifa.moneda,
         tiempoTransito: tarifa.tiempoTransitoDias ? `${tarifa.tiempoTransitoDias} días` : undefined,
         vigencia: tarifa.fechaFin ?? undefined,
-        condiciones: tarifa.condiciones || undefined,
+        condiciones: [tarifa.condiciones, formulaCobrable(tarifa, srv.carga)].filter(Boolean).join(' · ') || undefined,
         adjuntoUrl: null,
         archivoNombre: null,
         seleccionada: esPrimeraYUnica,
@@ -575,6 +585,9 @@ export default function FichaCotizacion({
         conceptoId: tarifa.conceptoId,
         tarifaOrigenId: tarifa.id,
       });
+    }
+    if (sinCalculo > 0) {
+      void avisar(`${sinCalculo} tarifa(s) por kg cobrable no se aplicaron: la carga del servicio no alcanza para calcularlas (falta peso, volumen o factor).`);
     }
     if (newCps.length === 0) return;
 
@@ -1665,6 +1678,10 @@ export default function FichaCotizacion({
           ))}
         </div>
       )}
+      {/* Tarea 102 · una ganada sin contrato firmado avisa; no frena nada. */}
+      {!viendoVersion && quote.etapa === 'ganada' && (
+        <div className="px-6 pt-2"><AvisoSinContrato quote={quote} /></div>
+      )}
       {errorVersiones && (
         <p className="mx-6 mt-2 text-[11px] text-red-600 font-semibold">{errorVersiones}</p>
       )}
@@ -1747,6 +1764,11 @@ export default function FichaCotizacion({
                 leen la matriz y la generación de embarques — pero deja de ser
                 el criterio de agrupación visual. */}
             {franjaSolicitud}
+
+            {/* Tarea 101 · lo que desea el cliente (se captura en Información → Operación). */}
+            <div className="border border-gray-200 bg-gray-50/60 rounded-xl px-4 py-2.5">
+              <LecturaFechasDeseadas fuente={quote} titulo="Fechas que desea el cliente" siempre />
+            </div>
 
             {/* 1b · Por proveedor (default) o por concepto. Editar concepto,
                 comparar y arrastrar tarifas viven en la vista por concepto;
@@ -2037,6 +2059,8 @@ export default function FichaCotizacion({
                     conceptoNombre={activeConceptoData?.concepto.nombre ?? null}
                     conceptoId={activeConceptoData?.concepto.conceptoId}
                     contenedorTipo={activeConceptoData?.servicio.fcl_contenedor}
+                    servicioAereo={activeConceptoData?.servicio.carga?.tipo === 'aereo' ? activeConceptoData.servicio.carga.servicioAereo ?? null : null}
+                    carga={activeConceptoData?.servicio.carga}
                     catalogoTarifas={catalogoTarifas}
                     tarifasYaUsadas={
                       activeConceptoData
@@ -2393,6 +2417,9 @@ export default function FichaCotizacion({
             </div>{/* fin columna derecha */}
             </div>{/* fin rejilla de dos columnas */}
 
+          {/* ── Contrato (tarea 102): solo cuando la cotización está ganada. */}
+          {quote.etapa === 'ganada' && !viendoVersion && <SeccionContrato quote={quote} onUpdateQuote={onUpdateQuote} />}
+
           {/* ── Operación (Fase A, 24-sep-2026) ───────────────────────────
               Lo que antes vivía en el modal «Datos del embarque», editable
               en línea y sobre la carga tipada. Sin modal. */}
@@ -2403,6 +2430,17 @@ export default function FichaCotizacion({
                 <span className="ml-auto normal-case tracking-normal font-semibold text-gray-400">solo lectura</span>
               )}
             </h3>
+            {/* Tarea 101 · fechas que desea el cliente. Pricing decide ruta y servicio con ellas. */}
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
+              {puedeEditarOperacion(rolActivo, quote.etapa, bloqueada) ? (
+                <EditorFechasDeseadas
+                  fuente={quote}
+                  onGuardar={(r, e) => onUpdateQuote({ ...quote, fechaRecoleccionDeseada: r, fechaEntregaDeseada: e })}
+                />
+              ) : (
+                <LecturaFechasDeseadas fuente={quote} titulo="Fechas que desea el cliente" siempre />
+              )}
+            </div>
             {quote.servicios.length === 0 && (
               <p className="text-[11px] text-gray-400">Esta cotización no tiene servicios.</p>
             )}

@@ -1,3 +1,4 @@
+import { sinContratoFirmado } from '../lib/contratoCotizacion';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { exigirExpediente } from '../lib/frenoExpediente';
 import { Prospecto } from '../data';
@@ -32,6 +33,8 @@ import { PROSPECTO_COLUMNS, VISTA_DEFAULT_PROSPECTOS } from './quotes/prospectoC
 import FichaProspecto from './quotes/FichaProspecto';
 import { useVistasUsuario } from '../hooks/useVistasUsuario';
 import VistaSelector from './table/VistaSelector';
+import { CapturaFechasDeseadas } from './quotes/FechasDeseadas';
+import { problemasFechasDeseadas } from '../lib/fechasDeseadas';
 import FormCargaServicio, { DraftServicio, nuevoDraft } from './quotes/FormCargaServicio';
 import { usePuertos } from '../hooks/usePuertos';
 import { useConceptos } from '../hooks/useConceptos';
@@ -99,6 +102,8 @@ export default function Quotes() {
   /** Prospecto abierto desde la lista. */
   const [prospectoAbierto, setProspectoAbierto] = useState<Prospecto | null>(null);
   const [filtroEtapa, setFiltroEtapa] = useState('');
+  /** Tarea 102 · «Ganadas sin contrato firmado». */
+  const [soloSinContrato, setSoloSinContrato] = useState(false);
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
 
   // Cotización seleccionada para abrir la ficha de detalle
@@ -413,9 +418,10 @@ export default function Quotes() {
         if (!etapasCotizacion.includes(q.etapa)) return false;
       }
       if (filtroEtapa && q.etapa !== filtroEtapa) return false;
+      if (soloSinContrato && !sinContratoFirmado(q)) return false;
       return coincide(`${q.id} ${q.prospecto?.empresa ?? ''} ${q.prospecto?.contacto ?? ''}`);
     });
-  }, [permittedQuotes, viewMode, busqueda, filtroEtapa]);
+  }, [permittedQuotes, viewMode, busqueda, filtroEtapa, soloSinContrato]);
 
   /**
    * Prospectos para la vista de Lista.
@@ -553,6 +559,8 @@ export default function Quotes() {
     }
     setFormCargas([nuevoDraft(m)]);
     setFormTrafico('');
+    setFormFechaRecoleccion(null);
+    setFormFechaEntrega(null);
   };
 
   /**
@@ -600,6 +608,8 @@ export default function Quotes() {
    * aquí y no se deja a la derivación por ruta, que es el respaldo para las
    * cotizaciones viejas. De este dato depende el folio del embarque.
    */
+  const [formFechaRecoleccion, setFormFechaRecoleccion] = useState<string | null>(null);
+  const [formFechaEntrega, setFormFechaEntrega] = useState<string | null>(null);
   const [formTrafico, setFormTrafico] = useState<'importacion' | 'exportacion' | ''>('');
 
   // Formulario Nuevo Prospecto
@@ -677,6 +687,13 @@ export default function Quotes() {
     if (!formEmpresa.trim() || formCargas.length === 0) {
       void avisar('Por favor introduce la empresa y agrega al menos una modalidad.');
       medirFlujoAbandonado(FLUJO_SOLICITUD, 'sin_empresa', 'validacion');
+      return;
+    }
+
+    // Tarea 101: la entrega antes de la recolección bloquea; una fecha pasada solo avisa en el formulario.
+    const pf = problemasFechasDeseadas(formFechaRecoleccion, formFechaEntrega);
+    if (pf.error) {
+      void avisar(pf.error);
       return;
     }
 
@@ -758,6 +775,9 @@ export default function Quotes() {
       }),
       valorTotalConsolidado: 0,
       moneda: 'USD',
+      // Tarea 101: se omiten cuando no hay (Firestore rechaza undefined).
+      ...(formFechaRecoleccion ? { fechaRecoleccionDeseada: formFechaRecoleccion } : {}),
+      ...(formFechaEntrega ? { fechaEntregaDeseada: formFechaEntrega } : {}),
       estadoFinal: null,
       motivoPerdida: null,
       createdAt: fechaActual,
@@ -936,15 +956,17 @@ export default function Quotes() {
                             <button
                               onClick={() => setFiltrosAbiertos(v => !v)}
                               className={`flex items-center text-[13px] font-bold rounded-lg px-3 py-2 border transition-colors shadow-sm ${
-                                filtroEtapa
+                                (filtroEtapa || soloSinContrato)
                                   ? 'bg-primario/10 border-primario/30 text-primario'
                                   : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
                               }`}
                             >
                               <Filter className="w-4 h-4 mr-2" />
-                              {filtroEtapa
-                                ? etapasDelFiltro.find(e => e.id === filtroEtapa)?.label ?? 'Filtros'
-                                : 'Filtros'}
+                              {soloSinContrato
+                                ? 'Ganadas sin contrato'
+                                : filtroEtapa
+                                  ? etapasDelFiltro.find(e => e.id === filtroEtapa)?.label ?? 'Filtros'
+                                  : 'Filtros'}
                             </button>
 
                             {filtrosAbiertos && (
@@ -952,13 +974,24 @@ export default function Quotes() {
                                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2">Etapa</p>
                                 <div className="space-y-0.5 max-h-[260px] overflow-y-auto">
                                   <button
-                                    onClick={() => { setFiltroEtapa(''); setFiltrosAbiertos(false); }}
+                                    onClick={() => { setFiltroEtapa(''); setSoloSinContrato(false); setFiltrosAbiertos(false); }}
                                     className={`w-full text-left px-2 py-1.5 rounded text-[12px] transition-colors ${
                                       filtroEtapa === '' ? 'bg-primario/10 text-primario font-semibold' : 'text-gray-600 hover:bg-gray-50'
                                     }`}
                                   >
                                     Todas
                                   </button>
+                                  {viewMode !== 'prospeccion' && (
+                                    <button
+                                      data-testid="filtro-ganadas-sin-contrato"
+                                      onClick={() => { setSoloSinContrato(v => !v); setFiltrosAbiertos(false); }}
+                                      className={`w-full text-left px-2 py-1.5 rounded text-[12px] transition-colors border-b border-gray-100 mb-1 ${
+                                        soloSinContrato ? 'bg-primario/10 text-primario font-semibold' : 'text-gray-600 hover:bg-gray-50'
+                                      }`}
+                                    >
+                                      Ganadas sin contrato
+                                    </button>
+                                  )}
                                   {etapasDelFiltro.map(e => (
                                     <button
                                       key={e.id}
@@ -1304,6 +1337,14 @@ export default function Quotes() {
                     );
                   })}
                 </div>
+              </div>
+
+              <div className="mb-4">
+                <CapturaFechasDeseadas
+                  recoleccion={formFechaRecoleccion}
+                  entrega={formFechaEntrega}
+                  onCambio={(r, e) => { setFormFechaRecoleccion(r); setFormFechaEntrega(e); }}
+                />
               </div>
 
               {formCargas[0] && (

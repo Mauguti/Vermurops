@@ -93,6 +93,7 @@ export interface EmbarqueCierres {
 }
 
 import type { TipoCambioCotizacion } from '../../lib/monedaComparativa';
+import type { ServicioAereo } from '../../lib/servicioAereo';
 
 export type MonedaCargo = 'USD' | 'MXN';
 
@@ -359,6 +360,11 @@ export interface EmbarqueProducto {
   volumen?: number;      // m³ (opcional)
   datosContenedor?: DatosContenedor;
   tipoConsolidacion?: 'FCL' | 'LCL';
+  /** Tarea 98: aéreo expeditado o regular. Sin valor = «Sin indicar». */
+  servicioAereo?: ServicioAereo;
+  /** Tarea 99: heredado de la carga. Sin valor = sin indicar. */
+  estibable?: boolean;
+  nivelesEstiba?: number | null;
   pallets?: Pallet[];
   /** Override manual: el usuario pisó el peso auto-calculado de pallets. */
   pesoOverride?: boolean;

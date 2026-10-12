@@ -1,3 +1,40 @@
+# Estado de VermurOps — 9 de octubre de 2026 (corte del sprint nocturno)
+
+**Cadena 98 → 102, lista y SIN PUBLICAR.** Cinco tareas `[x]`, ninguna `[!]`.
+Sale de `main` = `09c6dcc`; punta: `sprint/102-contrato-ganada` (lineal: mergearla
+trae las cinco). Hosting, más **reglas de Storage para la 102**. Sin Functions,
+índices, n8n ni modelo obligatorio (campos opcionales).
+
+| # | Qué | Rama | Sección |
+|---|---|---|---|
+| 98 | `servicioAereo` expeditado/regular: solicitud, embarque, tarifas, PDF | `sprint/98-aereo-servicio` | §4.57 |
+| 99 | `estibable` + `nivelesEstiba` con tope (terrestre 5, aéreo 3, marítimo sin tope) | `sprint/99-estibable` | §4.58 |
+| 100 | Tarifas por kg cobrable: factor, mínimo, escalas; desglose en la cotización | `sprint/100-peso-cobrable` | §4.59 |
+| 101 | Fechas deseadas de recolección y entrega (se leen de la cotización en el embarque) | `sprint/101-fechas-deseadas` | §4.60 |
+| 102 | Contrato de la ganada: subir, firmar, reemplazar, aviso y filtro | `sprint/102-contrato-ganada` | §4.61 |
+
+En la punta: 2,801 tests verdes · tsc 0 · build limpio · recorrido e2e 6/6, más un
+spec e2e por tarea.
+
+**Para publicar la 102:** pegar en `storage.rules` el bloque de
+`cotizaciones/{id}/contrato/` (está en `sprint/reportes/RESUMEN.md` §2), publicar
+reglas con `--only storage` (debe decir «uploading rules»), después hosting.
+Antes, correr 45-filtros y 47-barrido (la 98 no los corrió).
+
+**Cola restante:** vacía. Siguientes candidatas (de los reportes): volumen m³ en
+`CargaTerrestre` (para kg cobrable terrestre), campo «modalidad» en la tarifa,
+unidad nueva en `CargaMasivaTarifas`, edición de estiba en productos ya creados,
+plantilla de contrato (espera el modelo de Vermur).
+
+**Decisiones pendientes:** contrato firmado como freno o aviso (rec.: aviso);
+tope de estiba marítimo; estiba o fechas con campo propio en el PDF (toca n8n);
+servicio aéreo obligatorio al solicitar; copiar o leer las fechas deseadas.
+Detalle y preguntas para Vermur en `sprint/reportes/RESUMEN.md` (no versionado).
+Lo que sigue de este documento (corte del 7-oct) vale salvo donde la cadena
+96 → 97 ya se haya publicado.
+
+---
+
 # Estado de VermurOps — 7 de octubre de 2026 (corte del sprint nocturno)
 
 **Corte del sprint «Las dos de pruebas que se cayeron»: la cadena 96 → 97 está

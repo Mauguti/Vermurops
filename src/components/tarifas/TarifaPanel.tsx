@@ -11,7 +11,7 @@ import { BookOpen, Search, AlertTriangle, Check, GripVertical } from 'lucide-rea
 import type { TarifaVermur } from './TarifasData';
 import { buscarTarifasVigentes } from './TarifasData';
 import {
-  normalize, fmtPrecio, etiquetaContenedor, resolverMonto,
+  normalize, fmtPrecio, etiquetaContenedor, montoDeTarifa,
   matchConcept, buildConceptoMap, buildTarifaRuta, groupManobrasByTerminal,
 } from './tarifaMatching';
 import { useConceptos } from '../../hooks/useConceptos';
@@ -19,7 +19,8 @@ import { useProveedores } from '../../hooks/useProveedores';
 import { usePuertos } from '../../hooks/usePuertos';
 import { contactoPrincipal } from '../proveedores/ProveedoresData';
 import CapturaManualConcepto from './CapturaManualConcepto';
-import type { CotizacionProveedor } from '../quotes/QuotesData';
+import type { CotizacionProveedor, CargaSolicitada } from '../quotes/QuotesData';
+import DesgloseCobrable from './DesgloseCobrable';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { confirmar } from '../ui/Dialogos';
@@ -39,11 +40,13 @@ interface DraggableTarifaCardProps {
   simulada: boolean;
   /** SP-1: toggle simulación al clicar el cuerpo de la tarjeta. */
   onToggleSimulacion: () => void;
+  /** Tarea 100: carga del servicio, para el desglose de las tarifas por kg cobrable. */
+  carga?: CargaSolicitada | null;
 }
 
 function DraggableTarifaCard({
   tarifa, provNombre, contactoNombre, ruta, isMaxTerminal, terminalName, yaUsada, onUsar,
-  simulada, onToggleSimulacion,
+  simulada, onToggleSimulacion, carga,
 }: DraggableTarifaCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `tarifa-drag-${tarifa.id}`,
@@ -119,6 +122,7 @@ function DraggableTarifaCard({
               {fmtPrecio(tarifa)}
             </span>
           </div>
+          <DesgloseCobrable tarifa={tarifa} carga={carga} />
 
           {/* Botón Usar + badge simulación */}
           <div className="flex items-center justify-end gap-1.5 mt-1.5">
@@ -236,6 +240,8 @@ function SimuladorFooter({
   );
 }
 
+import { tarifasPorServicioAereo, type ServicioAereo } from '../../lib/servicioAereo';
+
 interface TarifaPanelProps {
   /** Nombre del concepto activo. null = ningún concepto seleccionado. */
   conceptoNombre: string | null;
@@ -250,6 +256,10 @@ interface TarifaPanelProps {
   conceptoId?: string;
   /** Tipo de contenedor del servicio (para resolución de monto). */
   contenedorTipo?: string;
+  /** Tarea 98: servicio de la cotización aérea; propone primero las tarifas del mismo tipo. */
+  servicioAereo?: ServicioAereo | null;
+  /** Tarea 100: carga del servicio activo (peso cobrable). */
+  carga?: CargaSolicitada | null;
   /** Tarifas del catálogo completo (de useTarifas). */
   catalogoTarifas: TarifaVermur[];
   /** IDs de tarifas ya aplicadas al concepto activo. */
@@ -273,6 +283,8 @@ export default function TarifaPanel({
   horizontal = false,
   conceptoId,
   contenedorTipo,
+  servicioAereo,
+  carga,
   catalogoTarifas,
   tarifasYaUsadas,
   onUsarTarifa,
@@ -309,10 +321,12 @@ export default function TarifaPanel({
   }, [conceptoId, conceptoNombre, conceptos, conceptoMap]);
 
   // ── Tarifas vigentes ──────────────────────────────────────────────────────
-  const vigentes = useMemo(() => {
-    if (!matchedConcept) return [];
-    return buscarTarifasVigentes(catalogoTarifas, { conceptoId: matchedConcept.id });
-  }, [matchedConcept, catalogoTarifas]);
+  const { vigentes, avisoServicio } = useMemo(() => {
+    if (!matchedConcept) return { vigentes: [] as TarifaVermur[], avisoServicio: null as string | null };
+    const todas = buscarTarifasVigentes(catalogoTarifas, { conceptoId: matchedConcept.id });
+    const { tarifas, aviso } = tarifasPorServicioAereo(todas, servicioAereo);
+    return { vigentes: tarifas, avisoServicio: aviso };
+  }, [matchedConcept, catalogoTarifas, servicioAereo]);
 
   // ── Lookup maps ───────────────────────────────────────────────────────────
   const provMap = useMemo(() => {
@@ -358,11 +372,11 @@ export default function TarifaPanel({
     const r: CostoByMoneda = { USD: 0, MXN: 0 };
     for (const t of vigentes) {
       if (simulatedIds.has(t.id)) {
-        r[t.moneda] += resolverMonto(t, contenedorTipo);
+        r[t.moneda] += montoDeTarifa(t, contenedorTipo, carga) ?? 0;
       }
     }
     return r;
-  }, [vigentes, simulatedIds, contenedorTipo]);
+  }, [vigentes, simulatedIds, contenedorTipo, carga]);
 
   // ── "Usar" handler ────────────────────────────────────────────────────────
   const handleUsar = (t: TarifaVermur) => {
@@ -451,6 +465,13 @@ export default function TarifaPanel({
           </div>
         )}
 
+        {avisoServicio && (
+          <div className="col-span-full flex items-start gap-2 px-2.5 py-2 rounded-md bg-amber-50 border border-amber-200/60 text-[10px] font-semibold text-amber-700" data-testid="aviso-servicio-aereo">
+            <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
+            <span>{avisoServicio}</span>
+          </div>
+        )}
+
         {/* Concepto encontrado pero sin tarifas vigentes */}
         {vigentes.length === 0 && matchedConcept && (
           <div className="col-span-full flex items-start gap-2 px-2.5 py-2 rounded-md bg-gray-50 border border-gray-150 text-[10px] text-gray-400">
@@ -490,6 +511,7 @@ export default function TarifaPanel({
               onUsar={() => handleUsar(t)}
               simulada={simulatedIds.has(t.id)}
               onToggleSimulacion={() => toggleSimulacion(t.id)}
+              carga={carga}
             />
           );
         })}

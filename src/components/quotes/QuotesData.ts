@@ -4,6 +4,7 @@
 // ============================================================
 import { calcLinea } from '../../lib/cotizacionCalculator';
 import type { TipoCambioCotizacion } from '../../lib/monedaComparativa';
+import type { ServicioAereo } from '../../lib/servicioAereo';
 import type { OrigenVersion, ResumenVersion } from '../../lib/versionesCotizacion';
 
 // ------------------------------------------------------------
@@ -148,6 +149,9 @@ export interface CargaFCL extends CargaBase {
   pesoBrutoKg: number;
   peligrosa: MercanciaPeligrosa;
   refrigeracion: Refrigeracion;
+  /** Tarea 99: ¿se puede estibar y cuántos niveles? Opcional; sin valor = sin indicar. */
+  estibable?: boolean;
+  nivelesEstiba?: number | null;
 }
 
 export interface CargaLCL extends CargaBase {
@@ -158,6 +162,8 @@ export interface CargaLCL extends CargaBase {
   bultos: Bulto[];
   /** Lo pidió Ventas explícitamente: cambia cómo se estiba y cotiza. */
   estibable: boolean;
+  /** Tarea 99: cuántos se pueden estibar uno encima de otro. Solo con estibable. */
+  nivelesEstiba?: number | null;
   peligrosa: MercanciaPeligrosa;
 }
 
@@ -168,6 +174,14 @@ export interface CargaAerea extends CargaBase {
   piezas: number;
   bultos: Bulto[];
   peligrosa: MercanciaPeligrosa;
+  /**
+   * Tarea 98: expeditado o regular, el FCL/LCL del aéreo. Opcional: lo viejo
+   * sin valor es «Sin indicar», no se asume ninguno.
+   */
+  servicioAereo?: ServicioAereo;
+  /** Tarea 99: ¿se puede estibar y cuántos niveles? Opcional; sin valor = sin indicar. */
+  estibable?: boolean;
+  nivelesEstiba?: number | null;
 }
 
 export type TipoUnidadTerrestre =
@@ -179,6 +193,9 @@ export interface CargaTerrestre extends CargaBase {
   pesoBrutoKg: number;
   piezas: number;
   requiereManiobras: boolean;
+  /** Tarea 99: ¿se puede estibar y cuántos niveles? Opcional; sin valor = sin indicar. */
+  estibable?: boolean;
+  nivelesEstiba?: number | null;
 }
 
 export interface CargaDespacho extends CargaBase {
@@ -474,6 +491,13 @@ export interface KanbanQuote {
    */
   diasLibresDemora?: number | null;
   /**
+   * Fechas que el cliente desea (tarea 101), YYYY-MM-DD. Opcionales. Pricing
+   * las lee para decidir ruta y servicio; el embarque las muestra como
+   * «solicitadas» y no pisa ETD/ETA. Ver lib/fechasDeseadas.ts.
+   */
+  fechaRecoleccionDeseada?: string | null;
+  fechaEntregaDeseada?: string | null;
+  /**
    * Días libres de almacenaje (tarea 08, 28-sep-2026).
    *
    * Sugeridos 7 para todos. La fecha límite = ETA + estos días.
@@ -531,6 +555,20 @@ export interface KanbanQuote {
    * evidencia de lo que se le mandó al cliente.
    */
   pdfs?: PdfCotizacion[];
+
+  /**
+   * Contrato de la cotización ganada (tarea 102). Opcional y aditivo: lo
+   * ausente es «sin contrato». `subidoEn` es ISO 8601 como el resto de las
+   * fechas del modelo. Un reemplazo deja la versión anterior en
+   * `actividades` (y el archivo en Storage); nunca se borra.
+   */
+  contrato?: {
+    storagePath: string;
+    nombreArchivo: string;
+    subidoPor: string;
+    subidoEn: string;
+    firmado: boolean;
+  } | null;
 
   // Timestamps y auditoría
   createdAt: string;

@@ -15,6 +15,8 @@
  *  - Spot inverso: captura manual en cotización puede guardarse como tarifa spot.
  */
 
+import type { ServicioAereo } from '../../lib/servicioAereo';
+
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
 export type TipoTarifa = 'tarifario' | 'spot';
@@ -28,7 +30,8 @@ export type UnidadTarifa =
   | 'VIAJE'        // Flete terrestre por viaje
   | 'BL'           // Por Bill of Lading
   | 'FIJO'         // Monto fijo (sin unidad variable)
-  | 'DIA';         // Almacenaje, demoras
+  | 'DIA'          // Almacenaje, demoras
+  | 'KG_COBRABLE'; // Tarea 100: el mayor entre peso bruto y volumétrico (lib/pesoCobrable.ts)
 
 // ─── Sub-objetos ─────────────────────────────────────────────────────────────
 
@@ -43,6 +46,12 @@ export interface PreciosTarifa {
   montoPor40HC?: number;
   /** Cargo mínimo (LCL, aéreo). */
   montoMinimo?: number;
+  /** Tarea 100 (KG_COBRABLE): kg por m³. Aéreo sin valor = 167; terrestre lo exige. */
+  factorVolumetricoKgM3?: number;
+  /** Tarea 100 (KG_COBRABLE): cargo mínimo. Se lee con respaldo de `montoMinimo`. */
+  minimo?: number;
+  /** Tarea 100 (KG_COBRABLE): precio por kg según el peso cobrable; `monto` rige debajo de la primera. */
+  escalas?: Array<{ desdeKg: number; monto: number }>;
 }
 
 // ─── Entidad principal ───────────────────────────────────────────────────────
@@ -89,6 +98,8 @@ export interface TarifaVermur {
   freeTimeDias: number | null;
   /** Notas, condiciones especiales. */
   condiciones: string;
+  /** Tarea 98: servicio de la tarifa aérea. Sin valor = «Sin indicar». */
+  servicioAereo?: ServicioAereo | null;
 
   // ── Estado ───────────────────────────────────────────────────────────────
   activo: boolean;
