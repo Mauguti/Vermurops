@@ -11,7 +11,7 @@ import { validarCarga, resumenCarga } from './cargaSolicitud';
 const terrestre = (p: Record<string, unknown> = {}) =>
   ({ tipo: 'terrestre', tipoUnidad: 'torton', pesoBrutoKg: 900, piezas: 1, requiereManiobras: false, ...p }) as CargaSolicitada;
 const ok = (r: ReturnType<typeof calcularPesoCobrable>): CalculoCobrable => {
-  if (!r.ok) throw new Error(r.motivo);
+  if (!r.ok) throw new Error((r as { motivo: string }).motivo);
   return r;
 };
 
@@ -61,7 +61,7 @@ describe('modalidad de la tarifa', () => {
     expect(r.cobrableKg).toBe(167);
     expect(r.factor).toBe(167);
   });
-  it('aéreo declarado aunque la carga sea terrestre: 167 y medio kilo', () => {
+  it('aéreo declarado sobre carga terrestre: redondea al medio kilo', () => {
     const r = ok(calcularPesoCobrable(entradaDesdeCarga(terrestre({ volumenM3: 1 })), { monto: 1 }, 'aereo'));
     expect(r.cobrableKg).toBe(900);
     const r2 = ok(calcularPesoCobrable(entradaDesdeCarga(terrestre({ pesoBrutoKg: 100.2, volumenM3: 0.1 })), { monto: 1 }, 'aereo'));
@@ -104,11 +104,11 @@ describe('problemasTarifaCobrable · modalidad', () => {
 describe('carga terrestre: validación y resumen', () => {
   it('volumen ausente, null o positivo es válido', () => {
     for (const v of [undefined, null, 8]) {
-      expect(validarCarga(terrestre({ volumenM3: v }), 'terrestre' as never)).toEqual(validarCarga(terrestre(), 'terrestre' as never));
+      expect(validarCarga(terrestre({ volumenM3: v }))).toEqual(validarCarga(terrestre()));
     }
   });
   it('volumen negativo se rechaza', () => {
-    expect(JSON.stringify(validarCarga(terrestre({ volumenM3: -2 }), 'terrestre' as never))).toMatch(/volumen/);
+    expect(JSON.stringify(validarCarga(terrestre({ volumenM3: -2 })))).toMatch(/volumen/);
   });
   it('el resumen incluye los m³ solo si hay', () => {
     expect(resumenCarga(terrestre({ volumenM3: 12 }))).toMatch(/12 m³/);
