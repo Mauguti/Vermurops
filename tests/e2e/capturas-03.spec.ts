@@ -9,6 +9,7 @@
  */
 
 import { test, expect, type Page, type Browser, type BrowserContext } from '@playwright/test';
+import { idsDe, soloNuevos } from './aislamiento';
 
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(120_000);
@@ -108,10 +109,11 @@ test('Solicitud para capturas', async ({ browser }) => {
   await page.getByRole('button', { name: 'Agregar concepto' }).click();
   await elegirConcepto(page, 'Documentation');
 
+  const cotsAntes = await idsDe('ventas@vermur.com', 'cotizaciones');
   await page.getByRole('button', { name: 'Enviar a Pricing' }).click();
   await expect(page.getByText(/Solicitado a Pricing|solicitado/i).first()).toBeVisible({ timeout: 15_000 });
 
-  const cots = await leerColeccion('ventas@vermur.com', 'cotizaciones');
+  const cots = soloNuevos(await leerColeccion('ventas@vermur.com', 'cotizaciones'), cotsAntes);
   const mia = cots.filter(c => c.etapa === 'solicitado_pricing')
     .sort((a, b) => String(b.createdAt ?? '').localeCompare(String(a.createdAt ?? '')))[0];
   expect(mia).toBeTruthy();

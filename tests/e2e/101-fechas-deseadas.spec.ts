@@ -7,6 +7,7 @@
 
 import { test, expect, type Page, type Browser, type BrowserContext } from '@playwright/test';
 import { fijarPreferencias } from './preferencias';
+import { idsDe, soloNuevos } from './aislamiento';
 
 // Tarea 90: las vistas de Cuentas por cobrar/pagar se guardan por usuario; cada spec parte del default.
 test.beforeAll(async () => { await fijarPreferencias(); });
@@ -161,10 +162,11 @@ test('Ventas · captura las fechas: la inversión bloquea, la pasada avisa', asy
   // Y la definitiva, futura y coherente.
   await rec.fill('2030-03-05');
   await ent.fill('2030-03-10');
+  const cotsAntes = await idsDe('ventas@vermur.com', 'cotizaciones');
   await page.getByRole('button', { name: 'Enviar a Pricing' }).click();
   await expect(page.getByText(/Solicitado a Pricing|solicitado/i).first()).toBeVisible({ timeout: 15_000 });
 
-  const cots = await leerColeccion('ventas@vermur.com', 'cotizaciones');
+  const cots = soloNuevos(await leerColeccion('ventas@vermur.com', 'cotizaciones'), cotsAntes);
   const mia = cots.filter(c => c.etapa === 'solicitado_pricing' && c.fechaEntregaDeseada === '2030-03-10')
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
   expect(mia, 'La solicitud con fechas no quedó en Firestore').toBeTruthy();

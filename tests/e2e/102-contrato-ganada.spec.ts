@@ -8,6 +8,7 @@
 
 import { test, expect, type Page, type Browser, type BrowserContext } from '@playwright/test';
 import { fijarPreferencias } from './preferencias';
+import { idsDe, soloNuevos } from './aislamiento';
 
 // Tarea 90: las vistas de Cuentas por cobrar/pagar se guardan por usuario; cada spec parte del default.
 test.beforeAll(async () => { await fijarPreferencias(); });
@@ -135,9 +136,10 @@ test('Ventas solicita, Pricing arma, Administración valida, Ventas gana', async
   await page.getByPlaceholder('4', { exact: true }).fill('3');
   await page.getByRole('button', { name: 'Agregar concepto' }).click();
   await elegirConcepto(page, 'Air Freight');
+  const cotsAntes = await idsDe('ventas@vermur.com', 'cotizaciones');
   await page.getByRole('button', { name: 'Enviar a Pricing' }).click();
   await expect(page.getByText(/Solicitado a Pricing|solicitado/i).first()).toBeVisible({ timeout: 15_000 });
-  const cots = await leerColeccion('ventas@vermur.com', 'cotizaciones');
+  const cots = soloNuevos(await leerColeccion('ventas@vermur.com', 'cotizaciones'), cotsAntes);
   const mia = cots.filter(c => c.etapa === 'solicitado_pricing')
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
   expect(mia, 'La solicitud no quedó en Firestore').toBeTruthy();
