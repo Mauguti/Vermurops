@@ -2347,6 +2347,31 @@ opcionales y aditivos: `CargaTerrestre.volumenM3?: number | null` y
     aéreo; el wizard mira el servicio aéreo). Nada se migra ni se reescribe.
   - e2e: `tests/e2e/103-volumen-terrestre.spec.ts`.
 
+## 4.63 La importación con IA entiende «por kg cobrable» (tarea 104, 12-oct-2026)
+
+`normalizarUnidad` convertía «kg» y «peso» en TON: un precio aéreo por kg se
+guardaba por tonelada, mil veces mal. Ahora `clasificarUnidad(texto, contexto)`
+(`lib/importacionTarifas.ts`, tests en `importacionTarifas.cobrable.test.ts`):
+  - **Sin duda → KG_COBRABLE:** «peso cobrable», «kg cobrable», «chargeable»,
+    «CW». **Sin duda → TON:** «ton», «tonelada», «TM».
+  - **«kg», «kilo», «por kg», «peso» dependen del contexto:** KG_COBRABLE solo
+    si el documento parece aéreo (`pareceAereo`: concepto, condiciones,
+    proveedor, observaciones) o la línea trae escalas (`mencionaEscalasKg`:
+    «+45», «100 kg+», o `escalas[]` estructuradas del extractor). Sin contexto
+    la unidad queda VACÍA y `unidadAmbigua`: la pantalla lo dice y bloquea con
+    «Falta la unidad». Nunca se adivina.
+  - **La revisión** pinta `EditorCobrable` (factor, mínimo, escalas) en cada
+    línea KG_COBRABLE. El guardado se bloquea con `cobrable_incompleto` según
+    `problemasTarifaCobrable`: aéreo detectado no necesita factor (167); lo
+    demás, sí. Se guarda `minimo`, no `montoMinimo`.
+  - **No se escribe `modalidad` desde la importación:** inferirla escribiría un
+    dato que la persona no eligió y que manda sobre la carga (§4.62).
+  - ⚠️ **`CargaMasivaTarifas` NO está montada en ninguna pantalla** (cero
+    importadores; la 78 no la vio). Se le agregó la unidad, el editor y la
+    modalidad elegida a mano, pero no se puede ver ni probar hasta que alguien
+    la monte: otra regla sin call site.
+  - e2e: `tests/e2e/104-importacion-cobrable.spec.ts` (extractor simulado).
+
 ---
 
 ## 5. Estado de los módulos

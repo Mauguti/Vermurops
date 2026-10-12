@@ -343,7 +343,11 @@ async function guardar(
           monto: l.monto, unidad: l.unidad!,
           ...(l.montoPor40 ? { montoPor40: l.montoPor40 } : {}),
           ...(l.montoPor40HC ? { montoPor40HC: l.montoPor40HC } : {}),
-          ...(l.montoMinimo ? { montoMinimo: l.montoMinimo } : {}),
+          // KG_COBRABLE guarda su mínimo como `minimo` (tarea 100), no `montoMinimo`.
+          ...(l.montoMinimo ? (l.unidad === 'KG_COBRABLE' ? { minimo: l.montoMinimo } : { montoMinimo: l.montoMinimo }) : {}),
+          ...(l.unidad === 'KG_COBRABLE' && l.factorVolumetricoKgM3 ? { factorVolumetricoKgM3: l.factorVolumetricoKgM3 } : {}),
+          ...(l.unidad === 'KG_COBRABLE' && (l.escalas?.length ?? 0) > 0
+            ? { escalas: [...l.escalas!].sort((a, b) => a.desdeKg - b.desdeKg) } : {}),
         },
         moneda: l.moneda!,
         vigenciaTexto: vigencia.vigenciaTexto,
