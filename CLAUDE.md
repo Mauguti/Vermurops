@@ -2433,6 +2433,12 @@ P3 de `docs/sprint-post-junta/PLAN-FICHA-COTIZACION.md`.
   - e2e: `tests/e2e/112-ganada-por-campos.spec.ts` (apagado y encendido; clona la
     COT-2026-0009 del recorrido, así que corre DESPUÉS de él).
 
+## 4.68 Volumen terrestre en el PDF (tarea 113, 12-oct-2026)
+
+`cargaParaPdf` llena `carga.volumen` de la carga terrestre con `volumenM3`
+(§4.62), igual que el LCL; sin volumen sigue en 0. Solo cambia el payload: la
+plantilla de n8n no se toca. Test en `pdfCotizacion.test.ts`.
+
 ---
 
 ## 5. Estado de los módulos
