@@ -1,3 +1,34 @@
+# Estado de VermurOps — 12 de octubre de 2026, tarde (corte del sprint nocturno)
+
+**Cadena 110 → 114 + 109, lista y SIN PUBLICAR.** Sale de `sprint/base`. Punta:
+`sprint/109-specs-aislados` (lineal: mergearla trae todo). Solo hosting; sin
+reglas, índices, Functions, n8n ni modelo.
+
+| # | Qué | Rama |
+|---|---|---|
+| 110 | P1 diff y fusión por id, puros (§4.65) | `sprint/110-diff-fusion` |
+| 111 | P2 `updateCotizacion` escribe solo lo tocado, en transacción y cola (§4.66) | `sprint/111-update-por-campos` |
+| 112 | P3 ganada / abrir embarque por campos, `arrayUnion` en `embarqueIds` (§4.67) | `sprint/112-otros-escritores` |
+| 113 | Volumen terrestre en el PDF (§4.68) | `sprint/113-volumen-terrestre-pdf` |
+| 114 | Aviso de contrato en la ficha del prospecto (§4.69) | `sprint/114-aviso-contrato-prospecto` |
+| 109 | Specs aislados; REPETIR=2 verde (§4.70) | `sprint/109-specs-aislados` |
+
+En la punta: 2,874 tests · tsc 0 · build limpio · recorrido 6/6 · 274+274 e2e
+verdes con `--retries=0`. Correr 45-filtros y 47-barrido antes de publicar y
+validar a mano el caso de dos pestañas (notas y PDF sobreviven).
+
+**Cola restante:** vacía. Candidatas: P4 del plan (adoptar del listener + aviso
+de conflicto en `servicios`), retirar `Quotes.tsx:124`, mismo patrón de
+escritura entera en embarque y OC (lista en reporte 112), etiquetar unidad de
+`carga.volumen` en el PDF.
+
+**Decisiones pendientes:** tomar P4; conflicto en `servicios` (decidido: último
+gana con aviso, el aviso es P4); unidad del volumen en la plantilla de n8n;
+capturas-03 en observación. Detalle en `sprint/reportes/RESUMEN.md` (no versionado).
+Lo que sigue (corte anterior) vale salvo donde esta cadena ya se haya publicado.
+
+---
+
 # Estado de VermurOps — 12 de octubre de 2026 (corte del sprint nocturno)
 
 **Cadena 103 → 105 + plan 108, lista y SIN PUBLICAR.** Sale de `main` = `8455acd`
