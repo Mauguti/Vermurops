@@ -1,3 +1,35 @@
+# Estado de VermurOps — 12 de octubre de 2026 (corte del sprint nocturno)
+
+**Cadena 103 → 105 + plan 108, lista y SIN PUBLICAR.** Sale de `main` = `8455acd`
+(98–102 ya publicadas). Punta: `sprint/108-plan-autoguardado` (lineal: mergearla
+trae todo). Solo hosting; sin reglas, índices, Functions, n8n ni modelo
+obligatorio (campos opcionales).
+
+| # | Qué | Rama |
+|---|---|---|
+| 103 | `volumenM3` en carga terrestre y `modalidad` en la tarifa (§4.62) | `sprint/103-volumen-terrestre` |
+| 104 | Importación con IA entiende «por kg cobrable» (§4.63) | `sprint/104-importacion-kg-cobrable` |
+| 105 | Estiba editable en el producto del embarque (§4.64) | `sprint/105-estiba-producto` |
+| 106 | Sin cambios: Prospectos no lista cotizaciones | (= 105) |
+| 108 | Plan `docs/sprint-post-junta/PLAN-FICHA-COTIZACION.md` | `sprint/108-plan-autoguardado` |
+
+`[!]` 107 (specs aislados y capturas-03): la sesión terminó sin reporte ni commits;
+hay que relanzarla en primer plano.
+
+En la punta de la 105: 2,851 tests verdes · tsc 0 · build limpio · recorrido 6/6
+más specs 98/100/103/104/105. Correr 45-filtros y 47-barrido antes de publicar.
+
+**Cola restante:** 107. Candidatas: montar o borrar `CargaMasivaTarifas`
+(inalcanzable), P2 del plan 108, volumen en el PDF.
+
+**Decisiones pendientes:** tomar P2 del plan 108; conflicto en `servicios` (rec.:
+último gana con aviso); montar o borrar la carga masiva; qué pantalla quería la
+106; tope de estiba marítimo; volumen terrestre en el PDF. Preguntas a Vermur y
+detalle en `sprint/reportes/RESUMEN.md` (no versionado).
+Lo que sigue (corte del 9-oct) vale salvo donde esta cadena ya se haya publicado.
+
+---
+
 # Estado de VermurOps — 9 de octubre de 2026 (corte del sprint nocturno)
 
 **Cadena 98 → 102, lista y SIN PUBLICAR.** Cinco tareas `[x]`, ninguna `[!]`.
