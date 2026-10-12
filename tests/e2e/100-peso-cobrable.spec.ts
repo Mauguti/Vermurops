@@ -128,7 +128,13 @@ async function sembrarTarifaCobrable(id: string) {
     body: JSON.stringify({ fields: {
       id: s(id), tipo: s('tarifario'), conceptoId: s('CON-021'), proveedorId: s('PRV-100'),
       puertoOrigenId: { nullValue: null }, puertoDestinoId: { nullValue: null }, terminalId: { nullValue: null },
-      rutaTexto: s('MEX → GDL'),
+      /*
+       * Ruta PROPIA de este spec. Con «MEX → GDL» chocaba con la tarifa que
+       * siembra `98-servicio-aereo`, que cuenta las filas de esa ruta: cada
+       * spec pasaba solo y en la suite completa la 98 veía 4 donde esperaba
+       * 3. Aquí la ruta es solo una etiqueta y no se asienta sobre ella.
+       */
+      rutaTexto: s('MEX → MTY'),
       precios: { mapValue: { fields: {
         monto: n(6), unidad: s('KG_COBRABLE'), minimo: n(90),
         escalas: { arrayValue: { values: [
