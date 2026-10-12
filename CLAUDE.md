@@ -2439,6 +2439,15 @@ P3 de `docs/sprint-post-junta/PLAN-FICHA-COTIZACION.md`.
 (§4.62), igual que el LCL; sin volumen sigue en 0. Solo cambia el payload: la
 plantilla de n8n no se toca. Test en `pdfCotizacion.test.ts`.
 
+## 4.69 Aviso de contrato en la ficha del prospecto convertido (tarea 114, 12-oct-2026)
+
+En la ficha de un prospecto convertido, bajo el enlace a sus cotizaciones, cada
+una ganada sin contrato firmado (o con archivo sin marcar firmado) pinta el
+`AvisoSinContrato` de la 102, reusado, con su folio al lado.
+`cotizacionesDelProspecto` (`lib/contratoCotizacion.ts`) empata por `prospectoId`
+y trae el aviso de cada una. No bloquea nada; sin modelo nuevo.
+e2e: `tests/e2e/114-aviso-contrato-prospecto.spec.ts`.
+
 ---
 
 ## 5. Estado de los módulos
