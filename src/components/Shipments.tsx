@@ -21,14 +21,14 @@ import { useDestinoPendiente, useRegistrarAbierta, useNavegacion, type Destino }
 import { useAuth } from '../auth/AuthContext';
 import { reservarFoliosSerie, generateFolioEmbarque } from '../lib/folioService';
 import { db } from '../firebase';
-import { runTransaction } from 'firebase/firestore';
+import { runTransaction, updateDoc, doc, arrayUnion } from 'firebase/firestore';
 import Toast, { TipoToast } from './ui/Toast';
 
 export default function Shipments() {
   // E-1: los embarques viven en Firestore. Antes eran useState sembrado desde
   // el mock y se perdían al recargar.
   const { embarques, loading, error, guardarEmbarque } = useEmbarques();
-  const { quotes, updateCotizacion } = useCotizaciones();
+  const { quotes } = useCotizaciones();
   const { clientes } = useClientes();
   /** Para resolver la ubicación de cada cargo por su concepto (regla espejo). */
   const { conceptos: conceptosCatalogo } = useConceptos();
@@ -299,8 +299,10 @@ export default function Shipments() {
          * embarque fallara, la cotización quedaría congelada apuntando a un
          * embarque que no existe.
          */
-        await updateCotizacion(quote.id, {
-          embarqueIds: [...(quote.embarqueIds ?? []), nuevo.id],
+        // arrayUnion (tarea 112): dos embarques seguidos conservan los dos ids
+        // aunque la copia local de `quote` todavía no traiga el primero.
+        await updateDoc(doc(db, 'cotizaciones', quote.id), {
+          embarqueIds: arrayUnion(nuevo.id),
         });
 
         setSelectedEmbarqueId(nuevo.id);

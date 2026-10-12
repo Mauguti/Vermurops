@@ -122,7 +122,8 @@ interface FichaCotizacionProps {
   onBack: () => void;
   /** `anterior` = la cotización viva antes de esta edición (tarea 111): permite escribir solo lo tocado. */
   onUpdateQuote: (quote: KanbanQuote, anterior?: KanbanQuote) => void;
-  onConvertToShipment: (quote: KanbanQuote) => void;
+  /** `anterior`: la copia sobre la que se calculó `quote` (tarea 112); con ella solo se escribe lo tocado. */
+  onConvertToShipment: (quote: KanbanQuote, anterior?: KanbanQuote) => void;
   /** Rol activo del usuario (Ventas o Pricing) */
   rolActivo: Rol;
   /** Etiqueta del botón regresar cuando se llegó desde otra ficha. */
@@ -188,7 +189,7 @@ export default function FichaCotizacion({
     onUpdateQuoteViva(q, quoteViva);
   };
   const onConvertToShipment = (q: KanbanQuote) => {
-    if (!viendoVersion) onConvertToShipmentViva(q);
+    if (!viendoVersion) onConvertToShipmentViva(q, quoteViva);
   };
   /** Congelada por embarque, o una versión pasada en pantalla. */
   const bloqueada = estaCongelada(quote) || viendoVersion;

@@ -2417,6 +2417,22 @@ las claves que la edición tocó (`parcheFusionado`, §4.65) y fusiona por id
   - e2e: `tests/e2e/111-actualizar-por-campos.spec.ts` (nota de otra pestaña y
     PDF sobreviven; mutado: sin transacción falla).
 
+## 4.67 Marcar ganada y abrir embarque escriben solo lo suyo (tarea 112, 12-oct-2026)
+
+P3 de `docs/sprint-post-junta/PLAN-FICHA-COTIZACION.md`.
+  - `crearEmbarquesDeCotizacionGanada` recibe `anterior` y la transacción escribe
+    `parcheDeGanada`: solo las claves tocadas (etapa, campos de ganada) más
+    `embarqueIds`, con actividades/chat/pdfs fusionados por id contra el servidor.
+    Sin `anterior`, la cotización entera, como antes.
+  - `onConvertToShipment(quote, anterior?)`: **el `anterior` es la copia de la
+    FICHA (`quoteViva`), no la del listener.** Con la del listener, una nota ajena
+    que ya llegó al listener pero la ficha no adoptó (P4) se leía como borrada por
+    esta edición y se perdía; lo atrapó el e2e. El Kanban pasa su propia lista.
+  - Con el interruptor apagado, `updateCotizacion(ganada, ganada, anterior)`.
+  - `Shipments` (ruta manual) liga el embarque con `arrayUnion` sobre `embarqueIds`.
+  - e2e: `tests/e2e/112-ganada-por-campos.spec.ts` (apagado y encendido; clona la
+    COT-2026-0009 del recorrido, así que corre DESPUÉS de él).
+
 ---
 
 ## 5. Estado de los módulos

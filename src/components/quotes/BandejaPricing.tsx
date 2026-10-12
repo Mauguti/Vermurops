@@ -38,7 +38,7 @@ import {
 interface BandejaPricingProps {
   quotes: KanbanQuote[];
   onUpdateQuotes: (quotes: KanbanQuote[], anterior?: KanbanQuote) => void;
-  onConvertToShipment: (quote: KanbanQuote) => void;
+  onConvertToShipment: (quote: KanbanQuote, anterior?: KanbanQuote) => void;
   onFichaVisible?: (visible: boolean) => void;
 }
 

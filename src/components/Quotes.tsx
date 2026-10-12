@@ -147,7 +147,7 @@ export default function Quotes() {
    *
    * Es idempotente: si la cotización ya tiene embarques, no genera gemelos.
    */
-  const handleCotizacionGanada = async (ganada: KanbanQuote) => {
+  const handleCotizacionGanada = async (ganada: KanbanQuote, anterior?: KanbanQuote) => {
     /*
      * Bloque 2b: el expediente del cliente, aquí, que es por donde pasan la
      * ficha Y el arrastre del Kanban. La ficha ya trae el salto de admin en
@@ -169,9 +169,13 @@ export default function Quotes() {
      * se abre a mano desde Embarques, eligiendo la serie.
      * Se enciende en Configuración → Consecutivos de folio (tarea 66).
      */
+    // Copia sobre la que se calculó `ganada` (la de la ficha, no la del listener,
+    // que puede traer lo ajeno): con ella solo se escribe lo que cambió y una
+    // nota agregada mientras tanto sobrevive (tarea 112, P3).
+    const anteriorGanada = anterior?.id === ganada.id ? anterior : kanbanQuotes.find(q => q.id === ganada.id);
     if (!embarqueAutomatico) {
       try {
-        await updateCotizacion(ganada.id, ganada);
+        await updateCotizacion(ganada.id, ganada, anteriorGanada);
         setToast({ mensaje: `${ganada.id} marcada como ganada. Abre su embarque desde el módulo de Embarques.`, tipo: 'exito' });
       } catch (err) {
         setToast({
@@ -187,6 +191,7 @@ export default function Quotes() {
       const cliente = clientes.find(c => c.id === ganada.clienteId) ?? null;
       const r = await crearEmbarquesDeCotizacionGanada({
         quote: ganada,
+        anterior: anteriorGanada,
         cliente,
         catalogoServicios: serviciosActivos,
         generadoPor: user?.nombre ?? user?.email ?? '',
