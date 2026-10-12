@@ -8,7 +8,7 @@ import { usePuertos } from '../../hooks/usePuertos';
 import { useAuth } from '../../auth/AuthContext';
 import { SERVICIOS_AEREO, ETIQUETA_SERVICIO_AEREO, ETIQUETA_SIN_INDICAR, leerServicioAereo, type ServicioAereo } from '../../lib/servicioAereo';
 import { proveedorOperable } from '../../lib/estatusProveedor';
-import { problemasTarifaCobrable, FACTOR_VOLUMETRICO_AEREO } from '../../lib/pesoCobrable';
+import { problemasTarifaCobrable, FACTOR_VOLUMETRICO_AEREO, MOTIVO_MARITIMO_NO_APLICA, type ModalidadCobrable } from '../../lib/pesoCobrable';
 
 interface Props {
   mode: 'crear' | 'editar';
@@ -72,6 +72,8 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
   const [activo, setActivo] = useState(tarifa?.activo ?? true);
   const [servicioAereo, setServicioAereo] = useState<ServicioAereo | ''>(leerServicioAereo(tarifa?.servicioAereo) ?? '');
 
+  const [modalidad, setModalidad] = useState<ModalidadCobrable | ''>(tarifa?.modalidad ?? '');
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -83,6 +85,8 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
     : null;
   const terminalesDisponibles = puertoConTerminales?.terminales ?? [];
 
+  // Con modalidad declarada manda ella; sin ella, el servicio aéreo (lógica anterior).
+  const conDefaultAereo = modalidad ? modalidad === 'aereo' : !!servicioAereo;
   const showContainerFields = unidad === 'CONTENEDOR';
   const esCobrable = unidad === 'KG_COBRABLE';
   const showMinimoField = unidad === 'CBM' || unidad === 'TON' || unidad === 'WM' || esCobrable;
@@ -101,7 +105,7 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
         factorVolumetricoKgM3: factorVol ? Number(factorVol) : undefined,
         minimo: montoMinimo ? Number(montoMinimo) : undefined,
         escalas: escalas.map(e => ({ desdeKg: Number(e.desdeKg), monto: Number(e.monto) })),
-      }, { aereo: !!servicioAereo });
+      }, { aereo: !!servicioAereo, modalidad: modalidad || null });
       if (problemas.length > 0) { setError(problemas[0]); return; }
     }
 
@@ -141,6 +145,7 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
           condiciones: condiciones.trim(),
           // null y no ausente: updateDoc no quita una clave que no se manda.
           servicioAereo: servicioAereo || null,
+          modalidad: modalidad || null,
           activo,
           updatedAt: now,
         });
@@ -163,6 +168,7 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
           freeTimeDias: freeTimeDias ? Number(freeTimeDias) : null,
           condiciones: condiciones.trim(),
           ...(servicioAereo ? { servicioAereo } : {}),
+          ...(modalidad ? { modalidad } : {}),
           activo: true,
           origenDatos: 'manual',
           creadoPor: user?.uid ?? '',
@@ -240,6 +246,18 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
               onChange={e => setServicioAereo(e.target.value as ServicioAereo | '')}>
               <option value="">{ETIQUETA_SIN_INDICAR}</option>
               {SERVICIOS_AEREO.map(s => <option key={s} value={s}>{ETIQUETA_SERVICIO_AEREO[s]}</option>)}
+            </select>
+          </div>
+
+          {/* ── Tarea 103: modalidad de la tarifa ─────────────────────── */}
+          <div className="max-w-[260px]">
+            <label className={LABEL}>Modalidad (define el factor volumétrico)</label>
+            <select className={INPUT} value={modalidad} data-testid="tarifa-modalidad"
+              onChange={e => setModalidad(e.target.value as ModalidadCobrable | '')}>
+              <option value="">Sin indicar</option>
+              <option value="maritimo">Marítimo</option>
+              <option value="aereo">Aéreo</option>
+              <option value="terrestre">Terrestre</option>
             </select>
           </div>
 
@@ -326,11 +344,12 @@ export default function TarifaFormModal({ mode, tarifa, onClose, onCreate, onUpd
                   En aéreo el cobrable se redondea al medio kilo.
                 </p>
                 <div className="max-w-[260px]">
-                  <label className={LABEL}>Factor volumétrico (kg por m³){servicioAereo ? '' : ' *'}</label>
+                  <label className={LABEL}>Factor volumétrico (kg por m³){conDefaultAereo ? '' : ' *'}</label>
                   <input type="number" step="1" className={INPUT} value={factorVol} data-testid="tarifa-factor-vol"
                     onChange={e => setFactorVol(e.target.value)}
-                    placeholder={servicioAereo ? `${FACTOR_VOLUMETRICO_AEREO} (aéreo)` : 'Ej. 250'} />
-                  {!servicioAereo && <p className="text-[10px] text-text-muted mt-1">Obligatorio: solo el aéreo tiene uno por default (167).</p>}
+                    placeholder={conDefaultAereo ? `${FACTOR_VOLUMETRICO_AEREO} (aéreo)` : 'Ej. 250'} />
+                  {!conDefaultAereo && <p className="text-[10px] text-text-muted mt-1">Obligatorio: solo el aéreo tiene uno por default (167).</p>}
+                  {modalidad === 'maritimo' && <p className="text-[10px] text-peligro mt-1" data-testid="tarifa-maritimo-aviso">{MOTIVO_MARITIMO_NO_APLICA}</p>}
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1.5">

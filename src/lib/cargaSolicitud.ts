@@ -121,6 +121,7 @@ export function validarCarga(carga: CargaSolicitada): string[] {
     }
     case 'terrestre': {
       pesoPositivo(carga.pesoBrutoKg, 'El peso');
+      if (carga.volumenM3 != null && !(carga.volumenM3 > 0)) faltantes.push('El volumen debe ser mayor que cero (o déjalo vacío).');
       estibaValida('terrestre');
       break;
     }
@@ -174,6 +175,7 @@ export function resumenCarga(carga: CargaSolicitada): string {
     case 'terrestre':
       partes.push(ETIQUETA_UNIDAD_TERRESTRE[carga.tipoUnidad]);
       if (carga.pesoBrutoKg > 0) partes.push(fmtKg(carga.pesoBrutoKg));
+      if ((carga.volumenM3 ?? 0) > 0) partes.push(`${carga.volumenM3} m³`);
       if (carga.requiereManiobras) partes.push('con maniobras');
       break;
     case 'despacho':

@@ -47,6 +47,11 @@ export interface EntradaPeso {
   aereo: boolean;
 }
 
+/** Tarea 103: modalidad declarada por la tarifa. Ausente = lógica anterior (por la carga / servicio aéreo). */
+export type ModalidadCobrable = 'maritimo' | 'aereo' | 'terrestre';
+
+export const MOTIVO_MARITIMO_NO_APLICA = 'El kg cobrable no aplica en marítimo: ahí se cobra por contenedor, CBM, TON o WM.';
+
 export type QuienGana = 'bruto' | 'volumetrico' | 'igual';
 
 export interface CalculoCobrable {
@@ -95,7 +100,14 @@ export function escalaAplicable(escalas: readonly EscalaPeso[] | undefined, cobr
   return elegida;
 }
 
-export function calcularPesoCobrable(entrada: EntradaPeso, precios: PreciosCobrable): ResultadoCobrable {
+export function calcularPesoCobrable(
+  entrada: EntradaPeso,
+  precios: PreciosCobrable,
+  modalidad?: ModalidadCobrable | null,
+): ResultadoCobrable {
+  if (modalidad === 'maritimo') return { ok: false, motivo: MOTIVO_MARITIMO_NO_APLICA };
+  // Con modalidad declarada manda ella; sin ella, la carga (lógica anterior).
+  const aereo = modalidad ? modalidad === 'aereo' : entrada.aereo;
   if (!positivo(entrada.brutoKg)) {
     return { ok: false, motivo: 'La carga no trae peso bruto.' };
   }
@@ -105,16 +117,16 @@ export function calcularPesoCobrable(entrada: EntradaPeso, precios: PreciosCobra
 
   const factor = positivo(precios.factorVolumetricoKgM3)
     ? precios.factorVolumetricoKgM3
-    : entrada.aereo ? FACTOR_VOLUMETRICO_AEREO : null;
+    : aereo ? FACTOR_VOLUMETRICO_AEREO : null;
 
   let volumetricoKg: number;
   let origenVolumetrico: 'capturado' | 'calculado';
-  if (entrada.aereo && positivo(entrada.pesoVolumetricoKg)) {
+  if (aereo && entrada.aereo && positivo(entrada.pesoVolumetricoKg)) {
     volumetricoKg = entrada.pesoVolumetricoKg;
     origenVolumetrico = 'capturado';
   } else {
     if (!positivo(entrada.volumenM3)) {
-      return { ok: false, motivo: 'La carga no trae volumen: sin él no se sabe cuál peso se cobra.' };
+      return { ok: false, motivo: aereo ? 'La carga no trae volumen: sin él no se sabe cuál peso se cobra.' : 'La carga no trae volumen (m³): sin él no se sabe cuál peso se cobra. Captúralo en la solicitud o en Información → Operación.' };
     }
     if (factor === null) {
       return { ok: false, motivo: 'La tarifa no trae factor volumétrico (kg por m³) y esta modalidad no tiene uno por default.' };
@@ -125,7 +137,7 @@ export function calcularPesoCobrable(entrada: EntradaPeso, precios: PreciosCobra
 
   const mayorKg = Math.max(entrada.brutoKg, volumetricoKg);
   const gana: QuienGana = entrada.brutoKg > volumetricoKg ? 'bruto' : volumetricoKg > entrada.brutoKg ? 'volumetrico' : 'igual';
-  const cobrableKg = entrada.aereo ? redondearMedioKilo(mayorKg) : mayorKg;
+  const cobrableKg = aereo ? redondearMedioKilo(mayorKg) : mayorKg;
   const redondeado = cobrableKg !== mayorKg;
 
   const escala = escalaAplicable(precios.escalas, cobrableKg);
@@ -157,7 +169,8 @@ export function calcularPesoCobrable(entrada: EntradaPeso, precios: PreciosCobra
  *  - Aéreo: el peso volumétrico capturado si viene; si no, el volumen de los
  *    bultos, pero solo cuando las dimensiones cubren TODAS las piezas (una
  *    lista corta de medidas no dice cuánto ocupa el resto).
- *  - Terrestre y FCL: no capturan volumen.
+ *  - Terrestre (tarea 103): el volumen en m³ si Ventas lo capturó.
+ *  - FCL: no captura volumen.
  */
 export function entradaDesdeCarga(carga: CargaSolicitada | null | undefined): EntradaPeso {
   const vacio: EntradaPeso = { brutoKg: null, volumenM3: null, pesoVolumetricoKg: null, aereo: false };
@@ -179,6 +192,7 @@ export function entradaDesdeCarga(carga: CargaSolicitada | null | undefined): En
       };
     }
     case 'terrestre':
+      return { ...vacio, brutoKg: carga.pesoBrutoKg, volumenM3: positivo(carga.volumenM3) ? carga.volumenM3 : null };
     case 'fcl':
       return { ...vacio, brutoKg: carga.pesoBrutoKg };
     default:
@@ -193,10 +207,16 @@ export function entradaDesdeCarga(carga: CargaSolicitada | null | undefined): En
  * servicio aéreo (tiene el factor 167 de respaldo); sin eso el factor es
  * obligatorio, porque terrestre no tiene default.
  */
-export function problemasTarifaCobrable(precios: PreciosCobrable, opciones: { aereo: boolean }): string[] {
+export function problemasTarifaCobrable(
+  precios: PreciosCobrable,
+  opciones: { aereo: boolean; modalidad?: ModalidadCobrable | null },
+): string[] {
   const p: string[] = [];
+  if (opciones.modalidad === 'maritimo') return [MOTIVO_MARITIMO_NO_APLICA];
   if (!positivo(precios.monto)) p.push('El precio por kg es obligatorio.');
-  if (!positivo(precios.factorVolumetricoKgM3) && !opciones.aereo) {
+  // Con modalidad declarada manda ella; sin ella, si la tarifa declara servicio aéreo.
+  const tieneDefault = opciones.modalidad ? opciones.modalidad === 'aereo' : opciones.aereo;
+  if (!positivo(precios.factorVolumetricoKgM3) && !tieneDefault) {
     p.push('El factor volumétrico (kg por m³) es obligatorio: solo el aéreo tiene uno por default.');
   }
   if (precios.minimo !== undefined && !(precios.minimo >= 0)) p.push('El mínimo no puede ser negativo.');
