@@ -120,7 +120,8 @@ export { ConceptoSection } from './ConceptoSection';
 interface FichaCotizacionProps {
   quote: KanbanQuote;
   onBack: () => void;
-  onUpdateQuote: (quote: KanbanQuote) => void;
+  /** `anterior` = la cotización viva antes de esta edición (tarea 111): permite escribir solo lo tocado. */
+  onUpdateQuote: (quote: KanbanQuote, anterior?: KanbanQuote) => void;
   onConvertToShipment: (quote: KanbanQuote) => void;
   /** Rol activo del usuario (Ventas o Pricing) */
   rolActivo: Rol;
@@ -184,7 +185,7 @@ export default function FichaCotizacion({
       setToastLocal('Estás viendo una versión pasada: es solo lectura. Vuelve a la actual para editar.');
       return;
     }
-    onUpdateQuoteViva(q);
+    onUpdateQuoteViva(q, quoteViva);
   };
   const onConvertToShipment = (q: KanbanQuote) => {
     if (!viendoVersion) onConvertToShipmentViva(q);

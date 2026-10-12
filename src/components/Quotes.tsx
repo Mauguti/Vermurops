@@ -117,7 +117,7 @@ export default function Quotes() {
 
   // Recibe el array completo que devuelven los componentes hijos y persiste
   // solo el documento que cambió (o el nuevo que se añadió).
-  const handleUpdateQuotes = async (newQuotes: KanbanQuote[]) => {
+  const handleUpdateQuotes = async (newQuotes: KanbanQuote[], anterior?: KanbanQuote) => {
     const existingIds = new Set(kanbanQuotes.map(q => q.id));
     const added = newQuotes.find(q => !existingIds.has(q.id));
     if (added) { await createCotizacion(added); return; }
@@ -127,7 +127,7 @@ export default function Quotes() {
     });
     if (changed) {
       try {
-        await updateCotizacion(changed.id, changed);
+        await updateCotizacion(changed.id, changed, anterior?.id === changed.id ? anterior : undefined);
       } catch (err) {
         setToast({
           mensaje: `No se pudo guardar la cotización: ${err instanceof Error ? err.message : err}`,
@@ -1420,11 +1420,11 @@ export default function Quotes() {
               setOrigenNav(null);
             }}
             regresarLabel={origenNav?.id}
-            onUpdateQuote={(updated) => {
+            onUpdateQuote={(updated, anterior) => {
               // El error se AVISA. Antes la promesa se rechazaba en silencio,
               // el estado local ya se había actualizado —así que en pantalla
               // parecía guardado— y el trabajo se perdía al recargar.
-              updateCotizacion(updated.id, updated).catch(err => setToast({
+              updateCotizacion(updated.id, updated, anterior).catch(err => setToast({
                 mensaje: `No se pudo guardar: ${err instanceof Error ? err.message : err}`,
                 tipo: 'error',
               }));

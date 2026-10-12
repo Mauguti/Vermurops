@@ -37,7 +37,7 @@ import {
 
 interface BandejaPricingProps {
   quotes: KanbanQuote[];
-  onUpdateQuotes: (quotes: KanbanQuote[]) => void;
+  onUpdateQuotes: (quotes: KanbanQuote[], anterior?: KanbanQuote) => void;
   onConvertToShipment: (quote: KanbanQuote) => void;
   onFichaVisible?: (visible: boolean) => void;
 }
@@ -326,8 +326,8 @@ export default function BandejaPricing({
   }, [clasificacion, tarifaCountMap, conceptosActivos, conceptoMap]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
-  const handleUpdateQuote = (updatedQuote: KanbanQuote) => {
-    onUpdateQuotes(quotes.map(q => q.id === updatedQuote.id ? updatedQuote : q));
+  const handleUpdateQuote = (updatedQuote: KanbanQuote, anterior?: KanbanQuote) => {
+    onUpdateQuotes(quotes.map(q => q.id === updatedQuote.id ? updatedQuote : q), anterior);
     setSelectedQuote(updatedQuote);
   };
 
