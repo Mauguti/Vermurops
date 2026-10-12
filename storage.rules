@@ -86,6 +86,25 @@ service firebase.storage {
       allow update, delete: if false;
     }
 
+    // El contrato de una cotización GANADA (tarea 102).
+    //
+    // Mismos formatos que los documentos de la orden —PDF y foto, hasta
+    // 20 MB— porque llega igual: firmado y escaneado, o fotografiado.
+    //
+    // Inmutable como el resto de la evidencia: «Reemplazar contrato» sube un
+    // archivo NUEVO. Un contrato firmado que se puede sobrescribir no prueba
+    // nada, que es la misma razón de `factura/` y del expediente.
+    //
+    // La cotización ganada está congelada (§4.8) y el contrato es evidencia,
+    // igual que su PDF: por eso se agrega sin tocar el congelado.
+    match /cotizaciones/{cotizacionId}/contrato/{archivo} {
+      allow read: if esDelEquipo();
+      allow create: if esDelEquipo()
+                    && request.resource.size < 20 * 1024 * 1024
+                    && request.resource.contentType.matches("application/pdf|image/jpeg|image/png|image/heic|image/heif");
+      allow update, delete: if false;
+    }
+
     // La factura del proveedor que ampara una orden de compra (tarea 55).
     //
     // Solo PDF y XML: el XML es el CFDI del que se extraen UUID, RFC y
