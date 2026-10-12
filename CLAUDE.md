@@ -2397,6 +2397,26 @@ anterior, nuevo)` para `actividades`, `chat` y `pdfs`, y `parcheFusionado`.
 **Nadie los llama todavía**: es la pieza que P2 usará en la transacción de
 `updateCotizacion`. Cero cambio de comportamiento.
 
+## 4.66 updateCotizacion escribe solo lo tocado (tarea 111, 12-oct-2026)
+
+P2 de `docs/sprint-post-junta/PLAN-FICHA-COTIZACION.md`. `updateCotizacion(id,
+data, anterior?)`: con `anterior`, una transacción lee el servidor, escribe SOLO
+las claves que la edición tocó (`parcheFusionado`, §4.65) y fusiona por id
+`actividades`, `chat` y `pdfs`. Sin `anterior` rige lo de siempre.
+  - **La ficha pasa `quoteViva` como `anterior`** y los tres hosts lo propagan
+    (`Quotes`, `BandejaPricing`, `KanbanCotizaciones`). Quitar el parámetro en
+    un host lo devuelve al comportamiento viejo.
+  - `guardadoAtrasado` y el congelado se evalúan contra el documento LEÍDO en
+    la transacción; el congelado, solo sobre lo tocado.
+  - **En cola por cotización** (`enCola`): dos transacciones seguidas pueden
+    confirmarse al revés, y `servicios` es una clave atómica, así que una edición
+    vieja pisaba a la nueva (se perdía el impuesto elegido tras un cambio de
+    profit; lo atrapó el recorrido). Con `updateDoc` el orden lo daba la conexión.
+  - `servicios` sigue sin fusionarse por dentro: en un conflicto gana el último
+    (aviso: P4). La ficha tampoco muestra todavía lo ajeno.
+  - e2e: `tests/e2e/111-actualizar-por-campos.spec.ts` (nota de otra pestaña y
+    PDF sobreviven; mutado: sin transacción falla).
+
 ---
 
 ## 5. Estado de los módulos
