@@ -23,7 +23,8 @@ const AUTH_EMULATOR = 'http://127.0.0.1:9099';
 const FUNCTIONS = 'http://127.0.0.1:5001/vermur-logistics-app/us-central1';
 const PW = '123456';
 
-const NUEVO_EMAIL = 'chema.test@vermur.com';
+// Único por corrida: invitar un correo que ya existe falla con 409, y REPETIR=2 corre sobre la misma base.
+const NUEVO_EMAIL = `chema.test.${Date.now()}@vermur.com`;
 const NUEVO_NOMBRE = 'Chema Test';
 const NUEVO_ROL = 'operaciones';
 

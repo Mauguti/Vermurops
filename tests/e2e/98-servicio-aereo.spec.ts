@@ -11,7 +11,7 @@
 
 import { test, expect, type Page, type Browser, type BrowserContext } from '@playwright/test';
 import { fijarPreferencias } from './preferencias';
-import { idsDe, soloNuevos } from './aislamiento';
+import { idsDe, soloNuevos, borrarSembrados } from './aislamiento';
 
 // Tarea 90: las vistas de Cuentas por cobrar/pagar se guardan por usuario; cada spec parte del default.
 test.beforeAll(async () => { await fijarPreferencias(); });
@@ -305,6 +305,8 @@ async function sembrarTarifa(id: string, servicio: 'expeditado' | 'regular' | nu
   });
   expect(r.ok).toBe(true);
 }
+
+test.afterAll(async () => { await borrarSembrados('tarifas', ['TAR-98-EXP', 'TAR-98-REG', 'TAR-98-SIN']); });
 
 test('Pricing · filtro de tarifas por servicio aéreo', async ({ browser }) => {
   await sembrarTarifa('TAR-98-EXP', 'expeditado');

@@ -37,3 +37,27 @@ export async function idsDe(email: string, col: string): Promise<Set<string>> {
 export function soloNuevos<T extends { __id?: unknown }>(docs: T[], antes: Set<string>): T[] {
   return docs.filter(d => !antes.has(String(d.__id)));
 }
+
+/**
+ * Borra de la base los documentos que un spec SEMBRÓ, al terminar.
+ *
+ * Los emuladores no se reinician entre specs ni entre vueltas de REPETIR: una
+ * tarifa sembrada por un spec sigue ahí cuando otro abre el mismo concepto y
+ * «Usar» toma la primera que ve (la 100 aplicó la TAR-98-REG de la 98 en la
+ * segunda vuelta). Sembrar es prestado: se devuelve.
+ */
+export async function borrarSembrados(col: string, ids: string[]): Promise<void> {
+  for (const id of ids) {
+    await fetch(`${FS}/${col}/${id}`, { method: 'DELETE', headers: { Authorization: 'Bearer owner' } });
+  }
+}
+
+/** Borra las tarifas cuyo texto de vigencia es el que un spec escribió a mano por la pantalla. */
+export async function borrarTarifasPorVigencia(vigenciaTexto: string): Promise<void> {
+  const r = await fetch(`${FS}/tarifas?pageSize=300`, { headers: { Authorization: 'Bearer owner' } });
+  const d = await r.json() as { documents?: { name: string; fields?: Record<string, { stringValue?: string }> }[] };
+  const ids = (d.documents ?? [])
+    .filter(doc => doc.fields?.vigenciaTexto?.stringValue === vigenciaTexto)
+    .map(doc => doc.name.split('/').pop()!);
+  await borrarSembrados('tarifas', ids);
+}

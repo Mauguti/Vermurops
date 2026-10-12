@@ -151,6 +151,9 @@ async function notaDeOtraPestana(id: string, texto: string) {
         id: { stringValue: id }, tipo: { stringValue: 'nota' },
         descripcion: { stringValue: texto }, texto: { stringValue: texto },
         autor: { stringValue: 'Otra pestaña' }, fecha: { stringValue: fecha },
+        // Forma REAL de una nota (Historial ordena por createdAt y la nombra por responsableId):
+        // sin ellos la ficha truena al reabrirse y la segunda vuelta no pasa de la pantalla en blanco.
+        createdAt: { stringValue: fecha }, responsableId: { stringValue: 'Otra pestaña' },
       } } }] } }],
     } }] }),
   });

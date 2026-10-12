@@ -12,7 +12,7 @@
 
 import { test, expect, type Page, type Browser, type BrowserContext } from '@playwright/test';
 import { fijarPreferencias } from './preferencias';
-import { idsDe, soloNuevos } from './aislamiento';
+import { idsDe, soloNuevos, borrarSembrados, borrarTarifasPorVigencia } from './aislamiento';
 
 // Tarea 90: las vistas de Cuentas por cobrar/pagar se guardan por usuario; cada spec parte del default.
 test.beforeAll(async () => { await fijarPreferencias(); });
@@ -195,6 +195,8 @@ test('Pricing · el wizard exige el factor y guarda factor, mínimo y escalas', 
   expect((p.escalas as { desdeKg: number }[]).map(e => e.desdeKg)).toEqual([45, 100]);
   await ctx.close();
 });
+
+test.afterAll(async () => { await borrarSembrados('tarifas', ['TAR-100-AER']); await borrarTarifasPorVigencia('Prueba 100'); });
 
 test('Ventas · solicita un aéreo de 120 kg bruto y 480 kg volumétrico', async ({ browser }) => {
   await sembrarTarifaCobrable('TAR-100-AER');

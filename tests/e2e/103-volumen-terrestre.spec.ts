@@ -8,7 +8,7 @@
  */
 import { test, expect, type Page, type Browser, type BrowserContext } from '@playwright/test';
 import { fijarPreferencias } from './preferencias';
-import { idsDe, soloNuevos } from './aislamiento';
+import { idsDe, soloNuevos, borrarSembrados, borrarTarifasPorVigencia } from './aislamiento';
 
 // Tarea 90: las vistas de Cuentas por cobrar/pagar se guardan por usuario; cada spec parte del default.
 test.beforeAll(async () => { await fijarPreferencias(); });
@@ -182,6 +182,8 @@ test('Pricing · la modalidad decide el factor: terrestre lo exige, marítimo no
   }, { timeout: 15_000 }).toBe('terrestre');
   await ctx.close();
 });
+
+test.afterAll(async () => { await borrarSembrados('tarifas', ['TAR-103-TER']); await borrarTarifasPorVigencia('Prueba 103'); });
 
 test('Ventas · solicita un terrestre de 900 kg y 12 m³', async ({ browser }) => {
   await sembrarTarifaTerrestre('TAR-103-TER');
