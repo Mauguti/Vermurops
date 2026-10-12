@@ -4,7 +4,7 @@ import { EmbarqueProducto, Pallet, DatosContenedor, TIPOS_CONTENEDOR, palletPiez
 import { ClienteVermur } from '../clientes/ClientesData';
 import { SERVICIOS_AEREO, ETIQUETA_SERVICIO_AEREO, serviciosDeProductos, etiquetaServicioAereo, type ServicioAereo } from '../../lib/servicioAereo';
 import CampoEstiba from '../ui/CampoEstiba';
-import { textoCortoEstiba, modalidadEstibaDeTexto } from '../../lib/estiba';
+import { textoCortoEstiba, modalidadEstibaDeTexto, leerEstiba, conEstiba } from '../../lib/estiba';
 import { clienteOperable, estatusDeCliente, ETIQUETA_ESTATUS } from '../../lib/estatusCliente';
 
 const TIPOS_EMBALAJE = ['Pallet', 'Caja', 'Tambor', 'Bulto', 'Bobina', 'Contenedor', 'Otro'] as const;
@@ -23,6 +23,8 @@ interface ProductosEmbarqueProps {
   clientes: ClienteVermur[];
   onAddProducto: (prod: Omit<EmbarqueProducto, 'id'>) => void;
   onDeleteProducto: (id: string) => void;
+  /** Tarea 105: reemplaza un producto ya creado (hoy solo se edita su estiba). */
+  onUpdateProducto?: (producto: EmbarqueProducto) => void;
   /** Tarea 98: solo un embarque aéreo pregunta expeditado o regular. */
   modalidad?: string;
   /** Pone (o quita, con null) el servicio en TODOS los productos del embarque. */
@@ -34,6 +36,7 @@ export default function ProductosEmbarque({
   clientes,
   onAddProducto,
   onDeleteProducto,
+  onUpdateProducto,
   modalidad,
   onSetServicioAereo,
 }: ProductosEmbarqueProps) {
@@ -69,6 +72,8 @@ export default function ProductosEmbarque({
 
   // Estado UI
   const [expandedRows, setExpandedRows] = useState<string[]>([]);
+  // Tarea 105: producto cuya estiba se está editando.
+  const [editandoEstibaId, setEditandoEstibaId] = useState<string | null>(null);
   const [showPalletModal, setShowPalletModal] = useState(false);
   const [editPalletId, setEditPalletId] = useState<string | null>(null);
 
@@ -201,7 +206,7 @@ export default function ProductosEmbarque({
                 <th className="px-5 py-3 text-right">Piezas</th>
                 <th className="px-5 py-3 text-right">Peso (kg)</th>
                 <th className="px-5 py-3 text-right">Volumen (m³)</th>
-                <th className="px-5 py-3 text-center w-[54px]">Acc.</th>
+                <th className="px-5 py-3 text-center w-[84px]">Acc.</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-divider text-xs font-semibold text-text-secondary">
@@ -264,6 +269,18 @@ export default function ProductosEmbarque({
                           {p.volumen != null ? p.volumen.toLocaleString(undefined, { minimumFractionDigits: 2 }) : '—'}
                         </td>
                         <td className="px-5 py-3.5 text-center">
+                          {onUpdateProducto && (
+                            <button
+                              type="button"
+                              data-testid="editar-estiba-producto"
+                              title="Editar estiba"
+                              aria-pressed={editandoEstibaId === p.id}
+                              onClick={() => setEditandoEstibaId(editandoEstibaId === p.id ? null : p.id)}
+                              className="text-text-muted hover:text-brand p-1 rounded hover:bg-brand/10 transition-colors"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => onDeleteProducto(p.id)}
@@ -273,6 +290,18 @@ export default function ProductosEmbarque({
                           </button>
                         </td>
                       </tr>
+                      {onUpdateProducto && editandoEstibaId === p.id && (
+                        <tr className="bg-canvas border-l-2 border-brand" data-testid="fila-editar-estiba">
+                          <td colSpan={7} className="px-8 py-3">
+                            <CampoEstiba
+                              modalidad={modalidadEstibaDeTexto(modalidad)}
+                              estibable={leerEstiba(p).estibable}
+                              niveles={leerEstiba(p).niveles}
+                              onCambio={(est, n) => onUpdateProducto(conEstiba(p, est, n))}
+                            />
+                          </td>
+                        </tr>
+                      )}
                       {/* Fila expandida para contenedores */}
                       {isContainer && isExpanded && (
                         <tr className="bg-canvas border-l-2 border-brand">

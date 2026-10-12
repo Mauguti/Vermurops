@@ -133,3 +133,15 @@ describe('integración con la solicitud, el embarque y el PDF', () => {
     expect(borradorTieneDatos({ ...b, carga: { ...terrestre({ estibable: true }), pesoBrutoKg: 0 } as CargaSolicitada } as never)).toBe(true);
   });
 });
+
+describe('estiba de un producto ya creado (tarea 105)', () => {
+  it('editar niveles conserva el resto del producto y no deja undefined', () => {
+    const p = { id: 'prod-1', descripcion: 'X', piezas: 2, estibable: true, nivelesEstiba: 3 };
+    const e = conEstiba(p, true, 7);
+    expect(e).toEqual({ id: 'prod-1', descripcion: 'X', piezas: 2, estibable: true, nivelesEstiba: 7 });
+    const n = conEstiba(p, false, 7);
+    expect('nivelesEstiba' in n).toBe(false);
+    expect(n.estibable).toBe(false);
+    expect(Object.values(conEstiba<{ id: string; estibable?: boolean; nivelesEstiba?: number | null }>({ id: 'a' }, true, null)).includes(undefined as never)).toBe(false);
+  });
+});

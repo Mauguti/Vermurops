@@ -2372,6 +2372,22 @@ guardaba por tonelada, mil veces mal. Ahora `clasificarUnidad(texto, contexto)`
     la monte: otra regla sin call site.
   - e2e: `tests/e2e/104-importacion-cobrable.spec.ts` (extractor simulado).
 
+## 4.64 Estiba editable en el producto del embarque (tarea 105, 12-oct-2026)
+
+Cierra lo que la 99 dejó anotado: la estiba solo se capturaba al CREAR un
+producto. Ahora cada renglón de Productos trae un lápiz («Editar estiba») que
+abre el mismo `CampoEstiba` con los mismos topes (`lib/estiba.ts`) y guarda por
+`conEstiba` (no estibable borra los niveles; nunca `undefined`).
+`ProductosEmbarque` recibe `onUpdateProducto` (opcional) y `FichaEmbarque` lo
+cablea con `handleUpdateProducto`. Sin modelo nuevo.
+  - **Casillas viejas:** en `ServicioSection`, `lcl_estibable` y `ter_estibable`
+    solo se pintan si el servicio NO tiene `carga`; con `carga` la estiba se edita
+    en Información → Operación. Se siguen LEYENDO (`cargaDesdeLegacy`,
+    `estibaLegacy`); no se borran ni migran.
+  - e2e: `tests/e2e/105-estiba-producto.spec.ts` (alta ×3 → editar ×7 → no
+    estibable, verificado en Firestore). Un `uncheck()` de Playwright falla aquí
+    porque la casilla es controlada y se actualiza al volver el listener: usar `click()`.
+
 ---
 
 ## 5. Estado de los módulos

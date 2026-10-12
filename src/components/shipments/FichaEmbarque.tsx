@@ -489,6 +489,15 @@ export default function FichaEmbarque({
     });
   };
 
+  // Tarea 105: reemplaza un producto ya creado (su estiba).
+  const handleUpdateProducto = (prod: EmbarqueProducto) => {
+    guardar({
+      ...embarque,
+      productos: (embarque.productos || []).map(p => p.id === prod.id ? prod : p),
+      updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+    });
+  };
+
   const handleDeleteProducto = (prodId: string) => {
     guardar({
       ...embarque,
@@ -1793,6 +1802,7 @@ export default function FichaEmbarque({
             clientes={clientes}
             onAddProducto={handleAddProducto}
             onDeleteProducto={handleDeleteProducto}
+            onUpdateProducto={handleUpdateProducto}
             modalidad={embarque.modalidad}
             onSetServicioAereo={handleSetServicioAereo}
           />
