@@ -63,6 +63,19 @@ export function avisoContrato(q: ConContrato): string | null {
 }
 
 /**
+ * Cotizaciones de un prospecto, con su aviso de contrato (tarea 114). Cada
+ * una lleva el aviso que le toca —null si no hay nada que avisar— para que la
+ * ficha del prospecto convertido pinte el mismo `AvisoSinContrato` de la 102.
+ */
+export function cotizacionesDelProspecto<T extends ConContrato & { id: string; prospectoId?: string | null }>(
+  quotes: T[], prospectoId: string,
+): Array<{ quote: T; aviso: string | null }> {
+  return quotes
+    .filter(q => q.prospectoId === prospectoId)
+    .map(quote => ({ quote, aviso: avisoContrato(quote) }));
+}
+
+/**
  * Entrada de Historial / Notas cuando un contrato reemplaza a otro. El
  * archivo anterior sigue en Storage (la regla no deja borrar) y aquí queda
  * dicho cuál era.

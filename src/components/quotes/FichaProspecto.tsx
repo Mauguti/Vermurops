@@ -10,6 +10,8 @@ import EstadoVacio from '../ui/EstadoVacio';
 import LineaTiempo from '../ui/ficha/LineaTiempo';
 import { BloqueEnlaces } from '../ui/ficha/EnlaceEntidad';
 import { useCotizaciones } from '../../hooks/useCotizaciones';
+import { AvisoSinContrato } from './SeccionContrato';
+import { cotizacionesDelProspecto } from '../../lib/contratoCotizacion';
 import { useAuth } from '../../auth/AuthContext';
 
 /**
@@ -58,6 +60,7 @@ export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUp
   // U-8 · La cotización que salió de este prospecto. Se busca por
   // `prospectoId`, que la conversión guarda desde hoy.
   const { quotes } = useCotizaciones();
+  const cotizacionesProspecto = cotizacionesDelProspecto(quotes, prospecto.id);
   // Antes «Eliminar prospecto» solo pedía confirmación y tenía un TODO: no
   // hacía nada. Ahora se marca como perdido con su motivo, igual que una
   // cotización perdida — no se borra, se registra por qué se perdió.
@@ -172,9 +175,16 @@ export default function FichaProspecto({ prospecto, isOpen = true, onClose, onUp
           <BloqueEnlaces
             titulo="Cotización"
             tipo="cotizacion"
-            ids={quotes.filter(q => q.prospectoId === prospecto.id).map(q => q.id)}
+            ids={cotizacionesProspecto.map(c => c.quote.id)}
             vacio="Se convirtió antes de que se guardara el vínculo; búscala por el nombre de la empresa."
           />
+          {/* Tarea 114 · el mismo aviso de la 102 por cada ganada sin contrato firmado. */}
+          {cotizacionesProspecto.filter(c => c.aviso).map(c => (
+            <div key={c.quote.id} className="mt-2" data-testid={`contrato-prospecto-${c.quote.id}`}>
+              <span className="text-[11px] font-mono text-gray-500 mr-2">{c.quote.id}</span>
+              <AvisoSinContrato quote={c.quote} />
+            </div>
+          ))}
         </div>
       )}
 

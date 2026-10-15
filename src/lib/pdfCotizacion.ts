@@ -84,7 +84,7 @@ function cargaParaPdfSinEstiba(carga: CargaSolicitada): PayloadPdf['carga'] {
     case 'aereo':
       return { tipo: carga.servicioAereo ? `Aéreo ${ETIQUETA_SERVICIO_AEREO[carga.servicioAereo]}` : 'Aéreo', contenedores: '', piezas: carga.piezas, peso: carga.pesoBrutoKg, volumen: carga.pesoVolumetricoKg };
     case 'terrestre':
-      return { tipo: ETIQUETA_UNIDAD_TERRESTRE[carga.tipoUnidad], contenedores: '', piezas: carga.piezas, peso: carga.pesoBrutoKg, volumen: 0 };
+      return { tipo: ETIQUETA_UNIDAD_TERRESTRE[carga.tipoUnidad], contenedores: '', piezas: carga.piezas, peso: carga.pesoBrutoKg, volumen: carga.volumenM3 ?? 0 };
     case 'despacho':
       return { tipo: `Despacho ${carga.operacion === 'importacion' ? 'importación' : 'exportación'}`, contenedores: '', piezas: 0, peso: 0, volumen: 0 };
   }

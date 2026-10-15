@@ -155,6 +155,20 @@ mostrado entre paréntesis. Firebase los guarda al terminar en
 Al agregar un parámetro, decirlo en el reporte: el deploy deja de ser
 desatendido.
 
+**Una Function NUNCA cambia la forma de su respuesta de manera
+incompatible.** Las pestañas abiertas siguen corriendo el bundle viejo, y una
+Function recién desplegada les sirve a ellas también. El 15-oct eso tiró
+producción a **pantalla en blanco**: `invitar` devolvía el usuario en `datos`,
+se cambió a `{ usuario, correoEnviado }`, se desplegaron Function y hosting
+juntos — y el hook viejo metió el SOBRE en la lista de usuarios, donde
+`FilaUsuario` le pidió `.nombre` para el avatar. Un `TypeError` dentro de un
+render desmonta el árbol completo.
+
+Primero se publica la versión que entiende **las dos formas**, y la vieja se
+quita después, cuando se sabe que ya nadie trae ese bundle. Avisar al equipo
+de que recargue no es un plan: nadie recarga, y quien tiene la pestaña abierta
+es justo quien está trabajando. Ver §4.73.
+
 **Antes de diagnosticar una regresión en local, mira DESDE DÓNDE corre el dev
 server.** `lsof -ti:3000` y revisa la ruta del proceso. Si el trabajo está en un
 worktree y el server corre desde el checkout principal, se ve otra rama y
@@ -2674,6 +2688,146 @@ las 11 pm del 31-dic en México ya son enero en UTC). Reglas puras y tests en
   - `sembrarFolios.ts` siembra el año en curso; `--reiniciar` ya no hace falta.
   - **Pendiente:** el contador de cotizaciones, prospectos, OC y pagos sigue sin
     mirar el año (no se pidió).
+
+> **Nota de numeración (15-oct-2026):** las secciones de la cadena 109→114
+> llegaron como §4.65–§4.70 y se corrieron a §4.67–§4.72. Esos dos números los
+> había ocupado el mismo día el arreglo de las invitaciones (§4.65) y los
+> scripts de carga (§4.66), que se publicaron antes. Las referencias internas
+> de la cadena se ajustaron.
+
+## 4.67 Diff y fusión por id de la cotización (tarea 110, 12-oct-2026)
+
+P1 de `docs/sprint-post-junta/PLAN-FICHA-COTIZACION.md`. `lib/diffCotizacion.ts`
+(17 tests, verificados por mutación): `tocados(anterior, nuevo)` por clave de
+primer nivel (`updatedAt` solo no cuenta), `fusionarListaPorId(servidor,
+anterior, nuevo)` para `actividades`, `chat` y `pdfs`, y `parcheFusionado`.
+**Nadie los llama todavía**: es la pieza que P2 usará en la transacción de
+`updateCotizacion`. Cero cambio de comportamiento.
+
+## 4.68 updateCotizacion escribe solo lo tocado (tarea 111, 12-oct-2026)
+
+P2 de `docs/sprint-post-junta/PLAN-FICHA-COTIZACION.md`. `updateCotizacion(id,
+data, anterior?)`: con `anterior`, una transacción lee el servidor, escribe SOLO
+las claves que la edición tocó (`parcheFusionado`, §4.67) y fusiona por id
+`actividades`, `chat` y `pdfs`. Sin `anterior` rige lo de siempre.
+  - **La ficha pasa `quoteViva` como `anterior`** y los tres hosts lo propagan
+    (`Quotes`, `BandejaPricing`, `KanbanCotizaciones`). Quitar el parámetro en
+    un host lo devuelve al comportamiento viejo.
+  - `guardadoAtrasado` y el congelado se evalúan contra el documento LEÍDO en
+    la transacción; el congelado, solo sobre lo tocado.
+  - **En cola por cotización** (`enCola`): dos transacciones seguidas pueden
+    confirmarse al revés, y `servicios` es una clave atómica, así que una edición
+    vieja pisaba a la nueva (se perdía el impuesto elegido tras un cambio de
+    profit; lo atrapó el recorrido). Con `updateDoc` el orden lo daba la conexión.
+  - `servicios` sigue sin fusionarse por dentro: en un conflicto gana el último
+    (aviso: P4). La ficha tampoco muestra todavía lo ajeno.
+  - e2e: `tests/e2e/111-actualizar-por-campos.spec.ts` (nota de otra pestaña y
+    PDF sobreviven; mutado: sin transacción falla).
+
+## 4.69 Marcar ganada y abrir embarque escriben solo lo suyo (tarea 112, 12-oct-2026)
+
+P3 de `docs/sprint-post-junta/PLAN-FICHA-COTIZACION.md`.
+  - `crearEmbarquesDeCotizacionGanada` recibe `anterior` y la transacción escribe
+    `parcheDeGanada`: solo las claves tocadas (etapa, campos de ganada) más
+    `embarqueIds`, con actividades/chat/pdfs fusionados por id contra el servidor.
+    Sin `anterior`, la cotización entera, como antes.
+  - `onConvertToShipment(quote, anterior?)`: **el `anterior` es la copia de la
+    FICHA (`quoteViva`), no la del listener.** Con la del listener, una nota ajena
+    que ya llegó al listener pero la ficha no adoptó (P4) se leía como borrada por
+    esta edición y se perdía; lo atrapó el e2e. El Kanban pasa su propia lista.
+  - Con el interruptor apagado, `updateCotizacion(ganada, ganada, anterior)`.
+  - `Shipments` (ruta manual) liga el embarque con `arrayUnion` sobre `embarqueIds`.
+  - e2e: `tests/e2e/112-ganada-por-campos.spec.ts` (apagado y encendido; clona la
+    COT-2026-0009 del recorrido, así que corre DESPUÉS de él).
+
+## 4.70 Volumen terrestre en el PDF (tarea 113, 12-oct-2026)
+
+`cargaParaPdf` llena `carga.volumen` de la carga terrestre con `volumenM3`
+(§4.62), igual que el LCL; sin volumen sigue en 0. Solo cambia el payload: la
+plantilla de n8n no se toca. Test en `pdfCotizacion.test.ts`.
+
+## 4.71 Aviso de contrato en la ficha del prospecto convertido (tarea 114, 12-oct-2026)
+
+En la ficha de un prospecto convertido, bajo el enlace a sus cotizaciones, cada
+una ganada sin contrato firmado (o con archivo sin marcar firmado) pinta el
+`AvisoSinContrato` de la 102, reusado, con su folio al lado.
+`cotizacionesDelProspecto` (`lib/contratoCotizacion.ts`) empata por `prospectoId`
+y trae el aviso de cada una. No bloquea nada; sin modelo nuevo.
+e2e: `tests/e2e/114-aviso-contrato-prospecto.spec.ts`.
+
+## 4.72 Specs aislados: lo creado se identifica por diferencia, lo sembrado se devuelve (tarea 109, 12-oct-2026)
+
+`tests/e2e/aislamiento.ts`. Los specs comparten UNA base y `createdAt` de una
+cotización tiene resolución de MINUTO: «la más reciente en `solicitado_pricing`»
+empata con lo que otro spec dejó hace segundos (causa de `capturas-03`
+intermitente). Ahora `idsDe` toma la foto antes de «Enviar a Pricing» y
+`soloNuevos` descarta lo previo (9 specs). Lo que un spec siembra por REST
+(`TAR-98-*`, `TAR-100-AER`, `TAR-103-TER` y las tarifas «Prueba 100/103»
+creadas por pantalla) lo borra en `afterAll` (`borrarSembrados`,
+`borrarTarifasPorVigencia`): sin eso la 100 aplicaba la tarifa de la 98 en la
+2ª vuelta. `gestion-usuarios` usa un correo único por corrida; la nota externa
+de 111 lleva `createdAt` y `responsableId` como una nota real (sin ellos la
+ficha truena al reabrirse: `FichaCotizacion` ordena Historial por `createdAt`).
+`REPETIR=2 ./scripts/e2e-completo.sh --retries=0`: 274 + 274 verdes, 24 min 40 s.
+
+## 4.73 🔴 Producción en blanco: cambiar la forma de una respuesta es incompatible (15-oct-2026)
+
+A las 14:40, `vermur-logistics-app.web.app` en blanco, con
+`Cannot read properties of undefined (reading 'split')`.
+
+**La causa.** La tarea de las invitaciones (§4.65) cambió lo que `invitar`
+devuelve en `datos`: antes era el usuario, pasó a ser
+`{ usuario, correoEnviado, motivoCorreo }`. Se desplegaron Function y hosting
+juntos, y pareció suficiente. No lo era: **una Function recién desplegada le
+sirve también a las pestañas que ya estaban abiertas**, y el hook del bundle
+anterior hacía
+
+```js
+const x = await llamar({ accion: 'invitar', … });   // x = datos
+setEstado(e => ({ ...e, usuarios: [...e.usuarios, x] }));
+```
+
+o sea que metió el SOBRE en la lista de usuarios. `FilaUsuario` le pidió
+`.nombre` para las iniciales del avatar, era `undefined`, y un `TypeError`
+dentro de un render **desmonta el árbol completo**: pantalla en blanco, no un
+renglón roto.
+
+**La lección es del despliegue, no del campo.** Cambiar la forma de la
+respuesta de una Function es un cambio incompatible, y el cliente viejo sigue
+vivo en la pestaña de alguien. Las dos salidas, y se tomaron las dos:
+  1. **La respuesta lleva al usuario DOS veces** (`respuestaInvitacion` en
+     `functions/src/usuarios/invitacion.ts`): los campos al nivel de arriba
+     para el cliente viejo, y `usuario` para el nuevo. Está fijado con tests
+     que ejercitan **los dos lectores**; si alguien quita la compatibilidad,
+     se caen, y hay que comprobar antes que ya nadie trae ese bundle.
+  2. **Ningún `.split()` sobre un campo que puede faltar**, que es la regla
+     que `lib/texto.ts` ya declaraba desde el Bloque 4 y que este código
+     rompía en seis lugares a la vez — la misma línea copiada para calcular
+     iniciales. Ahora es `inicialesDe()`, con tests, en la tabla de Usuarios,
+     los dos Kanban, la bandeja de Pricing y la bitácora del embarque.
+  - También se endurecieron dos `.split()` que podían tirar la app desde más
+    arriba: `firebaseUser.email.split('@')` en `AuthContext` —`email` es
+    `string | null` en el SDK, y eso revienta **en el arranque de la sesión**—
+    y `lastMessage.timestamp.split(' ')` en el chat, donde el `|| '00:00'`
+    protegía el índice y no el campo.
+
+**Lo que NO era.** No fue el dato de José Tejeda: `invitar` valida que el
+nombre no venga vacío. El `undefined` era del sobre, no de su documento.
+
+**Dos cosas que se midieron en vez de suponerse:**
+  - El bundle de la consola (`index-WWO2Gqy5.js`, que se leyó como `WW02`) se
+    reconstruyó desde `f239490` y **el hash coincidió exacto**: así se supo
+    que la pestaña corría el código de la mañana y no lo desplegado.
+  - La pestaña vieja ADEMÁS manda el correo de Firebase, así que una
+    invitación hecha desde ahí genera **dos** enlaces de restablecimiento.
+    Se probó en el emulador de Auth: el segundo **no invalida** al primero,
+    los dos sirven. (Emulador, no Identity Platform: la prueba real es usarlo.)
+
+**Lo que se hace al desplegar, de aquí en adelante:** si una Function cambia
+la forma de su respuesta, o se mantiene compatible con el cliente anterior, o
+el cambio se parte en dos despliegues —primero la Function que acepta y
+devuelve las dos formas, después el cliente—. Y avisar al equipo de recargar
+no es un plan: nadie recarga.
 
 ---
 

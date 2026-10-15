@@ -4,6 +4,7 @@ import { Plus, Calendar, DollarSign } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
 import { renderIcon, useServicios } from '../../config/serviciosStore';
 import FichaProspecto from './FichaProspecto';
+import { inicialesDe } from '../../lib/texto';
 
 const PROSPECT_STAGES = [
   { id: 'nuevo_lead', label: 'Nuevo Lead', color: 'border-t-gray-200 bg-gray-50' },
@@ -156,7 +157,7 @@ export default function KanbanProspeccion({
                           <span className="text-[9px] text-gray-300 italic">Sin valor estimado</span>
                         )}
                         <div className="w-5 h-5 rounded-full bg-brand/10 text-brand font-bold text-[8px] flex items-center justify-center ring-1 ring-white" title={p.responsable}>
-                          {p.responsable.split(' ').map(n => n[0]).join('')}
+                          {inicialesDe(p.responsable)}
                         </div>
                       </div>
 

@@ -37,11 +37,14 @@ import { planearEmbarquesDeGanada } from './planEmbarquesGanada';
 import { reservarFoliosMultiSerie } from './folioService';
 import { sanitizarParaFirestore } from './sanitizarFirestore';
 import { exigirClienteVinculado } from './frenoCliente';
+import { parcheFusionado } from './diffCotizacion';
 import type { SaltoExpediente } from './frenoExpediente';
 
 export interface ParametrosGeneracion {
   /** La cotización YA con los campos de «ganada» aplicados. */
   quote: KanbanQuote;
+  /** Copia sobre la que se calculó `quote`; con ella solo se escribe lo tocado (tarea 112). */
+  anterior?: KanbanQuote;
   /** Expediente del cliente, para poder revisarlo. null = no se pudo leer. */
   cliente: ClienteVermur | null;
   catalogoServicios: Servicio[];
@@ -63,6 +66,31 @@ export interface ResultadoGeneracion {
   advertencias: Advertencia[];
   /** Series cuyo contador nunca se sembró con el consecutivo de Magaya. */
   seriesSinSembrar: string[];
+}
+
+/**
+ * Lo que la transacción escribe en la cotización (tarea 112, P3 del plan de la
+ * ficha). Con `anterior` —la copia sobre la que se calculó `quote`— solo viajan
+ * las claves que la edición tocó (etapa, campos de ganada…) más `embarqueIds`,
+ * con actividades/chat/pdfs fusionados por id contra el documento del servidor:
+ * una nota agregada mientras tanto sobrevive. Sin `anterior` rige lo de siempre,
+ * la cotización entera.
+ */
+export function parcheDeGanada(
+  servidor: Record<string, unknown>,
+  anterior: KanbanQuote | undefined,
+  quote: KanbanQuote,
+  embarqueIds: string[],
+): Record<string, unknown> {
+  if (!anterior) return { ...(quote as unknown as Record<string, unknown>), embarqueIds };
+  return {
+    ...parcheFusionado(
+      servidor,
+      anterior as unknown as Record<string, unknown>,
+      quote as unknown as Record<string, unknown>,
+    ),
+    embarqueIds,
+  };
 }
 
 /**
@@ -149,10 +177,13 @@ export async function crearEmbarquesDeCotizacionGanada(
     });
 
     const embarqueIds = embarques.map(e => e.id);
-    tx.set(refCotizacion, sanitizarParaFirestore({
-      ...p.quote,
-      embarqueIds,
-    }), { merge: true });
+    tx.set(
+      refCotizacion,
+      sanitizarParaFirestore(parcheDeGanada(
+        (snapCotizacion.data() ?? {}) as Record<string, unknown>, p.anterior, p.quote, embarqueIds,
+      )),
+      { merge: true },
+    );
 
     return {
       embarques,

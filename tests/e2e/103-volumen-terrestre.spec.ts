@@ -8,6 +8,7 @@
  */
 import { test, expect, type Page, type Browser, type BrowserContext } from '@playwright/test';
 import { fijarPreferencias } from './preferencias';
+import { idsDe, soloNuevos, borrarSembrados, borrarTarifasPorVigencia } from './aislamiento';
 
 // Tarea 90: las vistas de Cuentas por cobrar/pagar se guardan por usuario; cada spec parte del default.
 test.beforeAll(async () => { await fijarPreferencias(); });
@@ -182,6 +183,8 @@ test('Pricing · la modalidad decide el factor: terrestre lo exige, marítimo no
   await ctx.close();
 });
 
+test.afterAll(async () => { await borrarSembrados('tarifas', ['TAR-103-TER']); await borrarTarifasPorVigencia('Prueba 103'); });
+
 test('Ventas · solicita un terrestre de 900 kg y 12 m³', async ({ browser }) => {
   await sembrarTarifaTerrestre('TAR-103-TER');
   const { page, ctx } = await entrar(browser, 'ventas@vermur.com');
@@ -202,10 +205,11 @@ test('Ventas · solicita un terrestre de 900 kg y 12 m³', async ({ browser }) =
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.getByRole('button', { name: 'Agregar concepto' }).click();
   await elegirConcepto(page, 'Inland Freight');
+  const cotsAntes = await idsDe('ventas@vermur.com', 'cotizaciones');
   await page.getByRole('button', { name: 'Enviar a Pricing' }).click();
   await expect(page.getByText(/Solicitado a Pricing|solicitado/i).first()).toBeVisible({ timeout: 15_000 });
 
-  const cots = await leerColeccion('ventas@vermur.com', 'cotizaciones');
+  const cots = soloNuevos(await leerColeccion('ventas@vermur.com', 'cotizaciones'), cotsAntes);
   const mia = cots.filter(c => c.etapa === 'solicitado_pricing' && JSON.stringify(c.servicios).includes('Planta Toluca 103'))
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
   expect(mia, 'La solicitud terrestre no quedó en Firestore').toBeTruthy();

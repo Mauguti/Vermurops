@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  problemaArchivoContrato, rutaStorageContrato, sinContratoFirmado, estadoContrato, avisoContrato,
+  problemaArchivoContrato, rutaStorageContrato, sinContratoFirmado, estadoContrato, avisoContrato, cotizacionesDelProspecto,
   textoReemplazoContrato, MAX_BYTES_CONTRATO,
 } from './contratoCotizacion';
 
@@ -67,5 +67,22 @@ describe('textoReemplazoContrato', () => {
     expect(t).toContain('firmado');
     expect(t).toContain('cotizaciones/COT-1/contrato/x.pdf');
     expect(t).toContain('nuevo.pdf');
+  });
+});
+
+describe('cotizacionesDelProspecto (tarea 114)', () => {
+  const q = (id: string, prospectoId: string | undefined, etapa: string, c?: ReturnType<typeof contrato>) =>
+    ({ id, prospectoId, etapa, contrato: c } as any);
+  it('solo las del prospecto, con aviso en la ganada sin contrato o sin firmar', () => {
+    const r = cotizacionesDelProspecto([
+      q('A', 'p1', 'ganada'), q('B', 'p1', 'ganada', contrato(false)), q('C', 'p1', 'ganada', contrato(true)),
+      q('D', 'p1', 'negociacion'), q('E', 'p2', 'ganada'),
+    ], 'p1');
+    expect(r.map(x => x.quote.id)).toEqual(['A', 'B', 'C', 'D']);
+    expect(r.map(x => x.aviso === null)).toEqual([false, false, true, true]);
+    expect(r[0].aviso).toBe('Sin contrato firmado');
+  });
+  it('prospecto sin cotizaciones: lista vacía', () => {
+    expect(cotizacionesDelProspecto([q('E', 'p2', 'ganada')], 'p1')).toEqual([]);
   });
 });

@@ -23,6 +23,7 @@ import { useTarifas } from '../../hooks/useTarifas';
 import { useConceptos } from '../../hooks/useConceptos';
 import { buildConceptoMap } from '../tarifas/tarifaMatching';
 import { cargaDesdeLegacy, resumenCarga } from '../../lib/cargaSolicitud';
+import { inicialesDe } from '../../lib/texto';
 import {
   clasificarBandeja,
   calcularProgreso,
@@ -37,8 +38,8 @@ import {
 
 interface BandejaPricingProps {
   quotes: KanbanQuote[];
-  onUpdateQuotes: (quotes: KanbanQuote[]) => void;
-  onConvertToShipment: (quote: KanbanQuote) => void;
+  onUpdateQuotes: (quotes: KanbanQuote[], anterior?: KanbanQuote) => void;
+  onConvertToShipment: (quote: KanbanQuote, anterior?: KanbanQuote) => void;
   onFichaVisible?: (visible: boolean) => void;
 }
 
@@ -197,7 +198,7 @@ function CotizacionRow({ quote, progreso, dias, tarifasCount, bloque, onAbrir, o
             {quote.pricingId ? (
               <span className="flex items-center gap-1 shrink-0">
                 <span className="w-4 h-4 rounded-full bg-primario/10 text-primario-hover font-bold text-[7px] flex items-center justify-center">
-                  {quote.pricingId.split(' ').map(n => n[0]).join('')}
+                  {inicialesDe(quote.pricingId)}
                 </span>
                 <span className="text-gray-400 truncate max-w-[80px]">{quote.pricingId}</span>
               </span>
@@ -326,8 +327,8 @@ export default function BandejaPricing({
   }, [clasificacion, tarifaCountMap, conceptosActivos, conceptoMap]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
-  const handleUpdateQuote = (updatedQuote: KanbanQuote) => {
-    onUpdateQuotes(quotes.map(q => q.id === updatedQuote.id ? updatedQuote : q));
+  const handleUpdateQuote = (updatedQuote: KanbanQuote, anterior?: KanbanQuote) => {
+    onUpdateQuotes(quotes.map(q => q.id === updatedQuote.id ? updatedQuote : q), anterior);
     setSelectedQuote(updatedQuote);
   };
 

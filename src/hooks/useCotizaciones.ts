@@ -18,7 +18,7 @@
  */
 
 import { db } from '../firebase';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, runTransaction } from 'firebase/firestore';
 import { KanbanQuote } from '../components/quotes/QuotesData';
 import { useTiendaCatalogo, tiendaCotizaciones } from './tiendasCatalogos';
 import { useAuth } from '../auth/AuthContext';
@@ -27,9 +27,52 @@ import { puedeCrearCotizacion, PermisoDenegadoError } from '../auth/permisos';
 import { UserRole } from '../auth/users';
 import { conAviso } from '../lib/erroresEscritura';
 import { estaCongelada, cambiosBloqueados } from '../lib/lineasCotizacion';
+import { parcheFusionado } from '../lib/diffCotizacion';
 import { guardadoAtrasado, numeroVersionActual, sinCamposDeVersion } from '../lib/versionesCotizacion';
 
 /* El seed y su candado viven en tiendasCatalogos.ts (tarea 93). */
+
+/**
+ * V-2 · Una pantalla que se quedó en una versión anterior no escribe.
+ * Las pantallas reescriben la cotización ENTERA; si la nueva versión se
+ * creó después de abrir la ficha, este guardado pisaría la bitácora y,
+ * en una perdida, hasta la reapertura.
+ */
+function verificarGuardado(id: string, guardada: KanbanQuote, data: Partial<KanbanQuote>): void {
+  if (guardadoAtrasado(guardada, data)) {
+    throw new Error(
+      `${id} ya va en la v${numeroVersionActual(guardada)} y esta pantalla tenía una versión anterior. `
+      + 'Vuelve a abrir la ficha para no pisar el trabajo.',
+    );
+  }
+}
+
+/**
+ * El congelado de §4.8, de verdad: se compara contra lo guardado y no contra
+ * las claves del patch, porque los componentes mandan la cotización entera.
+ */
+function verificarCongelado(id: string, guardada: KanbanQuote, data: Partial<KanbanQuote>): void {
+  if (!estaCongelada(guardada)) return;
+  const bloqueados = cambiosBloqueados(
+    guardada as unknown as Record<string, unknown>,
+    data as Record<string, unknown>,
+  );
+  if (bloqueados.length > 0) {
+    throw new Error(
+      `${id} ya generó embarque: sus ${bloqueados.join(' y ')} no se pueden cambiar. `
+      + 'Si el embarque necesita otra cosa, corrígelo en el embarque.',
+    );
+  }
+}
+
+/** Escrituras por transacción en fila, una cola por cotización (tarea 111). */
+const colas = new Map<string, Promise<unknown>>();
+function enCola<T>(id: string, tarea: () => Promise<T>): Promise<T> {
+  const previa = colas.get(id) ?? Promise.resolve();
+  const esta = previa.then(tarea, tarea);
+  colas.set(id, esta.catch(() => undefined));
+  return esta;
+}
 
 export function useCotizaciones() {
   const { user } = useAuth();
@@ -69,7 +112,45 @@ export function useCotizaciones() {
    * parecía guardado— y al recargar el trabajo no estaba. Lo mismo que ya
    * resolvimos en useEmbarques.
    */
-  const updateCotizacion = async (id: string, data: Partial<KanbanQuote>): Promise<void> => {
+  const updateCotizacion = async (
+    id: string,
+    data: Partial<KanbanQuote>,
+    anterior?: KanbanQuote,
+  ): Promise<void> => {
+    /*
+     * Con `anterior` (tarea 111, P2 del plan de la ficha) la escritura va en una
+     * transacción que lee el servidor, escribe SOLO las claves que esta edición
+     * tocó y fusiona por id actividades/chat/pdfs. El congelado y
+     * `guardadoAtrasado` se evalúan contra el documento leído ahí, no contra el
+     * listener. Sin `anterior` rige lo de abajo, igual que siempre.
+     */
+    if (anterior) {
+      /*
+       * En ORDEN por documento. Con `updateDoc` el orden de las escrituras lo
+       * daba la conexión; dos transacciones lanzadas seguidas pueden
+       * confirmarse al revés, y una edición vieja de `servicios` (clave
+       * atómica) pisaría a la nueva: en el recorrido se perdía el impuesto
+       * elegido justo después de un cambio de profit.
+       */
+      await enCola(id, () => conAviso('la cotización', () => runTransaction(db, async tx => {
+        const ref = doc(db, 'cotizaciones', id);
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error(`${id} ya no existe. No se guardó nada.`);
+        const servidor = snap.data() as KanbanQuote;
+        verificarGuardado(id, servidor, data);
+        const parche = parcheFusionado(
+          servidor as unknown as Record<string, unknown>,
+          anterior as unknown as Record<string, unknown>,
+          data as unknown as Record<string, unknown>,
+        );
+        if (Object.keys(parche).length === 0) return;
+        // Congelada: solo se evalúa lo que esta edición tocó, contra el servidor.
+        verificarCongelado(id, servidor, parche as Partial<KanbanQuote>);
+        tx.update(ref, sanitizarParaFirestore(sinCamposDeVersion(parche as Partial<KanbanQuote>)) as Record<string, unknown>);
+      })));
+      return;
+    }
+
     /*
      * ── El congelado, de verdad (9-sep-2026) ─────────────────────────────
      * §4.8: «una vez que pasa a embarques ya así se queda». Hasta hoy eso
@@ -83,31 +164,9 @@ export function useCotizaciones() {
      * pasa; uno distinto se detiene aquí, que es donde importa.
      */
     const actual = quotes.find(q => q.id === id);
-
-    /*
-     * V-2 · Una pantalla que se quedó en una versión anterior no escribe.
-     * Las pantallas reescriben la cotización ENTERA; si la nueva versión se
-     * creó después de abrir la ficha, este guardado pisaría la bitácora y,
-     * en una perdida, hasta la reapertura.
-     */
-    if (actual && guardadoAtrasado(actual, data)) {
-      throw new Error(
-        `${id} ya va en la v${numeroVersionActual(actual)} y esta pantalla tenía una versión anterior. `
-        + 'Vuelve a abrir la ficha para no pisar el trabajo.',
-      );
-    }
-
-    if (actual && estaCongelada(actual)) {
-      const bloqueados = cambiosBloqueados(
-        actual as unknown as Record<string, unknown>,
-        data as Record<string, unknown>,
-      );
-      if (bloqueados.length > 0) {
-        throw new Error(
-          `${id} ya generó embarque: sus ${bloqueados.join(' y ')} no se pueden cambiar. `
-          + 'Si el embarque necesita otra cosa, corrígelo en el embarque.',
-        );
-      }
+    if (actual) {
+      verificarGuardado(id, actual, data);
+      verificarCongelado(id, actual, data);
     }
 
     await conAviso('la cotización', () => updateDoc(

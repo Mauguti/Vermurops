@@ -117,3 +117,46 @@ export function textoInvitacion(d: DatosInvitacion): string {
     `Después entras siempre por ${d.urlApp}`,
   ].join('\n');
 }
+
+/** La forma que viaja en `datos`. Lleva los campos del usuario Y `usuario`. */
+export interface RespuestaInvitacion extends Record<string, unknown> {
+  usuario: object | null;
+  correoEnviado: boolean;
+  motivoCorreo?: string;
+}
+
+/**
+ * 🔴 La respuesta lleva al usuario DOS veces, y no es redundancia.
+ *
+ * El 15-oct esto tiró producción a pantalla en blanco. `invitar` devolvía el
+ * usuario en `datos`; se cambió a `datos = { usuario, correoEnviado }` y se
+ * desplegaron Function y hosting juntos. Pero **una Function recién
+ * desplegada le sirve también a las pestañas que ya estaban abiertas**, y el
+ * hook viejo hace:
+ *
+ *     const x = await llamar({ accion: 'invitar', … });   // x = datos
+ *     setEstado(e => ({ ...e, usuarios: [...e.usuarios, x] }));
+ *
+ * O sea que metió el SOBRE en la lista de usuarios. `FilaUsuario` le pidió
+ * `.nombre` para las iniciales del avatar, era `undefined`, el `.split(' ')`
+ * lanzó dentro del render y React tiró el árbol completo.
+ *
+ * Por eso los campos del usuario van también al nivel de arriba: un cliente
+ * viejo lee lo que siempre leyó y uno nuevo lee `usuario`. La lección es la
+ * del despliegue, no la del campo: **cambiar la forma de la respuesta de una
+ * Function es un cambio incompatible, y el cliente viejo sigue vivo en la
+ * pestaña de alguien.** Si algún día se quita esta compatibilidad, hay que
+ * saber que ya nadie trae el bundle de hoy.
+ */
+export function respuestaInvitacion(
+  usuario: object | null,
+  correoEnviado: boolean,
+  motivoCorreo?: string,
+): RespuestaInvitacion {
+  return {
+    ...(usuario ?? {}),
+    usuario,
+    correoEnviado,
+    ...(motivoCorreo ? { motivoCorreo } : {}),
+  } as RespuestaInvitacion;
+} 

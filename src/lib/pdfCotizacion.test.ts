@@ -71,6 +71,13 @@ describe('el payload del PDF', () => {
 });
 
 describe('carga, vigencia y nombre', () => {
+  it('terrestre: el volumen sale de volumenM3, y sin él queda en 0 (tarea 113)', () => {
+    const base = { tipo: 'terrestre' as const, tipoUnidad: 'caja_seca_53' as const, pesoBrutoKg: 20000, piezas: 24, requiereManiobras: false };
+    expect(cargaParaPdf({ ...servicio, carga: { ...base, volumenM3: 38.5 } }).volumen).toBe(38.5);
+    expect(cargaParaPdf({ ...servicio, carga: { ...base, volumenM3: null } }).volumen).toBe(0);
+    expect(cargaParaPdf({ ...servicio, carga: base }).volumen).toBe(0);
+  });
+
   it('LCL, aéreo, terrestre y despacho', () => {
     expect(cargaParaPdf({ ...servicio, carga: { tipo: 'lcl', pesoBrutoKg: 900, volumenM3: 4.5, piezas: 12, bultos: [], estibable: true, peligrosa: { esPeligrosa: false } } }))
       .toEqual({ tipo: 'LCL', contenedores: '', piezas: 12, peso: 900, volumen: 4.5 });

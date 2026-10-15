@@ -19,6 +19,7 @@
 
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
+import * as logger from 'firebase-functions/logger';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import {
@@ -30,7 +31,8 @@ import {
 } from '../comun/auth.js';
 import { enviarCorreoPorN8n, N8N_WEBHOOK_URL_CORREO } from '../correo/correoPorN8n.js';
 import {
-  asuntoInvitacion, htmlInvitacion, textoInvitacion,
+  asuntoInvitacion, htmlInvitacion, respuestaInvitacion, textoInvitacion,
+  type RespuestaInvitacion,
 } from './invitacion.js';
 
 /** Ya existe en Secret Manager: lo usan los demás proxies de n8n. */
@@ -75,14 +77,6 @@ interface AccionReenviar {
 type Payload =
   | AccionListar | AccionInvitar | AccionCambiarRol | AccionDesactivar | AccionReenviar;
 
-/** Lo que devuelven `invitar` y `reenviar`: la cuenta y qué pasó con el correo. */
-export interface ResultadoInvitacion {
-  usuario: UsuarioRegistrado | null;
-  correoEnviado: boolean;
-  /** Solo cuando NO salió: listo para enseñarse en pantalla. */
-  motivoCorreo?: string;
-}
-
 export interface UsuarioRegistrado {
   uid: string;
   email: string;
@@ -98,6 +92,13 @@ export interface UsuarioRegistrado {
    * invitación que no se usó de una cuenta que ya opera.
    */
   ultimoAcceso?: string | null;
+  /**
+   * Cuándo salió la última invitación (ISO). Se GUARDA, no se deriva: así
+   * «Enviada hace X min» sobrevive a una recarga y dos personas en la
+   * pantalla no mandan el correo dos veces. Solo se escribe cuando el envío
+   * SALIÓ — un intento fallido no debe bloquear el botón.
+   */
+  ultimaInvitacion?: string | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -142,12 +143,13 @@ function validarRol(rol: unknown): UserRole {
  * entrar a la cuenta de alguien más.
  */
 async function mandarInvitacion(
+  uid: string,
   email: string,
   nombre: string,
   rol: string,
   invitadoPor: string,
   esReenvio: boolean,
-): Promise<{ correoEnviado: boolean; motivoCorreo?: string }> {
+): Promise<{ correoEnviado: boolean; motivoCorreo?: string; ultimaInvitacion?: string }> {
   let enlace: string;
   try {
     enlace = await authAdmin().generatePasswordResetLink(email, { url: URL_APP });
@@ -177,7 +179,25 @@ async function mandarInvitacion(
     nombreRemitente: 'VermurOps',
   }, { url: N8N_WEBHOOK_URL_CORREO.value(), token: VERMUR_N8N_TOKEN.value() });
 
-  return r.ok ? { correoEnviado: true } : { correoEnviado: false, motivoCorreo: r.error };
+  if (!r.ok) return { correoEnviado: false, motivoCorreo: r.error };
+
+  /*
+   * Solo se marca cuando el correo SALIÓ. Si se marcara al intentar, un fallo
+   * de n8n bloquearía el botón diez minutos justo cuando hay que reintentar.
+   *
+   * `set` con merge y no `update`: una cuenta anterior al módulo de Usuarios
+   * no tiene documento, y un `update` sobre lo que no existe LANZA — después
+   * de que el correo ya salió (§3, «guardó a medias»).
+   */
+  const ultimaInvitacion = new Date().toISOString();
+  try {
+    await db().collection('usuarios').doc(uid).set({ ultimaInvitacion }, { merge: true });
+  } catch (err) {
+    // El correo ya salió: no se deshace nada ni se reporta como fallo. Lo
+    // único que se pierde es el «Enviada hace X min» tras recargar.
+    logger.error('[invitacion] no se pudo registrar ultimaInvitacion', { uid, err: String(err) });
+  }
+  return { correoEnviado: true, ultimaInvitacion };
 }
 
 // ── Acciones ─────────────────────────────────────────────────────────────────
@@ -254,7 +274,7 @@ async function listar(): Promise<UsuarioRegistrado[]> {
 async function invitar(
   payload: AccionInvitar,
   invitadoPorEmail: string,
-): Promise<ResultadoInvitacion> {
+): Promise<RespuestaInvitacion> {
   const email = validarEmail(payload.email);
   const rol = validarRol(payload.rol);
   const nombre = (payload.nombre ?? '').trim();
@@ -307,8 +327,8 @@ async function invitar(
    * deshace nada —borrar una cuenta por un fallo de envío es peor— y se
    * devuelve el motivo para que la pantalla lo diga y ofrezca reenviar.
    */
-  const { correoEnviado, motivoCorreo } = await mandarInvitacion(
-    email, nombre, rol, invitadoPorEmail, false,
+  const { correoEnviado, motivoCorreo, ultimaInvitacion } = await mandarInvitacion(
+    uid, email, nombre, rol, invitadoPorEmail, false,
   );
 
     /*
@@ -320,7 +340,10 @@ async function invitar(
    *
    * El campo NO se guarda en el documento: se deriva de Auth en `listar()`.
    */
-  return { usuario: { uid, ...doc, ultimoAcceso: null }, correoEnviado, motivoCorreo };
+  return respuestaInvitacion(
+    { uid, ...doc, ultimoAcceso: null, ultimaInvitacion: ultimaInvitacion ?? null },
+    correoEnviado, motivoCorreo,
+  );
 }
 
 /**
@@ -333,7 +356,7 @@ async function invitar(
 async function reenviar(
   payload: AccionReenviar,
   reenviadoPorEmail: string,
-): Promise<ResultadoInvitacion> {
+): Promise<RespuestaInvitacion> {
   const email = validarEmail(payload.email);
 
   let userRecord;
@@ -362,8 +385,8 @@ async function reenviar(
    * lo que la deja entrar a Firestore (`tieneRolValido` en firestore.rules),
    * así que sin él la persona pone su contraseña y no ve nada.
    */
-  const { correoEnviado, motivoCorreo } = await mandarInvitacion(
-    email, nombre, rol, invitadoPor, true,
+  const { correoEnviado, motivoCorreo, ultimaInvitacion } = await mandarInvitacion(
+    userRecord.uid, email, nombre, rol, invitadoPor, true,
   );
 
   const aviso = rol ? motivoCorreo
@@ -376,13 +399,16 @@ async function reenviar(
     ? new Date(userRecord.metadata.lastSignInTime).toISOString()
     : null;
 
-  return {
-    usuario: snap.exists
-      ? ({ uid: userRecord.uid, ...doc, ultimoAcceso } as UsuarioRegistrado)
+  return respuestaInvitacion(
+    snap.exists
+      ? ({
+          uid: userRecord.uid, ...doc, ultimoAcceso,
+          ...(ultimaInvitacion ? { ultimaInvitacion } : {}),
+        } as UsuarioRegistrado)
       : null,
     correoEnviado,
-    ...(aviso ? { motivoCorreo: aviso } : {}),
-  };
+    aviso || undefined,
+  );
 }
 
 async function cambiarRol(
