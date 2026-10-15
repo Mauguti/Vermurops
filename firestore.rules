@@ -11,20 +11,66 @@ service cloud.firestore {
      * volviera a abrirse o alguien creara una cuenta por otra vía, no
      * alcance ni un documento.
      *
-     * Es una LISTA DE CORREOS a propósito: el rol no está en el token
-     * todavía. Cuando Usuarios y roles ponga los claims, esta función se
-     * sustituye por permisos por rol (paso 3) y la lista desaparece.
-     *
-     * ⚠️ Una cuenta recién invitada que no esté aquí NO puede entrar: la
-     * pantalla de Usuarios avisa, y el correo se agrega en el mismo cambio.
+     * ERA una lista de correos a secas, mientras el rol no viajaba en el
+     * token. Desde el 15-oct también vale el claim `rol` —ver
+     * `tieneRolValido()` abajo—, así que invitar a alguien YA NO exige un
+     * deploy de reglas. La lista se queda como respaldo.
      *
      * Las cuentas de prueba del emulador NO van aquí: se inyectan al
      * generar las reglas del emulador (scripts/reglasEmulador.sh), para no
      * dejar en producción correos que alguien pueda crear después.
      */
-    function esDelEquipo() {
-      return request.auth != null
-        && request.auth.token.email != null
+    /*
+     * ── El rol del token también identifica al equipo (15-oct-2026) ──────
+     * Luis invitó SIETE cuentas el 13-oct y ninguna entraba a nada: la lista
+     * de correos de abajo es fija, así que una cuenta nueva quedaba fuera de
+     * todo hasta el siguiente deploy de reglas. Invitar dejó de depender de
+     * un deploy.
+     *
+     * El claim `rol` solo lo pone el Admin SDK, desde `gestionarUsuarios`,
+     * que exige `usuario.gestionar` (solo admin): el navegador no puede
+     * mandar el suyo. Por eso valerlo como identidad del equipo es seguro.
+     *
+     * Un rol que estas reglas NO reconocen deja la cuenta FUERA, no dentro:
+     * un dedazo o un rol retirado quita permisos, nunca los regala.
+     *
+     * La lista de correos SE QUEDA como respaldo. Las seis cuentas del
+     * equipo son anteriores al módulo de Usuarios y una puede quedarse sin
+     * claim —un `setCustomUserClaims` a medias, una invitación sin rol—; sin
+     * la lista, ese día se quedaría fuera de la plataforma.
+     */
+    function tieneRolValido() {
+      return 'rol' in request.auth.token
+        && request.auth.token.rol in ['admin', 'ventas', 'pricing', 'operaciones', 'administracion'];
+    }
+
+    /*
+     * ⚠️ Las cuentas de PRUEBA se niegan por nombre, antes de todo lo demás.
+     *
+     * Tres de ellas siguen existiendo en el Auth de PRODUCCIÓN (§6) y su
+     * contraseña está escrita en este repo. Mientras el equipo se
+     * identificaba solo por correo, la lista las dejaba fuera sola. Con el
+     * claim ya no: si alguna trae `rol` —y la pantalla de Usuarios ahora las
+     * enseña, así que es fácil habérselo puesto— entraría a TODO.
+     *
+     * `scripts/reglasEmulador.sh` vacía esta lista en el derivado del
+     * emulador, que es donde esas cinco cuentas son las del recorrido.
+     */
+    function esCuentaDePrueba() {
+      return request.auth.token.email != null
+        && request.auth.token.email.lower() in [
+          // PRUEBA:INICIO — reglasEmulador.sh la vacía en el derivado; no reordenar a mano
+          'admin@vermur.com',
+          'pricing@vermur.com',
+          'ventas@vermur.com',
+          'operaciones@vermur.com',
+          'administracion@vermur.com'
+          // PRUEBA:FIN
+        ];
+    }
+
+    function correoDelEquipo() {
+      return request.auth.token.email != null
         && request.auth.token.email.lower() in [
           // EQUIPO:INICIO — generado también para el emulador; no reordenar a mano
           'itzel.laurean@vermur.com',
@@ -36,6 +82,12 @@ service cloud.firestore {
           'info@digsol.com.mx'
           // EQUIPO:FIN
         ];
+    }
+
+    function esDelEquipo() {
+      return request.auth != null
+        && !esCuentaDePrueba()
+        && (correoDelEquipo() || tieneRolValido());
     }
 
 

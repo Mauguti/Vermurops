@@ -26,11 +26,23 @@ for archivo in firestore storage; do
   origen="$archivo.rules"
   destino="$archivo.emulador.rules"
   grep -q "EQUIPO:INICIO" "$origen" || { echo "✗ $origen no tiene el marcador EQUIPO:INICIO"; exit 1; }
+  # Dos operaciones sobre el mismo archivo, y las dos son necesarias:
+  #   1. INYECTAR las cinco cuentas de prueba en la lista del equipo.
+  #   2. VACIAR la lista de `esCuentaDePrueba()`, que en producción las niega
+  #      por nombre antes que nada (15-oct-2026). Sin este paso el recorrido
+  #      se queda fuera con sus propias cuentas: la negación gana siempre.
   awk -v cuentas="$CUENTAS_PRUEBA" '
     /EQUIPO:INICIO/ { print; print "          // ── solo emulador, generado por scripts/reglasEmulador.sh ──"; printf "%s\n", cuentas; next }
+    /PRUEBA:INICIO/ { print; print "          // ── vaciada para el emulador: aquí esas cuentas SON el recorrido ──"; print "          '"'"'nadie@sin-cuentas-de-prueba.invalido'"'"'"; saltando = 1; next }
+    /PRUEBA:FIN/    { saltando = 0; print; next }
+    saltando        { next }
     { print }
   ' "$origen" > "$destino"
   grep -q "ventas@vermur.com" "$destino" || { echo "✗ no se inyectaron las cuentas en $destino"; exit 1; }
+  grep -q "sin-cuentas-de-prueba.invalido" "$destino" || { echo "✗ no se vació esCuentaDePrueba en $destino"; exit 1; }
+  # La prueba de que quedó vacía: la única mención de ventas@ debe ser la del
+  # equipo, no la de la lista negada. Dos menciones = la negación sigue viva.
+  [ "$(grep -c "ventas@vermur.com" "$destino")" = "1" ] || { echo "✗ $destino todavía niega las cuentas de prueba"; exit 1; }
 done
 
 # ── Tarea 102 (9-oct-2026): contrato de la cotización ganada ─────────────────
