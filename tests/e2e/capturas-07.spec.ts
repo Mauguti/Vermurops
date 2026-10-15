@@ -12,7 +12,7 @@ test.beforeAll(async () => { await fijarPreferencias(); });
 
 test.setTimeout(60_000);
 
-const PW = '123456';
+const PW = process.env.PASSWORD_CUENTAS_PRUEBA ?? '';
 
 async function entrar(browser: Browser, email: string): Promise<{ page: Page; ctx: BrowserContext }> {
   const ctx = await browser.newContext();

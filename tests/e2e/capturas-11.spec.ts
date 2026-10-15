@@ -9,7 +9,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 test.setTimeout(60_000);
 
-const PW = '123456';
+const PW = process.env.PASSWORD_CUENTAS_PRUEBA ?? '';
 const IMG = 'sprint/reportes/img';
 
 async function entrar(page: Page) {

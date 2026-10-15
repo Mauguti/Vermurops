@@ -15,7 +15,7 @@ test.beforeAll(async () => { await fijarPreferencias(); });
  * catálogos de conceptos, clientes, proveedores, puertos y términos de pago.
  */
 
-const PW = '123456';
+const PW = process.env.PASSWORD_CUENTAS_PRUEBA ?? '';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

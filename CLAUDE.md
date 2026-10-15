@@ -24,7 +24,7 @@ Levanta Auth + Firestore + Storage, siembra las cuentas y sirve la app en
 **http://localhost:3100**. Siempre arranca limpio (apaga lo que haya en los
 puertos). Cuentas: `ventas@vermur.com`, `pricing@vermur.com`,
 `operaciones@vermur.com`, `administracion@vermur.com`, `admin@vermur.com`;
-contraseña `123456`. Los datos de ejemplo (COT-2026-0001…0008) los siembra
+contraseña aleatoria por corrida (`PASSWORD_CUENTAS_PRUEBA`, la imprime el script; ya no vive en el repo). Los datos de ejemplo (COT-2026-0001…0008) los siembra
 la app sola al entrar por primera vez. Ctrl+C apaga todo. Si el trabajo
 está en un worktree, correrlo DESDE el worktree: sirve ese checkout.
 **Identidad:** morado `#4B2A8C` (acento de la interfaz), rojo `#DC2626` SOLO para peligro
@@ -2902,6 +2902,21 @@ escribe SOLO lo tocado (`planEscrituraOC`, `lib/diffOrdenCompra.ts`, sobre
     `historialEstados` completo con `updateDoc` (no en esta tarea).
   - e2e: `tests/e2e/124-oc-por-campos.spec.ts`.
 
+## 4.77 Limpiezas del autoguardado y de las cuentas de prueba (tarea 125, 15-oct-2026)
+
+  - **`handleUpdateQuotes` ya no busca «la primera que cambió por referencia»**:
+    `cambioDeLista` (`lib/cambioDeLista.ts`) escribe la cotización que dice
+    `anterior`. Si un host no lo manda, no adivina y no calla: aviso rojo.
+    Kanban (arrastre) y Bandeja (consolidar) ahora pasan su `anterior`.
+  - **Historial / Notas** ordena con `ordenarPorFechaDesc`: una actividad sin
+    `createdAt` se muestra sin fecha, al final, en vez de tirar la ficha.
+  - **La contraseña de las cuentas de prueba salió del repo.** Variable
+    `PASSWORD_CUENTAS_PRUEBA`: `e2e.sh` y `dev-emuladores.sh` generan una
+    aleatoria por corrida (la segunda la imprime); specs y scripts la leen del
+    entorno. `sembrarEmuladores.sh` y `createUsers.js` fallan sin ella. Las
+    cuentas en Auth de producción no se tocaron: **siguen con la contraseña
+    vieja, que está en el historial de git; hay que cambiarla o borrarlas.**
+
 ---
 
 ## 5. Estado de los módulos
@@ -3142,7 +3157,7 @@ Cerrado responde `ADMIN_ONLY_OPERATION`; abierto devuelve un `idToken`.
 **🔴 CRÍTICO — Hay tres cuentas de PRUEBA en el Auth de producción.**
 `admin@vermur.com`, `pricing@vermur.com` y `ventas@vermur.com` existen en
 producción (inventario del 26-sep-2026 con `firebase auth:export`). Son las
-del emulador, donde su contraseña es `123456`. Hasta el Bloque 8,
+del emulador, donde la contraseña es aleatoria por corrida (`PASSWORD_CUENTAS_PRUEBA`). Hasta el Bloque 8,
 `admin@vermur.com` tenía rol **admin** en el mapa de las Functions. El
 parche de reglas del Bloque 9 las deja fuera de Firestore y Storage, pero
 **hay que borrarlas o deshabilitarlas en la consola**: mientras existan,

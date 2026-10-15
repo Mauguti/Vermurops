@@ -21,7 +21,7 @@ test.describe.configure({ mode: 'serial' });
 test.setTimeout(120_000);
 
 const FS = 'http://127.0.0.1:8080/v1/projects/vermur-logistics-app/databases/(default)/documents';
-const PW = '123456';
+const PW = process.env.PASSWORD_CUENTAS_PRUEBA ?? '';
 const IMG = 'sprint/reportes/img';
 
 async function sembrarOC(oc: {

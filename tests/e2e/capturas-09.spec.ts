@@ -3,7 +3,7 @@
  */
 import { test, expect } from '@playwright/test';
 
-const PW = '123456';
+const PW = process.env.PASSWORD_CUENTAS_PRUEBA ?? '';
 const IMG = 'sprint/reportes/img';
 
 async function login(page: import('@playwright/test').Page, email: string) {

@@ -23,6 +23,8 @@
 #         Es opt-in porque compila las Functions (unos segundos) y porque el
 #         resto del trabajo diario no las necesita.
 set -uo pipefail
+# Contraseña de las cuentas de prueba: aleatoria por corrida, solo en el entorno.
+export PASSWORD_CUENTAS_PRUEBA="${PASSWORD_CUENTAS_PRUEBA:-$(openssl rand -hex 8)}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
 mkdir -p .noche/reportes
@@ -75,7 +77,7 @@ done
 
 echo
 echo "  Sirviendo $REPO"
-echo "  http://localhost:$PUERTO  ·  cuentas: ventas@ / pricing@ / operaciones@ / administracion@ / admin@vermur.com  (contraseña 123456)"
+echo "  http://localhost:$PUERTO  ·  cuentas: ventas@ / pricing@ / operaciones@ / administracion@ / admin@vermur.com  (contraseña de esta corrida: $PASSWORD_CUENTAS_PRUEBA)"
 echo "  Ctrl+C para apagar emuladores y app."
 echo
 wait

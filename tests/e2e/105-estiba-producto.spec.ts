@@ -11,7 +11,7 @@ test.setTimeout(120_000);
 
 const AUTH = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1';
 const FS = 'http://127.0.0.1:8080/v1/projects/vermur-logistics-app/databases/(default)/documents';
-const PW = '123456';
+const PW = process.env.PASSWORD_CUENTAS_PRUEBA ?? '';
 const IMG = 'sprint/reportes/img';
 const DESC = `TORNILLERIA 105 ${Date.now()}`;
 

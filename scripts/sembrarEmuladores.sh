@@ -10,6 +10,12 @@
 # sigue con la siguiente.
 set -uo pipefail
 
+# La contraseña de las cuentas de prueba NO vive en el repo: la fijan e2e.sh y
+# dev-emuladores.sh (aleatoria por corrida) o quien llame esto a mano.
+if [[ -z "${PASSWORD_CUENTAS_PRUEBA:-}" ]]; then
+  echo "Define PASSWORD_CUENTAS_PRUEBA (ej. export PASSWORD_CUENTAS_PRUEBA=\$(openssl rand -hex 8))." >&2
+  exit 1
+fi
 AUTH="http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signUp?key=emulador"
 
 if ! curl -s -o /dev/null --max-time 3 "http://127.0.0.1:9099"; then
@@ -20,7 +26,7 @@ fi
 for correo in admin@vermur.com ventas@vermur.com pricing@vermur.com \
               operaciones@vermur.com administracion@vermur.com; do
   r=$(curl -s -X POST "$AUTH" -H 'Content-Type: application/json' \
-    -d "{\"email\":\"$correo\",\"password\":\"123456\",\"returnSecureToken\":true}")
+    -d "{\"email\":\"$correo\",\"password\":\"$PASSWORD_CUENTAS_PRUEBA\",\"returnSecureToken\":true}")
   if echo "$r" | grep -q '"idToken"'; then echo "  ✓ $correo"
   elif echo "$r" | grep -q 'EMAIL_EXISTS'; then echo "  · $correo (ya existía)"
   else echo "  ✗ $correo → $r" >&2; fi

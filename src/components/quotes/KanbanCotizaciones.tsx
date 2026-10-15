@@ -217,7 +217,7 @@ export default function KanbanCotizaciones({
     if (newEtapa === 'ganada' && ganada) {
       onConvertToShipment(ganada, quotes.find(q => q.id === quoteId));
     } else {
-      onUpdateQuotes(updatedQuotes);
+      onUpdateQuotes(updatedQuotes, quotes.find(q => q.id === quoteId));
     }
 
     // Disparar notificación si aplica

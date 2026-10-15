@@ -359,7 +359,7 @@ export default function BandejaPricing({
         },
       ],
     };
-    onUpdateQuotes(quotes.map(q => q.id === quoteId ? updated : q));
+    onUpdateQuotes(quotes.map(q => q.id === quoteId ? updated : q), quote);
   };
 
   // ── Vista de ficha completa (reemplaza la bandeja) ──────────────────────

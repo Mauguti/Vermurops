@@ -16,7 +16,7 @@ async function login(page, email) {
   await page.getByRole('button', { name: 'Iniciar sesión' }).first().click({ timeout: 5000 });
   await page.waitForTimeout(1000);
   await page.getByPlaceholder('usuario@vermur.com').fill(email);
-  await page.getByPlaceholder('••••••••').fill('123456');
+  await page.getByPlaceholder('••••••••').fill(process.env.PASSWORD_CUENTAS_PRUEBA ?? '');
   await page.locator('#login-submit').click();
   await page.waitForTimeout(5000);
 }

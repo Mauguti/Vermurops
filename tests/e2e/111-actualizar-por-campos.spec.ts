@@ -19,7 +19,7 @@ test.setTimeout(120_000);
 const AUTH = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1';
 const FS = 'http://127.0.0.1:8080/v1/projects/vermur-logistics-app/databases/(default)/documents';
 const FS_RAIZ = 'projects/vermur-logistics-app/databases/(default)/documents';
-const PW = '123456';
+const PW = process.env.PASSWORD_CUENTAS_PRUEBA ?? '';
 const FOLIO = 'COT-2026-0002';
 const EXTERNA = 'Nota de OTRA pestana 111';
 const LOCAL = 'Nota local 111';

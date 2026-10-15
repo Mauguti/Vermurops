@@ -4,7 +4,7 @@
 import { test, expect, type Browser, type Page, type BrowserContext } from '@playwright/test';
 
 const IMG = 'sprint/reportes/img';
-const PW = '123456';
+const PW = process.env.PASSWORD_CUENTAS_PRUEBA ?? '';
 
 async function entrar(browser: Browser, email: string, width = 1440): Promise<{ page: Page; ctx: BrowserContext }> {
   const ctx = await browser.newContext({ viewport: { width, height: 900 } });

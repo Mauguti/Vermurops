@@ -3,7 +3,7 @@
  */
 import { test, expect } from '@playwright/test';
 
-const PW = '123456';
+const PW = process.env.PASSWORD_CUENTAS_PRUEBA ?? '';
 
 async function entrar(page: import('@playwright/test').Page, email: string) {
   await page.goto('/');

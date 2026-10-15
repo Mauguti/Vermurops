@@ -21,7 +21,7 @@ test.setTimeout(120_000);
 const AUTH_API = 'http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1';
 const AUTH_EMULATOR = 'http://127.0.0.1:9099';
 const FUNCTIONS = 'http://127.0.0.1:5001/vermur-logistics-app/us-central1';
-const PW = '123456';
+const PW = process.env.PASSWORD_CUENTAS_PRUEBA ?? '';
 
 // Único por corrida: invitar un correo que ya existe falla con 409, y REPETIR=2 corre sobre la misma base.
 const NUEVO_EMAIL = `chema.test.${Date.now()}@vermur.com`;

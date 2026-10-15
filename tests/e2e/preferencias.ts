@@ -32,7 +32,7 @@ async function uidDe(email: string): Promise<string | null> {
   const r = await fetch(AUTH, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: '123456', returnSecureToken: true }),
+    body: JSON.stringify({ email, password: process.env.PASSWORD_CUENTAS_PRUEBA ?? '', returnSecureToken: true }),
   });
   if (!r.ok) return null;
   return ((await r.json()) as { localId?: string }).localId ?? null;

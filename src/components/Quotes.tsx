@@ -1,3 +1,4 @@
+import { cambioDeLista } from '../lib/cambioDeLista';
 import { sinContratoFirmado } from '../lib/contratoCotizacion';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { exigirExpediente } from '../lib/frenoExpediente';
@@ -117,16 +118,17 @@ export default function Quotes() {
   // Recibe el array completo que devuelven los componentes hijos y persiste
   // solo el documento que cambió (o el nuevo que se añadió).
   const handleUpdateQuotes = async (newQuotes: KanbanQuote[], anterior?: KanbanQuote) => {
-    const existingIds = new Set(kanbanQuotes.map(q => q.id));
-    const added = newQuotes.find(q => !existingIds.has(q.id));
-    if (added) { await createCotizacion(added); return; }
-    const changed = newQuotes.find(newQ => {
-      const existing = kanbanQuotes.find(q => q.id === newQ.id);
-      return existing !== undefined && existing !== newQ;
-    });
-    if (changed) {
+    const cambio = cambioDeLista(kanbanQuotes, newQuotes, anterior);
+    if (cambio.tipo === 'alta') { await createCotizacion(cambio.quote); return; }
+    if (cambio.tipo === 'sin_anterior') {
+      // Un host que no dice qué cotización cambió: no se adivina y no se calla.
+      console.error('handleUpdateQuotes: falta `anterior`; no se guardó nada.');
+      setToast({ mensaje: 'No se pudo guardar la cotización: falta saber cuál cambió. Avisa a soporte.', tipo: 'error' });
+      return;
+    }
+    if (cambio.tipo === 'cambio') {
       try {
-        await updateCotizacion(changed.id, changed, anterior?.id === changed.id ? anterior : undefined);
+        await updateCotizacion(cambio.quote.id, cambio.quote, cambio.anterior);
       } catch (err) {
         setToast({
           mensaje: `No se pudo guardar la cotización: ${err instanceof Error ? err.message : err}`,

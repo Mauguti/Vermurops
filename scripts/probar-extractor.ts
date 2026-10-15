@@ -40,7 +40,7 @@ async function obtenerToken(): Promise<string> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: 'pricing@vermur.com',
-        password: '123456',
+        password: process.env.PASSWORD_CUENTAS_PRUEBA ?? '',
         returnSecureToken: true,
       }),
     }

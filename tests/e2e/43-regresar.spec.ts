@@ -5,7 +5,7 @@ import { test, expect, Browser, Page, BrowserContext } from '@playwright/test';
  * que al hacer clic regresa a la lista correcta.
  */
 
-const PW = '123456';
+const PW = process.env.PASSWORD_CUENTAS_PRUEBA ?? '';
 
 async function entrar(browser: Browser, email: string): Promise<{ page: Page; ctx: BrowserContext }> {
   const ctx = await browser.newContext();

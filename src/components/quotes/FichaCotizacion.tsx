@@ -1,3 +1,4 @@
+import { ordenarPorFechaDesc } from '../../lib/ordenHistorial';
 import { catalogoOperable } from '../../lib/estatusCatalogo';
 import React, { useState, useMemo, useCallback } from 'react';
 import { antesDeLaComa } from '../../lib/texto';
@@ -2660,7 +2661,7 @@ export default function FichaCotizacion({
             <div className="space-y-4">
               <h4 className="text-[10px] font-bold text-[#18181B] uppercase tracking-wider border-b border-gray-150 pb-2">Línea de Tiempo</h4>
               <div className="relative pl-6 border-l-2 border-gray-100 space-y-6">
-                {[
+                {ordenarPorFechaDesc([
                   ...quote.historialEtapas.map(h => ({
                     type: 'etapa' as const,
                     date: h.fecha,
@@ -2675,8 +2676,7 @@ export default function FichaCotizacion({
                     id: n.id,
                     autor: n.responsableId
                   })),
-                ]
-                  .sort((a, b) => b.date.localeCompare(a.date))
+                ])
                   .map((item, idx) => (
                     <div key={idx} className="relative">
                       <div className={`absolute -left-[31px] top-1.5 w-3.5 h-3.5 rounded-full border-2 bg-white flex items-center justify-center
@@ -2690,7 +2690,7 @@ export default function FichaCotizacion({
                           <span className="text-xs font-bold text-[#18181B]">
                             {item.title} {'autor' in item && item.autor ? `por ${item.autor}` : ''}
                           </span>
-                          <span className="text-[9px] text-gray-400 font-semibold tabular-nums">{item.date}</span>
+                          <span className="text-[9px] text-gray-400 font-semibold tabular-nums">{item.date ?? ''}</span>
                         </div>
                         <p className="text-xs text-gray-500 mt-1 leading-relaxed whitespace-pre-line">{item.desc}</p>
 
@@ -2700,7 +2700,7 @@ export default function FichaCotizacion({
                               <div key={reply.id} className="ml-4 pl-3 border-l-2 border-gray-200 mt-2">
                                 <div className="flex items-center gap-2">
                                   <span className="text-[10px] font-bold text-[#18181B]">{reply.responsableId}</span>
-                                  <span className="text-[9px] text-gray-400 tabular-nums">{reply.createdAt}</span>
+                                  <span className="text-[9px] text-gray-400 tabular-nums">{reply.createdAt ?? ''}</span>
                                 </div>
                                 <p className="text-xs text-gray-500 mt-1">{reply.descripcion}</p>
                               </div>

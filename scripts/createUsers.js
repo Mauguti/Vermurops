@@ -2,6 +2,8 @@ import admin from "firebase-admin";
 import { readFileSync } from "fs";
 const serviceAccount = JSON.parse(readFileSync(new URL("../serviceAccountKey.json", import.meta.url)));
 
+const CLAVE = process.env.PASSWORD_CUENTAS_PRUEBA
+if (!CLAVE) { console.error("Define PASSWORD_CUENTAS_PRUEBA: la contraseña ya no vive en el repo."); process.exit(1) }
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 })
@@ -9,17 +11,17 @@ admin.initializeApp({
 const usuarios = [
   {
     email: "admin@vermur.com",
-    password: "123456",
+    password: CLAVE,
     displayName: "Admin Vermur"
   },
   {
     email: "ventas@vermur.com",
-    password: "123456",
+    password: CLAVE,
     displayName: "Ana Ramírez"
   },
   {
     email: "pricing@vermur.com",
-    password: "123456",
+    password: CLAVE,
     displayName: "Carlos Medina"
   }
 ]

@@ -28,7 +28,7 @@ async function token(email: string): Promise<string> {
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password: '123456', returnSecureToken: true }),
+      body: JSON.stringify({ email, password: process.env.PASSWORD_CUENTAS_PRUEBA ?? '', returnSecureToken: true }),
     },
   );
   if (!res.ok) throw new Error(`Auth falló para ${email}: ${res.status} ${await res.text()}`);

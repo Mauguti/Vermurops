@@ -6,7 +6,7 @@ import { test, expect, type Page, type Browser, type BrowserContext } from '@pla
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(120_000);
 
-const PW = '123456';
+const PW = process.env.PASSWORD_CUENTAS_PRUEBA ?? '';
 const IMG = 'sprint/reportes/img';
 
 async function entrar(browser: Browser, email: string): Promise<{ page: Page; ctx: BrowserContext }> {

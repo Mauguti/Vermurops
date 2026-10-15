@@ -19,7 +19,7 @@ const FS = 'http://127.0.0.1:8080/v1/projects/vermur-logistics-app/databases/(de
 export async function idsDe(email: string, col: string): Promise<Set<string>> {
   const r = await fetch(`${AUTH}/accounts:signInWithPassword?key=emulador`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: '123456', returnSecureToken: true }),
+    body: JSON.stringify({ email, password: process.env.PASSWORD_CUENTAS_PRUEBA ?? '', returnSecureToken: true }),
   });
   const { idToken } = await r.json() as { idToken: string };
   const ids = new Set<string>();

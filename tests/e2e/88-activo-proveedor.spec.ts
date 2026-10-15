@@ -31,7 +31,7 @@ for (const vp of [{ n: 'escritorio', w: 1440, h: 900 }, { n: 'angosto', w: 390, 
     await page.goto('/');
     await page.getByRole('button', { name: 'Iniciar sesión' }).first().click();
     await page.getByPlaceholder('usuario@vermur.com').fill('administracion@vermur.com');
-    await page.getByPlaceholder('••••••••').fill('123456');
+    await page.getByPlaceholder('••••••••').fill(process.env.PASSWORD_CUENTAS_PRUEBA ?? '');
     await page.locator('#login-submit').click();
     await expect(page.getByRole('button', { name: 'Dashboard' })).toBeVisible({ timeout: 15_000 });
     await page.getByRole('button', { name: 'Altas', exact: true }).first().click();

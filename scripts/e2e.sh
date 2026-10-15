@@ -22,6 +22,8 @@
 #       CON_FUNCTIONS=1 ./scripts/e2e.sh   (suma el emulador de Functions :5001;
 #         lo fija e2e-completo.sh para gestion-usuarios y capturas-21)
 set -uo pipefail
+# Contraseña de las cuentas de prueba: aleatoria por corrida, solo en el entorno.
+export PASSWORD_CUENTAS_PRUEBA="${PASSWORD_CUENTAS_PRUEBA:-$(openssl rand -hex 8)}"
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO"
 mkdir -p .noche/reportes

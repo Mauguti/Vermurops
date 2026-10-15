@@ -94,7 +94,7 @@ test('3. Máximo 3 por correo por hora: el 4º responde igual y no envía', asyn
 test('4. Cuenta deshabilitada: la misma respuesta y no recibe enlace', async () => {
   const alta = await (await fetch(`${AUTH_API}/accounts:signUp?key=emulador`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: 'baja.test@vermur.com', password: '123456', returnSecureToken: true }),
+    body: JSON.stringify({ email: 'baja.test@vermur.com', password: process.env.PASSWORD_CUENTAS_PRUEBA ?? '', returnSecureToken: true }),
   })).json() as { localId: string };
   const des = await fetch(`${AUTH_API}/projects/vermur-logistics-app/accounts:update`, {
     method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer owner' },
