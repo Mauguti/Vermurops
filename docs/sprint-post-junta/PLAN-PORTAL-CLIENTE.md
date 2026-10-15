@@ -43,7 +43,7 @@ El propio archivo dice, en su cabecera, la salvedad que manda en este plan:
 > token: abre el archivo SIN sesión y sin pasar por las reglas. […] esta marca
 > es una convención de la interfaz, no un control de acceso.»
 
-Verificado: `getDownloadURL` se llama en 9 lugares de `src/` (documentos del
+Verificado: `getDownloadURL` se llama en 10 archivos de `src/` (documentos del
 embarque `hooks/useDocumentosEmbarque.ts:52`, expediente
 `hooks/useExpedienteCliente.ts:69` y `ExpedientePanel.tsx:126`, PDF de la
 cotización `usePdfCotizacion.ts:96`, tarifarios, subida clasificada,
@@ -190,7 +190,7 @@ Es el segundo agujero y no se cierra con reglas solas, por lo de §1.2:
   `portal/{clienteId}/{embarqueId}/` al marcar visible (copia, no enlace),
   con `allow read: if request.auth.token.clienteId == clienteId`.
 - La interfaz de documentos hoy pinta enlaces a `doc.url`. Ese cambio toca
-  `DocumentosEmbarque.tsx`, `useDocumentosEmbarque.ts` y los 8 sitios
+  `DocumentosEmbarque.tsx`, `useDocumentosEmbarque.ts` y los demás sitios
   restantes; es un paso propio (§5, paso 4), no «un detalle».
 
 **P-7. Cerrar la convivencia de reglas por rol.**
@@ -331,7 +331,7 @@ el paso 6.** Dependencias marcadas.
 | **1** | **Roles**: `UserRole` suma `cliente`; claim presente y desconocido ya no cae a mapa/fallback (cliente y Functions); `CAPACIDADES.cliente = []`; test que recorre todas las Functions con token cliente → 403. `invitar` aún **no** acepta `cliente`. | hosting + functions | — |
 | **2** | **Reglas** (aviso antes, comando exacto, §3): helper `esCliente()`; colecciones `portalEmbarques` y `portalFacturas` con lectura por `clienteId` y `write: false`; tests de reglas con mutación. Sin datos todavía. | firestore:rules | 1; PLAN-REGLAS-POR-ROL paso 2 recomendado |
 | **3** | **Proyección**: Function `onDocumentWritten` que escribe `portalEmbarques` y `portalFacturas` (lista blanca, sin escribir si no hay `clienteId` por id, retira lo cancelado/oculto), y script de **relleno** de los existentes (en seco, lo corre Mau). Tests de la derivación pura en `lib/` (campo nuevo del embarque **no** se filtra). | functions | 2; **115** (qué lee de `partes`/consignatario, si Mau aprueba) |
-| **4** | **Storage**: documentos por `storagePath` + URL firmada (Function `urlDocumentoCliente`); los 9 sitios de `getDownloadURL` dejan de guardar `url` (escritura nueva; lo viejo se lee); reglas de `portal/` si se elige la copia; luego **revocación de tokens** de documentos existentes (script en seco; rompe enlaces viejos, avisar). | functions + storage:rules + hosting | 3 |
+| **4** | **Storage**: documentos por `storagePath` + URL firmada (Function `urlDocumentoCliente`); los 10 archivos con `getDownloadURL` dejan de guardar `url` (escritura nueva; lo viejo se lee); reglas de `portal/` si se elige la copia; luego **revocación de tokens** de documentos existentes (script en seco; rompe enlaces viejos, avisar). | functions + storage:rules + hosting | 3 |
 | **5** | **Línea de tiempo** en la proyección: v1 con `eventos`; v2 con `lineaTiempo` cuando exista. «Ver como cliente» pasa a leer la proyección. | functions + hosting | 3; **116** para v2 |
 | **6** | **Interfaz del portal** (rol `cliente`: menú propio con Mis embarques, Facturas; sin Kanban ni nada interno) y `invitarCliente` / baja desde la ficha del cliente. **Primera cuenta real**: la de un cliente amigo, validada por Mau y por el cliente. | functions + hosting | 1–5 |
 | **7** | Endurecimiento: Paso 4 y 5 de `PLAN-REGLAS-POR-ROL` (quitar lista de correos y mapas) — sin esto el portal funciona, pero hay dos caminos de identidad. | firestore:rules + storage + hosting | 6 |
@@ -460,7 +460,7 @@ proyección lo resuelve sin migrar. Si el plan 115 lo agrega, mejor.
   Functions. Un correo desconocido con token válido puede llamar a
   `clasificarDocumento` con flujos de ventas. Preexistente; se vuelve urgente
   con clientes externos (P-2). Se arregla en el paso 1.
-- 9 sitios guardan la `url` con token en el documento; no solo los de
+- 10 archivos llaman a `getDownloadURL` y guardan la `url` con token en el documento; no solo los de
   embarque. Los PDF de cotización (`usePdfCotizacion.ts:96`) y el expediente
   KYC (`useExpedienteCliente.ts:69`) tienen el mismo agujero y afectan datos
   más sensibles que un BL. El paso 4 debe decidir si los incluye.
