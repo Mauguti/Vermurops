@@ -25,6 +25,7 @@ import {
 } from '../../lib/usuarios';
 import type { UserRole } from '../../auth/users';
 import { confirmar } from '../ui/Dialogos';
+import { inicialesDe } from '../../lib/texto';
 
 // ── Estilos de badge por rol ─────────────────────────────────────────────────
 
@@ -246,11 +247,12 @@ function FilaUsuario({
   const badge = badgeDe(usuario.rol);
   const acceso = etiquetaDeAcceso(usuario);
 
-  const avatar = usuario.nombre
-    .split(' ')
-    .map(p => p.charAt(0).toUpperCase())
-    .slice(0, 2)
-    .join('');
+  /*
+   * 🔴 Aquí vivía `usuario.nombre.split(' ')`, y el 15-oct recibió `undefined`
+   * y tiró producción a pantalla en blanco (§4.73). `inicialesDe` tolera el
+   * campo ausente; el nombre vacío se resuelve abajo con «(sin nombre)».
+   */
+  const avatar = inicialesDe(usuario.nombre);
 
   return (
     <tr className={`hover:bg-neutral-bg transition-colors ${!usuario.activo ? 'opacity-50' : ''}`}>
@@ -264,7 +266,7 @@ function FilaUsuario({
           </div>
           <div>
             <p className="text-[13px] font-semibold text-text-primary leading-tight">
-              {usuario.nombre}
+              {usuario.nombre || '(sin nombre)'}
               {esMismoUsuario && <span className="text-text-muted font-normal ml-1">(tú)</span>}
             </p>
           </div>

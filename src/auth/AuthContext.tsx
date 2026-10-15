@@ -4,6 +4,7 @@ import { AuthUser, isViewAllowed, UserRole } from './users';
 import { Capacidad, puede as puedeCapacidad } from './permisos';
 import { auth, USANDO_EMULADORES } from '../firebase';
 import { medirInicioDeSesion } from '../lib/analitica';
+import { texto } from '../lib/texto';
 
 const ROLES_VALIDOS: UserRole[] = ['ventas', 'pricing', 'operaciones', 'administracion', 'admin'];
 
@@ -132,7 +133,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           rol = getRolByEmail(firebaseUser.email);
         }
-        const nombre = firebaseUser.displayName || firebaseUser.email.split('@')[0];
+        /*
+         * `firebaseUser.email` es `string | null` en el SDK. Un `.split()`
+         * aquí revienta **en el arranque de la sesión**, o sea pantalla en
+         * blanco antes de que se pinte nada (§4.73). Una cuenta sin correo
+         * existe: la crea el Admin SDK sin él, o un proveedor que no lo
+         * entrega.
+         */
+        const nombre = firebaseUser.displayName
+          || texto(firebaseUser.email).split('@')[0]
+          || firebaseUser.uid.slice(0, 6);
         const avatar = nombre.substring(0, 2).toUpperCase();
 
         setUser({

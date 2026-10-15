@@ -30,7 +30,8 @@ import {
 } from '../comun/auth.js';
 import { enviarCorreoPorN8n, N8N_WEBHOOK_URL_CORREO } from '../correo/correoPorN8n.js';
 import {
-  asuntoInvitacion, htmlInvitacion, textoInvitacion,
+  asuntoInvitacion, htmlInvitacion, respuestaInvitacion, textoInvitacion,
+  type RespuestaInvitacion,
 } from './invitacion.js';
 
 /** Ya existe en Secret Manager: lo usan los demás proxies de n8n. */
@@ -74,14 +75,6 @@ interface AccionReenviar {
 
 type Payload =
   | AccionListar | AccionInvitar | AccionCambiarRol | AccionDesactivar | AccionReenviar;
-
-/** Lo que devuelven `invitar` y `reenviar`: la cuenta y qué pasó con el correo. */
-export interface ResultadoInvitacion {
-  usuario: UsuarioRegistrado | null;
-  correoEnviado: boolean;
-  /** Solo cuando NO salió: listo para enseñarse en pantalla. */
-  motivoCorreo?: string;
-}
 
 export interface UsuarioRegistrado {
   uid: string;
@@ -254,7 +247,7 @@ async function listar(): Promise<UsuarioRegistrado[]> {
 async function invitar(
   payload: AccionInvitar,
   invitadoPorEmail: string,
-): Promise<ResultadoInvitacion> {
+): Promise<RespuestaInvitacion> {
   const email = validarEmail(payload.email);
   const rol = validarRol(payload.rol);
   const nombre = (payload.nombre ?? '').trim();
@@ -320,7 +313,7 @@ async function invitar(
    *
    * El campo NO se guarda en el documento: se deriva de Auth en `listar()`.
    */
-  return { usuario: { uid, ...doc, ultimoAcceso: null }, correoEnviado, motivoCorreo };
+  return respuestaInvitacion({ uid, ...doc, ultimoAcceso: null }, correoEnviado, motivoCorreo);
 }
 
 /**
@@ -333,7 +326,7 @@ async function invitar(
 async function reenviar(
   payload: AccionReenviar,
   reenviadoPorEmail: string,
-): Promise<ResultadoInvitacion> {
+): Promise<RespuestaInvitacion> {
   const email = validarEmail(payload.email);
 
   let userRecord;
@@ -376,13 +369,11 @@ async function reenviar(
     ? new Date(userRecord.metadata.lastSignInTime).toISOString()
     : null;
 
-  return {
-    usuario: snap.exists
-      ? ({ uid: userRecord.uid, ...doc, ultimoAcceso } as UsuarioRegistrado)
-      : null,
+  return respuestaInvitacion(
+    snap.exists ? ({ uid: userRecord.uid, ...doc, ultimoAcceso } as UsuarioRegistrado) : null,
     correoEnviado,
-    ...(aviso ? { motivoCorreo: aviso } : {}),
-  };
+    aviso || undefined,
+  );
 }
 
 async function cambiarRol(
