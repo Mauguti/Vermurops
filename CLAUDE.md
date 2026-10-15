@@ -2829,6 +2829,34 @@ el cambio se parte en dos despliegues —primero la Function que acepta y
 devuelve las dos formas, después el cliente—. Y avisar al equipo de recargar
 no es un plan: nadie recarga.
 
+## 4.74 La ficha adopta lo ajeno y avisa del conflicto (tarea 122, 15-oct-2026)
+
+P4 de `docs/sprint-post-junta/PLAN-FICHA-COTIZACION.md`. Sustituye a
+`alDiaConVersion` en los tres hosts (`Quotes`, `BandejaPricing`,
+`KanbanCotizaciones`) con `FichaCotizacionSincronizada` → `useCotizacionAbierta`,
+sobre la lógica pura de `lib/adopcionCotizacion.ts` (10 tests, mutados).
+  - **Un `base` y fusión por campo en cada snapshot:** el servidor no lo movió →
+    se queda el local; otra persona lo cambió y aquí nadie lo tocó → se adopta
+    (nota, PDF, etapa aparecen solos); `actividades`/`chat`/`pdfs` de las dos
+    copias se fusionan por id sin conflicto; **el campo que la persona ya
+    cambió nunca se sobreescribe** (el borrador sin enviar no se pierde).
+  - **Conflicto = el mismo campo cambió distinto en las dos copias.** Gana el
+    último en guardar, con la franja ámbar «Otra persona modificó esta
+    cotización. [Ver cambios] [Recargar]» (`AvisoConflictoCotizacion`). «Recargar»
+    toma la copia del servidor. El aviso se apaga solo cuando las copias vuelven
+    a coincidir. `servicios` sigue siendo un campo atómico (no se fusiona por dentro).
+  - **El eco de una escritura propia no es conflicto:** se recuerdan los valores
+    que esta sesión escribió por campo; sin eso, dos guardados seguidos
+    produjeron un falso aviso con el snapshot del primero.
+  - Un cambio de número de versión adopta la copia del servidor entera, como antes.
+    `alDiaConVersion` queda exportado (y con sus tests) pero ya sin llamadores.
+  - Un campo que otra persona cambia mientras aquí se teclea sobre ÉL mismo y
+    aún no se guarda cuenta como conflicto, no se adopta.
+  - ⚠️ La numeración de §4.67–§4.69 está duplicada (la cadena de la 119–121 y la
+    110–112 se numeraron por separado); sin renumerar para no romper referencias.
+  - e2e: `tests/e2e/122-ficha-adopta-ajeno.spec.ts` (REST para lo ajeno; el
+    conflicto, con dos navegadores y uno sin red mientras edita).
+
 ---
 
 ## 5. Estado de los módulos

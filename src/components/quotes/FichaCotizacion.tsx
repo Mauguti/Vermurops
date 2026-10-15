@@ -85,6 +85,7 @@ import {
 } from '../ui/ficha/FichaLayout';
 import { BloqueEnlaces, EnlaceEntidad } from '../ui/ficha/EnlaceEntidad';
 import ProximosPasos from './ProximosPasos';
+import AvisoConflictoCotizacion from './AvisoConflictoCotizacion';
 import { buscarClientes } from '../../lib/buscarClientes';
 import { proximoPaso, pasoAtras } from '../../lib/proximosPasos';
 import {
@@ -128,6 +129,10 @@ interface FichaCotizacionProps {
   rolActivo: Rol;
   /** Etiqueta del botón regresar cuando se llegó desde otra ficha. */
   regresarLabel?: string;
+  /** Campos que otra persona y esta copia cambiaron distinto (tarea 122, P4). */
+  conflictos?: string[];
+  /** «Recargar» del aviso de conflicto: toma la copia del servidor. */
+  onRecargar?: () => void;
 }
 
 // La tabla de avance (qué sigue desde cada etapa, cómo se llama el botón)
@@ -154,6 +159,7 @@ const PDF_DISPONIBLE = true;
 export default function FichaCotizacion({
   quote: quoteViva, onBack, onUpdateQuote: onUpdateQuoteViva,
   onConvertToShipment: onConvertToShipmentViva, rolActivo, regresarLabel,
+  conflictos = [], onRecargar,
 }: FichaCotizacionProps) {
   const { user } = useAuth();
 
@@ -1711,6 +1717,10 @@ export default function FichaCotizacion({
             />
           )}
         </div>
+      )}
+
+      {onRecargar && (
+        <AvisoConflictoCotizacion conflictos={conflictos} onRecargar={onRecargar} />
       )}
 
       {/* Próximos pasos (23-sep-2026): las etapas, la acción que sigue y qué

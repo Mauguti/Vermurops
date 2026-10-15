@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { contiene, texto } from '../../lib/texto';
-import { alDiaConVersion } from '../../lib/versionesCotizacion';
 import {
   Search, Plus, X, Plane, Ship, Truck, ShieldCheck, Calendar, ArrowRight, HelpCircle,
 } from 'lucide-react';
@@ -8,7 +7,7 @@ import {
   KanbanQuote, PIPELINE_STAGES, ORIGENES_PROSPECTO, QuoteActivity, TipoServicio,
   TIPOS_SERVICIO, VENDEDORES, EQUIPO_PRICING, calcularTotalConsolidado, PipelineStageId,
 } from './QuotesData';
-import FichaCotizacion from './FichaCotizacion';
+import FichaCotizacionSincronizada from './FichaCotizacionSincronizada';
 import { useNotifications } from '../../notifications/NotificationsContext';
 import { crearNotificacionEtapa } from '../../notifications/notificationsStore';
 import { generateFolio } from '../../lib/folioService';
@@ -319,8 +318,9 @@ export default function KanbanCotizaciones({
   // ── Vista de ficha completa (reemplaza el kanban) ─────────────────────────
   if (selectedQuote) {
     return (
-      <FichaCotizacion
-        quote={alDiaConVersion(selectedQuote, quotes)}
+      <FichaCotizacionSincronizada
+        quote={selectedQuote}
+        lista={quotes}
         onBack={() => setSelectedQuote(null)}
         onUpdateQuote={handleUpdateQuote}
         onConvertToShipment={onConvertToShipment}

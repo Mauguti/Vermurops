@@ -9,7 +9,7 @@ import { UserRole } from '../auth/users';
 import KanbanCotizaciones from './quotes/KanbanCotizaciones';
 import BandejaPricing from './quotes/BandejaPricing';
 import KanbanProspeccion from './quotes/KanbanProspeccion';
-import FichaCotizacion from './quotes/FichaCotizacion';
+import FichaCotizacionSincronizada from './quotes/FichaCotizacionSincronizada';
 import RightChatPanel from './quotes/RightChatPanel';
 import {
   KanbanQuote, TipoServicio, PIPELINE_STAGES,
@@ -18,7 +18,6 @@ import {
 import { useServicios, renderIcon } from '../config/serviciosStore';
 import { useNotifications } from '../notifications/NotificationsContext';
 import { useCotizaciones } from '../hooks/useCotizaciones';
-import { alDiaConVersion } from '../lib/versionesCotizacion';
 import { useProspectos } from '../hooks/useProspectos';
 import { useClientes } from '../hooks/useClientes';
 import { generateFolio, generateFolioProspecto } from '../lib/folioService';
@@ -1417,8 +1416,9 @@ export default function Quotes() {
       ) : (viewMode === 'prospeccion' || viewMode === 'kanban') ? (
         /* ─── Vista Prospectos / Negociación (con sub-vista tabla/kanban) ─── */
         selectedQuote ? (
-          <FichaCotizacion
-            quote={alDiaConVersion(selectedQuote, kanbanQuotes)}
+          <FichaCotizacionSincronizada
+            quote={selectedQuote}
+        lista={kanbanQuotes}
             onBack={() => {
               if (origenNav) { registrarAbierta(null); irA(origenNav); }
               setSelectedQuote(null);

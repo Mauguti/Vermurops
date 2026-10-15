@@ -8,7 +8,6 @@
 import { catalogoOperable } from '../../lib/estatusCatalogo';
 import React, { useState, useEffect, useMemo } from 'react';
 import { antesDeLaComa } from '../../lib/texto';
-import { alDiaConVersion } from '../../lib/versionesCotizacion';
 import {
   Plane, Ship, Truck, ShieldCheck, Check, Clock,
   ChevronRight, BookOpen, Inbox,
@@ -17,7 +16,7 @@ import {
   KanbanQuote, ServicioSolicitado, CotizacionProveedor, TipoServicio,
   EQUIPO_PRICING, calcularTotalConsolidado,
 } from './QuotesData';
-import FichaCotizacion from './FichaCotizacion';
+import FichaCotizacionSincronizada from './FichaCotizacionSincronizada';
 import { useAuth } from '../../auth/AuthContext';
 import { useTarifas } from '../../hooks/useTarifas';
 import { useConceptos } from '../../hooks/useConceptos';
@@ -366,8 +365,9 @@ export default function BandejaPricing({
   // ── Vista de ficha completa (reemplaza la bandeja) ──────────────────────
   if (selectedQuote) {
     return (
-      <FichaCotizacion
-        quote={alDiaConVersion(selectedQuote, quotes)}
+      <FichaCotizacionSincronizada
+        quote={selectedQuote}
+        lista={quotes}
         onBack={() => setSelectedQuote(null)}
         onUpdateQuote={handleUpdateQuote}
         onConvertToShipment={onConvertToShipment}
