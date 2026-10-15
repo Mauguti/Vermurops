@@ -11,6 +11,7 @@ import {
   Shield, ChevronDown, Loader2,
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
+import { puede } from '../../auth/permisos';
 import { useGestionUsuarios } from '../../hooks/useGestionUsuarios';
 import {
   ROLES_VALIDOS,
@@ -65,7 +66,9 @@ export default function GestionUsuarios() {
   const [mostrarInvitar, setMostrarInvitar] = useState(false);
   const [feedback, setFeedback] = useState<{ tipo: 'ok' | 'error'; msg: string } | null>(null);
 
-  useEffect(() => { listar(); }, [listar]);
+  // Sin la capacidad la Function contesta 403: ni se llama ni se pinta.
+  const autorizado = puede(user?.rol, 'usuario.gestionar');
+  useEffect(() => { if (autorizado) listar(); }, [autorizado, listar]);
 
   // Limpiar feedback tras 5 segundos
   useEffect(() => {
@@ -73,6 +76,8 @@ export default function GestionUsuarios() {
     const t = setTimeout(() => setFeedback(null), 5000);
     return () => clearTimeout(t);
   }, [feedback]);
+
+  if (!autorizado) return null;
 
   return (
     <div>

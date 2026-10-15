@@ -2643,6 +2643,19 @@ regla verificada por mutación); el cliente, en `lib/solicitarRestablecimiento.t
     con `--only functions:solicitarRestablecimiento`.**
   - Queda sin uso (y sin borrar) `enviarCorreoDeAcceso` de `lib/recuperarContrasena.ts`.
 
+## 4.68 Configuración sin 403 para quien no gestiona usuarios (tarea 120, 15-oct-2026)
+
+Los 16 hallazgos del barrido 47 (§4.53) venían de un solo lugar: `Settings`
+arrancaba con `activeSection = 'users'` y el efecto que lo corregía a «Mi perfil»
+corría DESPUÉS del primer render, que ya había montado `GestionUsuarios` y
+su `listar()` → 403 para Ventas, Pricing, Operaciones y Administración.
+  - La sección inicial sale de `puede(rol, 'usuario.gestionar')`; el render de
+    `<GestionUsuarios />` y su efecto de `listar()` exigen la misma capacidad
+    (doble guarda: el componente tampoco llama solo).
+  - Spec `tests/e2e/120-config-sin-403.spec.ts`: sin la capacidad no hay petición
+    a `gestionarUsuarios` ni 403; admin sí la hace. Sin el arreglo, 4 de 5 caen.
+  - Barrido 47 con Functions: 0 hallazgos.
+
 ---
 
 ## 5. Estado de los módulos

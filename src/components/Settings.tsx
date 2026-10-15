@@ -5,6 +5,7 @@ import {
   Table2, Terminal, CheckCircle2, AlertCircle, LogOut, Package, Trash2, Hash
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { puede } from '../auth/permisos';
 import { useServicios, renderIcon, CategoriaServicio } from '../config/serviciosStore';
 import ContadoresFolio from './settings/ContadoresFolio';
 import GestionUsuarios from './settings/GestionUsuarios';
@@ -15,7 +16,10 @@ import { confirmar } from './ui/Dialogos';
 
 export default function Settings() {
   const { user, logout } = useAuth();
-  const [activeSection, setActiveSection] = useState('users');
+  // Sección inicial según la capacidad, no un default que luego se corrige:
+  // montar «Usuarios» un instante basta para que llame a la Function y dé 403.
+  const puedeGestionarUsuarios = puede(user?.rol, 'usuario.gestionar');
+  const [activeSection, setActiveSection] = useState(puedeGestionarUsuarios ? 'users' : 'perfil');
   const [activeCatalogTab, setActiveCatalogTab] = useState('carriers');
   const [editNombre, setEditNombre] = useState(user?.nombre ?? '');
 
@@ -224,7 +228,7 @@ export default function Settings() {
         <div className="flex-1 p-[32px] overflow-y-auto">
            {activeSection === 'company' && <ConfiguracionEmpresaForm />}
 
-           {activeSection === 'users' && <GestionUsuarios />}
+           {activeSection === 'users' && puedeGestionarUsuarios && <GestionUsuarios />}
 
            {activeSection === 'perfil' && renderPerfil()}
 
