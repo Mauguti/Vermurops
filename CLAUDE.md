@@ -2857,6 +2857,33 @@ sobre la lógica pura de `lib/adopcionCotizacion.ts` (10 tests, mutados).
   - e2e: `tests/e2e/122-ficha-adopta-ajeno.spec.ts` (REST para lo ajeno; el
     conflicto, con dos navegadores y uno sin red mientras edita).
 
+## 4.75 El embarque guarda solo lo tocado (tarea 123, 15-oct-2026)
+
+Lo de la 111 para la cotización, aplicado a `guardarEmbarque`, que escribía el
+documento ENTERO con `setDoc`: dos pestañas sobre el mismo embarque se pisaban
+(la última borraba la nota, el documento o el cierre de la otra).
+  - `guardarEmbarque(embarque, anterior?)`: con `anterior` (la copia sobre la
+    que se calculó el cambio) corre una transacción que lee el servidor y
+    escribe SOLO lo tocado (`planEscrituraEmbarque`, `lib/diffEmbarque.ts`,
+    sobre `diffCotizacion`: `parcheFusionado` ahora recibe la lista de claves
+    por id). Sin `anterior` —alta, HBL hijo— sigue el upsert de siempre.
+  - **Listas por id fusionadas:** `eventos`, `bitacora`, `documentos`,
+    `documentosGenerados`. **`cierres` se escribe por subclave**
+    (`cierres.pago`): Operaciones y Administración cierran a la vez. El resto de
+    los objetos (ruta, cargos, fechas…) son claves atómicas: ahí gana el último.
+  - Un opcional que la edición vació se manda con `deleteField` (con `setDoc`
+    desaparecía solo).
+  - **En cola por embarque** (`lib/enCola.ts`, movida desde `useCotizaciones`;
+    la clave lleva la colección). `FichaEmbarque` pasa el `anterior` desde
+    `guardar` (el `embarque` del render) y desde la cola de cierres (6ee9ff5),
+    y `conBitacora` sigue comparando antes/después: la bitácora no cambia.
+  - e2e `tests/e2e/123-embarque-por-campos.spec.ts`: la «otra pestaña» escribe
+    por REST en la MISMA tarea síncrona que el clic (copia local vieja con
+    certeza; congelar la red no sirve, el long-poll abierto no pasa por las
+    rutas de Playwright). Mutado: con `setDoc` cae. Incluye el caso de dos
+    embarques de la misma cotización que conserva los dos ids.
+
+
 ---
 
 ## 5. Estado de los módulos
