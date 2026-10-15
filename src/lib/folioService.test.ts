@@ -202,23 +202,76 @@ describe('dos cotizaciones ganadas a la vez', () => {
   });
 });
 
-// ─── El cambio de año ─────────────────────────────────────────────────────────
+// ─── El cambio de año (tarea 121) ─────────────────────────────────────────────
 
-describe('el cambio de año en la reserva', () => {
-  it('cambia el año del folio y el consecutivo continúa', async () => {
-    base.sembrar(RUTA('VLIM'), { ultimo: 14, sembrado: true });
+describe('el consecutivo reinicia en enero', () => {
+  it('31 de diciembre → 1 de enero: 2026 sigue, 2027 arranca en 001', async () => {
+    base.sembrar(RUTA('VLIM'), { ultimo: 320, sembrado: true });
     const dic = await base.transaccion(tx => reservarFoliosSerie(tx, 'VLIM', 1, 2026));
     const ene = await base.transaccion(tx => reservarFoliosSerie(tx, 'VLIM', 1, 2027));
-    expect(dic.folios).toEqual(['VLIM-26-015']);
-    expect(ene.folios).toEqual(['VLIM-27-016']);
+    const ene2 = await base.transaccion(tx => reservarFoliosSerie(tx, 'VLIM', 1, 2027));
+    expect(dic.folios).toEqual(['VLIM-26-321']);
+    expect(ene.folios).toEqual(['VLIM-27-001']);
+    expect(ene2.folios).toEqual(['VLIM-27-002']);
   });
 
-  it('reiniciar en enero exige volver a fijar el consecutivo en 0', async () => {
-    // Lo que hoy habría que hacer a mano si Vermur quiere VLIM-27-001: es la
-    // pregunta del reporte 66. Un contador por año sería otra tarea.
-    base.sembrar(RUTA('VLIM'), { ultimo: 0, sembrado: true });
-    const r = await base.transaccion(tx => reservarFoliosSerie(tx, 'VLIM', 1, 2027));
-    expect(r.folios).toEqual(['VLIM-27-001']);
+  it('un folio de 2026 emitido tarde (otra sesión) no toca el consecutivo de 2027', async () => {
+    base.sembrar(RUTA('VLIM'), { ultimo: 320, sembrado: true });
+    await base.transaccion(tx => reservarFoliosSerie(tx, 'VLIM', 2, 2027));
+    const tarde = await base.transaccion(tx => reservarFoliosSerie(tx, 'VLIM', 1, 2026));
+    expect(tarde.folios).toEqual(['VLIM-26-321']);
+    expect(base.docs.get(RUTA('VLIM'))?.datos.ultimoPorAnio).toEqual({ '26': 321, '27': 2 });
+  });
+
+  it('contador viejo sin ultimoPorAnio: 2026 sigue de `ultimo` sin migrar', async () => {
+    base.sembrar(RUTA('VLIT'), { ultimo: 201, sembrado: true });
+    const r = await base.transaccion(tx => reservarFoliosSerie(tx, 'VLIT', 1, 2026));
+    expect(r.folios).toEqual(['VLIT-26-202']);
+    // `ultimo` se mantiene al día para quien todavía lo lee.
+    expect(base.docs.get(RUTA('VLIT'))?.datos).toMatchObject({
+      ultimo: 202, ultimoPorAnio: { '26': 202 }, sembrado: true,
+    });
+  });
+
+  it('contador viejo sin ultimoPorAnio: un año nuevo arranca en 001 y deja `ultimo` intacto', async () => {
+    base.sembrar(RUTA('VLIT'), { ultimo: 201, sembrado: true });
+    const r = await base.transaccion(tx => reservarFoliosSerie(tx, 'VLIT', 1, 2027));
+    expect(r.folios).toEqual(['VLIT-27-001']);
+    expect(base.docs.get(RUTA('VLIT'))?.datos.ultimo).toBe(201);
+  });
+
+  it('el contador sin documento arranca en 001 en cualquier año', async () => {
+    const r = await base.transaccion(tx => reservarFoliosSerie(tx, 'VLET', 1, 2027));
+    expect(r.folios).toEqual(['VLET-27-001']);
+  });
+
+  it('multi-serie: cada serie reinicia sola y dos pedidos de la misma serie no repiten', async () => {
+    base.sembrar(RUTA('VLIM'), { ultimo: 40, sembrado: true });
+    base.sembrar(RUTA('VLIT'), { ultimo: 10, sembrado: true });
+    const r = await base.transaccion(tx => reservarFoliosMultiSerie(tx, [
+      { prefijo: 'VLIM', cuantos: 1 }, { prefijo: 'VLIT', cuantos: 1 }, { prefijo: 'VLIT', cuantos: 1 },
+    ], 2027));
+    expect(r.get('VLIM')?.folios).toEqual(['VLIM-27-001']);
+    expect(r.get('VLIT')?.folios).toEqual(['VLIT-27-001', 'VLIT-27-002']);
+  });
+
+  it('dos emisiones simultáneas en el cambio de año no reciben el mismo folio', async () => {
+    base.sembrar(RUTA('VLIM'), { ultimo: 320, sembrado: true });
+    let reintentos = -1;
+    const primera = base.transaccion(
+      tx => { reintentos++; return reservarFoliosSerie(tx, 'VLIM', 1, 2027); },
+      async () => { await base.transaccion(tx => reservarFoliosSerie(tx, 'VLIM', 1, 2027)); },
+    );
+    const r1 = await primera;
+    expect(reintentos).toBe(1);
+    expect(r1.folios).toEqual(['VLIM-27-002']); // la otra se quedó con el 001
+    expect(base.docs.get(RUTA('VLIM'))?.datos.ultimoPorAnio).toEqual({ '27': 2 });
+  });
+
+  it('con formato de cuatro dígitos de año el reinicio es el mismo', async () => {
+    base.sembrar(RUTA('VLIA'), { ultimo: 28, sembrado: true, formato: { digitosAnio: 4 } });
+    const r = await base.transaccion(tx => reservarFoliosSerie(tx, 'VLIA', 1, 2027));
+    expect(r.folios).toEqual(['VLIA-2027-001']);
   });
 });
 

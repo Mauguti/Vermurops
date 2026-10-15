@@ -28,22 +28,23 @@
  *     captura, bajarlo volvería a emitir folios que ya están impresos en un
  *     BL y en un pedimento. Se reporta y no se toca.
  *
- * ⚠️ **El consecutivo NO reinicia en enero, y hoy no hay nada que lo haga.**
- * Mau pidió que reinicie en 001 cada enero; eso no está construido (§4.31):
- * `ultimo` es un entero por serie que no mira el año, así que en enero de 2027
- * el siguiente folio sería `VLIM-27-321`, no `VLIM-27-001`. Hacerlo solo
- * exige un contador por año y serie, y es otra tarea. Mientras no exista, en
- * enero hay que volver a correr esto con `--reiniciar`.
- */
+ * ✅ **El consecutivo reinicia solo en enero (tarea 121).** El contador guarda
+ * `ultimoPorAnio` y el folio sigue del año de emisión (America/Mexico_City);
+ * un año nuevo arranca en 001 sin intervención. `--reiniciar` ya no hace
+ * falta y se ignora con un aviso. Este script siembra el año en curso:
+ * escribe `ultimoPorAnio[aa]` y, en 2026, también `ultimo`. */
 
 import { readFileSync } from 'fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { armarFolioSerie, type FormatoFolioSerie } from '../src/lib/formatoFolioSerie';
+import { anioMexico, escrituraDelAnio, ultimoDelAnio } from '../src/lib/consecutivoPorAnio';
 
 const APLICAR = process.argv.includes('--aplicar');
-/** Para enero: deja los contadores en 0 en vez del último usado. */
-const REINICIAR = process.argv.includes('--reiniciar');
+const ANIO = anioMexico();
+if (process.argv.includes('--reiniciar')) {
+  console.log('\nℹ️  --reiniciar ya no hace falta: el consecutivo reinicia solo en enero (tarea 121). La bandera se ignora.');
+}
 
 /**
  * Captura de Luis, 13-oct-2026. Solo las cinco que conocemos.
@@ -76,7 +77,7 @@ const SERIES_CONOCIDAS = ['VLIM', 'VLEM', 'VLIT', 'VLET', 'VLIA', 'VLEA', 'VL'];
  * Firebase: traerla a un script de Node conectaría a producción de lado.
  */
 function folio(prefijo: string, n: number, formato?: Partial<FormatoFolioSerie> | null): string {
-  return armarFolioSerie(prefijo, n, new Date().getFullYear(), formato);
+  return armarFolioSerie(prefijo, n, ANIO, formato);
 }
 
 function inicializar() {
@@ -94,7 +95,7 @@ function inicializar() {
 }
 
 async function main() {
-  console.log(`\n═════════ SEMBRAR CONTADORES DE FOLIO ${APLICAR ? '· APLICAR' : '· EN SECO'}${REINICIAR ? ' · REINICIAR A 0' : ''} ═════════\n`);
+  console.log(`\n═════════ SEMBRAR CONTADORES DE FOLIO ${APLICAR ? '· APLICAR' : '· EN SECO'} ═════════\n`);
 
   for (const s of Object.keys(ULTIMOS)) {
     if (!SERIES_CONOCIDAS.includes(s)) {
@@ -116,14 +117,14 @@ async function main() {
     const ref = db.collection('contadores').doc(`embarques_${serie}`);
     const snap = await ref.get();
     const data = snap.exists ? (snap.data() as Record<string, unknown>) : undefined;
-    const antes = data && typeof data.ultimo === 'number' ? data.ultimo : null;
+    const antes = data ? ultimoDelAnio(data, ANIO) : null;
     const sembradoAntes = Boolean(data?.sembrado);
-    const destino = REINICIAR ? 0 : capturado;
+    const destino = capturado;
 
     let accion: string;
     if (antes === null) accion = 'se siembra';
     else if (antes === destino) accion = 'ya está ahí';
-    else if (antes > destino && !REINICIAR) accion = '⛔ NO se toca: producción va MÁS ALTO';
+    else if (antes > destino) accion = '⛔ NO se toca: producción va MÁS ALTO';
     else accion = 'se sube';
 
     filas.push({
@@ -172,19 +173,19 @@ async function main() {
      * `merge: true` conserva el `formato` que alguien haya configurado por
      * pantalla: esto siembra el consecutivo, no reescribe la serie.
      */
-    await db.collection('contadores').doc(`embarques_${f.serie}`).set({
-      ultimo: f.destino,
+    const ref = db.collection('contadores').doc(`embarques_${f.serie}`);
+    const previo = (await ref.get()).data();
+    await ref.set({
+      ...escrituraDelAnio(previo, ANIO, f.destino),
       sembrado: true,
       sembradoPor: quien,
       sembradoEn: new Date().toISOString(),
-      sembradoDesde: REINICIAR ? 'reinicio de año' : 'captura de Luis del 13-oct-2026',
+      sembradoDesde: 'captura de Luis del 13-oct-2026',
     }, { merge: true });
     console.log(`  ✅ ${f.serie} → ultimo ${f.destino} · el siguiente será ${folio(f.serie, f.destino + 1, f.formato)}`);
   }
 
   console.log(`\n  ${porEscribir.length} contador(es) sembrado(s).`);
-  console.log('  ⚠️  Recuerda: el consecutivo NO reinicia solo en enero (§4.31).');
-  console.log('      En enero hay que correr esto otra vez con --reiniciar.\n');
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

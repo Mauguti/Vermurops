@@ -15,7 +15,7 @@
 
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { doc, onSnapshot, setDoc, collection, deleteField } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, collection, deleteField } from 'firebase/firestore';
 import {
   SERIES_EMBARQUE, EstadoContadorSerie, DOC_CONFIG_EMBARQUES,
   docConfiguracionEmbarques, leerInterruptorEmbarque,
@@ -24,6 +24,7 @@ import {
 import {
   formatoParaGuardar, razonFormatoInvalido, type FormatoFolioSerie,
 } from '../lib/formatoFolioSerie';
+import { anioMexico, escrituraDelAnio, ultimoDelAnio } from '../lib/consecutivoPorAnio';
 import { useAuth } from '../auth/AuthContext';
 import { exigir } from '../auth/permisos';
 import { UserRole } from '../auth/users';
@@ -56,7 +57,7 @@ export function useContadoresSerie() {
         const data = d.data();
         porSerie.set(serie, {
           serie,
-          ultimo: (data.ultimo as number) ?? 0,
+          ultimo: ultimoDelAnio(data, anioMexico()),
           sembrado: (data.sembrado as boolean) ?? false,
           fechaSiembra: data.fechaSiembra as string | undefined,
           sembradoPor: data.sembradoPor as string | undefined,
@@ -87,8 +88,10 @@ export function useContadoresSerie() {
     if (!Number.isInteger(ultimo) || ultimo < 0) {
       throw new Error('El consecutivo debe ser un entero mayor o igual a cero.');
     }
-    await conAviso('el consecutivo de folio', () => setDoc(doc(db, 'contadores', `embarques_${serie}`), sanitizarParaFirestore({
-      ultimo,
+    const ref = doc(db, 'contadores', `embarques_${serie}`);
+    const previo = (await getDoc(ref)).data();
+    await conAviso('el consecutivo de folio', () => setDoc(ref, sanitizarParaFirestore({
+      ...escrituraDelAnio(previo, anioMexico(), ultimo),
       sembrado: true,
       fechaSiembra: new Date().toISOString(),
       sembradoPor: user?.email ?? '',

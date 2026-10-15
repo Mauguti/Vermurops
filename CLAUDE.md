@@ -2656,6 +2656,25 @@ su `listar()` → 403 para Ventas, Pricing, Operaciones y Administración.
     a `gestionarUsuarios` ni 403; admin sí la hace. Sin el arreglo, 4 de 5 caen.
   - Barrido 47 con Functions: 0 hallazgos.
 
+## 4.69 El consecutivo del folio reinicia en enero (tarea 121, 15-oct-2026)
+
+Cierra el ⚠️ de §4.31 y §4.66. `contadores/embarques_{serie}` puede traer
+`ultimoPorAnio: { "26": 320, "27": 4 }` (opcional y aditivo) y el folio sigue
+del año de EMISIÓN en America/Mexico_City (`anioMexico`, no `getFullYear()`:
+las 11 pm del 31-dic en México ya son enero en UTC). Reglas puras y tests en
+`lib/consecutivoPorAnio.ts`; las usan `reservarFoliosSerie`,
+`reservarFoliosMultiSerie`, Configuración y `sembrarFolios.ts`.
+  - **Lectura dual, sin migrar:** existe `ultimoPorAnio[aa]` → de ahí; si no y
+    `aa` es 2026 (el año de `ultimo`) → de `ultimo`; año nuevo → 001.
+  - **En 2026 la escritura mantiene `ultimo` al día** junto al mapa: lo lee
+    Configuración y cualquier sesión con el código viejo, que si no emitiría un
+    folio repetido. En 2027 en adelante solo se escribe el mapa.
+  - Todo va en la misma transacción que ya reservaba el folio; el formato sigue
+    siendo `armarFolioSerie`.
+  - `sembrarFolios.ts` siembra el año en curso; `--reiniciar` ya no hace falta.
+  - **Pendiente:** el contador de cotizaciones, prospectos, OC y pagos sigue sin
+    mirar el año (no se pidió).
+
 ---
 
 ## 5. Estado de los módulos

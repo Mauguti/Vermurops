@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AlertTriangle, CheckCircle2, Hash, Pencil, Power, X } from 'lucide-react';
 import { useContadoresSerie } from '../../hooks/useContadoresSerie';
 import { formatFolioSerie } from '../../lib/folioService';
+import { anioMexico } from '../../lib/consecutivoPorAnio';
 import {
   MAX_DIGITOS, SEPARADORES, avisoPrefijoFueraDeFamilia, ejemploFolio,
   formatoDeSerie, formatoPersonalizado, razonFormatoInvalido,
@@ -51,7 +52,7 @@ export default function ContadoresFolio() {
   const [formato, setFormato] = useState<FormatoFolioSerie | null>(null);
   const [cambiandoSwitch, setCambiandoSwitch] = useState(false);
 
-  const anio = new Date().getFullYear();
+  const anio = anioMexico();
 
   const guardar = async (serie: string) => {
     const valor = Number(borradores[serie]);

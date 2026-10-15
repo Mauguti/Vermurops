@@ -15,6 +15,7 @@
 import { db } from '../firebase';
 import { doc, runTransaction } from 'firebase/firestore';
 import { armarFolioSerie, type FormatoFolioSerie } from './formatoFolioSerie';
+import { anioMexico, escrituraDelAnio, ultimoDelAnio } from './consecutivoPorAnio';
 
 // ─── Configuración del folio ──────────────────────────────────────────────────
 //
@@ -170,7 +171,7 @@ export async function generateFolioEmbarque(): Promise<string> {
 export function formatFolioSerie(
   prefijo: string,
   n: number,
-  anio = new Date().getFullYear(),
+  anio = anioMexico(),
   formato?: Partial<FormatoFolioSerie> | null,
 ): string {
   return armarFolioSerie(prefijo, n, anio, formato);
@@ -229,7 +230,7 @@ export async function reservarFoliosSerie(
         set: (ref: ReturnType<typeof docContadorSerie>, data: Record<string, unknown>, opts?: { merge: boolean }) => unknown },
   prefijo: string,
   cuantos: number,
-  anio = new Date().getFullYear(),
+  anio = anioMexico(),
 ): Promise<ResultadoReserva> {
   if (cuantos <= 0) return { folios: [], sembrado: true };
 
@@ -237,7 +238,8 @@ export async function reservarFoliosSerie(
   const snap = await tx.get(ref);
   const data = snap.exists() ? snap.data() : undefined;
 
-  const ultimo = (data?.ultimo as number) ?? 0;
+  // Tarea 121: el consecutivo es del AÑO de emisión; enero arranca en 001.
+  const ultimo = ultimoDelAnio(data, anio);
   const sembrado = (data?.sembrado as boolean) ?? false;
   const formato = data?.formato as Partial<FormatoFolioSerie> | undefined;
 
@@ -247,7 +249,7 @@ export async function reservarFoliosSerie(
   }
 
   // merge: true conserva `sembrado` y los datos de auditoría de la siembra.
-  tx.set(ref, { ultimo: ultimo + cuantos }, { merge: true });
+  tx.set(ref, escrituraDelAnio(data, anio, ultimo + cuantos), { merge: true });
   return { folios, sembrado };
 }
 
@@ -313,7 +315,7 @@ export async function reservarFoliosMultiSerie(
   tx: { get: (ref: ReturnType<typeof docContadorSerie>) => Promise<{ exists: () => boolean; data: () => Record<string, unknown> | undefined }>;
         set: (ref: ReturnType<typeof docContadorSerie>, data: Record<string, unknown>, opts?: { merge: boolean }) => unknown },
   pedidos: { prefijo: string; cuantos: number }[],
-  anio = new Date().getFullYear(),
+  anio = anioMexico(),
 ): Promise<Map<string, ResultadoReserva>> {
   const resultado = new Map<string, ResultadoReserva>();
 
@@ -328,14 +330,16 @@ export async function reservarFoliosMultiSerie(
   // ── Fase 1: todas las lecturas ────────────────────────────────────────────
   const estado = new Map<string, {
     ultimo: number; sembrado: boolean; formato?: Partial<FormatoFolioSerie>;
+    data?: Record<string, unknown>;
   }>();
   for (const prefijo of totalPorPrefijo.keys()) {
     const snap = await tx.get(docContadorSerie(prefijo));
     const data = snap.exists() ? snap.data() : undefined;
     estado.set(prefijo, {
-      ultimo: (data?.ultimo as number) ?? 0,
+      ultimo: ultimoDelAnio(data, anio),
       sembrado: (data?.sembrado as boolean) ?? false,
       formato: data?.formato as Partial<FormatoFolioSerie> | undefined,
+      data,
     });
   }
 
@@ -363,7 +367,7 @@ export async function reservarFoliosMultiSerie(
 
   // ── Fase 3: todas las escrituras ──────────────────────────────────────────
   cursor.forEach((ultimo, prefijo) => {
-    tx.set(docContadorSerie(prefijo), { ultimo }, { merge: true });
+    tx.set(docContadorSerie(prefijo), escrituraDelAnio(estado.get(prefijo)?.data, anio, ultimo), { merge: true });
   });
 
   return resultado;
