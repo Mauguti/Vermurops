@@ -17,6 +17,7 @@ import {
   doc,
   setDoc,
   updateDoc,
+  runTransaction,
   query,
   where,
   orderBy,
@@ -37,6 +38,8 @@ import { UserRole } from '../auth/users';
 import { totalesPorPagar, TotalesPorPagar } from '../lib/cuentasPorPagar';
 import { anotarBitacora } from './anotarBitacora';
 import { tituloOC } from '../lib/bitacoraEmbarque';
+import { enCola } from '../lib/enCola';
+import { planEscrituraOC } from '../lib/diffOrdenCompra';
 import { problemaFechaPagoIndividual, hoyLocal } from '../lib/formularioPagoProveedor';
 
 // ─── Colección ──────────────────────────────────────────────────────────────
@@ -118,10 +121,34 @@ export function useOrdenesCompra() {
   const updateOrden = useCallback(async (
     id: string,
     data: Partial<OrdenCompra>,
+    /**
+     * La copia de la orden sobre la que se calculó `data` (tarea 124). Con ella
+     * la escritura es una transacción que lee el servidor y escribe solo lo
+     * tocado, con documentos y anticipos fusionados por id. Sin ella, el
+     * parche de siempre.
+     */
+    anterior?: OrdenCompra,
   ): Promise<void> => {
+    const ahora = new Date().toISOString();
+    if (anterior && anterior.id === id) {
+      const patch = sanitizarParaFirestore({ ...data, updatedAt: ahora }) as Record<string, unknown>;
+      await enCola(`${COLLECTION}/${id}`, () => conAviso('la orden de compra', () => runTransaction(db, async tx => {
+        const ref = doc(db, COLLECTION, id);
+        const snap = await tx.get(ref);
+        if (!snap.exists()) throw new Error(`${id} ya no existe. No se guardó nada.`);
+        const cambios = planEscrituraOC(
+          snap.data() as Record<string, unknown>,
+          sanitizarParaFirestore(anterior) as unknown as Record<string, unknown>,
+          patch,
+        );
+        if (Object.keys(cambios).length === 0) return;
+        tx.update(ref, sanitizarParaFirestore(cambios));
+      })));
+      return;
+    }
     await conAviso('la orden de compra', () => updateDoc(doc(db, COLLECTION, id), sanitizarParaFirestore({
       ...data,
-      updatedAt: new Date().toISOString(),
+      updatedAt: ahora,
     }) as Record<string, unknown>));
   }, []);
 

@@ -152,7 +152,7 @@ export default function Finance() {
     const conCambios: OrdenCompra = { ...ocAbierta, ...(cambios ?? {}) };
     if (cambios && Object.keys(cambios).length > 0) {
       try {
-        await updateOrden(ocAbierta.id, cambios);
+        await updateOrden(ocAbierta.id, cambios, ocAbierta);
       } catch (err) {
         setToast({ mensaje: `No se pudo guardar: ${err instanceof Error ? err.message : err}`, tipo: 'error' });
         return;
@@ -283,7 +283,7 @@ export default function Finance() {
 
   const handleActualizarOC = (cambios: Partial<OrdenCompra>) => {
     if (!ocAbierta) return;
-    updateOrden(ocAbierta.id, cambios).catch(err =>
+    updateOrden(ocAbierta.id, cambios, ocAbierta).catch(err =>
       setToast({ mensaje: `No se pudo guardar: ${err instanceof Error ? err.message : err}`, tipo: 'error' }));
   };
 
