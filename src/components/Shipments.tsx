@@ -70,8 +70,8 @@ export default function Shipments() {
    * FichaEmbarque lo llama en catorce sitios y no necesita saber que ahora
    * esto escribe en Firestore.
    */
-  const handleUpdateEmbarque = (updated: EmbarqueCompleto) => {
-    guardarEmbarque(updated).catch(err => {
+  const handleUpdateEmbarque = (updated: EmbarqueCompleto, anterior?: EmbarqueCompleto) => {
+    guardarEmbarque(updated, anterior).catch(err => {
       setToast({
         mensaje: `No se pudo guardar el embarque: ${err instanceof Error ? err.message : err}`,
         tipo: 'error',

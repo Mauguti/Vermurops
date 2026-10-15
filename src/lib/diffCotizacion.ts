@@ -103,11 +103,13 @@ export function parcheFusionado(
   servidor: Objeto,
   anterior: Objeto,
   nuevo: Objeto,
+  /** Claves de lista con `id` que se fusionan; el embarque trae las suyas (tarea 123). */
+  listas: readonly string[] = LISTAS_POR_ID,
 ): Objeto {
   const parche: Objeto = {};
   for (const k of tocados(anterior, nuevo)) {
     if (nuevo[k] === undefined) continue;
-    if ((LISTAS_POR_ID as readonly string[]).includes(k)) {
+    if (listas.includes(k)) {
       parche[k] = fusionarListaPorId(
         servidor[k] as ConId[] | undefined,
         anterior[k] as ConId[] | undefined,

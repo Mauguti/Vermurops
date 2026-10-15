@@ -65,7 +65,8 @@ interface FichaEmbarqueProps {
   embarque: EmbarqueCompleto;
   allEmbarques: EmbarqueCompleto[];
   onClose: () => void;
-  onUpdateEmbarque: (updated: EmbarqueCompleto) => void;
+  /** `anterior` = la copia sobre la que se calculó el cambio: solo se escribe lo que difiere (tarea 123). */
+  onUpdateEmbarque: (updated: EmbarqueCompleto, anterior?: EmbarqueCompleto) => void | Promise<void>;
   onSelectEmbarqueById: (id: string) => void;
   /** Etiqueta del botón regresar cuando se llegó desde otra ficha. */
   regresarLabel?: string;
@@ -100,7 +101,7 @@ export default function FichaEmbarque({
    */
   const autorBitacora = { uid: user?.uid ?? '', nombre: user?.nombre ?? user?.email ?? '' };
   const guardar = (updated: EmbarqueCompleto) =>
-    onUpdateEmbarque(conBitacora(embarque, updated, autorBitacora, new Date().toISOString()));
+    onUpdateEmbarque(conBitacora(embarque, updated, autorBitacora, new Date().toISOString()), embarque);
 
   /*
    * Los cierres se guardan por una COLA: cada clic parte del resultado del
@@ -118,7 +119,7 @@ export default function FichaEmbarque({
     const anterior = colaAnterior.current;
     colaAnterior.current = siguiente;
     return onUpdateEmbarque(
-      conBitacora(anterior, siguiente, autorBitacora, new Date().toISOString()));
+      conBitacora(anterior, siguiente, autorBitacora, new Date().toISOString()), anterior);
   }));
   // El dato del servidor pone la cola al día; lo que tenga en vuelo manda.
   useEffect(() => {

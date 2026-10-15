@@ -17,6 +17,7 @@
  * En E3.4 se añadirán createCotizacion y updateCotizacion.
  */
 
+import { enCola } from '../lib/enCola';
 import { db } from '../firebase';
 import { doc, setDoc, updateDoc, runTransaction } from 'firebase/firestore';
 import { KanbanQuote } from '../components/quotes/QuotesData';
@@ -63,15 +64,6 @@ function verificarCongelado(id: string, guardada: KanbanQuote, data: Partial<Kan
       + 'Si el embarque necesita otra cosa, corrígelo en el embarque.',
     );
   }
-}
-
-/** Escrituras por transacción en fila, una cola por cotización (tarea 111). */
-const colas = new Map<string, Promise<unknown>>();
-function enCola<T>(id: string, tarea: () => Promise<T>): Promise<T> {
-  const previa = colas.get(id) ?? Promise.resolve();
-  const esta = previa.then(tarea, tarea);
-  colas.set(id, esta.catch(() => undefined));
-  return esta;
 }
 
 export function useCotizaciones() {
@@ -132,7 +124,7 @@ export function useCotizaciones() {
        * atómica) pisaría a la nueva: en el recorrido se perdía el impuesto
        * elegido justo después de un cambio de profit.
        */
-      await enCola(id, () => conAviso('la cotización', () => runTransaction(db, async tx => {
+      await enCola(`cotizaciones/${id}`, () => conAviso('la cotización', () => runTransaction(db, async tx => {
         const ref = doc(db, 'cotizaciones', id);
         const snap = await tx.get(ref);
         if (!snap.exists()) throw new Error(`${id} ya no existe. No se guardó nada.`);
