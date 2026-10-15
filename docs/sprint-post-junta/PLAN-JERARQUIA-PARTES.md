@@ -255,8 +255,8 @@ Sin cambios en `firestore.rules` (embarques ya admite al equipo), sin índices
 2. **¿Reusar `entidades` en vez de crear `partes`?** Recomendación: sí; el
    bloque nuevo sería una segunda copia de los mismos roles.
 3. **¿Cambiamos `RefEntidad` para que consignee/notify puedan ser cliente?**
-   Hoy van a proveedores por decisión tuya del 10-sep. Toca `vincular` y 15
-   lectores de `entidades.consignatario`.
+   Hoy van a proveedores por decisión tuya del 10-sep. Toca `vincular` y los
+   lectores de `entidades.consignatario` (FichaEmbarque, notificacionArribo, cartasEncomienda).
 4. **¿Dónde está el documento G1–G8?** No está en el repo.
 5. **¿Corro el script de auditoría contra producción** para saber cuántos
    masters reales hay antes de J2? Recomendación: sí, es solo lectura y lo corres tú.
