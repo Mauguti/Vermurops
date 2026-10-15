@@ -2883,6 +2883,24 @@ documento ENTERO con `setDoc`: dos pestañas sobre el mismo embarque se pisaban
     rutas de Playwright). Mutado: con `setDoc` cae. Incluye el caso de dos
     embarques de la misma cotización que conserva los dos ids.
 
+## 4.76 La orden de compra guarda solo lo tocado (tarea 124, 15-oct-2026)
+
+Lo de la 111 y la 123 para la OC. `updateOrden` ya mandaba un parche, pero las
+LISTAS viajaban enteras (`[...documentos, ...nuevos]`, `quitarAnticipo`,
+`aplicarAnticipo`) calculadas sobre la copia vieja de la ficha.
+`updateOrden(id, data, anterior?)`: con `anterior` (la OC sobre la que se
+calculó el parche) corre en transacción y en cola por orden, lee el servidor y
+escribe SOLO lo tocado (`planEscrituraOC`, `lib/diffOrdenCompra.ts`, sobre
+`diffCotizacion`).
+  - `documentos` y `anticiposCruzados` (por `ocId`) se fusionan por id;
+    `saldoPendiente` se recalcula sobre los anticipos ya fusionados.
+  - Una clave del parche igual a la de `anterior` no se escribe: reescribirla
+    pisaría con un valor viejo lo que otra persona ya cambió (p. ej. «No pagar»).
+  - `Finance` pasa `ocAbierta` en sus dos llamadas. Sin `anterior`, el parche de
+    siempre. Las transacciones de pago de la 85 no se tocaron.
+  - Pendiente anotado: `transicionarEstado` y `revertirPago` escriben
+    `historialEstados` completo con `updateDoc` (no en esta tarea).
+  - e2e: `tests/e2e/124-oc-por-campos.spec.ts`.
 
 ---
 
