@@ -2519,6 +2519,104 @@ siete cuentas del 13-oct se veían idénticas al resto del equipo:
     pantalla agrega al vuelo salía «Activa» en verde — justo el que tiene que
     decir «Pendiente».
 
+## 4.66 La carga del Excel de Luis, y los folios sembrados (15-oct-2026)
+
+Dos scripts que escriben en producción, los dos **en seco por omisión** y con
+reversa. Los corre Mau con su llave.
+
+### `scripts/cargarClientesLuis.ts` — 342 clientes
+
+Reglas puras en `lib/cargaClientesLuis.ts` (53 tests); el empate, el respaldo y
+la escritura, en el script. **Aparte de la 65**, no adaptándola: esa lista venía
+de Magaya con número de entidad y su `planearRenglon` tiene 58 tests que fijan
+ESE contrato. Se reusan las primitivas (`normalizarNombre`, que ya quita las
+formas societarias, `normalizarRFC`, `leerCodigoPostal`, `validarRFC`) y el
+**respaldo es el mismo formato**, así que la reversa es
+`revertirCargaClientes.ts` tal cual. El ciclo completo —sembrar, aplicar,
+revertir— se probó contra el emulador: los documentos volvieron idénticos.
+
+**Tres cosas que el Excel tiene y que, cargadas tal cual, habrían hecho daño:**
+
+  - 🔴 **El «nombre correcto» es MENOS completo en 169 de los 322 que
+    empatan.** El Excel dice «A KAYSER AUTOMOTIVE SYSTEMS» donde la plataforma
+    tiene «A KAYSER AUTOMOTIVE SYSTEMS GMBH»; igual con «ARYES» / «ARYES SA DE
+    CV» y «AIDA» / «AIDA SRL». Pisarlo borra la forma societaria, que es lo que
+    se imprime en la factura y en el BL. Por omisión **no se recorta** un
+    nombre que ya contenga al del Excel; se reporta. Con `--forzar-nombres` se
+    pisa. (La hoja «Verificación» de Luis los marca «OK – coincide» porque él
+    empató por nombre normalizado, que es justo lo que ignora el sufijo.)
+  - 🔴 **El cero es «no capturado», no «cero».** 277 de 342 traen días de
+    crédito en 0 y 309 traen límite en 0. Escribirlos pondría «pago de contado»
+    y «sin línea de crédito» en casi toda la cartera. Es la lección del cero de
+    Magaya (§4.30). Solo se escriben **48** días y **16** límites.
+  - 🔴 **Un C.P. de cinco dígitos puede no ser mexicano.** 171 direcciones son
+    del extranjero y traen «C.P. 37574, Germany»: válido como código postal
+    alemán, y en `codigoPostal` se vuelve un CP mexicano para todo lo demás.
+    Solo se extrae de direcciones que terminan en México: **152** de 342.
+
+**Lo demás, en números** (sobre los 342 renglones):
+  - RFC: solo **151** se escribirían. 55 son genéricos (XAXX/XEXX, 49 de ellos
+    XEXX), **119 no tienen forma de RFC mexicano** (`DE812193831`, `7719884`,
+    `AGlobal`, códigos chinos de 18 dígitos) y 17 vienen vacíos. Lo inválido se
+    reporta, no se carga.
+  - Ejecutivo: **64** a una cuenta, **91** «CLIENTES OFICINA» (sin ejecutivo),
+    **180 vacíos** —que NO es «quitarle el ejecutivo»— y **7 a revisión**
+    (6 GABRIELA, 1 KAREN) hasta que Luis conteste.
+  - «CLIENTES OFICINA» con un ejecutivo ya capturado **no se borra**: se
+    reporta. Borrar un dato por una afirmación de una columna es destruirlo.
+  - La columna «Comercial» del Excel es el EJECUTIVO; el campo `comercial` del
+    modelo es el nombre comercial del cliente. Va a `responsableVentas`.
+  - «Antigüedad» solo se reporta, y son **cinco** valores distintos, no tres
+    (suma «CLIENTES OFICINA NUEVO» y «CLIENTE NUEVO», más 180 vacíos).
+  - RFC repetidos dentro del Excel (`PME940105NT9`, `BSA171213J92`): esos cuatro
+    renglones quedan AMBIGUOS y no se tocan.
+  - `limiteCreditoMXN` **ya existía** en el modelo: no hubo campo nuevo.
+  - «TO BE ASSIGNED» no se crea: no es un cliente.
+  - ⚠️ La reversa deshace las ACTUALIZACIONES. Un cliente **creado** no se
+    deshace solo; sus ids quedan en el respaldo y la convención es baja lógica.
+
+### `lib/leerXlsx.ts` — el .xlsx se lee sin dependencias nuevas
+
+Un .xlsx es un ZIP con XML y Node trae `zlib`: ~100 líneas contra una
+dependencia nueva en la ruta de una carga que escribe en producción. Y evita el
+paso manual de «conviértelo a CSV», que es donde se pierde información (§4.30:
+Excel es-MX exporta con `;`, y un teléfono como `49  556179022166` se vuelve
+notación científica).
+  - 🔴 **El bug que importa, y cómo se encontró:** el regex de celdas tenía la
+    alternativa con cierre ANTES de la autocerrada, así que
+    `<c r="C1"/><c r="D1"><v>5</v></c>` casaba como UNA coincidencia, con la
+    `r=` de C1 y el valor de D1 — **todas las columnas corridas un lugar** a
+    partir de la primera celda vacía: el RFC donde va el comercial, el correo
+    donde va el RFC. No lo atrapó un test: lo atrapó **cotejar la lectura
+    contra una lectura independiente del mismo archivo**. Está fijado en
+    `leerXlsx.test.ts`, que arma un libro a mano.
+  - Y un test encontró otra fragilidad: `Id` y `Target` de las relaciones se
+    leían con un solo regex que exigía ese orden. En XML el orden de los
+    atributos no está garantizado; el archivo de Luis los trae así por
+    casualidad.
+
+### `scripts/sembrarFolios.ts` — dejar cada serie en el último usado
+
+Captura de Luis del 13-oct: VLIM 320, VLIT 201, VLIA 028, VLEM 003, VLEA 039.
+`VLIM-26-320` **es el formato predeterminado** (separador «-», año a dos
+dígitos, tres dígitos), así que no se escribe ningún `formato`: solo el
+consecutivo. La vista previa del siguiente folio usa `armarFolioSerie`, el de
+la plataforma, con el `formato` guardado de cada serie — no una copia, para que
+no enseñe algo distinto de lo que la app emite.
+  - 🔴 **No BAJA un contador.** Si producción ya va más alto que la captura,
+    bajarlo volvería a emitir folios que ya están impresos en un BL y en un
+    pedimento. Se reporta y no se toca. Probado en emulador con VLIM en 325.
+  - **No crea VLWHP** (no está en `SERIES_EMBARQUE`: sería una serie que el
+    editor no conoce y cuyo tráfico `traficoDeFolio` no sabe leer) ni toca
+    **VLET**, que no vino en la captura. Un contador sin sembrar avisa y no
+    bloquea (§4.15).
+  - **No enciende la creación automática de embarques.**
+  - ⚠️ **El reinicio en enero NO existe.** Mau pidió que reinicie en 001 cada
+    enero; eso no está construido (§4.31): `ultimo` es un entero por serie que
+    no mira el año, así que en enero de 2027 el siguiente sería `VLIM-27-321`.
+    Mientras no haya un contador por año y serie, en enero hay que correr el
+    script con `--reiniciar`. El script lo dice cada vez que corre.
+
 ---
 
 ## 5. Estado de los módulos
