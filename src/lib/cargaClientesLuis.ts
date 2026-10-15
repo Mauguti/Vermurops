@@ -248,3 +248,170 @@ export function plataformaTieneNombreMasCompleto(enPlataforma: string, enExcel: 
 }
 
 export { type CambioCampo, normalizarNombre, normalizarRFC };
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. El empate: la hoja de Luis primero, el nombre normalizado después
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Sufijos societarios que se ignoran al comparar nombres.
+ *
+ * ── Por qué una lista propia y no la de la 65 ─────────────────────────────
+ * La de `cargaClientesOk` trae las formas PEGADAS («SAS», «SRL», «SA»), y
+ * `normalizarNombre` convierte los puntos en espacios: «TRANSMARES LOGISTICA
+ * S.A.S» queda «TRANSMARES LOGISTICA S A S», que no termina en « SAS» y el
+ * sufijo no se quita. Resultado: no empataba con «TRANSMARES LOGISTICA» del
+ * Excel y el cargador lo iba a CREAR, duplicando a CLI-0147.
+ *
+ * No se tocó la lista de la 65: su `planearRenglon` tiene 58 tests que fijan
+ * ese empate y cambiarlo movería la otra carga.
+ */
+const SUFIJOS_LUIS = [
+  'SA DE CV', 'S A DE C V', 'SAPI DE CV', 'S DE RL DE CV', 'SA DE CV SOFOM ENR',
+  'S EN C', 'SA PROMOTORA DE INVERSION DE CV', 'SOFOM ENR', 'SPR DE RL',
+  'SA', 'SAPI', 'SAS', 'SRL', 'S DE RL', 'SC', 'AC',
+  'INC', 'LLC', 'LTD', 'LIMITED', 'CO', 'CORP', 'COMPANY', 'GMBH', 'AG', 'KG',
+  'BV', 'NV', 'SL', 'SPA', 'SPRL', 'LDA', 'PUBLIC', 'PTE LTD', 'CO LTD',
+  'PVT LTD', 'SDN BHD', 'AS', 'OY', 'AB', 'PLC', 'SARL', 'EURL',
+];
+
+/**
+ * Junta las corridas de DOS O MÁS letras sueltas: «S A S» → «SAS».
+ *
+ * Dos o más a propósito: con una sola, «A KAYSER» se volvería «AKAYSER» y
+ * «GRUPO A» perdería su letra. Esto es lo que hace que «S.A.S», «S.R.L.» y
+ * «S. de R.L.» lleguen a la lista de sufijos en la forma en que está escrita.
+ */
+export function juntarSiglas(s: string): string {
+  return s.replace(/\b(?:[A-Z] ){1,}[A-Z]\b/g, m => m.replace(/ /g, ''));
+}
+
+/** Nombre comparable para ESTA lista. Ver `SUFIJOS_LUIS`. */
+export function normalizarNombreLuis(valor: string): string {
+  let s = juntarSiglas(
+    (valor ?? '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .replace(/&/g, ' AND ')
+      .replace(/[^A-Z0-9]+/g, ' ')
+      .trim(),
+  );
+
+  let cambio = true;
+  while (cambio) {
+    cambio = false;
+    for (const suf of SUFIJOS_LUIS) {
+      if (s === suf) continue;
+      if (s.endsWith(' ' + suf)) {
+        s = s.slice(0, -(suf.length + 1)).trim();
+        cambio = true;
+      }
+    }
+  }
+  return s.replace(/ /g, '');
+}
+
+/** Una fila de la hoja «Verificación»: el cruce que hizo Luis a mano. */
+export interface FilaVerificacion {
+  numero: string;
+  /** Nombre EXACTO del cliente en la plataforma, o '' si no lo encontró. */
+  nombreEnBD: string;
+  estado: string;
+}
+
+/**
+ * Lee la hoja «Verificación».
+ *
+ * Es la llave MÁS fuerte que hay, y es humana: Luis abrió la plataforma y
+ * anotó el nombre exacto. Gana sobre cualquier normalización, porque hay
+ * casos que ninguna normalización alcanza — «NEW TRAFIC LOGISTICA S.A.S» en
+ * la plataforma contra «NEW TRAFFIC» en el Excel: distinta ortografía y una
+ * palabra de más.
+ */
+export function leerVerificacion(filas: Array<Record<string, string>>): Map<string, FilaVerificacion> {
+  const porNumero = new Map<string, FilaVerificacion>();
+  if (filas.length === 0) return porNumero;
+
+  const porTexto = new Map<string, string>();
+  for (const [letra, texto] of Object.entries(filas[0])) {
+    porTexto.set(normalizarEncabezadoLuis(texto), letra);
+  }
+  const col = (...alias: string[]) => {
+    for (const a of alias) { const l = porTexto.get(a); if (l) return l; }
+    return undefined;
+  };
+  const cNum = col('#', 'no');
+  const cBD = col('cliente encontrado en bd', 'cliente en bd', 'encontrado en bd');
+  const cEstado = col('estado');
+  if (!cNum || !cBD) return porNumero;
+
+  for (const f of filas.slice(1)) {
+    const numero = (f[cNum] ?? '').trim();
+    if (!numero) continue;
+    porNumero.set(numero, {
+      numero,
+      nombreEnBD: (f[cBD] ?? '').trim(),
+      estado: cEstado ? (f[cEstado] ?? '').trim() : '',
+    });
+  }
+  return porNumero;
+}
+
+/** ¿Luis dijo que este renglón NO está en la plataforma? */
+export function luisDiceQueNoEsta(v: FilaVerificacion | undefined): boolean {
+  if (!v) return false;
+  return v.nombreEnBD === '' && /no est[áa] en bd/i.test(v.estado);
+}
+
+/**
+ * El cliente de la plataforma más parecido, para poder revisar a mano antes
+ * de crear un duplicado. Compara por prefijo común sobre el nombre
+ * normalizado; devuelve null cuando no comparten ni cuatro caracteres.
+ */
+export function masParecido(
+  nombre: string,
+  base: Array<{ id: string; nombre: string }>,
+): { id: string; nombre: string; comun: number } | null {
+  const a = normalizarNombreLuis(nombre);
+  let mejor: { id: string; nombre: string; comun: number } | null = null;
+  for (const c of base) {
+    const b = normalizarNombreLuis(c.nombre ?? '');
+    let i = 0;
+    while (i < a.length && i < b.length && a[i] === b[i]) i++;
+    if (!mejor || i > mejor.comun) mejor = { id: c.id, nombre: c.nombre, comun: i };
+  }
+  return mejor && mejor.comun >= 4 ? mejor : null;
+}
+
+/**
+ * ¿El candidato más parecido es lo bastante parecido para NO crear?
+ *
+ * ── Por qué existe este freno ────────────────────────────────────────────
+ * Ni la hoja de Luis ni la normalización alcanzan para todo. «NEW TRAFFIC»
+ * del Excel existe en la plataforma como «NEW TRAFIC LOGISTICA S.A.S»
+ * (CLI-0162): una F de diferencia y una palabra de más. Luis lo marcó «No
+ * está en BD» —su cruce falló por lo mismo— y el nombre normalizado no
+ * empata. Con las dos reglas en la mano, igual se habría creado el
+ * duplicado.
+ *
+ * Así que ante una sospecha NO se crea: un cliente duplicado parte su
+ * historia, sus cotizaciones y sus facturas en dos, y eso se descubre
+ * semanas después en un estado de cuenta. Dejar uno sin crear se arregla en
+ * un minuto desde la pantalla de Altas.
+ *
+ * El umbral: al menos 6 caracteres de prefijo común Y que sean el 60% del
+ * nombre más corto. «NEWTRAFFIC» vs «NEWTRAFICLOGISTICA» comparten
+ * «NEWTRAF» = 7 de 10 (70%).
+ */
+export function sospechaDeDuplicado(
+  nombre: string,
+  parecido: { nombre: string; comun: number } | null,
+): boolean {
+  if (!parecido) return false;
+  const corto = Math.min(
+    normalizarNombreLuis(nombre).length,
+    normalizarNombreLuis(parecido.nombre).length,
+  );
+  if (corto === 0) return false;
+  return parecido.comun >= 6 && parecido.comun / corto >= 0.6;
+}

@@ -20,6 +20,8 @@ import {
   validarNombreInvitacion,
   etiquetaDeAcceso,
   estadoDeAcceso,
+  estadoReenvio,
+  MINUTOS_BLOQUEO_REENVIO,
   puedeReenviarse,
   type UsuarioRegistrado,
 } from '../../lib/usuarios';
@@ -149,11 +151,24 @@ export default function GestionUsuarios() {
             }
           }}
           onReenviar={async (email) => {
+            /*
+             * El aviso dice SIEMPRE algo, y en el error dice lo que contestó
+             * n8n —no «no se pudo»—: el 401 es nuestro token y el 404 es el
+             * flujo apagado, y mandar a la persona a revisar su contraseña
+             * por un fallo del servidor es la trampa de §4.29.
+             *
+             * Se relanza para que el renglón NO se marque como enviada: el
+             * bloqueo de diez minutos es para un envío que salió.
+             */
             try {
               await enviarInvitacion(email);
-              setFeedback({ tipo: 'ok', msg: `Correo reenviado a ${email}.` });
+              setFeedback({ tipo: 'ok', msg: `Invitación enviada a ${email}.` });
             } catch (err) {
-              setFeedback({ tipo: 'error', msg: err instanceof Error ? err.message : 'No se pudo reenviar el correo.' });
+              setFeedback({
+                tipo: 'error',
+                msg: `No salió la invitación a ${email}: ${err instanceof Error ? err.message : String(err)}`,
+              });
+              throw err;
             }
           }}
         />
@@ -246,6 +261,13 @@ function FilaUsuario({
   const [cambiando, setCambiando] = useState(false);
   const badge = badgeDe(usuario.rol);
   const acceso = etiquetaDeAcceso(usuario);
+  const [enviando, setEnviando] = useState(false);
+  /*
+   * El envío de ESTA sesión, para que el botón cambie al instante. Lo que
+   * manda si existe es lo que ya estaba guardado en el documento.
+   */
+  const [enviadaEn, setEnviadaEn] = useState<string | null>(null);
+  const reenvio = estadoReenvio(enviadaEn ?? usuario.ultimaInvitacion);
 
   /*
    * 🔴 Aquí vivía `usuario.nombre.split(' ')`, y el 15-oct recibió `undefined`
@@ -351,10 +373,42 @@ function FilaUsuario({
             */}
           {puedeReenviarse(usuario) && (
             <button
-              onClick={() => { void onReenviar(usuario.email); }}
-              className="text-[12px] font-semibold text-primario hover:underline transition-colors"
+              type="button"
+              data-testid="reenviar-invitacion"
+              disabled={enviando || reenvio.bloqueado}
+              title={reenvio.bloqueado
+                ? `Se puede reenviar ${MINUTOS_BLOQUEO_REENVIO - (reenvio.minutos ?? 0)} min después`
+                : undefined}
+              onClick={async () => {
+                /*
+                 * Antes no daba NINGUNA señal: se pulsaba y no se sabía si
+                 * había mandado. El botón se deshabilita mientras va, y quien
+                 * avisa del resultado es la pantalla (`onReenviar` lanza con
+                 * el motivo que devolvió n8n).
+                 */
+                setEnviando(true);
+                try {
+                  await onReenviar(usuario.email);
+                  /*
+                   * Optimista, y SOLO en el camino bueno: el bloqueo de diez
+                   * minutos es para un envío que salió. `onReenviar` relanza
+                   * cuando falla, así que esta línea no se ejecuta y el botón
+                   * queda disponible para reintentar.
+                   */
+                  setEnviadaEn(new Date().toISOString());
+                } catch {
+                  // El aviso ya lo puso la pantalla; aquí solo no se bloquea.
+                } finally {
+                  setEnviando(false);
+                }
+              }}
+              className={`text-[12px] font-semibold transition-colors ${
+                enviando || reenvio.bloqueado
+                  ? 'text-text-muted cursor-default'
+                  : 'text-primario hover:underline'
+              }`}
             >
-              Reenviar invitación
+              {enviando ? 'Enviando…' : reenvio.etiqueta}
             </button>
           )}
           {!esMismoUsuario && usuario.activo && (

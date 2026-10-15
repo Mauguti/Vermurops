@@ -33,8 +33,9 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { leerXlsx } from '../src/lib/leerXlsx';
 import {
   leerRenglonesLuis, resolverComercial, leerDiasLuis, leerCreditoLuis, cpDeDireccion,
-  leerRfcLuis, plataformaTieneNombreMasCompleto, normalizarNombre, normalizarRFC,
-  type RenglonLuis,
+  leerRfcLuis, plataformaTieneNombreMasCompleto, normalizarNombreLuis, normalizarRFC,
+  leerVerificacion, luisDiceQueNoEsta, masParecido, sospechaDeDuplicado,
+  type RenglonLuis, type FilaVerificacion,
 } from '../src/lib/cargaClientesLuis';
 
 const APLICAR = process.argv.includes('--aplicar');
@@ -43,6 +44,7 @@ const FORZAR_NOMBRES = process.argv.includes('--forzar-nombres');
 const ARCHIVO = process.env.ARCHIVO_CLIENTES
   ?? resolve(process.cwd(), '../vermurops-sprint/sprint/datos/clientes-unificados-luis.xlsx');
 const HOJA = 'Maestro de clientes';
+const HOJA_VERIF = 'Verificación';
 
 /** Nombres que NO son clientes y no se crean. */
 const NO_SON_CLIENTES = ['TO BE ASSIGNED', 'TBA', 'POR ASIGNAR'];
@@ -62,11 +64,14 @@ interface ClienteBD {
 }
 
 type Accion = 'escribe' | 'igual' | 'conflicto' | 'invalido' | 'sin_dato' | 'protegido';
+type Llave = 'hoja_de_luis' | 'rfc' | 'nombre' | 'nuevo' | 'ambiguo';
 interface Cambio { campo: string; accion: Accion; antes?: unknown; despues?: unknown; razon?: string }
 
 interface Plan {
   r: RenglonLuis;
-  empate: 'rfc' | 'nombre' | 'nuevo' | 'ambiguo';
+  empate: Llave;
+  verif?: FilaVerificacion;
+  parecido?: { id: string; nombre: string; comun: number } | null;
   cliente?: ClienteBD;
   razonAmbiguo?: string;
   cambios: Cambio[];
@@ -116,7 +121,7 @@ function numero(campo: string, actual: unknown, propuesto: number | null, crudo:
   };
 }
 
-function planear(r: RenglonLuis, cliente: ClienteBD | undefined, empate: Plan['empate'], razonAmbiguo?: string): Plan {
+function planear(r: RenglonLuis, cliente: ClienteBD | undefined, empate: Llave, razonAmbiguo?: string): Plan {
   const cambios: Cambio[] = [];
   const revision: string[] = [];
 
@@ -225,8 +230,15 @@ async function main() {
   }
   const { renglones, faltan } = leerRenglonesLuis(leerXlsx(buf, HOJA));
   if (faltan.length) { console.error(`Faltan columnas: ${faltan.join(', ')}`); process.exit(1); }
+  let verificacion = new Map<string, FilaVerificacion>();
+  try {
+    verificacion = leerVerificacion(leerXlsx(buf, HOJA_VERIF));
+  } catch {
+    console.log(`   ⚠️  No se pudo leer la hoja «${HOJA_VERIF}»: se empata solo por RFC y nombre.`);
+  }
   console.log(`📄 ${ARCHIVO}`);
-  console.log(`   hoja «${HOJA}» · ${renglones.length} renglones con nombre\n`);
+  console.log(`   hoja «${HOJA}» · ${renglones.length} renglones con nombre`);
+  console.log(`   hoja «${HOJA_VERIF}» · ${verificacion.size} renglones del cruce de Luis\n`);
 
   inicializar();
   const db = getFirestore();
@@ -237,13 +249,17 @@ async function main() {
   // ── índices ──────────────────────────────────────────────────────────────
   const porRfc = new Map<string, ClienteBD[]>();
   const porNombre = new Map<string, ClienteBD[]>();
+  const porCrudo = new Map<string, ClienteBD[]>();
   for (const c of base) {
     const r = normalizarRFC(String(c.rfc ?? ''));
     if (r && !['XAXX010101000', 'XEXX010101000'].includes(r)) {
       porRfc.set(r, [...(porRfc.get(r) ?? []), c]);
     }
-    const n = normalizarNombre(c.nombre ?? '');
+    const n = normalizarNombreLuis(c.nombre ?? '');
     if (n) porNombre.set(n, [...(porNombre.get(n) ?? []), c]);
+    // Índice por el nombre TAL CUAL, para la columna de Luis.
+    const crudo = (c.nombre ?? '').trim().toUpperCase();
+    if (crudo) porCrudo.set(crudo, [...(porCrudo.get(crudo) ?? []), c]);
   }
 
   // RFC repetidos DENTRO del Excel: no se usan para empatar.
@@ -257,8 +273,30 @@ async function main() {
   for (const r of renglones) {
     const rfc = leerRfcLuis(r.rfc);
     let plan: Plan | null = null;
+    const verif = verificacion.get(r.numero);
 
-    if (rfc.rfc) {
+    /*
+     * ── La hoja «Verificación» va PRIMERO ────────────────────────────────
+     * Es la llave más fuerte que hay, y es humana: Luis abrió la plataforma y
+     * anotó el nombre exacto. Gana sobre cualquier normalización porque hay
+     * casos que ninguna alcanza: «NEW TRAFIC LOGISTICA S.A.S» en la
+     * plataforma contra «NEW TRAFFIC» en el Excel.
+     */
+    if (verif?.nombreEnBD) {
+      const cand = porCrudo.get(verif.nombreEnBD.toUpperCase()) ?? [];
+      if (cand.length === 1) plan = planear(r, cand[0], 'hoja_de_luis');
+      else if (cand.length > 1) {
+        plan = planear(r, undefined, 'ambiguo', `${cand.length} clientes se llaman «${verif.nombreEnBD}»`);
+      } else {
+        // Luis anotó un nombre que ya no está así en la plataforma: se busca
+        // normalizado antes de darlo por nuevo.
+        const n = normalizarNombreLuis(verif.nombreEnBD);
+        const porNorm = porNombre.get(n) ?? [];
+        if (porNorm.length === 1) plan = planear(r, porNorm[0], 'hoja_de_luis');
+      }
+    }
+
+    if (!plan && rfc.rfc) {
       if ((vecesEnExcel.get(rfc.rfc) ?? 0) > 1) {
         plan = planear(r, undefined, 'ambiguo', `el RFC ${rfc.rfc} aparece ${vecesEnExcel.get(rfc.rfc)} veces en el Excel`);
       } else {
@@ -269,12 +307,14 @@ async function main() {
     }
 
     if (!plan) {
-      const n = normalizarNombre(r.nombre);
+      const n = normalizarNombreLuis(r.nombre);
       const cand = porNombre.get(n) ?? [];
       if (cand.length === 1) plan = planear(r, cand[0], 'nombre');
       else if (cand.length > 1) plan = planear(r, undefined, 'ambiguo', `${cand.length} clientes de la plataforma se llaman igual («${n}»)`);
       else plan = planear(r, undefined, 'nuevo');
     }
+    plan.verif = verif;
+    if (plan.empate === 'nuevo') plan.parecido = masParecido(r.nombre, base);
     planes.push(plan);
   }
 
@@ -285,13 +325,37 @@ async function main() {
   const ambiguos = planes.filter(p => p.empate === 'ambiguo');
   const conConflicto = planes.filter(p => p.cambios.some(c => c.accion === 'conflicto'));
   const protegidos = planes.filter(p => p.cambios.some(c => c.accion === 'protegido'));
-  const creables = nuevos.filter(p => !NO_SON_CLIENTES.includes(p.r.nombre.trim().toUpperCase()));
+  /*
+   * ── Solo se crea lo que Luis marcó «No está en BD» ───────────────────────
+   * El 15-oct el modo en seco dijo 42 por crear y Luis había marcado 17. Dos
+   * de los sobrantes —TRANSMARES LOGISTICA (CLI-0147) y NEW TRAFIC LOGISTICA
+   * (CLI-0162)— ya existían: crearlos los habría duplicado. Así que la marca
+   * de Luis es condición NECESARIA, no una pista.
+   */
+  const creables = nuevos.filter(p =>
+    !NO_SON_CLIENTES.includes(p.r.nombre.trim().toUpperCase())
+    && luisDiceQueNoEsta(p.verif)
+    && !sospechaDeDuplicado(p.r.nombre, p.parecido ?? null));
+  /*
+   * Marcados por Luis, sin empate… y con un candidato demasiado parecido
+   * para arriesgarse. El caso real: «NEW TRAFFIC» contra «NEW TRAFIC
+   * LOGISTICA S.A.S» (CLI-0162).
+   */
+  const sospechosos = nuevos.filter(p =>
+    !NO_SON_CLIENTES.includes(p.r.nombre.trim().toUpperCase())
+    && luisDiceQueNoEsta(p.verif)
+    && sospechaDeDuplicado(p.r.nombre, p.parecido ?? null));
   const noCreables = nuevos.filter(p => NO_SON_CLIENTES.includes(p.r.nombre.trim().toUpperCase()));
+  const nuevosSinMarca = nuevos.filter(p =>
+    !NO_SON_CLIENTES.includes(p.r.nombre.trim().toUpperCase())
+    && !luisDiceQueNoEsta(p.verif));
+  const luisDijoNuevoYSiEsta = planes.filter(p => p.cliente && luisDiceQueNoEsta(p.verif));
 
-  const nombresExcel = new Set(renglones.map(r => normalizarNombre(r.nombre)));
-  const fueraDelExcel = base.filter(c => !nombresExcel.has(normalizarNombre(c.nombre ?? ''))).length;
+  const nombresExcel = new Set(renglones.map(r => normalizarNombreLuis(r.nombre)));
+  const fueraDelExcel = base.filter(c => !nombresExcel.has(normalizarNombreLuis(c.nombre ?? ''))).length;
 
   console.log('── RESUMEN ──');
+  console.log(`  empatan por la hoja de Luis:    ${planes.filter(p => p.empate === 'hoja_de_luis').length}`);
   console.log(`  empatan por RFC:                ${planes.filter(p => p.empate === 'rfc').length}`);
   console.log(`  empatan por nombre:             ${planes.filter(p => p.empate === 'nombre').length}`);
   console.log(`  se ACTUALIZAN (algo cambia):    ${conCambios.length}`);
@@ -299,7 +363,10 @@ async function main() {
   console.log(`  con al menos un CONFLICTO:      ${conConflicto.length}`);
   console.log(`  nombre protegido (más completo):${protegidos.length}`);
   console.log(`  AMBIGUOS (no se tocan):         ${ambiguos.length}`);
-  console.log(`  no están en la plataforma:      ${nuevos.length}  (creables: ${creables.length})`);
+  console.log(`  no empatan con nada:            ${nuevos.length}`);
+  console.log(`    · marcados «No está en BD»:    ${creables.length}  ← los únicos que se crean`);
+  console.log(`    · sospechosos de duplicado:   ${sospechosos.length}  ← marcados, pero con un candidato muy parecido`);
+  console.log(`    · SIN marca de Luis:          ${nuevosSinMarca.length}  ← NO se crean, van a revisión`);
   console.log(`  en la plataforma y NO en Excel:  ${fueraDelExcel}  (no se tocan)`);
 
   const porCampo = new Map<string, Map<Accion, number>>();
@@ -318,13 +385,38 @@ async function main() {
     console.log('\n  ⚠️  No se crean, no son clientes:');
     noCreables.forEach(p => console.log(`       fila ${p.r.fila}: «${p.r.nombre}»`));
   }
+  if (sospechosos.length) {
+    console.log('\n  ⛔ Luis los marcó «No está en BD», pero hay un candidato DEMASIADO parecido.');
+    console.log('     NO se crean: un cliente duplicado parte su historia en dos.');
+    sospechosos.forEach(p => {
+      console.log(`       fila ${p.r.fila}: «${p.r.nombre}»`);
+      console.log(`         ¿es este?  ${p.parecido!.id} «${p.parecido!.nombre}»  (${p.parecido!.comun} caracteres en común)`);
+    });
+  }
+  if (nuevosSinMarca.length) {
+    console.log('\n  ⚠️  No empatan, pero Luis NO los marcó «No está en BD». NO se crean:');
+    nuevosSinMarca.forEach(p => {
+      const c = p.parecido;
+      console.log(`       fila ${p.r.fila}: ${p.r.nombre}`);
+      console.log(`         estado de Luis: «${p.verif?.estado || '(sin estado)'}»${p.verif?.nombreEnBD ? ` · anotó «${p.verif.nombreEnBD}»` : ''}`);
+      console.log(`         más parecido:   ${c ? `${c.id} «${c.nombre}»` : '(ninguno)'}`);
+    });
+  }
+  if (luisDijoNuevoYSiEsta.length) {
+    console.log('\n  ℹ️  Luis los marcó «No está en BD» y SÍ empataron. No se crean (se actualizan):');
+    luisDijoNuevoYSiEsta.forEach(p => console.log(`       fila ${p.r.fila}: ${p.r.nombre} → ${p.cliente!.id} «${p.cliente!.nombre}» (por ${p.empate})`));
+  }
   if (ambiguos.length) {
     console.log('\n  ⚠️  AMBIGUOS — no se escribe nada:');
     ambiguos.forEach(p => console.log(`       fila ${p.r.fila}: ${p.r.nombre} · ${p.razonAmbiguo}`));
   }
   if (creables.length) {
     console.log(`\n  ${CREAR ? '➕ SE CREAN' : 'ℹ️  Se crearían con --crear-nuevos'}:`);
-    creables.forEach(p => console.log(`       fila ${p.r.fila}: ${p.r.nombre}`));
+    creables.forEach(p => {
+      const c = p.parecido;
+      console.log(`       fila ${p.r.fila}: ${p.r.nombre}`);
+      console.log(`         más parecido en la plataforma: ${c ? `${c.id} «${c.nombre}» (${c.comun} caracteres en común)` : '(ninguno)'}`);
+    });
   }
 
   // ── CSV de revisión ──────────────────────────────────────────────────────
@@ -337,7 +429,13 @@ async function main() {
       ...p.cambios.filter(c => c.accion === 'conflicto' || c.accion === 'protegido' || c.accion === 'invalido')
         .map(c => `${c.accion.toUpperCase()} ${c.campo}: ${c.razon ?? ''}`),
       ...p.revision,
-      ...(p.empate === 'nuevo' ? ['NUEVO: no está en la plataforma'] : []),
+      ...(p.empate === 'nuevo' ? [
+        `NUEVO: no empata. Luis dice «${p.verif?.estado || '(sin estado)'}»`
+        + (luisDiceQueNoEsta(p.verif)
+            ? (sospechaDeDuplicado(p.r.nombre, p.parecido ?? null) ? ' → NO se crea: SOSPECHA DE DUPLICADO' : ' → SE CREA')
+            : ' → NO se crea, revisar')
+        + (p.parecido ? `. Más parecido: ${p.parecido.id} «${p.parecido.nombre}»` : ''),
+      ] : []),
     ];
     for (const a of asuntos) {
       lineas.push([p.r.fila, p.r.numero, p.r.nombre, p.empate, p.cliente?.id ?? '', a].map(csvEscapar).join(','));

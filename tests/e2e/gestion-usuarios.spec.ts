@@ -384,3 +384,50 @@ test('15. La pantalla distingue a quien NUNCA entró de quien ya entró', async 
 
   await ctx.close();
 });
+
+test('16. «Reenviar invitación» da señal: Enviando…, aviso, y bloqueo de 10 min', async ({ browser }) => {
+  /*
+   * Antes el botón no daba NINGUNA señal: se pulsaba y no se sabía si había
+   * mandado. En el emulador n8n está bloqueado a propósito (§4.73), así que
+   * lo que se comprueba aquí es el camino de FALLO — y es el que importa más:
+   * el aviso tiene que decir lo que contestó n8n, y el botón NO debe quedar
+   * bloqueado, porque el bloqueo es para un envío que salió.
+   */
+  const PEND = `reenvio.${Date.now()}@vermur.com`;
+  const { page, ctx } = await entrar(browser, 'admin@vermur.com');
+
+  await page.getByRole('button', { name: 'Configuración', exact: true }).first().click();
+  const seccion = page.getByRole('button', { name: /Usuarios y roles/ }).first();
+  if (await seccion.count()) await seccion.click();
+
+  await page.getByRole('button', { name: 'Invitar usuario' }).click();
+  await page.getByPlaceholder('nombre@vermur.com').fill(PEND);
+  await page.getByPlaceholder('Luis Rentería').fill('Rocío Vega');
+  await page.locator('select').first().selectOption('ventas');
+  await page.getByRole('button', { name: 'Invitar', exact: true }).click();
+  await expect(page.getByText(/quedó creada, pero el correo NO salió/)).toBeVisible({ timeout: 30_000 });
+
+  const fila = page.locator('tr', { hasText: PEND });
+  const boton = fila.getByTestId('reenviar-invitacion');
+
+  // El positivo: el botón existe y se puede pulsar.
+  await expect(boton).toBeEnabled();
+  await expect(boton).toHaveText('Reenviar invitación');
+
+  await boton.click();
+
+  // El aviso dice a quién, y dice el motivo que vino del servidor.
+  await expect(page.getByText(new RegExp(`No salió la invitación a ${PEND.replace('.', '\\.')}`)))
+    .toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/En emulador no se manda correo de verdad/)).toBeVisible();
+
+  /*
+   * Y el botón sigue disponible: un envío que NO salió no gasta el bloqueo de
+   * diez minutos. Si se bloqueara, la persona se quedaría sin poder
+   * reintentar justo cuando hay que reintentar.
+   */
+  await expect(boton).toBeEnabled();
+  await expect(boton).toHaveText('Reenviar invitación');
+
+  await ctx.close();
+});

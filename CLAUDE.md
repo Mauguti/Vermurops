@@ -155,6 +155,20 @@ mostrado entre paréntesis. Firebase los guarda al terminar en
 Al agregar un parámetro, decirlo en el reporte: el deploy deja de ser
 desatendido.
 
+**Una Function NUNCA cambia la forma de su respuesta de manera
+incompatible.** Las pestañas abiertas siguen corriendo el bundle viejo, y una
+Function recién desplegada les sirve a ellas también. El 15-oct eso tiró
+producción a **pantalla en blanco**: `invitar` devolvía el usuario en `datos`,
+se cambió a `{ usuario, correoEnviado }`, se desplegaron Function y hosting
+juntos — y el hook viejo metió el SOBRE en la lista de usuarios, donde
+`FilaUsuario` le pidió `.nombre` para el avatar. Un `TypeError` dentro de un
+render desmonta el árbol completo.
+
+Primero se publica la versión que entiende **las dos formas**, y la vieja se
+quita después, cuando se sabe que ya nadie trae ese bundle. Avisar al equipo
+de que recargue no es un plan: nadie recarga, y quien tiene la pestaña abierta
+es justo quien está trabajando. Ver §4.73.
+
 **Antes de diagnosticar una regresión en local, mira DESDE DÓNDE corre el dev
 server.** `lsof -ti:3000` y revisa la ruta del proceso. Si el trabajo está en un
 worktree y el server corre desde el checkout principal, se ve otra rama y
