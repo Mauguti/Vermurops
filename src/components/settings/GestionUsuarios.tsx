@@ -18,6 +18,9 @@ import {
   correoEnReglas,
   validarEmailInvitacion,
   validarNombreInvitacion,
+  etiquetaDeAcceso,
+  estadoDeAcceso,
+  puedeReenviarse,
   type UsuarioRegistrado,
 } from '../../lib/usuarios';
 import type { UserRole } from '../../auth/users';
@@ -241,6 +244,7 @@ function FilaUsuario({
   const [menuAbierto, setMenuAbierto] = useState(false);
   const [cambiando, setCambiando] = useState(false);
   const badge = badgeDe(usuario.rol);
+  const acceso = etiquetaDeAcceso(usuario);
 
   const avatar = usuario.nombre
     .split(' ')
@@ -313,27 +317,57 @@ function FilaUsuario({
         </div>
       </td>
       <td className="py-3 px-4 text-center">
-        <span className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
-          usuario.activo
-            ? 'bg-green-50 text-green-700'
-            : 'bg-red-50 text-red-700'
-        }`}>
-          {usuario.activo ? 'Activo' : 'Inactivo'}
+        {/*
+          * Tres estados, no dos. «Activo» a secas no distinguía a quien ya
+          * puso su contraseña de quien nunca recibió el correo — y las siete
+          * cuentas del 13-oct se veían idénticas al resto del equipo.
+          * Ámbar, no rojo: una invitación pendiente no es un error (§4.20).
+          */}
+        <span
+          data-testid="estado-acceso"
+          title={acceso.detalle}
+          className={`inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+            !usuario.activo ? 'bg-red-50 text-red-700'
+              : estadoDeAcceso(usuario) === 'pendiente' ? 'bg-amber-50 text-amber-700'
+              : 'bg-green-50 text-green-700'
+          }`}
+        >
+          {acceso.texto}
         </span>
       </td>
       <td className="py-3 px-4 text-right">
-        {!esMismoUsuario && usuario.activo && (
-          <button
-            onClick={async () => {
-              if (await confirmar({ mensaje: `¿Desactivar a ${usuario.nombre}? Ya no podrá entrar al sistema.`, confirmar: 'Desactivar', peligro: true })) {
-                onDesactivar(usuario.uid);
-              }
-            }}
-            className="text-[12px] font-medium text-text-muted hover:text-red-600 transition-colors"
-          >
-            Desactivar
-          </button>
-        )}
+        <div className="flex items-center justify-end gap-3">
+          {/*
+            * «Reenviar invitación» NO existía: el prop se pasaba de arriba a
+            * abajo y ningún renglón lo llamaba, mientras el aviso de error
+            * mandaba a usarlo («Usa «Reenviar invitación» en su renglón»).
+            *
+            * Se ofrece a quien NUNCA ha entrado, tenga rol o no: tener rol no
+            * significa haber recibido el correo — las siete cuentas del
+            * 13-oct tenían el suyo puesto. A quien ya entró no se le ofrece:
+            * un enlace de restablecimiento invalida su contraseña actual.
+            */}
+          {puedeReenviarse(usuario) && (
+            <button
+              onClick={() => { void onReenviar(usuario.email); }}
+              className="text-[12px] font-semibold text-primario hover:underline transition-colors"
+            >
+              Reenviar invitación
+            </button>
+          )}
+          {!esMismoUsuario && usuario.activo && (
+            <button
+              onClick={async () => {
+                if (await confirmar({ mensaje: `¿Desactivar a ${usuario.nombre}? Ya no podrá entrar al sistema.`, confirmar: 'Desactivar', peligro: true })) {
+                  onDesactivar(usuario.uid);
+                }
+              }}
+              className="text-[12px] font-medium text-text-muted hover:text-red-600 transition-colors"
+            >
+              Desactivar
+            </button>
+          )}
+        </div>
       </td>
     </tr>
   );

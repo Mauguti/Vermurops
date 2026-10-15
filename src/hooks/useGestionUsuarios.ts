@@ -6,12 +6,17 @@
  */
 
 import { useState, useCallback } from 'react';
-import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
 import { urlFuncion } from '../lib/urlFunciones';
-import { enviarCorreoDeAcceso } from '../lib/recuperarContrasena';
 import type { UserRole } from '../auth/users';
 import type { UsuarioRegistrado } from '../lib/usuarios';
+
+/** Lo que contesta la Function en «invitar» y en «reenviar». */
+interface ResultadoInvitacion {
+  usuario: UsuarioRegistrado | null;
+  correoEnviado: boolean;
+  motivoCorreo?: string;
+}
 
 interface EstadoGestion {
   usuarios: UsuarioRegistrado[];
@@ -59,44 +64,49 @@ export function useGestionUsuarios() {
   }, [llamarFuncion]);
 
   /**
-   * Manda el correo para poner la contraseña.
+   * Manda (o remanda) el correo para poner la contraseña.
    *
-   * Lo hace la APP, no la Function: el Admin SDK no envía correos, y creer
-   * que sí costó que Mau se invitara, se le creara la cuenta y no le llegara
-   * nada. Ver `enviarCorreoDeAcceso`.
+   * ── Por qué ya NO lo manda la app ────────────────────────────────────────
+   * Aquí vivía `sendPasswordResetEmail`, el correo de Firebase. **Ese correo
+   * no llega a vermur.com**: el dominio está en Microsoft 365 con SPF `-all`
+   * y sin DKIM ni DMARC propios. Las siete invitaciones del 13-oct se
+   * crearon bien y no llegó ninguna — y la pantalla decía «enviado», porque
+   * el SDK resuelve sin error aunque el mensaje muera después.
+   *
+   * Ahora lo manda el servidor por n8n, con una cuenta de Gmail real, y SÍ
+   * se sabe si salió: si no salió, esto LANZA con el motivo para que la
+   * pantalla lo diga. Un «reenviado» que no reenvió es peor que un error.
    */
   const enviarInvitacion = useCallback(async (email: string): Promise<void> => {
-    await enviarCorreoDeAcceso(
-      sendPasswordResetEmail as never, auth, email, window.location.origin,
-    );
-  }, []);
+    const r = await llamarFuncion({ accion: 'reenviar', email }) as ResultadoInvitacion;
+    if (!r.correoEnviado) {
+      throw new Error(r.motivoCorreo ?? 'El correo no salió y n8n no dijo por qué.');
+    }
+  }, [llamarFuncion]);
 
   /**
-   * Invitar = crear la cuenta Y mandar el correo.
+   * Invitar = crear la cuenta Y mandar el correo, en UNA llamada.
    *
-   * Si el correo falla, la cuenta YA está creada: no se deshace nada —sería
-   * borrar una cuenta por un fallo de envío— y se devuelve el aviso para que
-   * la pantalla lo diga y ofrezca reenviar.
+   * Las dos cosas pasan en el servidor, así que ya no hay una ventana en la
+   * que la cuenta exista y el navegador todavía no haya intentado el correo.
+   *
+   * Si el correo falla, la cuenta YA está creada: no se deshace nada —borrar
+   * una cuenta por un fallo de envío sería peor— y el motivo vuelve para que
+   * la pantalla lo diga y ofrezca «Reenviar invitación».
    */
   const invitar = useCallback(async (
     email: string,
     nombre: string,
     rol: UserRole,
-  ): Promise<{ usuario: UsuarioRegistrado; correoEnviado: boolean; motivo?: string }> => {
+  ): Promise<{ usuario: UsuarioRegistrado | null; correoEnviado: boolean; motivo?: string }> => {
     setEstado(e => ({ ...e, error: null }));
-    const nuevo = await llamarFuncion({ accion: 'invitar', email, nombre, rol });
-    setEstado(e => ({ ...e, usuarios: [...e.usuarios, nuevo] }));
-    try {
-      await enviarInvitacion(email);
-      return { usuario: nuevo, correoEnviado: true };
-    } catch (err) {
-      return {
-        usuario: nuevo,
-        correoEnviado: false,
-        motivo: err instanceof Error ? err.message : String(err),
-      };
+    const r = await llamarFuncion({ accion: 'invitar', email, nombre, rol }) as ResultadoInvitacion;
+    if (r.usuario) {
+      const nuevo = r.usuario;
+      setEstado(e => ({ ...e, usuarios: [...e.usuarios, nuevo] }));
     }
-  }, [llamarFuncion, enviarInvitacion]);
+    return { usuario: r.usuario, correoEnviado: r.correoEnviado, motivo: r.motivoCorreo };
+  }, [llamarFuncion]);
 
   const cambiarRol = useCallback(async (
     uid: string,

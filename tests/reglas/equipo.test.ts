@@ -50,6 +50,13 @@ beforeEach(async () => { await env.clearFirestore(); });
 const como = (email: string | null) =>
   email === null ? env.unauthenticatedContext() : env.authenticatedContext(`uid-${email}`, { email });
 
+/**
+ * Lo mismo, con el claim `rol` en el token — que es lo único que distingue a
+ * una cuenta invitada después del último deploy de reglas (15-oct-2026).
+ */
+const conRol = (email: string, rol: string) =>
+  env.authenticatedContext(`uid-${email}`, { email, rol });
+
 /** Colecciones con la regla común. `notificaciones` va aparte: solo las propias. */
 const COLECCIONES = ['cotizaciones', 'clientes', 'embarques', 'proveedores', 'tarifas'];
 const RUTAS_STORAGE = [
@@ -268,4 +275,135 @@ describe('Storage · ordenesCompra/{id}/documentos/', () => {
     await assertFails(uploadBytes(ref(st, RUTA), new Uint8Array([1]),
       { contentType: 'image/jpeg' }));
   });
+});
+
+/*
+ * ── El rol del token también identifica al equipo (15-oct-2026) ───────────
+ *
+ * Luis invitó siete cuentas el 13-oct y ninguna entraba: la lista de correos
+ * es fija y una cuenta nueva quedaba fuera de TODO hasta el siguiente deploy
+ * de reglas. Estos tests son el contrato de la salida, y los tres casos son
+ * los que de verdad deciden si la puerta queda abierta:
+ *
+ *   · fuera de la lista + rol válido  → ENTRA   (el caso que se arregla)
+ *   · fuera de la lista + sin rol     → no entra (la puerta sigue cerrada)
+ *   · fuera de la lista + rol inválido→ no entra (un dedazo quita, no regala)
+ */
+describe('un correo fuera de la lista, con claim de rol', () => {
+  /** Dos de las siete que invitó Luis el 13-oct. */
+  const INVITADA = 'andrea.guerrero@vermur.com';
+  const INVITADO = 'said.torres@vermur.com';
+
+  it.each([
+    [INVITADA, 'ventas'],
+    [INVITADO, 'operaciones'],
+    ['barbara.dsouza@vermur.com', 'pricing'],
+    ['carlos.gone@vermur.com', 'administracion'],
+    ['noemi.casas@vermur.com', 'admin'],
+  ])('%s con rol «%s» lee y escribe en Firestore', async (email, rol) => {
+    const db = conRol(email, rol).firestore();
+    for (const col of COLECCIONES) {
+      await assertSucceeds(setDoc(doc(db, col, 'x'), { hola: 1 }));
+      await assertSucceeds(getDoc(doc(db, col, 'x')));
+    }
+  });
+
+  it('y también entra a Storage, donde vive el expediente KYC', async () => {
+    const st = conRol(INVITADA, 'ventas').storage();
+    for (const ruta of RUTAS_STORAGE) {
+      await assertSucceeds(uploadBytes(ref(st, ruta), new Uint8Array([1, 2, 3])));
+      await assertSucceeds(getBytes(ref(st, ruta)));
+    }
+  });
+
+  it('SIN rol y fuera de la lista: no toca nada (Firestore y Storage)', async () => {
+    const db = como(INVITADA).firestore();
+    for (const col of COLECCIONES) {
+      await assertFails(setDoc(doc(db, col, 'x'), { hola: 1 }));
+      await assertFails(getDoc(doc(db, col, 'x')));
+    }
+    const st = como(INVITADA).storage();
+    await assertFails(uploadBytes(ref(st, RUTAS_STORAGE[0]), new Uint8Array([1])));
+  });
+
+  /*
+   * Un rol que las reglas no reconocen NO cae en «es del equipo».
+   * Es la misma trampa de la guarda de «pagada»: lo que no se reconoce tiene
+   * que quitar permisos, no regalarlos.
+   */
+  it.each(['Ventas', 'vendedor', 'cliente', 'contabilidad', '', 'ADMIN'])(
+    'rol inválido «%s»: no entra',
+    async (rol) => {
+      const db = conRol(INVITADA, rol).firestore();
+      await assertFails(setDoc(doc(db, COLECCIONES[0], 'x'), { hola: 1 }));
+      await assertFails(getDoc(doc(db, COLECCIONES[0], 'x')));
+    },
+  );
+
+  /*
+   * ── El test que vigila la suposición de la regla ─────────────────────────
+   *
+   * `esDelEquipo` evalúa `tieneRolValido() || correoDelEquipo()`, en ese
+   * orden y a propósito: así una cuenta del respaldo SIN claim pasa por la
+   * lectura de un claim que no existe ANTES de entrar por su correo.
+   *
+   * Eso es lo que este test fija. Si leer un claim ausente dejara de dar
+   * `false` y empezara a reventar la evaluación, las siete cuentas del
+   * respaldo —las seis del equipo y Mau— se quedarían fuera de la
+   * plataforma, y es el mismo error que ya cometimos con la convivencia de
+   * las reglas por rol.
+   *
+   * Con el orden al revés este test pasaría por el cortocircuito del `||`
+   * sin comprobar nada: medido el 15-oct, quitar la guarda `'rol' in …` no
+   * tumbaba un solo test de 61. Por eso la guarda se quitó (era peso muerto)
+   * y el orden se fijó.
+   */
+  it('el claim ausente no revienta: un correo del respaldo SIN rol entra igual', async () => {
+    for (const email of [DEL_EQUIPO, NUEVO_ADMIN]) {
+      const db = como(email).firestore();           // sin claim `rol` en el token
+      await assertSucceeds(setDoc(doc(db, COLECCIONES[0], 'x'), { hola: 1 }));
+      const st = como(email).storage();
+      await assertSucceeds(uploadBytes(ref(st, RUTAS_STORAGE[1]), new Uint8Array([1])));
+    }
+  });
+
+  it('un rol válido con un correo de FUERA de Vermur tampoco: el claim no es un pase libre... ', async () => {
+    /*
+     * ⚠️ Ojo con este test: HOY PASA porque el claim solo lo pone el Admin
+     * SDK, así que un `@gmail.com` no puede tener uno. Lo que fija es la
+     * consecuencia de la decisión, no una defensa: si alguien del equipo le
+     * pone rol a una cuenta externa desde la pantalla de Usuarios, ENTRA.
+     * El control es quién puede llamar a `gestionarUsuarios` (solo admin).
+     */
+    const db = conRol(INTRUSO, 'admin').firestore();
+    await assertSucceeds(setDoc(doc(db, COLECCIONES[0], 'x'), { hola: 1 }));
+  });
+});
+
+/*
+ * ── Las cuentas de prueba, negadas por nombre ─────────────────────────────
+ * Tres de ellas siguen vivas en el Auth de producción (§6) con la contraseña
+ * escrita en este repo. Mientras el equipo se identificaba por correo, la
+ * lista las dejaba fuera sola; con el claim, una que traiga `rol` entraría a
+ * todo. Por eso se niegan antes que nada, y por eso esto se prueba.
+ */
+describe('cuentas de prueba: el claim no las deja entrar', () => {
+  it.each(['admin', 'administracion', 'ventas', 'pricing', 'operaciones'])(
+    'ventas@vermur.com con rol «%s» sigue fuera',
+    async (rol) => {
+      const db = conRol(DE_PRUEBA, rol).firestore();
+      await assertFails(setDoc(doc(db, COLECCIONES[0], 'x'), { hola: 1 }));
+      await assertFails(getDoc(doc(db, COLECCIONES[0], 'x')));
+    },
+  );
+
+  it.each(['admin@vermur.com', 'pricing@vermur.com', 'operaciones@vermur.com', 'administracion@vermur.com'])(
+    '%s con rol admin sigue fuera, en Firestore y en Storage',
+    async (email) => {
+      const db = conRol(email, 'admin').firestore();
+      await assertFails(setDoc(doc(db, COLECCIONES[0], 'x'), { hola: 1 }));
+      const st = conRol(email, 'admin').storage();
+      await assertFails(uploadBytes(ref(st, RUTAS_STORAGE[1]), new Uint8Array([1])));
+    },
+  );
 });
