@@ -11,8 +11,9 @@ rules_version = '2';
 //
 // ⚠️ Estas reglas todavía NO distinguen roles: el rol se deriva en el cliente y
 // no viaja en el token (§6). Desde el Bloque 9 sí distinguen QUIÉN: solo el
-// equipo, por su correo o por su claim de rol (15-oct-2026). Aquí vive el expediente KYC —actas, RFC, comprobantes—,
-// así que el parche importa más que en ningún otro lado.
+// equipo, por su correo o por su claim de rol (15-oct-2026). Aquí vive el
+// expediente KYC —actas, RFC, comprobantes—, así que el parche importa más
+// que en ningún otro lado.
 // ─────────────────────────────────────────────────────────────────────────────
 service firebase.storage {
   match /b/{bucket}/o {
@@ -47,7 +48,10 @@ service firebase.storage {
      * mandar el suyo. Por eso valerlo como identidad del equipo es seguro.
      *
      * Un rol que estas reglas NO reconocen deja la cuenta FUERA, no dentro:
-     * un dedazo o un rol retirado quita permisos, nunca los regala.
+     * un dedazo o un rol retirado quita permisos, nunca los regala. Y una
+     * cuenta SIN claim tampoco revienta la evaluación: leer un claim ausente
+     * dentro de `x in [...]` da `false` — medido, no supuesto, y vigilado por
+     * el test «el claim ausente no revienta».
      *
      * La lista de correos SE QUEDA como respaldo. Las seis cuentas del
      * equipo son anteriores al módulo de Usuarios y una puede quedarse sin
@@ -55,8 +59,7 @@ service firebase.storage {
      * la lista, ese día se quedaría fuera de la plataforma.
      */
     function tieneRolValido() {
-      return 'rol' in request.auth.token
-        && request.auth.token.rol in ['admin', 'ventas', 'pricing', 'operaciones', 'administracion'];
+      return request.auth.token.rol in ['admin', 'ventas', 'pricing', 'operaciones', 'administracion'];
     }
 
     /*
@@ -99,10 +102,26 @@ service firebase.storage {
         ];
     }
 
+    /*
+     * ── Por qué el rol va PRIMERO, y no es cosmético ─────────────────────
+     * Con `correoDelEquipo()` delante, el `||` corta antes de llegar al
+     * claim: para las siete cuentas del respaldo, `tieneRolValido()` **nunca
+     * se evaluaba**, así que ningún test podía vigilar esa mitad de la
+     * regla. Se midió: quitarle la guarda `'rol' in …` no tumbaba un solo
+     * test de 61.
+     *
+     * Con el rol primero, un correo del respaldo SIN claim pasa por la
+     * lectura del claim ausente antes de entrar por la lista. O sea que el
+     * test «un correo del equipo lee y escribe» —y el de abajo, que lo dice
+     * con nombre— se cae el día que leer un claim que no existe deje de dar
+     * `false` y empiece a reventar la evaluación. Eso dejaría fuera de la
+     * plataforma a las siete cuentas del respaldo, y es exactamente el error
+     * que ya cometimos con la convivencia de las reglas por rol.
+     */
     function esDelEquipo() {
       return request.auth != null
         && !esCuentaDePrueba()
-        && (correoDelEquipo() || tieneRolValido());
+        && (tieneRolValido() || correoDelEquipo());
     }
 
 

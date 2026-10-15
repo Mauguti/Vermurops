@@ -18,6 +18,7 @@
  */
 
 import { onRequest } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import {
@@ -27,6 +28,25 @@ import {
   ROLES_VALIDOS,
   type UserRole,
 } from '../comun/auth.js';
+import { enviarCorreoPorN8n, N8N_WEBHOOK_URL_CORREO } from '../correo/correoPorN8n.js';
+import {
+  asuntoInvitacion, htmlInvitacion, textoInvitacion,
+} from './invitacion.js';
+
+/** Ya existe en Secret Manager: lo usan los demás proxies de n8n. */
+const VERMUR_N8N_TOKEN = defineSecret('VERMUR_N8N_TOKEN');
+
+/*
+ * A dónde regresa el enlace del correo, y la dirección que el cuerpo enseña.
+ *
+ * NO es un `defineString`: cada uno detiene el deploy preguntando (§3) y esta
+ * tarea ya mete uno, el del webhook. Default en el código + override por
+ * variable de entorno, como `configuracionSmtp` de la tarea 64.
+ *
+ * El dominio tiene que estar autorizado en Firebase Auth o
+ * `generatePasswordResetLink` rechaza la URL.
+ */
+const URL_APP = process.env.VERMUR_URL_APP ?? 'https://vermur-logistics-app.web.app';
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -46,8 +66,22 @@ interface AccionDesactivar {
   accion: 'desactivar';
   uid: string;
 }
+/** Vuelve a mandar el correo de «crea tu contraseña». No toca la cuenta. */
+interface AccionReenviar {
+  accion: 'reenviar';
+  email: string;
+}
 
-type Payload = AccionListar | AccionInvitar | AccionCambiarRol | AccionDesactivar;
+type Payload =
+  | AccionListar | AccionInvitar | AccionCambiarRol | AccionDesactivar | AccionReenviar;
+
+/** Lo que devuelven `invitar` y `reenviar`: la cuenta y qué pasó con el correo. */
+export interface ResultadoInvitacion {
+  usuario: UsuarioRegistrado | null;
+  correoEnviado: boolean;
+  /** Solo cuando NO salió: listo para enseñarse en pantalla. */
+  motivoCorreo?: string;
+}
 
 export interface UsuarioRegistrado {
   uid: string;
@@ -58,6 +92,12 @@ export interface UsuarioRegistrado {
   invitadoPor: string;
   creadoEn: string;
   actualizadoEn: string;
+  /**
+   * Último inicio de sesión (ISO) o `null` si NUNCA ha entrado. No se guarda:
+   * sale de los metadatos de Auth en cada `listar()`. Es lo que distingue una
+   * invitación que no se usó de una cuenta que ya opera.
+   */
+  ultimoAcceso?: string | null;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -80,6 +120,66 @@ function validarRol(rol: unknown): UserRole {
   return rol as UserRole;
 }
 
+/**
+ * Genera el enlace y manda el correo. El ÚNICO camino de salida.
+ *
+ * ── Por qué aquí y no en la app ───────────────────────────────────────────
+ * Hasta hoy lo mandaba el navegador con `sendPasswordResetEmail` del SDK de
+ * cliente, o sea el correo de Firebase. **Ese correo no llega a vermur.com**:
+ * el dominio está en Microsoft 365 con SPF `-all` y sin DKIM ni DMARC
+ * propios. Las siete invitaciones del 13-oct se crearon bien y no llegó
+ * ninguna; nadie se enteró porque la pantalla decía «enviado» — el SDK
+ * resuelve sin error aunque el mensaje muera después.
+ *
+ * Ahora el enlace lo genera el Admin SDK y el mensaje sale por n8n, que lo
+ * manda con una cuenta de Gmail real.
+ *
+ * **No hay respaldo por el correo de Firebase.** Mandar los dos en paralelo
+ * daría dos ligas de un solo uso para la misma cuenta —la segunda invalida la
+ * primera— y la persona apretaría la que no sirve. Si n8n falla, se dice.
+ *
+ * El enlace NO se registra en los logs: es una credencial de un solo uso para
+ * entrar a la cuenta de alguien más.
+ */
+async function mandarInvitacion(
+  email: string,
+  nombre: string,
+  rol: string,
+  invitadoPor: string,
+  esReenvio: boolean,
+): Promise<{ correoEnviado: boolean; motivoCorreo?: string }> {
+  let enlace: string;
+  try {
+    enlace = await authAdmin().generatePasswordResetLink(email, { url: URL_APP });
+  } catch (err: unknown) {
+    const code = (err as { code?: string }).code ?? '';
+    /*
+     * El caso que de verdad pasa: `auth/invalid-continue-uri` o
+     * `unauthorized-continue-uri` cuando el dominio de `URL_APP` no está
+     * autorizado en Firebase Auth. Se dice QUÉ hay que hacer, porque el
+     * mensaje de Firebase manda a revisar la contraseña del usuario.
+     */
+    if (code.includes('continue-uri')) {
+      return {
+        correoEnviado: false,
+        motivoCorreo: `Firebase rechazó la dirección de regreso (${URL_APP}). Hay que autorizar ese dominio en Authentication → Settings → Authorized domains.`,
+      };
+    }
+    return { correoEnviado: false, motivoCorreo: `No se pudo generar el enlace (${code || 'error desconocido'}).` };
+  }
+
+  const datos = { nombre, rol, invitadoPor, enlace, urlApp: URL_APP, esReenvio };
+  const r = await enviarCorreoPorN8n({
+    para: email,
+    asunto: asuntoInvitacion(esReenvio),
+    html: htmlInvitacion(datos),
+    texto: textoInvitacion(datos),
+    nombreRemitente: 'VermurOps',
+  }, { url: N8N_WEBHOOK_URL_CORREO.value(), token: VERMUR_N8N_TOKEN.value() });
+
+  return r.ok ? { correoEnviado: true } : { correoEnviado: false, motivoCorreo: r.error };
+}
+
 // ── Acciones ─────────────────────────────────────────────────────────────────
 
 /*
@@ -100,11 +200,29 @@ async function listar(): Promise<UsuarioRegistrado[]> {
   const porUid = new Map<string, UsuarioRegistrado>();
   snap.docs.forEach(d => porUid.set(d.id, { uid: d.id, ...d.data() } as UsuarioRegistrado));
 
+  /*
+   * Auth se recorre SIEMPRE y completo, no solo para las cuentas sin
+   * documento: `lastSignInTime` solo vive aquí, y es lo que distingue una
+   * invitación que nunca se usó —las siete del 13-oct— de una cuenta que ya
+   * opera. Antes esta vuelta se saltaba las filas que ya venían de Firestore
+   * (`continue`), así que el dato no llegaba justo a quien sí tiene
+   * documento.
+   */
   let token: string | undefined;
   do {
     const pagina = await authAdmin().listUsers(1000, token);
     for (const u of pagina.users) {
-      if (porUid.has(u.uid)) continue;
+      const ultimoAcceso = u.metadata.lastSignInTime
+        ? new Date(u.metadata.lastSignInTime).toISOString()
+        : null;
+
+      const yaEsta = porUid.get(u.uid);
+      if (yaEsta) {
+        // Auth manda sobre el documento en lo que Auth sabe mejor.
+        porUid.set(u.uid, { ...yaEsta, ultimoAcceso, activo: !u.disabled });
+        continue;
+      }
+
       const claims = (u.customClaims ?? {}) as { rol?: string };
       porUid.set(u.uid, {
         uid: u.uid,
@@ -117,19 +235,26 @@ async function listar(): Promise<UsuarioRegistrado[]> {
           ? new Date(u.metadata.creationTime).toISOString()
           : '',
         actualizadoEn: '',
+        ultimoAcceso,
         sinDocumento: true,
       } as UsuarioRegistrado);
     }
     token = pagina.pageToken;
   } while (token);
 
+  /*
+   * Una fila que quedó SIN `ultimoAcceso` es una cuenta con documento en
+   * `usuarios/` y sin cuenta en Auth. Se deja ausente a propósito: la
+   * pantalla lo lee como «no se sabe» y NO ofrece reenviar. Ponerle `null`
+   * diría «nunca entró» de una cuenta que ya no existe.
+   */
   return [...porUid.values()].sort((a, b) => (a.nombre ?? '').localeCompare(b.nombre ?? ''));
 }
 
 async function invitar(
   payload: AccionInvitar,
   invitadoPorEmail: string,
-): Promise<UsuarioRegistrado> {
+): Promise<ResultadoInvitacion> {
   const email = validarEmail(payload.email);
   const rol = validarRol(payload.rol);
   const nombre = (payload.nombre ?? '').trim();
@@ -169,27 +294,95 @@ async function invitar(
   await db().collection('usuarios').doc(uid).set(doc);
 
   /*
-   * El correo lo manda la APP, no esta Function.
+   * El correo sale de AQUÍ, no de la app.
    *
-   * Aquí había un `generatePasswordResetLink`, con un comentario que decía
-   * que «en producción Firebase envía el correo automáticamente». Es falso:
-   * ese método GENERA el enlace y no manda nada. El Admin SDK no envía
-   * correos. Mau se invitó, la cuenta se creó en Auth y en `usuarios/{uid}`,
-   * y no llegó nada.
+   * Aquí hubo un `generatePasswordResetLink` con un comentario que decía que
+   * «en producción Firebase envía el correo automáticamente». Es falso: ese
+   * método GENERA el enlace y no manda nada. Se quitó y el envío se pasó al
+   * navegador, con `sendPasswordResetEmail`... y resultó que el correo de
+   * Firebase **no llega a vermur.com**. Las siete invitaciones del 13-oct se
+   * perdieron ahí.
    *
-   * El e2e no lo atrapaba porque el emulador registra el oobCode al generar
-   * el enlace, aunque nadie lo mande: el enlace existía y la prueba lo
-   * encontraba.
-   *
-   * Quien sí envía es `sendPasswordResetEmail` del SDK de cliente, que es lo
-   * que ya usa la pantalla de recuperar contraseña. Se llama desde la app al
-   * volver esta respuesta.
-   *
-   * Y no se registra el enlace en los logs: es una credencial de un solo uso
-   * para entrar a la cuenta de alguien más.
+   * La cuenta YA está creada en este punto. Si el correo no sale no se
+   * deshace nada —borrar una cuenta por un fallo de envío es peor— y se
+   * devuelve el motivo para que la pantalla lo diga y ofrezca reenviar.
    */
+  const { correoEnviado, motivoCorreo } = await mandarInvitacion(
+    email, nombre, rol, invitadoPorEmail, false,
+  );
 
-  return { uid, ...doc };
+    /*
+   * `ultimoAcceso: null` explícito. Una cuenta que se acaba de crear NUNCA ha
+   * entrado: es un hecho, no una suposición. Sin esto, el renglón que la
+   * pantalla agrega al vuelo venía sin el campo, se leía como «no se sabe» y
+   * salía «Activa» en verde — justo el renglón que tiene que decir
+   * «Pendiente» y ofrecer «Reenviar invitación».
+   *
+   * El campo NO se guarda en el documento: se deriva de Auth en `listar()`.
+   */
+  return { usuario: { uid, ...doc, ultimoAcceso: null }, correoEnviado, motivoCorreo };
+}
+
+/**
+ * Reenviar: NO toca la cuenta, solo vuelve a mandar el correo.
+ *
+ * El rol y el nombre se leen de Auth y de `usuarios/{uid}`, no del cliente:
+ * el correo tiene que decir el rol que la cuenta TIENE, no el que la pantalla
+ * creía que tenía.
+ */
+async function reenviar(
+  payload: AccionReenviar,
+  reenviadoPorEmail: string,
+): Promise<ResultadoInvitacion> {
+  const email = validarEmail(payload.email);
+
+  let userRecord;
+  try {
+    userRecord = await authAdmin().getUserByEmail(email);
+  } catch {
+    throw new ErrorAuth(404, `No hay ninguna cuenta con el correo «${email}».`);
+  }
+  if (userRecord.disabled) {
+    throw new ErrorAuth(409, `La cuenta de «${email}» está desactivada: reactívala antes de reenviar la invitación.`);
+  }
+
+  const snap = await db().collection('usuarios').doc(userRecord.uid).get();
+  const doc = snap.data() as Partial<UsuarioRegistrado> | undefined;
+  const claims = (userRecord.customClaims ?? {}) as { rol?: string };
+  const rol = claims.rol ?? doc?.rol ?? '';
+  const nombre = doc?.nombre ?? userRecord.displayName ?? email;
+  // Quien la invitó originalmente; si no hay registro, quien reenvía.
+  const invitadoPor = doc?.invitadoPor && doc.invitadoPor.includes('@')
+    ? doc.invitadoPor
+    : reenviadoPorEmail;
+
+  /*
+   * Una cuenta SIN rol se reenvía igual, y el correo dice el rol en blanco en
+   * vez de inventarle uno. Pero conviene saberlo: desde el 15-oct el rol es
+   * lo que la deja entrar a Firestore (`tieneRolValido` en firestore.rules),
+   * así que sin él la persona pone su contraseña y no ve nada.
+   */
+  const { correoEnviado, motivoCorreo } = await mandarInvitacion(
+    email, nombre, rol, invitadoPor, true,
+  );
+
+  const aviso = rol ? motivoCorreo
+    : [motivoCorreo, `Ojo: «${email}» no tiene rol asignado, así que al entrar no verá datos. Asígnale uno.`]
+        .filter(Boolean).join(' ');
+
+  // El último acceso ya lo tenemos en la mano: se devuelve en vez de dejar
+  // que la pantalla lo lea como «no se sabe».
+  const ultimoAcceso = userRecord.metadata.lastSignInTime
+    ? new Date(userRecord.metadata.lastSignInTime).toISOString()
+    : null;
+
+  return {
+    usuario: snap.exists
+      ? ({ uid: userRecord.uid, ...doc, ultimoAcceso } as UsuarioRegistrado)
+      : null,
+    correoEnviado,
+    ...(aviso ? { motivoCorreo: aviso } : {}),
+  };
 }
 
 async function cambiarRol(
@@ -291,7 +484,7 @@ async function desactivar(
 // ── Handler principal ────────────────────────────────────────────────────────
 
 export const gestionarUsuarios = onRequest(
-  { cors: true, invoker: 'public' },
+  { cors: true, invoker: 'public', secrets: [VERMUR_N8N_TOKEN] },
   async (req, res) => {
     if (req.method === 'OPTIONS') {
       res.status(204).send('');
@@ -325,6 +518,9 @@ export const gestionarUsuarios = onRequest(
           break;
         case 'desactivar':
           resultado = await desactivar(payload, usuario.email);
+          break;
+        case 'reenviar':
+          resultado = await reenviar(payload, usuario.email);
           break;
         default:
           throw new ErrorAuth(400, `Acción desconocida: «${(payload as { accion: string }).accion}».`);

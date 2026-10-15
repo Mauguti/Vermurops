@@ -10,6 +10,7 @@ a la derecha): la URL de producción `/webhook/...` solo responde activo.
 | `generar-pdf-cotizacion.n8n.json` | `POST /webhook/generar-pdf-cotizacion` | Recibe el payload de `lib/pdfCotizacion.ts`, arma el HTML, Gotenberg lo convierte y devuelve `application/pdf`. Si algo falla, responde JSON `{ ok: false, error }` con 502. |
 | `generar-documento.n8n.json` | `POST /webhook/generar-documento` | Convertidor HTML→PDF para TODOS los documentos operativos. Recibe `{ html, nombreArchivo, tipo, pagina? }`, Gotenberg lo convierte con `preferCssPageSize` y `printBackground`, y devuelve `application/pdf`. Error: JSON 502. |
 | `tipo-cambio-banxico.n8n.json` | `POST /webhook/tipo-cambio` | Consulta el SIE de Banxico. Body opcional `{ "series": [...] }`. Responde `{ ok, fuente: 'banxico', consultado, series: [{ serie, titulo, fecha, valor }] }`. Series por defecto: SF43718 (FIX del DOF por fecha de determinación) y SF60653 (FIX por fecha de liquidación). `valor: null` cuando Banxico reporta «N/E». Probado activo el 1-oct-2026. |
+| `enviar-correo.n8n.json` | `POST /webhook/enviar-correo` | El canal de salida de correo. Body `{ para, asunto, html, texto?, responderA?, nombreRemitente? }`; manda por **Gmail** (no por Exchange: el correo de vermur.com no sale, ver abajo) y responde `{ ok: true, id, para }`. Valida del lado del servidor: máximo 20 destinatarios y **solo** los dominios `vermur.com` y `digsol.com.mx` — un cuerpo mal armado es 400, un rechazo de Gmail es 502. Lo llama `functions/src/correo/correoPorN8n.ts`. |
 
 Las plantillas HTML NO viven en n8n: las llena una Cloud Function desde el
 repo y n8n solo convierte. Un payload de prueba, en `pruebas/`.
@@ -104,3 +105,28 @@ coincida con `firebase functions:secrets:access VERMUR_N8N_TOKEN`.
 (`git show HEAD~1:docs/n8n/generar-pdf-cotizacion.n8n.json`), que no trae el
 nodo de validación. O desactivar el flujo nuevo y reactivar el anterior desde
 el historial de versiones de n8n.
+
+## enviar-correo — por qué Gmail y no el correo de Vermur (15-oct-2026)
+
+Luis invitó siete cuentas el 13-oct. Las siete se crearon bien en Auth… y a
+ninguna le llegó el correo para poner su contraseña.
+
+La causa no es la plataforma: **el correo de restablecimiento de Firebase no
+llega a `vermur.com`**. El dominio está en Microsoft 365 con SPF `-all` y sin
+DKIM ni DMARC propios, así que un mensaje que Firebase manda «de parte de»
+Vermur se cae en la puerta. Y no se notaba porque
+`sendPasswordResetEmail` **resuelve sin error** aunque el mensaje muera
+después: la pantalla decía «enviado».
+
+Por eso el enlace lo genera ahora el Admin SDK (`generatePasswordResetLink`)
+y el mensaje sale por este flujo, con una cuenta de Gmail real que sí
+entrega.
+
+**No hay respaldo por el correo de Firebase.** Mandar los dos en paralelo
+daría dos enlaces de un solo uso para la misma cuenta —el segundo invalida al
+primero— y la persona apretaría el que ya no sirve.
+
+Lo que falta, anotado: la pantalla de **«¿Olvidaste tu contraseña?»**
+(`components/RecuperarContrasena.tsx`) sigue usando el correo de Firebase, así
+que tiene exactamente el mismo problema para quien ya tiene cuenta. Pasarla a
+este flujo es otro cambio y no entró aquí.

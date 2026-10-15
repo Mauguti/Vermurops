@@ -340,6 +340,33 @@ describe('un correo fuera de la lista, con claim de rol', () => {
     },
   );
 
+  /*
+   * ── El test que vigila la suposición de la regla ─────────────────────────
+   *
+   * `esDelEquipo` evalúa `tieneRolValido() || correoDelEquipo()`, en ese
+   * orden y a propósito: así una cuenta del respaldo SIN claim pasa por la
+   * lectura de un claim que no existe ANTES de entrar por su correo.
+   *
+   * Eso es lo que este test fija. Si leer un claim ausente dejara de dar
+   * `false` y empezara a reventar la evaluación, las siete cuentas del
+   * respaldo —las seis del equipo y Mau— se quedarían fuera de la
+   * plataforma, y es el mismo error que ya cometimos con la convivencia de
+   * las reglas por rol.
+   *
+   * Con el orden al revés este test pasaría por el cortocircuito del `||`
+   * sin comprobar nada: medido el 15-oct, quitar la guarda `'rol' in …` no
+   * tumbaba un solo test de 61. Por eso la guarda se quitó (era peso muerto)
+   * y el orden se fijó.
+   */
+  it('el claim ausente no revienta: un correo del respaldo SIN rol entra igual', async () => {
+    for (const email of [DEL_EQUIPO, NUEVO_ADMIN]) {
+      const db = como(email).firestore();           // sin claim `rol` en el token
+      await assertSucceeds(setDoc(doc(db, COLECCIONES[0], 'x'), { hola: 1 }));
+      const st = como(email).storage();
+      await assertSucceeds(uploadBytes(ref(st, RUTAS_STORAGE[1]), new Uint8Array([1])));
+    }
+  });
+
   it('un rol válido con un correo de FUERA de Vermur tampoco: el claim no es un pase libre... ', async () => {
     /*
      * ⚠️ Ojo con este test: HOY PASA porque el claim solo lo pone el Admin

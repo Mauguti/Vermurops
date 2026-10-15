@@ -2388,6 +2388,127 @@ cablea con `handleUpdateProducto`. Sin modelo nuevo.
     estibable, verificado en Firestore). Un `uncheck()` de Playwright falla aquí
     porque la casilla es controlada y se actualiza al volver el listener: usar `click()`.
 
+## 4.65 Invitar dejó de depender de un deploy, y el correo sale por n8n (15-oct-2026)
+
+Luis invitó **siete** cuentas el 13-oct —andrea.guerrero, ari.morales,
+barbara.dsouza, carlos.gone, gabriela.gallegos, noemi.casas, said.torres—. Las
+siete se crearon bien en Auth, con su rol en claims. Y ninguna servía, por
+**dos** causas independientes que se veían como una sola:
+
+**(a) `esDelEquipo()` era una lista fija de siete correos**, así que una cuenta
+nueva quedaba fuera de TODO —Firestore y Storage— hasta el siguiente deploy de
+reglas. Ahora `esDelEquipo()` acepta también a quien trae un claim `rol` de los
+cinco válidos (`tieneRolValido`). El claim **solo lo pone el Admin SDK** desde
+`gestionarUsuarios`, que exige `usuario.gestionar`: el navegador no puede
+mandar el suyo, y por eso valerlo como identidad es seguro. **Invitar ya no
+exige un deploy de reglas.**
+  - **La lista de correos SE QUEDA como respaldo.** Las seis cuentas del equipo
+    son anteriores al módulo de Usuarios y una puede quedarse sin claim; sin la
+    lista, ese día se quedaría fuera de la plataforma.
+  - **Un rol que las reglas no reconocen deja la cuenta FUERA, no dentro**: un
+    dedazo o un rol retirado quita permisos, nunca los regala.
+  - 🔴 **Las cinco cuentas de prueba se niegan por NOMBRE, antes que nada**
+    (`esCuentaDePrueba`). Tres siguen vivas en el Auth de producción (§6) con
+    la contraseña escrita en este repo; mientras el equipo se identificaba solo
+    por correo, la lista las dejaba fuera sola — con el claim, una que trajera
+    `rol` entraría a TODO. Y la pantalla de Usuarios ahora las enseña, así que
+    es fácil habérselo puesto. `scripts/reglasEmulador.sh` **vacía** esa lista
+    en el derivado del emulador, donde esas cuentas son el recorrido.
+  - 23 tests nuevos en `tests/reglas/equipo.test.ts` (61 en total).
+
+**(b) El correo de restablecimiento de Firebase NO LLEGA a `vermur.com`.** El
+dominio está en Microsoft 365 con SPF `-all` y sin DKIM ni DMARC propios. Y no
+se notaba porque **`sendPasswordResetEmail` resuelve sin error** aunque el
+mensaje muera después: la pantalla decía «enviado». Ahora el enlace lo genera
+el servidor (`generatePasswordResetLink`) y el mensaje sale por el flujo
+**`enviar-correo`** de n8n, con una cuenta de Gmail real que sí entrega.
+  - `functions/src/correo/correoPorN8n.ts` es el canal reutilizable, para las
+    notificaciones que vienen después. **No se llama `enviarCorreo`**: ese
+    nombre es de la Function de SMTP por Exchange (§4.29), que sigue comentada
+    en `index.ts`, y este módulo **no importa nada de ahí** a propósito —
+    tocarlo volvería a traer sus dos `defineSecret` al análisis del deploy (§3).
+  - El cuerpo del correo es puro y aparte (`usuarios/invitacion.ts`): dice quién
+    invitó, el rol en español, el botón «Crear mi contraseña» y la dirección de
+    la plataforma. El nombre se escapa: viene de un formulario.
+  - **No hay respaldo por el correo de Firebase.** Mandar los dos en paralelo
+    daría dos enlaces de un solo uso para la misma cuenta —el segundo invalida
+    al primero— y la persona apretaría el que ya no sirve. Si n8n falla, la
+    pantalla lo dice y queda «Reenviar invitación».
+  - **Acción nueva `reenviar`**: no toca la cuenta; lee el rol y el nombre de
+    Auth y de `usuarios/{uid}`, no del cliente. Una cuenta desactivada se niega
+    (un enlace que promete acceso y no lo da) y una inexistente da 404.
+  - `N8N_WEBHOOK_URL_CORREO` es un **`defineString` nuevo**: el deploy de
+    Functions deja de ser desatendido (§3). Default de producción.
+  - El enlace **no se registra en los logs**: es una credencial de un solo uso
+    para entrar a la cuenta de alguien más.
+
+**`auditarClaims.ts` ya no cuenta contra una lista fija.** Esa era justo su
+falla: las siete cuentas nuevas no estaban en su lista, así que ni las miraba —
+y eran las que no entraban. Ahora evalúa **la misma condición que las reglas**
+sobre todas las cuentas de Auth y dice quién pasa, marcando aparte: rol
+inválido, sin rol y fuera del respaldo, quien entra **solo** por su claim,
+quien nunca ha iniciado sesión (su invitación no se usó) y las de prueba vivas.
+Y lo primero que hace es **comparar sus listas contra `firestore.rules`**: un
+script de auditoría que se quedó viejo afirma que alguien entra cuando no.
+
+**⚠️ Lo que sigue roto y no se tocó:** la pantalla de **«¿Olvidaste tu
+contraseña?»** (`components/RecuperarContrasena.tsx`) sigue mandando por el
+correo de Firebase, así que tiene el mismo problema (b) para quien ya tiene
+cuenta y olvida su contraseña. Pasarla a `correoPorN8n` es otro cambio.
+
+**Medido, y corrige una nota anterior:** en estas reglas, leer un claim que no
+existe dentro de `x in [...]` devuelve **false, no un error de evaluación**.
+Verificado quitando la guarda `'rol' in request.auth.token` y además
+invirtiendo el orden de los dos caminos: los 61 tests seguían en verde. La
+nota del despliegue por rol decía lo contrario para otra expresión; lo que
+está medido es esto.
+
+**Y de ahí salió el orden de `esDelEquipo`.** Si esa guarda no sostiene nada,
+sobra: se quitó. Pero con `correoDelEquipo()` delante, el `||` cortaba antes
+de llegar al claim, así que para las siete cuentas del respaldo
+`tieneRolValido()` **nunca se evaluaba** y ningún test podía vigilar esa
+mitad de la regla. Ahora el orden es `tieneRolValido() || correoDelEquipo()`:
+toda petición pasa por la lectura del claim, y el test «el claim ausente no
+revienta» se caería el día que esa lectura deje de dar `false` — lo que
+dejaría fuera de la plataforma a las siete cuentas del respaldo. **La
+suposición se sostiene en la medición, no en una mutación**: no hay forma de
+inyectar la semántica contraria del motor de reglas.
+
+**⛔ El emulador NO le pega al webhook de correo de producción.** El default
+del `defineString` es producción y el emulador de Functions lee los mismos
+parámetros, así que `CON_FUNCTIONS=1 ./scripts/e2e.sh` le pegaba a
+`n8n.vermur.mx` de verdad — y el flujo acepta cualquier destinatario
+`@vermur.com`, o sea que **una corrida de pruebas podía mandar invitaciones
+reales al equipo**. Lo delató que el paso 1 del e2e tardara 31 segundos
+esperando a que la petición se rindiera. El corte vive en
+`bloqueadoEnEmulador` (código, no `.env`: `.env.local` no se versiona y una
+máquina sin él volvería a pegarle a producción): en emulador, un webhook que
+no sea `127.0.0.1` se rechaza **antes del `fetch`** y se dice. Para probar el
+envío de verdad se apunta la URL a un n8n local en `functions/.env.local`.
+
+**La lista de Usuarios distingue tres estados, no dos** (`estadoDeAcceso` y
+`puedeReenviarse` en `lib/usuarios.ts`, 16 tests). «Activo» en verde no
+separaba a quien ya puso su contraseña de quien nunca recibió el correo, y las
+siete cuentas del 13-oct se veían idénticas al resto del equipo:
+  - **Pendiente** (ámbar): nunca ha iniciado sesión. Trae **«Reenviar
+    invitación»**.
+  - **Entró** (verde): con la fecha del último acceso en el tooltip.
+  - **Inactivo** (rojo) y **Activa** (no se pudo leer su acceso en Auth).
+  - **«No se sabe» NO se trata como «nunca entró»**: confundirlos haría
+    reenviarle la invitación a alguien que ya opera, y el enlace de
+    restablecimiento le invalidaría su contraseña.
+  - **El botón no existía.** `onReenviar` se pasaba de arriba abajo y ningún
+    renglón lo llamaba, mientras el aviso de error mandaba a usarlo («Usa
+    «Reenviar invitación» en su renglón»). Otra regla sin call site.
+  - Se ofrece a quien nunca entró **tenga rol o no**: tener rol no significa
+    haber recibido el correo — las siete del 13-oct tenían el suyo puesto.
+  - `listar()` recorre Auth COMPLETO para traer `lastSignInTime` de todas las
+    filas; antes se saltaba (`continue`) las que ya venían de Firestore, así
+    que el dato no llegaba justo a quien sí tiene documento. Y `invitar`
+    devuelve `ultimoAcceso: null` explícito: sin eso, el renglón que la
+    pantalla agrega al vuelo salía «Activa» en verde — justo el que tiene que
+    decir «Pendiente».
+
 ---
 
 ## 5. Estado de los módulos

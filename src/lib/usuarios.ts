@@ -21,6 +21,19 @@ export interface UsuarioRegistrado {
   actualizadoEn: string;
   historial?: CambioUsuario[];
   /**
+   * Último inicio de sesión, de los metadatos de Auth. NO se guarda: lo
+   * calcula `listar()` en cada llamada.
+   *
+   *   string → entró                 (ISO 8601)
+   *   null   → NUNCA ha entrado: su invitación no se usó, o no llegó
+   *   ausente→ no se sabe: no se pudo leer su cuenta de Auth
+   *
+   * Los tres casos son distintos a propósito. Enseñar «pendiente» cuando no
+   * se pudo leer la cuenta mandaría a reenviarle una invitación a alguien que
+   * ya entró.
+   */
+  ultimoAcceso?: string | null;
+  /**
    * La cuenta existe en Auth y NO tiene documento en `usuarios/`: es anterior
    * a este módulo. Se enseña igual —antes era invisible— y al cambiarle el rol
    * el documento se crea.
@@ -82,4 +95,52 @@ export function validarNombreInvitacion(nombre: string): string | null {
   if (!limpio) return 'El nombre es obligatorio.';
   if (limpio.length < 2) return 'El nombre es muy corto.';
   return null;
+}
+
+/*
+ * ── Pendiente, entró, o no se sabe ───────────────────────────────────────
+ * Lo que distingue a las siete cuentas del 13-oct —creadas, con rol y sin
+ * usar— de las que ya operan. Sin esto, la lista de Usuarios las enseña
+ * exactamente igual que al resto y nadie puede ver a quién le falta.
+ */
+export type EstadoAcceso = 'entro' | 'pendiente' | 'desconocido';
+
+export function estadoDeAcceso(u: Pick<UsuarioRegistrado, 'ultimoAcceso'>): EstadoAcceso {
+  if (u.ultimoAcceso === undefined) return 'desconocido';
+  return u.ultimoAcceso === null ? 'pendiente' : 'entro';
+}
+
+/**
+ * ¿Se le ofrece «Reenviar invitación»?
+ *
+ * A quien **nunca ha entrado**, tenga rol o no: tener rol no significa haber
+ * recibido el correo — las siete del 13-oct tenían su rol puesto. Y a una
+ * cuenta desactivada no, porque el enlace prometería un acceso que no da (la
+ * Function también lo niega, con 409).
+ */
+export function puedeReenviarse(u: Pick<UsuarioRegistrado, 'ultimoAcceso' | 'activo'>): boolean {
+  return u.activo && estadoDeAcceso(u) === 'pendiente';
+}
+
+/** Lo que se pinta en la columna Estado. */
+export function etiquetaDeAcceso(u: UsuarioRegistrado): { texto: string; detalle: string } {
+  if (!u.activo) return { texto: 'Inactivo', detalle: 'La cuenta está desactivada: no puede entrar.' };
+  switch (estadoDeAcceso(u)) {
+    case 'pendiente':
+      return {
+        texto: 'Pendiente',
+        detalle: 'Nunca ha iniciado sesión: no ha puesto su contraseña. Usa «Reenviar invitación».',
+      };
+    case 'desconocido':
+      return { texto: 'Activa', detalle: 'No se pudo leer su último acceso en Auth.' };
+    default:
+      return { texto: 'Entró', detalle: `Último acceso: ${fechaCorta(u.ultimoAcceso as string)}.` };
+  }
+}
+
+export function fechaCorta(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 }
