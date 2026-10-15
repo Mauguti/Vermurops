@@ -11,7 +11,7 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  bloqueadoEnEmulador, detalleDelCuerpo, enviarCorreoPorN8n, mensajeDeFallo,
+  bloqueadoEnEmulador, detalleDelCuerpo, enviarCorreoPorN8n, mensajeDeFallo, urlWebhookCorreo,
 } from './correoPorN8n.js';
 
 const CORREO = {
@@ -194,5 +194,20 @@ describe('el emulador no le pega a producción', () => {
       if (previo === undefined) delete process.env.FUNCTIONS_EMULATOR;
       else process.env.FUNCTIONS_EMULATOR = previo;
     }
+  });
+});
+
+describe('urlWebhookCorreo', () => {
+  const env = (o: Record<string, string>) => o as NodeJS.ProcessEnv;
+  it('en emulador, el simulado manda sobre el parámetro', () => {
+    expect(urlWebhookCorreo('https://prod', env({ FUNCTIONS_EMULATOR: 'true', VERMUR_N8N_CORREO_SIMULADO: 'http://127.0.0.1:9797/x' })))
+      .toBe('http://127.0.0.1:9797/x');
+  });
+  it('fuera del emulador se ignora: no puede desviar el correo de producción', () => {
+    expect(urlWebhookCorreo('https://prod', env({ VERMUR_N8N_CORREO_SIMULADO: 'http://127.0.0.1:9797/x' })))
+      .toBe('https://prod');
+  });
+  it('en emulador sin simulado, rige el parámetro', () => {
+    expect(urlWebhookCorreo('https://prod', env({ FUNCTIONS_EMULATOR: 'true' }))).toBe('https://prod');
   });
 });

@@ -36,6 +36,12 @@ if [[ "${CON_FUNCTIONS:-0}" == "1" ]]; then
   # usan Functions (gestion-usuarios, capturas-21) no llaman a n8n; si algún
   # día lo hicieran, un token falso falla en vez de pegarle al n8n real.
   export VERMUR_N8N_TOKEN="${VERMUR_N8N_TOKEN:-EMULADOR_NO_REAL}"
+  # El correo apunta a un n8n SIMULADO en 127.0.0.1 (lo levanta el spec 119).
+  # Va por una variable propia, solo-emulador: `functions/.env` fija el webhook
+  # de producción y gana sobre `N8N_WEBHOOK_URL_CORREO`. Sin simulador la
+  # conexión se rechaza al instante y ningún correo sale de verdad.
+  export VERMUR_N8N_CORREO_SIMULADO="${VERMUR_N8N_CORREO_SIMULADO:-http://127.0.0.1:9797/webhook/enviar-correo}"
+
 fi
 FS="http://127.0.0.1:8080/v1/projects/vermur-logistics-app/databases/(default)/documents"
 

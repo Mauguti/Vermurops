@@ -1,20 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import {
-  sendPasswordResetEmail, verifyPasswordResetCode, confirmPasswordReset,
-} from 'firebase/auth';
+import { verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
 import { auth } from '../firebase';
-import {
-  mensajeDeErrorAuth, validarNuevaContrasena, MENSAJE_CORREO_ENVIADO,
-} from '../lib/recuperarContrasena';
+import { mensajeDeErrorAuth, validarNuevaContrasena } from '../lib/recuperarContrasena';
+import { solicitarRestablecimiento } from '../lib/solicitarRestablecimiento';
+import { urlFuncion } from '../lib/urlFunciones';
 
 /**
  * Restablecer la contraseña (24-sep-2026).
  *
  * Dos pantallas con la misma tarjeta del login:
- *   - «solicitar»: pide el correo y dispara sendPasswordResetEmail. El
- *     correo es el que Firebase manda por defecto (no se personaliza hoy);
- *     `auth.languageCode = 'es'` lo pone en español.
+ *   - «solicitar»: pide el correo a la Function `solicitarRestablecimiento`
+ *     (sin sesión), que genera el enlace y lo manda por n8n. Ya no es el
+ *     correo de Firebase: ese no llega a vermur.com (tarea 119).
  *   - «restablecer»: llega desde el enlace del correo cuando la URL de
  *     acción del proyecto apunta a la app (?mode=resetPassword&oobCode=…).
  *     Verifica el código, pide la contraseña nueva y la confirma. Si el
@@ -56,29 +54,16 @@ export function SolicitarRecuperacion({ correoInicial = '', onVolver }: { correo
   const [email, setEmail] = useState(correoInicial);
   const [error, setError] = useState('');
   const [enviado, setEnviado] = useState(false);
+  const [mensajeOk, setMensajeOk] = useState('');
   const [cargando, setCargando] = useState(false);
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setCargando(true);
-    // La URL de regreso lleva al usuario de vuelta a la app después de
-    // cambiarla. Si el dominio no estuviera autorizado en Firebase, se
-    // reintenta sin ella: mejor un correo sin botón de regreso que ninguno.
-    const opciones = { url: `${window.location.origin}/` };
-    try {
-      try {
-        await sendPasswordResetEmail(auth, email.trim(), opciones);
-      } catch (err) {
-        if ((err as { code?: string }).code !== 'auth/unauthorized-continue-uri') throw err;
-        await sendPasswordResetEmail(auth, email.trim());
-      }
-      setEnviado(true);
-    } catch (err) {
-      setError(mensajeDeErrorAuth((err as { code?: string }).code, 'solicitar'));
-    } finally {
-      setCargando(false);
-    }
+    const r = await solicitarRestablecimiento(urlFuncion('solicitarRestablecimiento'), email);
+    if ('error' in r) setError(r.error); else { setMensajeOk(r.mensaje); setEnviado(true); }
+    setCargando(false);
   };
 
   return (
@@ -86,7 +71,7 @@ export function SolicitarRecuperacion({ correoInicial = '', onVolver }: { correo
       <h2 className="text-[18px] font-bold text-[#18181B] tracking-tight mb-[6px]">Restablecer contraseña</h2>
       {enviado ? (
         <div className="space-y-[18px]">
-          <p className="text-[13px] text-[#3F3F46] leading-relaxed">{MENSAJE_CORREO_ENVIADO}</p>
+          <p className="text-[13px] text-[#3F3F46] leading-relaxed">{mensajeOk}</p>
           <p className="text-[12px] text-[#71717A]">El enlace del correo te pide la contraseña nueva; después entras con ella como siempre.</p>
           <Boton type="button" onClick={onVolver}>Volver al inicio de sesión</Boton>
         </div>

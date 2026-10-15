@@ -27,6 +27,9 @@ export { generarDocumento } from './documentos/generarDocumento.js';
 // ── Gestión de usuarios ─────────────────────────────────────────────────────
 export { gestionarUsuarios } from './usuarios/gestionarUsuarios.js';
 
+// ── «¿Olvidaste tu contraseña?» por n8n, sin sesión (tarea 119) ─────────────
+export { solicitarRestablecimiento } from './usuarios/solicitarRestablecimiento.js';
+
 // ── Tipo de cambio (tarea 51) ───────────────────────────────────────────────
 export { tipoCambioProgramado, actualizarTipoCambio } from './tipoCambio/tipoCambio.js';
 

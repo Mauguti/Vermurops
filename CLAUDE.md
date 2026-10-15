@@ -2617,6 +2617,32 @@ no enseñe algo distinto de lo que la app emite.
     Mientras no haya un contador por año y serie, en enero hay que correr el
     script con `--reiniciar`. El script lo dice cada vez que corre.
 
+## 4.67 «¿Olvidaste tu contraseña?» por n8n, sin sesión (tarea 119, 15-oct-2026)
+
+Cierra el ⚠️ de §4.65: la pantalla seguía con `sendPasswordResetEmail`, cuyo
+correo no llega a vermur.com. Ahora llama a la Function `solicitarRestablecimiento`
+(`onRequest`, `invoker: 'public'`, sin token: quien olvidó su contraseña no tiene
+sesión), que genera el enlace con el Admin SDK y lo manda por `correoPorN8n`.
+Lógica pura en `functions/src/usuarios/restablecerContrasena.ts` (14 tests, cada
+regla verificada por mutación); el cliente, en `lib/solicitarRestablecimiento.ts`.
+  - **La misma respuesta siempre** (200 con el mensaje neutro) exista o no la
+    cuenta, esté deshabilitada, se haya pasado del límite o haya fallado n8n; el
+    desenlace real solo va al log, sin correo ni enlace. Un correo mal formado es
+    400: no revela nada sobre cuentas.
+  - **Límite: 3 por correo por hora**, ventana deslizante en
+    `limitesCorreo/{sha256 del correo}` (`envios: number[]`), por transacción.
+    Cuenta TODA solicitud bien formada, exista o no la cuenta: contar solo las
+    reales dejaría un rastro distinto para los correos que existen. Solo escribe
+    el Admin SDK; el catch-all de `firestore.rules` ya niega el resto, sin regla nueva.
+  - **Cuenta deshabilitada: no hay enlace.**
+  - **Prueba en emulador:** `VERMUR_N8N_CORREO_SIMULADO` (solo se lee con
+    `FUNCTIONS_EMULATOR`) apunta el correo a un n8n simulado en 127.0.0.1;
+    `functions/.env` fija producción y gana sobre `N8N_WEBHOOK_URL_CORREO`.
+    `scripts/e2e.sh` lo exporta con `CON_FUNCTIONS=1`. Spec: `tests/e2e/119-*.spec.ts`.
+  - Sin `defineString` ni secreto nuevos. **Hay Function nueva: se despliega
+    con `--only functions:solicitarRestablecimiento`.**
+  - Queda sin uso (y sin borrar) `enviarCorreoDeAcceso` de `lib/recuperarContrasena.ts`.
+
 ---
 
 ## 5. Estado de los módulos

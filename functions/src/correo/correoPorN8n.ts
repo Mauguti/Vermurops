@@ -72,6 +72,18 @@ export function bloqueadoEnEmulador(url: string, enEmulador: boolean): string | 
   return `En emulador no se manda correo de verdad: el webhook apunta a producción (${url}). Si quieres probar el envío, apúntalo a 127.0.0.1 en functions/.env.local.`;
 }
 
+/**
+ * La URL del webhook de correo. En el emulador, `VERMUR_N8N_CORREO_SIMULADO`
+ * manda sobre el parámetro: `functions/.env` fija el de producción y gana
+ * sobre las variables del proceso, así que los e2e (tarea 119) no tenían
+ * otra forma de apuntar a un n8n simulado. Fuera del emulador se ignora: en
+ * producción esa variable no puede desviar el correo a otro lado.
+ */
+export function urlWebhookCorreo(parametro: string, entorno: NodeJS.ProcessEnv = process.env): string {
+  const simulado = entorno.VERMUR_N8N_CORREO_SIMULADO?.trim();
+  return entorno.FUNCTIONS_EMULATOR === 'true' && simulado ? simulado : parametro;
+}
+
 export interface CorreoSaliente {
   /** Uno o varios destinatarios. El flujo rechaza dominios fuera de Vermur. */
   para: string | string[];
