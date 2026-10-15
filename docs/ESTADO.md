@@ -1,3 +1,47 @@
+# Estado de VermurOps — 16 de octubre de 2026 (corte del sprint nocturno)
+
+**Cadena 119 → 125 + 115, 117, 118, lista y SIN PUBLICAR.** Orden:
+119 → 120 → 121 → 122 → 123 → 124 → 125 → 115 → 117 → 118. Punta:
+`sprint/118-portal-cliente-rol` (mergearla trae todo; la 122 ya trae `main`).
+`[!]` 116 (plan de eventos DCSA, fuera de la cadena, rama
+`sprint/116-plan-eventos-embarque`): códigos DCSA sin verificar.
+
+| # | Qué | Rama |
+|---|---|---|
+| 119 | «¿Olvidaste tu contraseña?» por n8n (§4.67) | `sprint/119-olvide-contrasena-n8n` |
+| 120 | Configuración sin 403 (§4.68) | `sprint/120-config-sin-403` |
+| 121 | Folio por año, reinicia en enero (§4.69) | `sprint/121-folios-por-anio` |
+| 122 | P4: la ficha adopta lo ajeno y avisa del conflicto (§4.74) | `sprint/122-ficha-adopta-ajeno` |
+| 123 | Embarque guarda solo lo tocado (§4.75) | `sprint/123-embarque-por-campos` |
+| 124 | OC y Finanzas guardan solo lo tocado (§4.76) | `sprint/124-oc-por-campos` |
+| 125 | Limpiezas del autoguardado y cuentas de prueba (§4.77) | `sprint/125-limpiezas-autoguardado` |
+| 115 | Plan jerarquía Master/House/Direct | `sprint/115-plan-jerarquia-partes` |
+| 117 | Auditoría de profit por embarque | `sprint/117-auditoria-profit-real` |
+| 118 | Plan del portal del cliente | `sprint/118-portal-cliente-rol` |
+
+**Para publicar:** la 119 despliega una Function nueva
+(`functions:solicitarRestablecimiento`, primero) y luego hosting; 120–125 solo
+hosting; 115/117/118 son docs. Sin reglas, índices, `defineString` ni n8n.
+En la 125: 3,119 tests · tsc 0 · build limpio. Correr 45-filtros y 47-barrido
+antes de publicar y validar dos pestañas (122–124).
+
+**Alertas:** el paso 6 del recorrido es intermitente (diálogo de cierre tapa el
+clic; probable carrera con la cola de la 123); `DocumentosOC` truena sin
+`fecha`; un rol desconocido cae a `ventas` (urgente antes del portal); las 3
+cuentas de prueba de producción siguen con la contraseña vieja.
+
+**Cola restante:** vacía. Candidatas: cargos/ruta por subclave y aviso de
+conflicto en embarque, `historialEstados` de la OC con arrayUnion, retirar
+`alDiaConVersion` y `enviarCorreoDeAcceso`, verificar códigos DCSA (116).
+
+**Decisiones pendientes:** jerarquía derivada vs explícita (115); modelo
+`lineaTiempo` y convivencia (116); A-1, M-1 `cargoId`, M-2 `monedaReporte` (117);
+Q1–Q8 del portal (118); reinicio anual de otros folios; deshabilitar las
+cuentas de prueba. Detalle en `sprint/reportes/RESUMEN.md` (no versionado).
+Lo que sigue (corte anterior) vale salvo donde esta cadena ya se haya publicado.
+
+---
+
 # Estado de VermurOps — 12 de octubre de 2026, tarde (corte del sprint nocturno)
 
 **Cadena 110 → 114 + 109, lista y SIN PUBLICAR.** Sale de `sprint/base`. Punta:
