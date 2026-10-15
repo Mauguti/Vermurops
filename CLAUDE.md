@@ -2142,10 +2142,20 @@ de la lectura deja la lista vacía y `loading` en false, como antes.
 
   - **`./scripts/e2e-completo.sh`** (`npm run e2e:completo`) corre el recorrido
     y después todos los demás specs: 232 tests, ~11 min, verde en una pasada.
-    Quedan fuera `gestion-usuarios` y `capturas-21`: necesitan el emulador de
-    Functions (:5001), que el script no levanta (`CON_FUNCTIONS=1
-    ./scripts/dev-emuladores.sh`). `REPETIR=2` repite la suite sobre los mismos
-    emuladores.
+    `REPETIR=2` repite la suite sobre los mismos emuladores.
+    - ⚠️ **Corregido el 15-oct-2026:** esta nota decía que `gestion-usuarios` y
+      `capturas-21` quedaban FUERA por necesitar el emulador de Functions. Es
+      falso: el script hace `export CON_FUNCTIONS=1` y los corre. La nota vieja
+      llevó a verificar los barridos aparte, sin Functions, y a reportar «sin
+      hallazgos» mientras la corrida completa traía 16 — ver abajo.
+    - 🔴 **El resumen de hallazgos del barrido 47 hay que LEERLO.** Sale al
+      final del spec 47 («Total: N hallazgos») y **no falla el test**, así que
+      un `grep passed|failed` lo salta entero. Las cadenas 98→102 y 103→108 se
+      reportaron «en verde» con 16 hallazgos sin mirar. Los 16 son la pantalla
+      de Configuración llamando a `gestionarUsuarios` con roles que no tienen
+      `usuario.gestionar` (403 en consola para ventas, pricing, operaciones y
+      administración). Preexistente y sin arreglar: la pantalla debería no
+      llamar a `listar` sin la capacidad.
   - **`tests/e2e/preferencias.ts`**: `fijarPreferencias()` en el `beforeAll` de
     cada spec que toca Finanzas deja las vistas por default y BORRA las vistas
     guardadas (`vistasUsuario`). 67 y 69 declaran `factura`: dependían, sin
