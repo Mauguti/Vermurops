@@ -8,6 +8,7 @@
 
 import { test, expect, type Page, type Browser, type BrowserContext } from '@playwright/test';
 import { fijarPreferencias } from './preferencias';
+import { idsDe, soloNuevos } from './aislamiento';
 
 // Tarea 90: las vistas de Cuentas por cobrar/pagar se guardan por usuario; cada spec parte del default.
 test.beforeAll(async () => { await fijarPreferencias(); });
@@ -135,9 +136,10 @@ test('Ventas solicita, Pricing arma, Administración valida, Ventas gana', async
   await page.getByPlaceholder('4', { exact: true }).fill('3');
   await page.getByRole('button', { name: 'Agregar concepto' }).click();
   await elegirConcepto(page, 'Air Freight');
+  const cotsAntes = await idsDe('ventas@vermur.com', 'cotizaciones');
   await page.getByRole('button', { name: 'Enviar a Pricing' }).click();
   await expect(page.getByText(/Solicitado a Pricing|solicitado/i).first()).toBeVisible({ timeout: 15_000 });
-  const cots = await leerColeccion('ventas@vermur.com', 'cotizaciones');
+  const cots = soloNuevos(await leerColeccion('ventas@vermur.com', 'cotizaciones'), cotsAntes);
   const mia = cots.filter(c => c.etapa === 'solicitado_pricing')
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
   expect(mia, 'La solicitud no quedó en Firestore').toBeTruthy();
@@ -244,6 +246,13 @@ test('Ventas · sin contrato avisa, sube el contrato, lo marca firmado y el avis
   await page.setViewportSize({ width: 390, height: 844 });
   await page.screenshot({ path: 'sprint/reportes/img/102-ficha-angosto.png', fullPage: true });
 
+  // La pantalla se pinta del estado local y la escritura llega después: se espera a que el
+  // contrato firmado esté EN Firestore antes de leerlo (leerlo de inmediato vio el v1 en la 2ª vuelta).
+  await expect.poll(async () => {
+    const x = (await leerColeccion('ventas@vermur.com', 'cotizaciones')).find(y => y.__id === S.folio);
+    const k = x?.contrato as Record<string, unknown> | undefined;
+    return `${k?.nombreArchivo}|${k?.firmado}`;
+  }, { timeout: 15_000 }).toBe('contrato-v2.pdf|true');
   const c = (await leerColeccion('ventas@vermur.com', 'cotizaciones')).find(x => x.__id === S.folio)!;
   const contrato = c.contrato as Record<string, unknown>;
   expect(contrato.nombreArchivo).toBe('contrato-v2.pdf');

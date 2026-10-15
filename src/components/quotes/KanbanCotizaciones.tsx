@@ -18,8 +18,8 @@ import { medirCotizacionCreada } from '../../lib/analitica';
 
 interface KanbanCotizacionesProps {
   quotes: KanbanQuote[];
-  onUpdateQuotes: (quotes: KanbanQuote[]) => void;
-  onConvertToShipment: (quote: KanbanQuote) => void;
+  onUpdateQuotes: (quotes: KanbanQuote[], anterior?: KanbanQuote) => void;
+  onConvertToShipment: (quote: KanbanQuote, anterior?: KanbanQuote) => void;
   /** Rol activo del usuario simulado */
   rolActivo: Rol;
   onFichaVisible?: (visible: boolean) => void;
@@ -215,7 +215,7 @@ export default function KanbanCotizaciones({
      */
     const ganada = updatedQuotes.find(q => q.id === quoteId);
     if (newEtapa === 'ganada' && ganada) {
-      onConvertToShipment(ganada);
+      onConvertToShipment(ganada, quotes.find(q => q.id === quoteId));
     } else {
       onUpdateQuotes(updatedQuotes);
     }
@@ -224,8 +224,8 @@ export default function KanbanCotizaciones({
     if (notifPayload) agregarNotificacion(notifPayload);
   };
 
-  const handleUpdateQuote = (updatedQuote: KanbanQuote) => {
-    onUpdateQuotes(quotes.map(q => q.id === updatedQuote.id ? updatedQuote : q));
+  const handleUpdateQuote = (updatedQuote: KanbanQuote, anterior?: KanbanQuote) => {
+    onUpdateQuotes(quotes.map(q => q.id === updatedQuote.id ? updatedQuote : q), anterior);
     setSelectedQuote(updatedQuote);
   };
 

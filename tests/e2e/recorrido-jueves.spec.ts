@@ -17,6 +17,7 @@
 
 import { test, expect, type Page, type Browser, type BrowserContext } from '@playwright/test';
 import { fijarPreferencias } from './preferencias';
+import { idsDe, soloNuevos } from './aislamiento';
 
 // Tarea 90: las vistas de Cuentas por cobrar/pagar se guardan por usuario; cada spec parte del default.
 test.beforeAll(async () => { await fijarPreferencias(); });
@@ -151,10 +152,11 @@ test('Ventas · solicita una cotización FCL con puertos y conceptos', async ({ 
   await page.getByRole('button', { name: 'Agregar concepto' }).click();
   await elegirConcepto(page, 'Documentation');
 
+  const cotsAntes = await idsDe('ventas@vermur.com', 'cotizaciones');
   await page.getByRole('button', { name: 'Enviar a Pricing' }).click();
   await expect(page.getByText(/Solicitado a Pricing|solicitado/i).first()).toBeVisible({ timeout: 15_000 });
 
-  const cots = await leerColeccion('ventas@vermur.com', 'cotizaciones');
+  const cots = soloNuevos(await leerColeccion('ventas@vermur.com', 'cotizaciones'), cotsAntes);
   const mia = cots.filter(c => c.etapa === 'solicitado_pricing' && (c.prospecto as Record<string, unknown>)?.empresa === 'Plásticos Ramírez S.A. de C.V.')
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
   expect(mia, 'La solicitud no quedó en Firestore en solicitado_pricing').toBeTruthy();
