@@ -34,7 +34,7 @@ Punto 6 de Mau. Todo lo que dice «medido» salió de ejecutar el código del re
    proveedor, 0 conceptos en las 8 cotizaciones (§3.1). El ejemplo de §3.2 es
    un caso armado, corrido con las funciones reales y marcado como tal.
 9. **Hallazgo de integridad:** un gasto con orden de compra se puede quitar del
-   embarque; la orden queda huérfana y sale del profit (§2.3, R-1).
+   embarque; la orden queda huérfana y sale del profit (§2.1, R-1).
 10. **Lo más barato y más valioso:** hacer que «pagado» lea el `Pago` (R-2) y que
     la factura del proveedor llegue a todas las órdenes que cubre (R-3).
 
@@ -102,7 +102,7 @@ Los eslabones y su dirección:
 
 **Dónde se rompe, de más a menos dañino para el profit:**
 
-**R-1 · Un gasto con orden se puede quitar** (medido por lectura, §2.3).
+**R-1 · Un gasto con orden se puede quitar** (lectura del código).
 `handleDeleteCargo` (`FichaEmbarque.tsx:386`) filtra el cargo sin mirar
 `ordenCompraId` ni `facturaProveedorId`; el botón de la tabla solo se oculta si
 `facturaId` (la factura **al cliente**) existe (`TablaUnificadaCargos.tsx:549`,
