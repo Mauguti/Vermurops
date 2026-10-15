@@ -48,3 +48,25 @@ export function compararTexto(a: unknown, b: unknown): number {
 export function antesDeLaComa(v: unknown): string {
   return texto(v).split(',')[0].trim();
 }
+
+/**
+ * Iniciales para un avatar. Ausente o vacío → ''.
+ *
+ * ── Por qué es una función y no un `.split(' ')` en cada tarjeta ──────────
+ * El 15-oct, `usuario.nombre.split(' ')` en la tabla de Usuarios tiró
+ * producción a **pantalla en blanco**: el valor llegó `undefined` y un
+ * `TypeError` dentro de un render desmonta el árbol completo. Era el sexto
+ * lugar del código que calculaba iniciales con la misma línea copiada, así
+ * que arreglar solo ese renglón dejaba otros cinco esperando turno.
+ *
+ * Parte por espacios, puntos y arrobas, así que también sirve para un correo
+ * («itzel.laurean@vermur.com» → «IL») cuando no hay nombre.
+ */
+export function inicialesDe(v: unknown, cuantas = 2): string {
+  return texto(v)
+    .split(/[\s.@_-]+/)
+    .filter(Boolean)
+    .slice(0, cuantas)
+    .map(p => p.charAt(0).toUpperCase())
+    .join('');
+}

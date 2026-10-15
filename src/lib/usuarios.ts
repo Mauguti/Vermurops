@@ -34,6 +34,15 @@ export interface UsuarioRegistrado {
    */
   ultimoAcceso?: string | null;
   /**
+   * Cuándo salió la última invitación (ISO 8601). Opcional y aditivo.
+   *
+   * Se GUARDA en `usuarios/{uid}` —no se deriva— para que «Enviada hace X
+   * min» sobreviva a una recarga y para que dos personas en la pantalla no
+   * se manden el correo dos veces. Solo se escribe cuando el envío SALIÓ:
+   * un intento fallido no debe bloquear el botón.
+   */
+  ultimaInvitacion?: string | null;
+  /**
    * La cuenta existe en Auth y NO tiene documento en `usuarios/`: es anterior
    * a este módulo. Se enseña igual —antes era invisible— y al cambiarle el rol
    * el documento se crea.
@@ -143,4 +152,61 @@ export function fechaCorta(iso: string): string {
   return Number.isNaN(d.getTime())
     ? iso
     : d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// El botón de «Reenviar invitación»
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Cuánto se bloquea el botón después de un envío.
+ *
+ * Diez minutos es el acuerdo con Mau, y tiene razón de ser: cada reenvío
+ * genera un enlace NUEVO de un solo uso, y aunque el anterior siga sirviendo
+ * (medido en el emulador, §4.73), mandar cuatro correos seguidos a la misma
+ * persona se lee como un error del sistema.
+ */
+export const MINUTOS_BLOQUEO_REENVIO = 10;
+
+export interface EstadoReenvio {
+  /** El botón no se puede pulsar. */
+  bloqueado: boolean;
+  /** Lo que dice el botón. */
+  etiqueta: string;
+  /** Minutos desde el último envío, o null si nunca se mandó. */
+  minutos: number | null;
+}
+
+/**
+ * Qué dice y si se puede pulsar, a partir de `ultimaInvitacion`.
+ *
+ * `ahora` se inyecta para poder probarlo sin reloj de verdad.
+ */
+export function estadoReenvio(
+  ultimaInvitacion: string | null | undefined,
+  ahora: Date = new Date(),
+): EstadoReenvio {
+  if (!ultimaInvitacion) {
+    return { bloqueado: false, etiqueta: 'Reenviar invitación', minutos: null };
+  }
+  const t = new Date(ultimaInvitacion).getTime();
+  if (Number.isNaN(t)) {
+    // Una fecha basura no bloquea: dejar a alguien sin poder reenviar por un
+    // dato mal escrito es peor que permitir un reenvío de más.
+    return { bloqueado: false, etiqueta: 'Reenviar invitación', minutos: null };
+  }
+  /*
+   * Un `ultimaInvitacion` en el FUTURO (reloj desfasado entre el servidor y
+   * el navegador) daría minutos negativos y bloquearía el botón un rato
+   * largo. Se trata como «ahora mismo».
+   */
+  const minutos = Math.max(0, Math.floor((ahora.getTime() - t) / 60_000));
+  if (minutos >= MINUTOS_BLOQUEO_REENVIO) {
+    return { bloqueado: false, etiqueta: 'Reenviar invitación', minutos };
+  }
+  return {
+    bloqueado: true,
+    etiqueta: minutos < 1 ? 'Enviada hace menos de 1 min' : `Enviada hace ${minutos} min`,
+    minutos,
+  };
 }

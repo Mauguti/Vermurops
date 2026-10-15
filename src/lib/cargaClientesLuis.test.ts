@@ -6,8 +6,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  cpDeDireccion, esDireccionMexicana, leerCreditoLuis, leerDiasLuis, leerRenglonesLuis,
-  leerRfcLuis, plataformaTieneNombreMasCompleto, resolverColumnas, resolverComercial,
+  cpDeDireccion, esDireccionMexicana, juntarSiglas, leerCreditoLuis, leerDiasLuis,
+  leerRenglonesLuis, leerRfcLuis, leerVerificacion, luisDiceQueNoEsta, masParecido,
+  normalizarNombreLuis, plataformaTieneNombreMasCompleto, resolverColumnas,
+  resolverComercial, sospechaDeDuplicado,
 } from './cargaClientesLuis';
 
 describe('las columnas se buscan por encabezado, no por letra', () => {
@@ -194,5 +196,112 @@ describe('🔴 el nombre del Excel a veces es MENOS completo', () => {
   /* Un prefijo que NO es sufijo societario igual se protege: no se pisa a ciegas. */
   it('la plataforma más larga por cualquier razón se respeta', () => {
     expect(plataformaTieneNombreMasCompleto('OMEC MOTORS DE MEXICO', 'OMEC MOTORS')).toBe(true);
+  });
+});
+
+describe('🔴 el empate, y los dos duplicados que casi se crean', () => {
+  /*
+   * El 15-oct el modo en seco dijo 42 por crear y Luis había marcado 17. Dos
+   * de los sobrantes ya existían en la plataforma.
+   */
+  it('«S.A.S» se ignora como sufijo: TRANSMARES ya no se duplica', () => {
+    // Con la lista de la 65 esto NO empataba: «S.A.S» quedaba como «S A S» y
+    // la lista tenía «SAS» pegado.
+    expect(normalizarNombreLuis('TRANSMARES LOGISTICA S.A.S'))
+      .toBe(normalizarNombreLuis('TRANSMARES LOGISTICA'));
+  });
+
+  it.each([
+    ['ARYES S.A. DE C.V.', 'ARYES'],
+    ['AIDA S.R.L.', 'AIDA'],
+    ['ALMIG COMPRESSOREN GMBH', 'ALMIG COMPRESSOREN'],
+    ['XIAMEN TRANS-CHINA LOGISTICS CO., LTD', 'XIAMEN TRANS-CHINA LOGISTICS'],
+    ['SAGA ULUSLARARASI TASIMACILIK LIMITED', 'SAGA ULUSLARARASI TASIMACILIK'],
+  ])('«%s» empata con «%s»', (plat, excel) => {
+    expect(normalizarNombreLuis(plat)).toBe(normalizarNombreLuis(excel));
+  });
+
+  /* `juntarSiglas` NO debe comerse una inicial legítima. */
+  it.each([
+    ['A KAYSER AUTOMOTIVE', 'A KAYSER AUTOMOTIVE'],
+    ['GRUPO A', 'GRUPO A'],
+    ['S A S', 'SAS'],
+    ['S. de R.L. de C.V.', 'S DE RL DE CV'],
+  ])('juntarSiglas(«%s») = «%s»', (v, esperado) => {
+    expect(juntarSiglas(v.normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim())).toBe(esperado);
+  });
+
+  it('dos nombres de verdad distintos NO se fusionan', () => {
+    expect(normalizarNombreLuis('TRANSPORTES DEL NORTE'))
+      .not.toBe(normalizarNombreLuis('TRANSMARES LOGISTICA'));
+  });
+});
+
+describe('la hoja «Verificación» de Luis', () => {
+  const HOJA = [
+    { A: '#', B: 'Cliente (Unificados)', C: 'RFC', E: 'Cliente encontrado en BD', G: 'Estado' },
+    { A: '23', B: 'ARYES', E: 'ARYES SA DE CV', G: 'OK – coincide' },
+    { A: '210', B: 'NEW TRAFFIC', E: '', G: 'No está en BD → en blanco' },
+    { A: '99', B: 'OTRO', E: '', G: 'En BD pero sin dirección → en blanco' },
+  ];
+
+  it('indexa por número y trae el nombre exacto de la plataforma', () => {
+    const v = leerVerificacion(HOJA);
+    expect(v.get('23')?.nombreEnBD).toBe('ARYES SA DE CV');
+    expect(v.get('210')?.estado).toMatch(/No está en BD/);
+  });
+
+  it('solo «No está en BD» cuenta como «créalo»', () => {
+    const v = leerVerificacion(HOJA);
+    expect(luisDiceQueNoEsta(v.get('210'))).toBe(true);
+    expect(luisDiceQueNoEsta(v.get('23'))).toBe(false);
+    /* «En BD pero sin dirección» SÍ está en la base: no se crea. */
+    expect(luisDiceQueNoEsta(v.get('99'))).toBe(false);
+    expect(luisDiceQueNoEsta(undefined)).toBe(false);
+  });
+
+  it('una hoja sin las columnas esperadas devuelve un mapa vacío, no truena', () => {
+    expect(leerVerificacion([{ A: 'otra cosa' }]).size).toBe(0);
+    expect(leerVerificacion([]).size).toBe(0);
+  });
+});
+
+describe('🔴 el freno de duplicados', () => {
+  const BASE = [
+    { id: 'CLI-0162', nombre: 'NEW TRAFIC LOGISTICA S.A.S' },
+    { id: 'CLI-0147', nombre: 'TRANSMARES LOGISTICA S.A.S' },
+    { id: 'CLI-0500', nombre: 'ACME INDUSTRIAL' },
+  ];
+
+  /*
+   * El caso real: Luis marcó «NEW TRAFFIC» como «No está en BD» —su cruce
+   * falló por la F de diferencia— y el nombre normalizado tampoco empata. Con
+   * las dos reglas en la mano se habría creado el duplicado de CLI-0162.
+   */
+  it('«NEW TRAFFIC» encuentra a «NEW TRAFIC LOGISTICA S.A.S» y NO se crea', () => {
+    const p = masParecido('NEW TRAFFIC', BASE);
+    expect(p?.id).toBe('CLI-0162');
+    expect(sospechaDeDuplicado('NEW TRAFFIC', p)).toBe(true);
+  });
+
+  it('un nombre de verdad nuevo sí se crea', () => {
+    const p = masParecido('JABONES Y PRODUCTOS ESPECIALIZADOS', BASE);
+    expect(sospechaDeDuplicado('JABONES Y PRODUCTOS ESPECIALIZADOS', p)).toBe(false);
+  });
+
+  it('sin candidato no hay sospecha', () => {
+    expect(sospechaDeDuplicado('MELANGE', null)).toBe(false);
+    expect(masParecido('MELANGE', BASE)).toBeNull();
+  });
+
+  /* Tres letras en común no son una sospecha: «GLI» no es «GLOBAL». */
+  it('un prefijo corto no frena nada', () => {
+    const p = masParecido('GLI', [{ id: 'X', nombre: 'GLOBAL LOGISTICS' }]);
+    expect(sospechaDeDuplicado('GLI', p)).toBe(false);
+  });
+
+  it('el candidato más parecido es el de más prefijo común, no el primero', () => {
+    expect(masParecido('TRANSMARES LOGISTICA', BASE)?.id).toBe('CLI-0147');
   });
 });

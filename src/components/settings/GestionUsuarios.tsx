@@ -20,11 +20,14 @@ import {
   validarNombreInvitacion,
   etiquetaDeAcceso,
   estadoDeAcceso,
+  estadoReenvio,
+  MINUTOS_BLOQUEO_REENVIO,
   puedeReenviarse,
   type UsuarioRegistrado,
 } from '../../lib/usuarios';
 import type { UserRole } from '../../auth/users';
 import { confirmar } from '../ui/Dialogos';
+import { inicialesDe } from '../../lib/texto';
 
 // ── Estilos de badge por rol ─────────────────────────────────────────────────
 
@@ -148,11 +151,24 @@ export default function GestionUsuarios() {
             }
           }}
           onReenviar={async (email) => {
+            /*
+             * El aviso dice SIEMPRE algo, y en el error dice lo que contestó
+             * n8n —no «no se pudo»—: el 401 es nuestro token y el 404 es el
+             * flujo apagado, y mandar a la persona a revisar su contraseña
+             * por un fallo del servidor es la trampa de §4.29.
+             *
+             * Se relanza para que el renglón NO se marque como enviada: el
+             * bloqueo de diez minutos es para un envío que salió.
+             */
             try {
               await enviarInvitacion(email);
-              setFeedback({ tipo: 'ok', msg: `Correo reenviado a ${email}.` });
+              setFeedback({ tipo: 'ok', msg: `Invitación enviada a ${email}.` });
             } catch (err) {
-              setFeedback({ tipo: 'error', msg: err instanceof Error ? err.message : 'No se pudo reenviar el correo.' });
+              setFeedback({
+                tipo: 'error',
+                msg: `No salió la invitación a ${email}: ${err instanceof Error ? err.message : String(err)}`,
+              });
+              throw err;
             }
           }}
         />
@@ -245,12 +261,20 @@ function FilaUsuario({
   const [cambiando, setCambiando] = useState(false);
   const badge = badgeDe(usuario.rol);
   const acceso = etiquetaDeAcceso(usuario);
+  const [enviando, setEnviando] = useState(false);
+  /*
+   * El envío de ESTA sesión, para que el botón cambie al instante. Lo que
+   * manda si existe es lo que ya estaba guardado en el documento.
+   */
+  const [enviadaEn, setEnviadaEn] = useState<string | null>(null);
+  const reenvio = estadoReenvio(enviadaEn ?? usuario.ultimaInvitacion);
 
-  const avatar = usuario.nombre
-    .split(' ')
-    .map(p => p.charAt(0).toUpperCase())
-    .slice(0, 2)
-    .join('');
+  /*
+   * 🔴 Aquí vivía `usuario.nombre.split(' ')`, y el 15-oct recibió `undefined`
+   * y tiró producción a pantalla en blanco (§4.73). `inicialesDe` tolera el
+   * campo ausente; el nombre vacío se resuelve abajo con «(sin nombre)».
+   */
+  const avatar = inicialesDe(usuario.nombre);
 
   return (
     <tr className={`hover:bg-neutral-bg transition-colors ${!usuario.activo ? 'opacity-50' : ''}`}>
@@ -264,7 +288,7 @@ function FilaUsuario({
           </div>
           <div>
             <p className="text-[13px] font-semibold text-text-primary leading-tight">
-              {usuario.nombre}
+              {usuario.nombre || '(sin nombre)'}
               {esMismoUsuario && <span className="text-text-muted font-normal ml-1">(tú)</span>}
             </p>
           </div>
@@ -349,10 +373,42 @@ function FilaUsuario({
             */}
           {puedeReenviarse(usuario) && (
             <button
-              onClick={() => { void onReenviar(usuario.email); }}
-              className="text-[12px] font-semibold text-primario hover:underline transition-colors"
+              type="button"
+              data-testid="reenviar-invitacion"
+              disabled={enviando || reenvio.bloqueado}
+              title={reenvio.bloqueado
+                ? `Se puede reenviar ${MINUTOS_BLOQUEO_REENVIO - (reenvio.minutos ?? 0)} min después`
+                : undefined}
+              onClick={async () => {
+                /*
+                 * Antes no daba NINGUNA señal: se pulsaba y no se sabía si
+                 * había mandado. El botón se deshabilita mientras va, y quien
+                 * avisa del resultado es la pantalla (`onReenviar` lanza con
+                 * el motivo que devolvió n8n).
+                 */
+                setEnviando(true);
+                try {
+                  await onReenviar(usuario.email);
+                  /*
+                   * Optimista, y SOLO en el camino bueno: el bloqueo de diez
+                   * minutos es para un envío que salió. `onReenviar` relanza
+                   * cuando falla, así que esta línea no se ejecuta y el botón
+                   * queda disponible para reintentar.
+                   */
+                  setEnviadaEn(new Date().toISOString());
+                } catch {
+                  // El aviso ya lo puso la pantalla; aquí solo no se bloquea.
+                } finally {
+                  setEnviando(false);
+                }
+              }}
+              className={`text-[12px] font-semibold transition-colors ${
+                enviando || reenvio.bloqueado
+                  ? 'text-text-muted cursor-default'
+                  : 'text-primario hover:underline'
+              }`}
             >
-              Reenviar invitación
+              {enviando ? 'Enviando…' : reenvio.etiqueta}
             </button>
           )}
           {!esMismoUsuario && usuario.activo && (

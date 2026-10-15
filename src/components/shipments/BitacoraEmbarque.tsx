@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { EntradaBitacora, EventoBitacora } from './EmbarquesData';
 import { filtrarBitacora, ETIQUETA_EVENTO, type FiltroBitacora } from '../../lib/bitacoraEmbarque';
+import { inicialesDe } from '../../lib/texto';
 
 interface Props {
   bitacora: EntradaBitacora[];
@@ -155,7 +156,9 @@ function Comentario({ e, mia, editando, onEmpezar, onCambiar, onConfirmar, onCan
   onEmpezar: () => void; onCambiar: (t: string) => void; onConfirmar: () => void; onCancelar: () => void;
   error: string | null;
 }) {
-  const iniciales = (e.autor.nombre || '?').split(/[\s.@]+/).filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase()).join('');
+  // Ya toleraba el nombre ausente con `|| '?'`; se unifica en `inicialesDe`
+  // para que haya UN solo lugar que calcule iniciales (§4.73).
+  const iniciales = inicialesDe(e.autor?.nombre) || '?';
   return (
     <div className="px-4 py-3 flex items-start gap-3 group">
       <span className="mt-0.5 w-7 h-7 rounded-full bg-primario/10 text-primario text-[10px] font-black flex items-center justify-center shrink-0" title={e.autor.nombre}>

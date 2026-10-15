@@ -155,6 +155,20 @@ mostrado entre paréntesis. Firebase los guarda al terminar en
 Al agregar un parámetro, decirlo en el reporte: el deploy deja de ser
 desatendido.
 
+**Una Function NUNCA cambia la forma de su respuesta de manera
+incompatible.** Las pestañas abiertas siguen corriendo el bundle viejo, y una
+Function recién desplegada les sirve a ellas también. El 15-oct eso tiró
+producción a **pantalla en blanco**: `invitar` devolvía el usuario en `datos`,
+se cambió a `{ usuario, correoEnviado }`, se desplegaron Function y hosting
+juntos — y el hook viejo metió el SOBRE en la lista de usuarios, donde
+`FilaUsuario` le pidió `.nombre` para el avatar. Un `TypeError` dentro de un
+render desmonta el árbol completo.
+
+Primero se publica la versión que entiende **las dos formas**, y la vieja se
+quita después, cuando se sabe que ya nadie trae ese bundle. Avisar al equipo
+de que recargue no es un plan: nadie recarga, y quien tiene la pestaña abierta
+es justo quien está trabajando. Ver §4.73.
+
 **Antes de diagnosticar una regresión en local, mira DESDE DÓNDE corre el dev
 server.** `lsof -ti:3000` y revisa la ruta del proceso. Si el trabajo está en un
 worktree y el server corre desde el checkout principal, se ve otra rama y
@@ -2697,6 +2711,65 @@ creadas por pantalla) lo borra en `afterAll` (`borrarSembrados`,
 de 111 lleva `createdAt` y `responsableId` como una nota real (sin ellos la
 ficha truena al reabrirse: `FichaCotizacion` ordena Historial por `createdAt`).
 `REPETIR=2 ./scripts/e2e-completo.sh --retries=0`: 274 + 274 verdes, 24 min 40 s.
+
+## 4.73 🔴 Producción en blanco: cambiar la forma de una respuesta es incompatible (15-oct-2026)
+
+A las 14:40, `vermur-logistics-app.web.app` en blanco, con
+`Cannot read properties of undefined (reading 'split')`.
+
+**La causa.** La tarea de las invitaciones (§4.65) cambió lo que `invitar`
+devuelve en `datos`: antes era el usuario, pasó a ser
+`{ usuario, correoEnviado, motivoCorreo }`. Se desplegaron Function y hosting
+juntos, y pareció suficiente. No lo era: **una Function recién desplegada le
+sirve también a las pestañas que ya estaban abiertas**, y el hook del bundle
+anterior hacía
+
+```js
+const x = await llamar({ accion: 'invitar', … });   // x = datos
+setEstado(e => ({ ...e, usuarios: [...e.usuarios, x] }));
+```
+
+o sea que metió el SOBRE en la lista de usuarios. `FilaUsuario` le pidió
+`.nombre` para las iniciales del avatar, era `undefined`, y un `TypeError`
+dentro de un render **desmonta el árbol completo**: pantalla en blanco, no un
+renglón roto.
+
+**La lección es del despliegue, no del campo.** Cambiar la forma de la
+respuesta de una Function es un cambio incompatible, y el cliente viejo sigue
+vivo en la pestaña de alguien. Las dos salidas, y se tomaron las dos:
+  1. **La respuesta lleva al usuario DOS veces** (`respuestaInvitacion` en
+     `functions/src/usuarios/invitacion.ts`): los campos al nivel de arriba
+     para el cliente viejo, y `usuario` para el nuevo. Está fijado con tests
+     que ejercitan **los dos lectores**; si alguien quita la compatibilidad,
+     se caen, y hay que comprobar antes que ya nadie trae ese bundle.
+  2. **Ningún `.split()` sobre un campo que puede faltar**, que es la regla
+     que `lib/texto.ts` ya declaraba desde el Bloque 4 y que este código
+     rompía en seis lugares a la vez — la misma línea copiada para calcular
+     iniciales. Ahora es `inicialesDe()`, con tests, en la tabla de Usuarios,
+     los dos Kanban, la bandeja de Pricing y la bitácora del embarque.
+  - También se endurecieron dos `.split()` que podían tirar la app desde más
+    arriba: `firebaseUser.email.split('@')` en `AuthContext` —`email` es
+    `string | null` en el SDK, y eso revienta **en el arranque de la sesión**—
+    y `lastMessage.timestamp.split(' ')` en el chat, donde el `|| '00:00'`
+    protegía el índice y no el campo.
+
+**Lo que NO era.** No fue el dato de José Tejeda: `invitar` valida que el
+nombre no venga vacío. El `undefined` era del sobre, no de su documento.
+
+**Dos cosas que se midieron en vez de suponerse:**
+  - El bundle de la consola (`index-WWO2Gqy5.js`, que se leyó como `WW02`) se
+    reconstruyó desde `f239490` y **el hash coincidió exacto**: así se supo
+    que la pestaña corría el código de la mañana y no lo desplegado.
+  - La pestaña vieja ADEMÁS manda el correo de Firebase, así que una
+    invitación hecha desde ahí genera **dos** enlaces de restablecimiento.
+    Se probó en el emulador de Auth: el segundo **no invalida** al primero,
+    los dos sirven. (Emulador, no Identity Platform: la prueba real es usarlo.)
+
+**Lo que se hace al desplegar, de aquí en adelante:** si una Function cambia
+la forma de su respuesta, o se mantiene compatible con el cliente anterior, o
+el cambio se parte en dos despliegues —primero la Function que acepta y
+devuelve las dos formas, después el cliente—. Y avisar al equipo de recargar
+no es un plan: nadie recarga.
 
 ---
 

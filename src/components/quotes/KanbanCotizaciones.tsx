@@ -15,6 +15,7 @@ import { generateFolio } from '../../lib/folioService';
 import { puedeTransicionarA, type Rol } from '../../lib/stateMachine';
 import { useAuth } from '../../auth/AuthContext';
 import { medirCotizacionCreada } from '../../lib/analitica';
+import { inicialesDe } from '../../lib/texto';
 
 interface KanbanCotizacionesProps {
   quotes: KanbanQuote[];
@@ -558,7 +559,7 @@ export default function KanbanCotizaciones({
                                 className="w-5 h-5 rounded-full bg-primario/10 text-primario font-bold text-[8px] flex items-center justify-center ring-1 ring-white"
                                 title={`Ventas: ${quote.vendedorId}`}
                               >
-                                {quote.vendedorId.split(' ').map(n => n[0]).join('')}
+                                {inicialesDe(quote.vendedorId)}
                               </div>
                               {/* Avatar pricing */}
                               {quote.pricingId && (
@@ -566,7 +567,7 @@ export default function KanbanCotizaciones({
                                   className="w-5 h-5 rounded-full bg-primario/10 text-primario-hover font-bold text-[8px] flex items-center justify-center ring-1 ring-white"
                                   title={`Pricing: ${quote.pricingId}`}
                                 >
-                                  {quote.pricingId.split(' ').map(n => n[0]).join('')}
+                                  {inicialesDe(quote.pricingId)}
                                 </div>
                               )}
                             </div>

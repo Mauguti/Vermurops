@@ -4,6 +4,7 @@ import { useNotifications } from '../../notifications/NotificationsContext';
 import { MessageSquare, Clock, X } from 'lucide-react';
 import { AuthUser } from '../../auth/users';
 import { tiempoRelativo } from '../../notifications/notificationsStore';
+import { texto } from '../../lib/texto';
 
 interface RightChatPanelProps {
   quotes: KanbanQuote[];
@@ -84,7 +85,7 @@ export default function RightChatPanel({ quotes, onSelectQuote, user, isOpen, on
                 </div>
                 <div className="flex items-center text-[10px] text-gray-400 font-medium whitespace-nowrap">
                   <Clock className="w-3 h-3 mr-1" />
-                  {lastMessage.timestamp.split(' ')[1] || '00:00'}
+                  {texto(lastMessage.timestamp).split(' ')[1] || '00:00'}
                 </div>
               </div>
               <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-100">
